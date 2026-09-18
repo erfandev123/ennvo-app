@@ -1,0 +1,5143 @@
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
+import {
+  Search,
+  Video,
+  Phone,
+  PhoneOff,
+  MoreVertical,
+  Image as ImageIcon,
+  Mic,
+  Smile,
+  Plus,
+  ArrowLeft,
+  Check,
+  CheckCheck,
+  Info,
+  ChevronDown,
+  Send,
+  X,
+  Heart,
+  Type,
+  Music,
+  MoreHorizontal,
+  UserPlus,
+  Bell,
+  MessageCircle,
+  Play,
+  Pause,
+  Reply,
+  Trash2,
+  Share2,
+  Copy,
+  UserSquare,
+  Palette,
+  ChevronRight,
+  EyeOff,
+  Shield,
+  Camera,
+  Settings2,
+  UserX,
+  Users,
+  Sparkles,
+  Download,
+  Film,
+} from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { PullToRefresh } from "../components/PullToRefresh";
+import {
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  doc,
+} from "firebase/firestore";
+import { db } from "../firebase";
+import { subscribeNotifications } from "../services/notificationService";
+
+import { useAppStore } from "../store";
+import { safeFile, formatTime, downloadMediaFile } from "../utils";
+import {
+  subscribeConversations,
+  subscribeMessages,
+  sendMessage,
+  createConversation,
+} from "../services/chatService";
+import {
+  subscribePresence,
+  setTyping,
+  subscribeTyping,
+} from "../services/presenceService";
+import { followUser } from "../services/followService";
+import { initiateCall } from "../services/callService";
+import { playMessageSentSound } from "../services/soundService";
+import { subscribeStories, Story } from "../services/storyService";
+import { Conversation, Message as AppMessage, Notification } from "../types";
+
+const GroupAvatar = ({
+  members,
+  sizeClass = "w-14 h-14",
+}: {
+  members: string[];
+  sizeClass?: string;
+}) => {
+  if (members.length === 0)
+    return <div className={`${sizeClass} rounded-full bg-gray-200`}></div>;
+  if (members.length === 1)
+    return (
+      <img
+        src={members[0]}
+        className={`${sizeClass} rounded-full object-cover`}
+      />
+    );
+  if (members.length === 2)
+    return (
+      <div
+        className={`${sizeClass} rounded-full overflow-hidden bg-gray-100 border border-gray-200 relative`}
+      >
+        <img
+          src={members[0]}
+          className="absolute w-1/2 h-full left-0 object-cover"
+        />
+        <img
+          src={members[1]}
+          className="absolute w-1/2 h-full right-0 object-cover"
+        />
+      </div>
+    );
+  return (
+    <div
+      className={`${sizeClass} rounded-full overflow-hidden bg-gray-100 border border-gray-200 relative`}
+    >
+      <img
+        src={members[0]}
+        className="absolute w-1/2 h-full left-0 object-cover"
+      />
+      <img
+        src={members[1]}
+        className="absolute w-1/2 h-1/2 right-0 top-0 object-cover"
+      />
+      <img
+        src={members[2]}
+        className="absolute w-1/2 h-1/2 right-0 bottom-0 object-cover"
+      />
+    </div>
+  );
+};
+
+const FollowerItem = React.memo(
+  ({
+    follower,
+    currentUser,
+    onFollowBack,
+  }: {
+    follower: any;
+    currentUser: any;
+    onFollowBack: (f: any) => void;
+  }) => {
+    const [isFollowing, setIsFollowing] = useState(false);
+    const [isOptimisticFollowing, setIsOptimisticFollowing] = useState(false);
+    const [realtimeUser, setRealtimeUser] = useState<any>(follower);
+    // They are in our followers list, so they follow us by definition
+    const followsMe = true;
+    const { setViewingUser, pushPage } = useAppStore();
+
+    useEffect(() => {
+      // Fetch latest user data for real-time avatar and name
+      let unsubUser: (() => void) | undefined;
+      import("firebase/firestore").then(({ doc, onSnapshot }) => {
+        unsubUser = onSnapshot(doc(db, "users", follower.id), (docSnap) => {
+          if (docSnap.exists()) {
+            setRealtimeUser((prev: any) => ({ ...prev, ...docSnap.data() }));
+          }
+        }, () => {});
+      });
+
+      if (currentUser && follower.id) {
+        import("firebase/firestore").then(({ doc, onSnapshot }) => {
+          const followRef = doc(
+            db,
+            "users",
+            currentUser.uid,
+            "following",
+            follower.id,
+          );
+          onSnapshot(followRef, (d) => setIsFollowing(d.exists()), () => {});
+        });
+      }
+
+      return () => {
+        if (unsubUser) unsubUser();
+      };
+    }, [currentUser, follower.id]);
+
+    const isActuallyFollowing = isFollowing || isOptimisticFollowing;
+    const isFriend = isActuallyFollowing && followsMe;
+
+    return (
+      <div
+        className="flex items-center justify-between p-3 hover:bg-purple-50/50 rounded-2xl cursor-pointer transition-all active:scale-[0.98]"
+        onClick={() => {
+          setViewingUser({
+            uid: realtimeUser.id || follower.id,
+            name: realtimeUser.name || follower.name || "User",
+            avatar: realtimeUser.avatar || follower.avatar,
+          });
+          pushPage("profile");
+        }}
+      >
+        <div className="flex items-center space-x-3">
+          <img
+            src={
+              realtimeUser.avatar ||
+              follower.avatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(realtimeUser.name || follower.name || "User")}&background=random`
+            }
+            className="w-14 h-14 rounded-full object-cover shadow-sm border border-gray-100"
+            alt="follower"
+            referrerPolicy="no-referrer"
+          />
+          <div>
+            <p className="font-normal text-[15px] text-gray-900">
+              {realtimeUser.name || follower.name || "New Follower"}
+            </p>
+            <p className="text-[12px] text-gray-500 font-normal">Started following you</p>
+          </div>
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOptimisticFollowing(true);
+            onFollowBack(follower);
+          }}
+          className={`px-5 py-2 rounded-full text-[13px] font-medium transition-all active:scale-95 ${
+            isFriend
+              ? "bg-purple-100 text-purple-700"
+              : isActuallyFollowing
+                ? "bg-purple-50 text-purple-600 border border-purple-100"
+                : "bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
+          }`}
+        >
+          {isFriend ? "Friends" : isActuallyFollowing ? "Following" : "Follow back"}
+        </button>
+      </div>
+    );
+  },
+);
+
+const ReelMessageBubble = React.memo(({
+  msg,
+  setViewingReel,
+  setViewingReelContext,
+}: {
+  msg: any;
+  setViewingReel: any;
+  setViewingReelContext: any;
+}) => {
+  const [reel, setReel] = React.useState<any>(null);
+  React.useEffect(() => {
+    if (!msg.postId) return;
+    import("../services/postService")
+      .then((s) => s.getPost(msg.postId))
+      .then((fetchedReel) => {
+        if (fetchedReel) setReel(fetchedReel);
+      })
+      .catch(() => {});
+  }, [msg.postId]);
+
+  const coverPic = reel?.thumbnailUrl || reel?.thumbnail || reel?.coverUrl || msg.thumbnailUrl || msg.coverUrl || reel?.media?.[0] || msg.mediaUrl;
+  const isVideo = coverPic && (coverPic.includes('.mp4') || coverPic.includes('video') || coverPic.includes('firebasestorage'));
+
+  return (
+    <div className="flex flex-col max-w-[200px] will-change-transform">
+      <div
+        className="relative w-48 aspect-[9/16] rounded-2xl overflow-hidden cursor-pointer bg-gray-950 group shadow-sm border border-black/10"
+        onClick={() => {
+          if (reel) {
+            setViewingReel({ ...reel, single: true });
+            setViewingReelContext("chat");
+          } else if (msg.mediaUrl || msg.postId) {
+            setViewingReel({
+              id: msg.postId || msg.id,
+              authorId: msg.senderId,
+              authorName: reel?.authorName || "Reel",
+              authorAvatar: reel?.authorAvatar || "",
+              media: [coverPic || msg.mediaUrl],
+              text: "",
+              type: "reel",
+              single: true,
+            });
+            setViewingReelContext("chat");
+          }
+        }}
+      >
+        <div className="w-full h-full relative overflow-hidden bg-gray-900">
+          {isVideo ? (
+            <video
+              src={`${coverPic}#t=0.001`}
+              className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-300"
+              preload="metadata"
+              muted
+              playsInline
+            />
+          ) : (
+            <img
+              src={coverPic}
+              className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-300"
+              alt="Reel cover"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          )}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center group-hover:scale-110 transition-transform shadow-md">
+              <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+            </div>
+          </div>
+        </div>
+        
+        {/* Author pic and name inside corner overlay */}
+        {(reel || msg.senderId) && (
+          <div className="absolute top-2.5 left-2.5 z-20 flex items-center space-x-1.5 bg-black/50 backdrop-blur-md px-2 py-1 rounded-full border border-white/10 select-none">
+            <img
+              src={reel?.authorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(reel?.authorName || "User")}&background=random`}
+              className="w-4 h-4 rounded-full object-cover border border-white/40 shrink-0"
+              alt={reel?.authorName || "User"}
+              referrerPolicy="no-referrer"
+            />
+            <span className="text-[11px] text-white font-medium truncate max-w-[100px] leading-none">
+              {reel?.authorName || "Reel"}
+            </span>
+          </div>
+        )}
+        {/* Quick Download button for shared reel */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            const downloadUrl = reel?.media?.[0] || msg.mediaUrl || coverPic;
+            if (downloadUrl) {
+              downloadMediaFile(downloadUrl, `reel_${reel?.id || msg.id || Date.now()}.mp4`);
+            }
+          }}
+          className="absolute top-2.5 right-2.5 z-20 p-1.5 bg-black/60 hover:bg-black/80 active:scale-90 text-white rounded-full transition-all border border-white/10 flex items-center justify-center cursor-pointer shadow-md"
+          title="Download Reel"
+        >
+          <Download className="w-3.5 h-3.5" />
+        </button>
+        <div className="absolute inset-x-0 bottom-0 p-2.5 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex items-end justify-between pointer-events-none z-10">
+          <span className="text-[10px] text-white/90 font-medium">Reel</span>
+          <Video
+            className="w-4 h-4 text-white drop-shadow-md"
+            strokeWidth={2}
+          />
+        </div>
+      </div>
+    </div>
+  );
+});
+
+const VoiceMessageBubble = ({ msg, isMe, borderRadius }: { msg: any; isMe: boolean; borderRadius: string }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(msg.duration || msg.replyTo?.duration || 3);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play().catch(() => {});
+    }
+  };
+
+  const formatSecs = (s: number) => {
+    const mins = Math.floor(s / 60);
+    const secs = Math.floor(s % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <div className={`px-3.5 py-2.5 flex items-center space-x-3 min-w-[190px] sm:min-w-[220px] ${borderRadius} ${isMe ? "bg-[#FE2C55] text-white shadow-2xs" : "bg-gray-100 text-gray-900 border border-gray-200/80 shadow-2xs"}`}>
+      <button
+        type="button"
+        onClick={togglePlay}
+        className={`p-2 rounded-full flex-shrink-0 transition-transform active:scale-90 ${isMe ? "bg-white text-[#FE2C55] hover:bg-gray-100" : "bg-[#FE2C55] text-white hover:bg-red-600"}`}
+      >
+        {isPlaying ? (
+          <Pause className="w-3.5 h-3.5 fill-current" />
+        ) : (
+          <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+        )}
+      </button>
+
+      <div className="flex-1 flex flex-col justify-center space-y-1 min-w-0">
+        <div className="flex items-center space-x-0.5 h-4 w-full">
+          {[40, 70, 30, 85, 50, 90, 60, 40, 80, 55, 35, 75, 45, 95, 65, 30].map((height, i) => (
+            <div
+              key={i}
+              className={`flex-1 rounded-full transition-all duration-150 ${isMe ? "bg-white" : "bg-gray-400"}`}
+              style={{
+                height: isPlaying ? `${Math.max(20, (height + (i % 3) * 15) % 100)}%` : `${height * 0.4}%`,
+                opacity: (i / 16) <= (currentTime / (duration || 1)) ? 1 : 0.45,
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="flex justify-between items-center text-[10px] opacity-80 font-mono">
+          <span>{formatSecs(currentTime)}</span>
+          <span>{formatSecs(duration)}</span>
+        </div>
+      </div>
+
+      <audio
+        ref={audioRef}
+        src={msg.mediaUrl || "https://actions.google.com/sounds/v1/ambiences/outdoor_park.ogg"}
+        preload="metadata"
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onTimeUpdate={() => {
+          if (audioRef.current) {
+            setCurrentTime(audioRef.current.currentTime);
+            if (audioRef.current.duration && !isNaN(audioRef.current.duration)) {
+              setDuration(audioRef.current.duration);
+            }
+          }
+        }}
+        onLoadedMetadata={() => {
+          if (audioRef.current && audioRef.current.duration && !isNaN(audioRef.current.duration)) {
+            setDuration(audioRef.current.duration);
+          }
+        }}
+        onEnded={() => {
+          setIsPlaying(false);
+          setCurrentTime(0);
+        }}
+      />
+    </div>
+  );
+};
+
+const MessageBubble = React.memo(function MessageBubble({
+  msg,
+  isMe,
+  isFirstInGroup,
+  isLastInGroup,
+  borderRadius,
+  isNew,
+  avatarUrl,
+  senderName,
+  isGroup,
+  seenStr,
+  onReply,
+  onLongPress,
+  onContextMenu,
+  onToggleReaction,
+  setViewingReel,
+  setViewingReelContext,
+  setViewingMedia,
+  handleStartCall
+}: {
+  msg: any;
+  isMe: boolean;
+  isFirstInGroup: boolean;
+  isLastInGroup: boolean;
+  borderRadius: string;
+  isNew: boolean;
+  avatarUrl?: string;
+  senderName?: string;
+  isGroup?: boolean;
+  seenStr: string | null;
+  onReply: (msg: any) => void;
+  onLongPress: (e: React.UIEvent, msgId: string) => void;
+  onContextMenu: (e: React.MouseEvent, msgId: string) => void;
+  onToggleReaction: (msgId: string, currentReaction: string | null) => void;
+  setViewingReel: (r: any) => void;
+  setViewingReelContext: (c: any) => void;
+  setViewingMedia: (m: any) => void;
+  handleStartCall: (type: 'audio' | 'video') => void;
+}) {
+  const bubbleRef = React.useRef<HTMLDivElement>(null);
+  const replyIconLeftRef = React.useRef<HTMLDivElement>(null);
+  const touchStartRef = React.useRef<{ x: number; y: number } | null>(null);
+  const longPressTimerRef = React.useRef<any>(null);
+  const currentDragXRef = React.useRef<number>(0);
+  const isVerticalScrollRef = React.useRef<boolean>(false);
+  const isSwipeReplyActiveRef = React.useRef<boolean>(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    currentDragXRef.current = 0;
+    isVerticalScrollRef.current = false;
+    isSwipeReplyActiveRef.current = false;
+    if (bubbleRef.current) {
+      bubbleRef.current.style.transition = 'none';
+    }
+    longPressTimerRef.current = setTimeout(() => {
+      onLongPress(e, msg.id);
+    }, 420);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const dx = e.touches[0].clientX - touchStartRef.current.x;
+    const dy = e.touches[0].clientY - touchStartRef.current.y;
+
+    if (Math.abs(dx) > 7 || Math.abs(dy) > 7) {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
+
+    // If already detected as vertical scroll, do not handle horizontal drag
+    if (isVerticalScrollRef.current) return;
+
+    if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) {
+      isVerticalScrollRef.current = true;
+      return;
+    }
+
+    // STRICT: Never allow dragging to the left (prevents messages shifting left when scrolling)
+    if (dx <= 0) return;
+
+    // Detect intentional right swipe for reply
+    if (!isSwipeReplyActiveRef.current && dx > 14 && dx > Math.abs(dy) * 1.8) {
+      isSwipeReplyActiveRef.current = true;
+    }
+
+    if (isSwipeReplyActiveRef.current && dx > 0) {
+      const damped = Math.min(dx * 0.44, 56);
+      currentDragXRef.current = damped;
+
+      if (bubbleRef.current) {
+        bubbleRef.current.style.transform = `translate3d(${damped}px, 0, 0)`;
+      }
+
+      if (replyIconLeftRef.current) {
+        const progress = Math.min(1, Math.max(0, (damped - 8) / 22));
+        replyIconLeftRef.current.style.opacity = progress.toString();
+        replyIconLeftRef.current.style.transform = `translate3d(0, -50%, 0) scale(${0.7 + 0.3 * progress})`;
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    const finalDrag = currentDragXRef.current;
+    if (bubbleRef.current) {
+      bubbleRef.current.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1)';
+      bubbleRef.current.style.transform = 'translate3d(0, 0, 0)';
+    }
+
+    if (replyIconLeftRef.current) {
+      replyIconLeftRef.current.style.transition = 'opacity 0.15s ease-out';
+      replyIconLeftRef.current.style.opacity = '0';
+    }
+
+    if (finalDrag > 24) {
+      if (typeof window !== 'undefined' && window.navigator?.vibrate) {
+        try { window.navigator.vibrate(12); } catch (err) {}
+      }
+      onReply(msg);
+    }
+
+    currentDragXRef.current = 0;
+    isVerticalScrollRef.current = false;
+    isSwipeReplyActiveRef.current = false;
+    touchStartRef.current = null;
+  };
+
+  const emojiRegex = /^[\p{Extended_Pictographic}\s]+$/u;
+  const trimmedMsg = (msg.content || "").trim();
+  const isEmojiOnly = emojiRegex.test(trimmedMsg) && Array.from(trimmedMsg).length <= 3 && trimmedMsg.length > 0;
+  const emojiCount = isEmojiOnly ? Array.from(trimmedMsg).length : 0;
+
+  const bubbleContent = (
+    <div
+      id={`msg-${msg.id}`}
+      className={`flex ${isMe ? "justify-end" : "justify-start"} ${isFirstInGroup ? "mt-2" : isMe ? "mt-[0.5px]" : "mt-[1.5px]"} group relative touch-pan-y`}
+      onContextMenu={(e) => onLongPress(e, msg.id)}
+    >
+      {!isMe && isLastInGroup && avatarUrl && (
+        <img
+          src={avatarUrl}
+          className="w-7 h-7 rounded-full mr-2 self-end mb-1 object-cover"
+          alt="Avatar"
+          loading="lazy"
+        />
+      )}
+      {!isMe && !isLastInGroup && <div className="w-9 shrink-0"></div>}
+
+      {isMe && (
+        <div className="hidden sm:group-hover:flex items-center opacity-0 group-hover:opacity-100 transition-opacity pr-2">
+          <button
+            type="button"
+            onClick={() => onReply(msg)}
+            className="p-1.5 hover:bg-black/5 rounded-full"
+            title="Reply"
+          >
+            <Reply className="w-4 h-4 text-gray-400 cursor-pointer" />
+          </button>
+        </div>
+      )}
+
+      <div
+        ref={bubbleRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        className={`flex flex-col max-w-[78%] ${isMe ? "items-end" : "items-start"} relative group/bubble select-none`}
+      >
+        {/* Swipe Right to Reply Indicator */}
+        <div 
+          ref={replyIconLeftRef}
+          className="absolute left-[-32px] top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center bg-white/95 border border-purple-200/80 text-purple-600 rounded-full pointer-events-none z-10 opacity-0 shadow-xs"
+        >
+          <Reply className="w-3.5 h-3.5" strokeWidth={2.4} />
+        </div>
+
+        {isGroup && !isMe && isFirstInGroup && (
+          <span className="text-[11px] text-gray-500 font-normal ml-1 mb-0.5 mt-1">
+            {senderName || "User"}
+          </span>
+        )}
+
+        <div
+          onContextMenu={(e) => onContextMenu(e, msg.id)}
+          onDoubleClick={() => onToggleReaction(msg.id, (msg as any).reaction)}
+          className={`relative flex flex-col ${isMe ? "items-end" : "items-start"} max-w-full select-none`}
+        >
+          {/* Reply preview inside message bubble if it's a reply */}
+          {msg.replyTo && (
+            <div
+              className={`mb-1 px-2.5 py-1 rounded-xl text-[11px] border-l-2 transition-all max-w-full overflow-hidden flex items-center cursor-pointer ${
+                isMe
+                  ? "bg-black/15 text-white/95 border-white/70"
+                  : "bg-gray-200/80 text-gray-800 border-gray-400"
+              }`}
+              onClick={() => {
+                const el = document.getElementById(`msg-${msg.replyTo.id}`);
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth", block: "center" });
+                  el.style.backgroundColor = "rgba(254, 44, 85, 0.15)";
+                  setTimeout(() => { el.style.backgroundColor = ""; }, 2000);
+                }
+              }}
+            >
+              <div className="flex-1 min-w-0 pr-1">
+                {msg.replyTo.type === "reel" ? (
+                  <div className="flex items-center space-x-1">
+                    <Play className={`w-3 h-3 ${isMe ? "text-white/80" : "text-gray-500"}`} />
+                    <span className="font-normal text-[11px]">Reel</span>
+                  </div>
+                ) : (
+                  <p className="line-clamp-1 italic text-ellipsis break-words font-normal text-[11px] max-w-[200px]">
+                    {msg.replyTo.content || "Media"}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="max-w-full relative">
+            {(() => {
+              if (msg.type === "reel") {
+                return (
+                  <ReelMessageBubble
+                    msg={msg}
+                    setViewingReel={setViewingReel}
+                    setViewingReelContext={setViewingReelContext}
+                  />
+                );
+              } else if (msg.type === "voice") {
+                return (
+                  <VoiceMessageBubble
+                    msg={msg}
+                    isMe={isMe}
+                    borderRadius={borderRadius}
+                  />
+                );
+              } else if (msg.type === "audio") {
+                return (
+                  <div
+                    className={`px-4 py-3 ${borderRadius} ${isMe ? "bg-[#FE2C55] text-white shadow-xs" : "bg-[#F2F4F7] text-gray-900 border border-gray-100/80 shadow-2xs"}`}
+                  >
+                    <audio
+                      controls
+                      src={msg.mediaUrl}
+                      className={`h-8 ${isMe ? "invert filter grayscale" : ""}`}
+                      style={{ maxWidth: "200px" }}
+                    />
+                  </div>
+                );
+              } else if (msg.type === "video") {
+                return (
+                  <div
+                    className="relative group cursor-pointer rounded-2xl overflow-hidden max-w-[240px] bg-black shadow-sm"
+                    onClick={() =>
+                      setViewingMedia({
+                        type: "video",
+                        url: msg.mediaUrl!,
+                        user: { name: senderName || "", avatar: avatarUrl || "" },
+                      })
+                    }
+                  >
+                    <video
+                      src={`${msg.mediaUrl}#t=0.001`}
+                      className="w-full h-auto max-h-[280px] object-cover"
+                      preload="metadata"
+                      playsInline
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/40 transition-colors">
+                      <div className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-md">
+                        <Play className="w-5 h-5 text-gray-900 ml-0.5 fill-gray-900" />
+                      </div>
+                    </div>
+                    {/* Quick Download button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        downloadMediaFile(msg.mediaUrl!, `video_${msg.id || Date.now()}.mp4`);
+                      }}
+                      className="absolute bottom-2 right-2 p-1.5 bg-black/60 hover:bg-black/85 active:scale-90 text-white rounded-full transition-all shadow-md backdrop-blur-sm"
+                      title="Download Video"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              } else if (msg.type === "image") {
+                return (
+                  <div
+                    className="relative group cursor-pointer rounded-2xl overflow-hidden max-w-[240px] shadow-sm"
+                    onClick={() =>
+                      setViewingMedia({
+                        type: "image",
+                        url: msg.mediaUrl!,
+                        user: { name: senderName || "", avatar: avatarUrl || "" },
+                      })
+                    }
+                  >
+                    <img
+                      src={msg.mediaUrl}
+                      alt="Sent image"
+                      className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                      <div className="bg-black/60 text-white text-[11px] font-normal px-3 py-1.5 rounded-full backdrop-blur-sm">
+                        View Full Screen
+                      </div>
+                    </div>
+                    {/* Quick Download button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        downloadMediaFile(msg.mediaUrl!, `photo_${msg.id || Date.now()}.jpg`);
+                      }}
+                      className="absolute bottom-2 right-2 p-1.5 bg-black/60 hover:bg-black/85 active:scale-90 text-white rounded-full transition-all shadow-md backdrop-blur-sm"
+                      title="Download Photo"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              } else if (isEmojiOnly) {
+                return (
+                  <div className={`leading-none drop-shadow-sm px-1 py-0.5 select-none ${emojiCount === 1 ? "text-5xl sm:text-6xl" : "text-4xl sm:text-5xl"}`}>
+                    {msg.content}
+                  </div>
+                );
+              } else if (
+                msg.content && (
+                  msg.content.includes("call") ||
+                  msg.content.includes("Missed") ||
+                  msg.content.includes("Declined") ||
+                  msg.content.startsWith("📞") ||
+                  msg.content.startsWith("📹") ||
+                  msg.content.startsWith("📵") ||
+                  msg.content.startsWith("🚫")
+                )
+              ) {
+                const isMissed = msg.content.includes("Missed") || msg.content.includes("📵");
+                const isDeclined = msg.content.includes("Declined") || msg.content.includes("🚫");
+                const isVideoCall = msg.content.includes("Video") || msg.content.includes("📹");
+                const parts = msg.content.split('•').map((s: string) => s.trim());
+                const mainLabel = parts[0] || msg.content;
+                const durationLabel = parts[1] || '';
+
+                return (
+                  <div className={`p-3.5 rounded-2xl flex flex-col space-y-2.5 max-w-[260px] shadow-sm border ${
+                    isMissed || isDeclined 
+                      ? "bg-rose-50/95 border-rose-200/80 text-rose-950" 
+                      : isMe 
+                        ? "bg-purple-600 text-white border-purple-500/80 shadow-purple-600/20" 
+                        : "bg-white border-purple-100 text-gray-900 shadow-xs"
+                  }`}>
+                    <div className="flex items-center space-x-3">
+                      <div className={`p-2.5 rounded-full shrink-0 ${
+                        isMissed || isDeclined 
+                          ? "bg-rose-100 text-rose-600" 
+                          : isMe 
+                            ? "bg-white/20 text-white" 
+                            : "bg-purple-100 text-purple-700"
+                      }`}>
+                        {isVideoCall ? <Video className="w-4 h-4" /> : (isMissed || isDeclined) ? <PhoneOff className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-[13px] truncate leading-tight">{mainLabel}</h4>
+                        {durationLabel && (
+                          <p className={`text-[11px] font-medium mt-0.5 ${
+                            isMissed || isDeclined 
+                              ? "text-rose-600" 
+                              : isMe 
+                                ? "text-purple-100" 
+                                : "text-purple-600"
+                          }`}>
+                            Duration: {durationLabel}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {!isGroup && (
+                      <button
+                        type="button"
+                        onClick={() => handleStartCall(isVideoCall ? 'video' : 'audio')}
+                        className={`w-full py-1.5 px-3 rounded-xl text-xs font-medium flex items-center justify-center space-x-1.5 transition-all active:scale-95 border ${
+                          isMe 
+                            ? "bg-white/15 hover:bg-white/25 text-white border-white/20" 
+                            : "bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200/60"
+                        }`}
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>Call Back</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              } else {
+                return (
+                  <div
+                    className={`px-4 py-2.5 text-[15px] leading-snug whitespace-pre-wrap break-words inline-block ${borderRadius} ${isMe ? "bg-[#FE2C55] text-white shadow-xs font-normal" : "bg-[#F2F4F7] text-gray-900 border border-gray-100/80 shadow-2xs font-normal"}`}
+                  >
+                    {msg.content}
+                  </div>
+                );
+              }
+            })()}
+          </div>
+
+          {(msg as any).reaction && (
+            <div
+              className={`absolute -bottom-3 ${isMe ? "right-2" : "left-2"} bg-white border border-gray-100 rounded-full px-1.5 py-0.5 text-sm z-10 shadow-xs`}
+            >
+              {(msg as any).reaction}
+            </div>
+          )}
+        </div>
+
+        {/* Seen text animation: smooth glide and fade-in */}
+        {seenStr && (
+          <motion.div
+            key="seen-indicator"
+            initial={{ opacity: 0, y: -6, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: "auto" }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="text-[11px] text-gray-400 font-normal select-none self-end mt-0.5 pr-0.5 overflow-hidden flex items-center space-x-1"
+          >
+            <span>{seenStr}</span>
+          </motion.div>
+        )}
+      </div>
+
+      {!isMe && (
+        <div className="hidden sm:group-hover:flex items-center opacity-0 group-hover:opacity-100 transition-opacity pl-2">
+          <button
+            type="button"
+            onClick={() => onReply(msg)}
+            className="p-1.5 hover:bg-black/5 rounded-full"
+            title="Reply"
+          >
+            <Reply className="w-4 h-4 text-gray-400 cursor-pointer" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div
+      className={isNew ? "animate-message-pop" : ""}
+      style={{ transformOrigin: isMe ? "bottom right" : "bottom left" }}
+    >
+      {bubbleContent}
+    </div>
+  );
+}, (prev, next) => {
+  return (
+    prev.msg.id === next.msg.id &&
+    prev.msg.status === next.msg.status &&
+    prev.msg.content === next.msg.content &&
+    (prev.msg as any).reaction === (next.msg as any).reaction &&
+    prev.isFirstInGroup === next.isFirstInGroup &&
+    prev.isLastInGroup === next.isLastInGroup &&
+    prev.borderRadius === next.borderRadius &&
+    prev.seenStr === next.seenStr &&
+    prev.isMe === next.isMe &&
+    prev.isNew === next.isNew &&
+    prev.avatarUrl === next.avatarUrl &&
+    prev.senderName === next.senderName
+  );
+});
+
+export default function Messages() {
+  const {
+    chatTheme,
+    setChatTheme,
+    setViewingUser,
+    viewingStory,
+    setViewingStory,
+    activeChat,
+    setActiveChat,
+    currentUser,
+    pushPage,
+    lastCheckedActivity,
+    setLastCheckedActivity,
+    lastCheckedFollowers,
+    setLastCheckedFollowers,
+    setViewingReel,
+    setViewingReelContext,
+    setViewingMedia,
+    cachedChatMessages: messagesCache,
+    setCachedChatMessages: setMessagesCache,
+    cachedConversations: conversations,
+    setCachedConversations: setConversations,
+    setIsBottomNavHidden,
+    setActiveCallState
+  } = useAppStore();
+
+  const handleStartCall = async (type: 'audio' | 'video') => {
+    if (!currentUser || !activeContact?.uid || activeContact.isGroup) return;
+
+    setActiveCallState({
+      callId: '',
+      otherUid: activeContact.uid,
+      otherName: activeContact.name,
+      otherAvatar: activeContact.avatar,
+      type,
+      status: 'ringing',
+      isCaller: true
+    });
+
+    try {
+      const { callId } = await initiateCall(
+        { uid: currentUser.uid, name: currentUser.name || 'User', avatar: currentUser.avatar || '' },
+        { uid: activeContact.uid, name: activeContact.name || 'User', avatar: activeContact.avatar || '' },
+        type,
+        () => {},
+        (status) => {
+          if (status === 'ended' || status === 'rejected') {
+            useAppStore.getState().setActiveCallState(null);
+          } else if (status === 'accepted') {
+            const currentCall = useAppStore.getState().activeCallState;
+            if (currentCall) {
+              useAppStore.getState().setActiveCallState({ ...currentCall, status: 'accepted' });
+            }
+          }
+        }
+      );
+
+      setActiveCallState({
+        callId,
+        otherUid: activeContact.uid,
+        otherName: activeContact.name,
+        otherAvatar: activeContact.avatar,
+        type,
+        status: 'ringing',
+        isCaller: true
+      });
+    } catch (err) {
+      console.error("Failed to initiate call:", err);
+      setActiveCallState(null);
+    }
+  };
+  const [jarvisMessages, setJarvisMessages] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem("jarvis_chat_history");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [
+      {
+        id: "jarvis-welcome-1",
+        senderId: "jarvis",
+        type: "text",
+        content: `কিরে বন্ধু ${currentUser?.name ? currentUser.name : ""}! কী খবর তোর? আমি তোর বেস্ট ফ্রেন্ড এনভো জার্ভিস! আজকে কী করতে চাস বল?`,
+        createdAt: { toMillis: () => Date.now() },
+        status: "sent"
+      }
+    ];
+  });
+  const [isJarvisTyping, setIsJarvisTyping] = useState(false);
+
+  const messages = activeChat === "jarvis"
+    ? jarvisMessages
+    : (activeChat && messagesCache[activeChat]) || [];
+  const [inputText, setInputText] = useState("");
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [presenceData, setPresenceData] = useState<{
+    [uid: string]: { isOnline: boolean; lastSeen: number };
+  }>({});
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [followers, setFollowers] = useState<any[]>([]);
+  const [userDataCache, setUserDataCache] = useState<{
+    [uid: string]: { name: string; avatar: string; statusNote?: string };
+  }>({});
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const prevScrollHeightRef = useRef<number>(0);
+  const shouldAutoScrollRef = useRef<boolean>(true);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    msgId: string;
+  } | null>(null);
+  const [chatContextMenu, setChatContextMenu] = useState<{
+    x: number;
+    y: number;
+    convId: string;
+    otherUid?: string;
+  } | null>(null);
+  const [showThemeSettings, setShowThemeSettings] = useState(false);
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showPrivacySheet, setShowPrivacySheet] = useState(false);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
+  const [selectedMediaType, setSelectedMediaType] = useState<"image" | "video">("image");
+  const [showSharedMedia, setShowSharedMedia] = useState(false);
+  const [sharedMediaTab, setSharedMediaTab] = useState<"all" | "media" | "reels">("all");
+  const [viewportBottomOffset, setViewportBottomOffset] = useState(0);
+
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [replyingTo, setReplyingTo] = useState<any | null>(null);
+  const [showChatSettings, setShowChatSettings] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [lastSeenFollowers, setLastSeenFollowers] = useState<number>(0);
+  const [storyPreview, setStoryPreview] = useState<string | null>(null);
+  const [storyFile, setStoryFile] = useState<File | null>(null);
+  const [storyUploading, setStoryUploading] = useState(false);
+  const isTypingActiveRef = useRef<boolean>(false);
+  const typingTimerRef = useRef<any>(null);
+
+  const [fixedScreenSize, setFixedScreenSize] = useState(() => {
+    if (typeof window === "undefined") {
+      return { width: "100vw", height: "100vh" };
+    }
+    const h = Math.max(window.screen?.availHeight || 0, window.screen?.height || 0, window.innerHeight || 0, 950);
+    const w = Math.max(window.screen?.availWidth || 0, window.screen?.width || 0, window.innerWidth || 0, 390);
+    return { width: `${w}px`, height: `${h}px` };
+  });
+
+  const isChatInitialLoadedRef = useRef<boolean>(false);
+  const animatedMsgIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    isChatInitialLoadedRef.current = false;
+    const timer = setTimeout(() => {
+      isChatInitialLoadedRef.current = true;
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [activeChat]);
+
+  useEffect(() => {
+    const handleOrientationOrResize = () => {
+      const currentWidth = window.innerWidth;
+      const parsedW = parseInt(fixedScreenSize.width, 10);
+      if (Math.abs(currentWidth - parsedW) > 50) {
+        const h = Math.max(window.screen?.availHeight || 0, window.screen?.height || 0, window.innerHeight || 0, 950);
+        const w = Math.max(window.screen?.availWidth || 0, window.screen?.width || 0, window.innerWidth || 0, 390);
+        setFixedScreenSize({ width: `${w}px`, height: `${h}px` });
+      }
+    };
+    window.addEventListener("orientationchange", handleOrientationOrResize);
+    window.addEventListener("resize", handleOrientationOrResize);
+    return () => {
+      window.removeEventListener("orientationchange", handleOrientationOrResize);
+      window.removeEventListener("resize", handleOrientationOrResize);
+    };
+  }, [fixedScreenSize.width]);
+
+  useEffect(() => {
+    if (!window.visualViewport) return;
+    const updateViewport = () => {
+      if (!window.visualViewport) return;
+      const diff = window.innerHeight - window.visualViewport.height;
+      setViewportBottomOffset(Math.max(0, diff));
+      if (shouldAutoScrollRef.current && messagesContainerRef.current) {
+        requestAnimationFrame(() => {
+          if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTo({
+              top: messagesContainerRef.current.scrollHeight,
+              behavior: 'smooth'
+            });
+          }
+        });
+      }
+    };
+    window.visualViewport.addEventListener("resize", updateViewport);
+    window.visualViewport.addEventListener("scroll", updateViewport);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateViewport);
+      window.visualViewport?.removeEventListener("scroll", updateViewport);
+    };
+  }, []);
+
+  const sharedMediaItems = React.useMemo(() => {
+    if (!messages || messages.length === 0) return [];
+    return messages
+      .filter((m: any) => {
+        return (
+          m.type === "image" ||
+          m.type === "video" ||
+          m.type === "reel" ||
+          (m.mediaUrl && (m.mediaUrl.startsWith("http") || m.mediaUrl.startsWith("data:"))) ||
+          m.postId
+        );
+      })
+      .map((m: any) => {
+        const isReel = m.type === "reel" || !!m.postId;
+        const isVid = m.type === "video" || (m.mediaUrl && (m.mediaUrl.includes(".mp4") || m.mediaUrl.includes("video")));
+        const isImg = m.type === "image" || (!isReel && !isVid && !!m.mediaUrl);
+        const cover = m.thumbnailUrl || m.coverUrl || m.mediaUrl;
+        return {
+          ...m,
+          isReel,
+          isVid,
+          isImg,
+          cover,
+          mediaType: isReel ? "reel" : isVid ? "video" : "image",
+        };
+      });
+  }, [messages]);
+
+  const displayedSharedItems = React.useMemo(() => {
+    if (sharedMediaTab === "media") return sharedMediaItems.filter((i: any) => i.isImg || i.isVid);
+    if (sharedMediaTab === "reels") return sharedMediaItems.filter((i: any) => i.isReel);
+    return sharedMediaItems;
+  }, [sharedMediaItems, sharedMediaTab]);
+
+  const [newGroupAvatar, setNewGroupAvatar] = useState<string | null>(null);
+  const groupPfpInputRef = useRef<HTMLInputElement>(null);
+  const [showStatusInput, setShowStatusInput] = useState(false);
+  const [statusNoteText, setStatusNoteText] = useState("");
+  const [privacyMode, setPrivacyMode] = useState<"public" | "private">(() => {
+    return (
+      (localStorage.getItem("privacyMode") as "public" | "private") || "public"
+    );
+  });
+  const [showCreateStory, setShowCreateStory] = useState(false);
+  const [inboxStories, setInboxStories] = useState<Story[]>([]);
+  const [viewedInboxStories, setViewedInboxStories] = useState<
+    Record<string, boolean>
+  >(() => {
+    try {
+      return JSON.parse(localStorage.getItem("viewedInboxStories") || "{}");
+    } catch {
+      return {};
+    }
+  });
+  useEffect(() => {
+    if (showCreateGroup || showStatusInput || showPrivacySheet || showCreateStory) {
+      setIsBottomNavHidden(true);
+      return () => setIsBottomNavHidden(false);
+    } else {
+      setIsBottomNavHidden(false);
+    }
+  }, [showCreateGroup, showStatusInput, showPrivacySheet, showCreateStory, setIsBottomNavHidden]);
+
+  useEffect(() => {
+    if (showStatusInput && currentUser) {
+      setStatusNoteText((currentUser as any)?.statusNote || "");
+    }
+  }, [showStatusInput, currentUser]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const durationIntervalRef = useRef<any>(null);
+  const isCanceledRef = useRef(false);
+  const fetchedUserIdsRef = useRef<Set<string>>(new Set());
+  const subscribedPresenceRef = useRef<Map<string, () => void>>(new Map());
+  const isSendingMsgRef = useRef(false);
+
+  const startRecording = async () => {
+    isCanceledRef.current = false;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        if (isCanceledRef.current) return;
+
+        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target?.result as string;
+          if (
+            activeChat &&
+            activeChat !== "followers" &&
+            activeChat !== "activity" &&
+            currentUser
+          ) {
+            sendMessage(
+              activeChat,
+              currentUser.uid,
+              "voice",
+              "Sent a voice message",
+              dataUrl,
+              undefined,
+              { duration: Math.max(1, recordingDuration) }
+            ).catch(console.error);
+          }
+        };
+        reader.readAsDataURL(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = setInterval(() => {
+        setRecordingDuration((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Microphone fallback activated", err);
+      setIsRecording(true);
+      setRecordingDuration(0);
+      if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = setInterval(() => {
+        setRecordingDuration((prev) => prev + 1);
+      }, 1000);
+    }
+  };
+
+  const stopRecording = () => {
+    if (isRecording) {
+      setIsRecording(false);
+      if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      } else if (!isCanceledRef.current) {
+        const synthUrl = "https://actions.google.com/sounds/v1/ambiences/outdoor_park.ogg";
+        if (activeChat && currentUser) {
+          sendMessage(
+            activeChat,
+            currentUser.uid,
+            "voice",
+            "Sent a voice message",
+            synthUrl,
+            undefined,
+            { duration: Math.max(1, recordingDuration) }
+          ).catch(console.error);
+        }
+      }
+    }
+  };
+
+  const cancelRecording = () => {
+    isCanceledRef.current = true;
+    setIsRecording(false);
+    if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (
+      !file ||
+      !activeChat ||
+      activeChat === "followers" ||
+      activeChat === "activity" ||
+      !currentUser
+    )
+      return;
+
+    const isVideo = file.type.startsWith("video/");
+    if (isVideo) {
+      setSelectedMediaType("video");
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setSelectedImagePreview(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setSelectedMediaType("image");
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 800;
+          const scaleSize = Math.min(1, MAX_WIDTH / img.width);
+          canvas.width = img.width * scaleSize;
+          canvas.height = img.height * scaleSize;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+          setSelectedImagePreview(dataUrl);
+        };
+        img.src = event.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem("last_seen_followers");
+    if (saved) setLastSeenFollowers(parseInt(saved));
+  }, []);
+
+  useEffect(() => {
+    if (activeChat === "activity" && currentUser) {
+      import("../services/notificationService").then((m) =>
+        m.markAllRead(currentUser.uid),
+      );
+      setLastCheckedActivity(Date.now());
+    }
+    if (activeChat === "followers" && followers.length > 0) {
+      setLastCheckedFollowers(followers.length);
+    }
+  }, [activeChat, currentUser, followers.length]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsubscribe = subscribeConversations(
+      currentUser.uid,
+      setConversations,
+    );
+    const unsubscribeNotifs = subscribeNotifications(
+      currentUser.uid,
+      setNotifications,
+    );
+    const unsubscribeStories = subscribeStories(setInboxStories, "inbox");
+
+    // Fetch followers for the followers tab
+    const q = query(
+      collection(db, "users", currentUser.uid, "followers"),
+      orderBy("createdAt", "desc"),
+    );
+    const unsubscribeFollowers = onSnapshot(q, async (snapshot) => {
+      const { getDoc, doc } = await import("firebase/firestore");
+      const cacheUpdates: Record<string, any> = {};
+      const followerData = await Promise.all(
+        snapshot.docs.map(async (docRef) => {
+          const data = docRef.data();
+          const userSnap = await getDoc(doc(db, "users", docRef.id));
+          if (userSnap.exists()) {
+            const upToDateUser = userSnap.data();
+            cacheUpdates[docRef.id] = {
+              name: upToDateUser.name,
+              avatar: upToDateUser.avatar,
+              statusNote: upToDateUser.statusNote,
+            };
+            return { id: docRef.id, ...data, ...upToDateUser };
+          }
+          return { id: docRef.id, ...data };
+        }),
+      );
+      if (Object.keys(cacheUpdates).length > 0) {
+        setUserDataCache((prev) => ({ ...prev, ...cacheUpdates }));
+      }
+      setFollowers(followerData);
+    }, () => {});
+
+    return () => {
+      unsubscribe();
+      unsubscribeNotifs();
+      unsubscribeStories();
+      unsubscribeFollowers();
+    };
+  }, [currentUser]);
+
+  // Listen in REAL-TIME to user profile changes for conversation participants
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsubs: (() => void)[] = [];
+    const allParticipantIds = new Set<string>();
+
+    conversations.forEach((conv) => {
+      conv.participantIds?.forEach((id: string) => {
+        if (id && id !== currentUser.uid) allParticipantIds.add(id);
+      });
+    });
+
+    allParticipantIds.forEach((uid) => {
+      const userRef = doc(db, "users", uid);
+      const unsub = onSnapshot(userRef, (userDoc) => {
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          const name = data.name || data.username || "User";
+          const avatar = data.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
+          setUserDataCache((prev) => ({
+            ...prev,
+            [uid]: {
+              name,
+              avatar,
+              statusNote: data.statusNote,
+            },
+          }));
+        }
+      }, (err) => console.warn("Real-time user cache listener error:", err));
+      unsubs.push(unsub);
+    });
+
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+    };
+  }, [conversations, currentUser]);
+
+  const [messageLimit, setMessageLimit] = useState(20);
+  const [activityLimit, setActivityLimit] = useState(15);
+
+  useEffect(() => {
+    if (!activeChat || activeChat === "followers" || activeChat === "activity")
+      return;
+
+    if (currentUser) {
+      import("../services/chatService").then((m) =>
+        m.markConversationRead(activeChat, currentUser.uid),
+      );
+    }
+
+    const unsubscribe = subscribeMessages(
+      activeChat,
+      (newMsgs) => {
+        setMessagesCache((prev) => {
+          const currentCached = prev[activeChat] || [];
+          const newMsgIds = new Set(newMsgs.map(m => m.id));
+          
+          // Filter out temp messages that have already synced to Firestore
+          const pendingTempMsgs = currentCached.filter((m: any) => {
+            if (!m.id || typeof m.id !== 'string') return false;
+            if (!m.id.startsWith('temp_')) return false;
+            // Check if synced
+            const isSynced = newMsgs.some(nm =>
+              nm.senderId === m.senderId &&
+              nm.type === m.type &&
+              nm.content === m.content &&
+              Math.abs((nm.createdAt?.toMillis?.() || Date.now()) - (m.createdAt?.toMillis?.() || Date.now())) < 20000
+            );
+            return !isSynced;
+          });
+
+          // Deduplicate all messages by id
+          const seenIds = new Set<string>();
+          const merged: any[] = [];
+          
+          [...newMsgs, ...pendingTempMsgs].forEach(m => {
+            const idToUse = m.id || m.tempId;
+            if (idToUse && !seenIds.has(idToUse)) {
+              seenIds.add(idToUse);
+              merged.push(m);
+            }
+          });
+
+          return { ...prev, [activeChat]: merged };
+        });
+        if (currentUser && newMsgs.some(m => m.senderId !== currentUser.uid && m.status !== 'seen')) {
+          import("../services/chatService").then((m) =>
+            m.markConversationRead(activeChat, currentUser.uid),
+          );
+        }
+      },
+      messageLimit,
+    );
+    const unsubscribeTyping = subscribeTyping(activeChat, (users) => {
+      setTypingUsers(users.filter((uid) => uid !== currentUser?.uid));
+    });
+    return () => {
+      unsubscribe();
+      unsubscribeTyping();
+    };
+  }, [activeChat, currentUser, messageLimit]);
+
+  useLayoutEffect(() => {
+    setMessageLimit(20); // Reset limit when chat changes
+    if (activeChat && messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [activeChat]);
+
+  const prevMessagesCountRef = useRef(messages.length);
+  useLayoutEffect(() => {
+    const isAdded = messages.length > prevMessagesCountRef.current;
+    prevMessagesCountRef.current = messages.length;
+
+    if (activeChat && messagesContainerRef.current && shouldAutoScrollRef.current) {
+      if (isAdded) {
+        messagesContainerRef.current.scrollTo({
+          top: messagesContainerRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [messages.length, activeChat]);
+
+  // Focus input safely when replying without jumping the viewport
+  useEffect(() => {
+    if (replyingTo) {
+      textareaRef.current?.focus({ preventScroll: true });
+      if (messagesContainerRef.current && shouldAutoScrollRef.current) {
+        messagesContainerRef.current.scrollTo({
+          top: messagesContainerRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [replyingTo]);
+
+  // Keep chat content aligned smoothly when virtual keyboard opens without forcing scroll if user scrolled up
+  useEffect(() => {
+    if (!activeChat) return;
+    let rafId: number | null = null;
+    const handleViewportChange = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (messagesContainerRef.current && shouldAutoScrollRef.current) {
+          messagesContainerRef.current.scrollTo({
+            top: messagesContainerRef.current.scrollHeight,
+            behavior: 'smooth'
+          });
+        }
+      });
+    };
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+    }
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportChange);
+      }
+    };
+  }, [activeChat]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const currentUnsubs = subscribedPresenceRef.current;
+    conversations.forEach((conv) => {
+      const otherId = conv.participantIds?.find((id) => id !== currentUser.uid);
+      if (otherId && !currentUnsubs.has(otherId)) {
+        const unsub = subscribePresence(otherId, (data) => {
+          setPresenceData((prev) => ({ ...prev, [otherId]: data }));
+        });
+        currentUnsubs.set(otherId, unsub);
+      }
+    });
+  }, [conversations, currentUser]);
+
+  const handleLongPress = (e: React.UIEvent, msgId: string) => {
+    e.preventDefault();
+    if (typeof window !== "undefined" && window.navigator?.vibrate) {
+      try { window.navigator.vibrate(25); } catch (err) {}
+    }
+    const x =
+      "touches" in e
+        ? (e as React.TouchEvent).touches[0].clientX
+        : (e as React.MouseEvent).clientX;
+    const y =
+      "touches" in e
+        ? (e as React.TouchEvent).touches[0].clientY
+        : (e as React.MouseEvent).clientY;
+    setContextMenu({
+      x: Math.min(x, window.innerWidth - 270),
+      y: Math.min(y, window.innerHeight - 250),
+      msgId,
+    });
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSendingMsgRef.current) return;
+    if (
+      (!inputText.trim() && !selectedImagePreview) ||
+      !activeChat ||
+      activeChat === "followers" ||
+      activeChat === "activity" ||
+      !currentUser
+    )
+      return;
+
+    isSendingMsgRef.current = true;
+    playMessageSentSound();
+    const textToSend = inputText.trim();
+    const mediaToSend = selectedImagePreview;
+    const replyData = replyingTo
+      ? {
+          id: replyingTo.id,
+          content: replyingTo.content,
+          senderId: replyingTo.senderId,
+          type: replyingTo.type,
+          mediaUrl: replyingTo.mediaUrl,
+        }
+      : undefined;
+
+    // Reset inputs IMMEDIATELY for ultra-fast response
+    setInputText("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.focus({ preventScroll: true });
+    }
+    setSelectedImagePreview(null);
+    setReplyingTo(null);
+    setTyping(activeChat, currentUser.uid, false);
+    shouldAutoScrollRef.current = true;
+
+    // Handle Ennvo Jarvis AI Assistant messages
+    if (activeChat === "jarvis") {
+      const userMsg = {
+        id: "user-" + Date.now(),
+        senderId: currentUser.uid,
+        type: "text",
+        content: textToSend,
+        createdAt: { toMillis: () => Date.now() },
+        status: "sent"
+      };
+
+      const newJarvisMsgs = [...jarvisMessages, userMsg];
+      setJarvisMessages(newJarvisMsgs);
+      try { localStorage.setItem("jarvis_chat_history", JSON.stringify(newJarvisMsgs)); } catch (e) {}
+
+      setIsJarvisTyping(true);
+      isSendingMsgRef.current = false;
+
+      const apiEndpoint = typeof window !== 'undefined' && window.location?.origin && window.location.origin.startsWith('http')
+        ? `${window.location.origin}/api/jarvis`
+        : '/api/jarvis';
+
+      fetch(apiEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: newJarvisMsgs,
+          userName: currentUser?.name || "দোস্ত"
+        })
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("API HTTP " + res.status);
+          return res.json();
+        })
+        .then((data) => {
+          const replyText = data?.reply || `কিরে বন্ধু ${currentUser?.name || ""}! তোর মেসেজ পেয়েছি, বল কী সাহায্য করতে পারি?`;
+          const replyMsg = {
+            id: "jarvis-" + Date.now(),
+            senderId: "jarvis",
+            type: "text",
+            content: replyText,
+            createdAt: { toMillis: () => Date.now() },
+            status: "sent"
+          };
+          setJarvisMessages((prev) => {
+            const updated = [...prev, replyMsg];
+            try { localStorage.setItem("jarvis_chat_history", JSON.stringify(updated)); } catch (e) {}
+            return updated;
+          });
+          playMessageSentSound();
+        })
+        .catch((err) => {
+          console.error("Jarvis response error:", err);
+          const fallbackText = `কিরে ${currentUser?.name || "দোস্ত"}! তোর মেসেজ পেয়েছি! বিজয়নগরের সন্তান এরফান ভাইয়ের বানানো Ennvo এআই সার্ভিস তোর পাশে সব সময় রেডি আছে! বল কী হেল্প লাগবে?`;
+          const replyMsg = {
+            id: "jarvis-" + Date.now(),
+            senderId: "jarvis",
+            type: "text",
+            content: fallbackText,
+            createdAt: { toMillis: () => Date.now() },
+            status: "sent"
+          };
+          setJarvisMessages((prev) => {
+            const updated = [...prev, replyMsg];
+            try { localStorage.setItem("jarvis_chat_history", JSON.stringify(updated)); } catch (e) {}
+            return updated;
+          });
+          playMessageSentSound();
+        })
+        .finally(() => {
+          setIsJarvisTyping(false);
+        });
+
+      return;
+    }
+
+    // Optimistically show message in UI
+    const tempId = 'temp_' + Date.now();
+    const optMsg: any = {
+      id: tempId,
+      tempId: tempId,
+      senderId: currentUser.uid,
+      type: mediaToSend ? 'image' : 'text',
+      content: textToSend || (mediaToSend ? 'Sent an image' : ''),
+      mediaUrl: mediaToSend || null,
+      createdAt: { toMillis: () => Date.now() },
+      status: 'sent',
+      replyTo: replyData
+    };
+
+    setMessagesCache((prev) => ({
+      ...prev,
+      [activeChat]: [...(prev[activeChat] || []), optMsg]
+    }));
+
+    shouldAutoScrollRef.current = true;
+
+    try {
+      if (mediaToSend) {
+        await sendMessage(
+          activeChat,
+          currentUser.uid,
+          selectedMediaType === "video" ? "video" : "image",
+          textToSend || (selectedMediaType === "video" ? "Sent a video" : "Sent an image"),
+          mediaToSend,
+          undefined,
+          replyData
+        );
+        setSelectedMediaType("image");
+      } else {
+        await sendMessage(
+          activeChat,
+          currentUser.uid,
+          "text",
+          textToSend,
+          undefined,
+          undefined,
+          replyData
+        );
+      }
+    } catch (error) {
+      console.error("Failed sending chat message:", error);
+    } finally {
+      isSendingMsgRef.current = false;
+    }
+  };
+
+  const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInputText(val);
+    if (
+      activeChat &&
+      activeChat !== "followers" &&
+      activeChat !== "activity" &&
+      currentUser
+    ) {
+      if (val.trim().length > 0) {
+        if (!isTypingActiveRef.current) {
+          isTypingActiveRef.current = true;
+          setTyping(activeChat, currentUser.uid, true);
+        }
+        if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = setTimeout(() => {
+          isTypingActiveRef.current = false;
+          setTyping(activeChat, currentUser.uid, false);
+        }, 3000);
+      } else {
+        if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+        isTypingActiveRef.current = false;
+        setTyping(activeChat, currentUser.uid, false);
+      }
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, msgId: string) => {
+    e.preventDefault();
+    let x = e.clientX;
+    let y = e.clientY;
+
+    const menuWidth = 270;
+    const menuHeight = 250;
+
+    if (x + menuWidth > window.innerWidth)
+      x = window.innerWidth - menuWidth - 10;
+    if (y + menuHeight > window.innerHeight)
+      y = window.innerHeight - menuHeight - 10;
+
+    setContextMenu({ x, y, msgId });
+  };
+
+  const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const longPressedRef = useRef(false);
+
+  const handleChatTouchStart = (
+    e: React.TouchEvent | React.MouseEvent,
+    convId: string,
+    otherUid?: string,
+  ) => {
+    longPressedRef.current = false;
+    const x = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const y = "touches" in e ? e.touches[0].clientY : e.clientY;
+    touchTimerRef.current = setTimeout(() => {
+      longPressedRef.current = true;
+      setChatContextMenu({ x, y, convId, otherUid });
+    }, 500); // 500ms long press
+  };
+
+  const handleChatTouchEnd = () => {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current);
+    }
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu(null);
+    setChatContextMenu(null);
+  };
+
+  const handleFollowBack = async (follower: any) => {
+    if (!currentUser) return;
+    try {
+      await followUser(currentUser, {
+        uid: follower.id,
+        name: follower.name,
+        avatar: follower.avatar,
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const filteredConversations = conversations.filter((conv) => {
+    if (!searchQuery.trim()) return true;
+    const otherId = conv.participantIds?.find((id) => id !== currentUser?.uid);
+    const name =
+      (conv.participantNames || {})[otherId || ""] ||
+      userDataCache[otherId || ""]?.name ||
+      "User";
+    return name.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const activeConversation = conversations.find((c) => c.id === activeChat);
+  const otherParticipantId = activeConversation?.participantIds?.find(
+    (id) => id !== currentUser?.uid,
+  );
+  const isGroup = activeConversation
+    ? (activeConversation as any).isGroup ||
+      !!(activeConversation as any).groupName ||
+      activeConversation.participantIds?.length > 2
+    : false;
+
+  const activeContact = activeChat === "jarvis"
+    ? {
+        id: "jarvis",
+        uid: "jarvis",
+        name: "Ennvo Jarvis",
+        avatar: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80",
+        online: true,
+        lastSeen: Date.now(),
+        isGroup: false,
+        isAi: true
+      }
+    : activeConversation
+    ? {
+        id: activeConversation.id,
+        uid: isGroup ? activeConversation.id : otherParticipantId,
+        name: isGroup
+          ? (activeConversation as any).groupName || "Group Chat"
+          : userDataCache[otherParticipantId || ""]?.name ||
+            (activeConversation.participantNames || {})[
+              otherParticipantId || ""
+            ] ||
+            "User",
+        avatar: isGroup
+          ? (activeConversation as any).groupAvatar
+          : userDataCache[otherParticipantId || ""]?.avatar ||
+            (activeConversation.participantAvatars || {})[
+              otherParticipantId || ""
+            ] ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(userDataCache[otherParticipantId || ""]?.name || (activeConversation.participantNames || {})[otherParticipantId || ""] || "User")}&background=random`,
+        online: isGroup
+          ? false
+          : presenceData[otherParticipantId || ""]?.isOnline || false,
+        lastSeen: isGroup
+          ? 0
+          : presenceData[otherParticipantId || ""]?.lastSeen || 0,
+        isGroup,
+      }
+    : (activeChat && activeChat !== "followers" && activeChat !== "activity")
+    ? {
+        id: activeChat,
+        uid: activeChat,
+        name: userDataCache[activeChat]?.name || "Chat",
+        avatar: userDataCache[activeChat]?.avatar || `https://ui-avatars.com/api/?name=Chat&background=random`,
+        online: false,
+        lastSeen: 0,
+        isGroup: false
+      }
+    : null;
+
+  const scrollToBottom = (force = false) => {
+    if (messagesContainerRef.current && (shouldAutoScrollRef.current || force)) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: force ? "instant" : "smooth",
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (messagesContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } =
+        messagesContainerRef.current;
+
+      // Handle pagination scroll adjustment when top messages are loaded
+      if (scrollHeight > prevScrollHeightRef.current && scrollTop < 80) {
+        const diff = scrollHeight - prevScrollHeightRef.current;
+        messagesContainerRef.current.scrollTop = scrollTop + diff;
+      } else if (shouldAutoScrollRef.current) {
+        scrollToBottom();
+      }
+      prevScrollHeightRef.current = scrollHeight;
+    }
+  }, [messages, typingUsers]);
+
+  // Force scroll to bottom on chat enter
+  useEffect(() => {
+    if (activeChat) {
+      shouldAutoScrollRef.current = true;
+      scrollToBottom(true);
+      setTimeout(() => scrollToBottom(true), 150);
+    }
+  }, [activeChat]);
+
+  const isSpecialChat = activeChat === "followers" || activeChat === "activity";
+
+  const isMobile =
+    typeof window !== "undefined" ? window.innerWidth < 768 : false;
+
+  const unreadNotifsCount = notifications.filter((n) => !n.isRead).length;
+
+  const renderedMessages = React.useMemo(
+    () =>
+      messages.map((msg, idx) => {
+        const isMe = msg.senderId === currentUser?.uid;
+        const prevMsg = messages[idx - 1];
+        const nextMsg = messages[idx + 1];
+
+        const getMsgTime = (m: any) => {
+          if (!m) return 0;
+          if (m.createdAt?.toMillis) return m.createdAt.toMillis();
+          if (m.createdAt?.seconds) return m.createdAt.seconds * 1000;
+          if (typeof m.createdAt === 'number') return m.createdAt;
+          return Date.now();
+        };
+
+        const msgTime = getMsgTime(msg);
+        const prevTime = getMsgTime(prevMsg);
+        const nextTime = getMsgTime(nextMsg);
+
+        const emojiRegex = /^[\p{Extended_Pictographic}\s]+$/u;
+        const checkIsEmoji = (m: any) => {
+          if (!m || m.type !== 'text' || !m.content) return false;
+          const trimmed = (m.content || "").trim();
+          return emojiRegex.test(trimmed) && Array.from(trimmed).length <= 3 && trimmed.length > 0;
+        };
+
+        const curIsEmoji = checkIsEmoji(msg);
+        const prevIsEmoji = checkIsEmoji(prevMsg);
+        const nextIsEmoji = checkIsEmoji(nextMsg);
+
+        const prevSame = !curIsEmoji && !prevIsEmoji && prevMsg && prevMsg.senderId === msg.senderId && Math.abs(msgTime - prevTime) < 60000;
+        const nextSame = !curIsEmoji && !nextIsEmoji && nextMsg && nextMsg.senderId === msg.senderId && Math.abs(nextTime - msgTime) < 60000;
+
+        const isFirstInGroup = !prevSame;
+        const isLastInGroup = !nextSame;
+
+        let borderRadius = "rounded-3xl";
+        if (isMe) {
+          if (!isFirstInGroup && !isLastInGroup)
+            borderRadius = "rounded-3xl rounded-tr-md rounded-br-md";
+          else if (!isFirstInGroup && isLastInGroup)
+            borderRadius = "rounded-3xl rounded-tr-md";
+          else if (isFirstInGroup && !isLastInGroup)
+            borderRadius = "rounded-3xl rounded-br-md";
+        } else {
+          if (!isFirstInGroup && !isLastInGroup)
+            borderRadius = "rounded-3xl rounded-tl-md rounded-bl-md";
+          else if (!isFirstInGroup && isLastInGroup)
+            borderRadius = "rounded-3xl rounded-tl-md";
+          else if (isFirstInGroup && !isLastInGroup)
+            borderRadius = "rounded-3xl rounded-bl-md";
+        }
+
+        const messageKey = msg.id && !msg.id.startsWith("temp_")
+          ? msg.id
+          : `${msg.id || msg.tempId || 'msg'}_${idx}`;
+
+        const isLastMsg = idx === messages.length - 1;
+        let seenStr: string | null = null;
+        if (isMe && isLastMsg) {
+          const otherUid = activeConversation?.participantIds?.find(id => id !== currentUser?.uid);
+          const isReadByOther = msg.status === 'seen' || (otherUid && activeConversation?.unreadCount && activeConversation.unreadCount[otherUid] === 0);
+          if (isReadByOther) {
+            const mTime = (msg.createdAt as any)?.toMillis ? (msg.createdAt as any).toMillis() : ((msg.createdAt as any)?.seconds ? (msg.createdAt as any).seconds * 1000 : (typeof msg.createdAt === 'number' ? msg.createdAt : Date.now()));
+            const diffSec = Math.floor((Date.now() - mTime) / 1000);
+            if (diffSec < 45) {
+              seenStr = "Seen";
+            } else if (diffSec < 3600) {
+              const mins = Math.max(1, Math.floor(diffSec / 60));
+              seenStr = `Seen ${mins}m ago`;
+            } else if (diffSec < 86400) {
+              const hours = Math.floor(diffSec / 3600);
+              seenStr = `Seen ${hours}h ago`;
+            } else {
+              const days = Math.floor(diffSec / 86400);
+              seenStr = `Seen ${days}d ago`;
+            }
+          }
+        }
+
+        const msgId = msg.id || msg.tempId;
+        const isTemp = Boolean(msg.id?.startsWith("temp_"));
+        const isNew = isTemp || (Boolean(msgId) && !animatedMsgIdsRef.current.has(msgId) && isChatInitialLoadedRef.current);
+        if (msgId) {
+          animatedMsgIdsRef.current.add(msgId);
+        }
+
+        const avatarUrl = !isMe && isLastInGroup
+          ? (activeContact?.isGroup
+              ? ((activeConversation as any)?.participantAvatars || {})[msg.senderId] ||
+                userDataCache[msg.senderId]?.avatar ||
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(((activeConversation as any)?.participantNames || {})[msg.senderId] || userDataCache[msg.senderId]?.name || "User")}&background=random`
+              : activeContact?.avatar)
+          : undefined;
+
+        const senderName = activeContact?.isGroup && !isMe
+          ? ((activeConversation as any)?.participantNames?.[msg.senderId] || userDataCache[msg.senderId]?.name || "User")
+          : undefined;
+
+        return (
+          <MessageBubble
+            key={messageKey}
+            msg={msg}
+            isMe={isMe}
+            isFirstInGroup={isFirstInGroup}
+            isLastInGroup={isLastInGroup}
+            borderRadius={borderRadius}
+            isNew={isNew}
+            avatarUrl={avatarUrl}
+            senderName={senderName}
+            isGroup={Boolean(activeContact?.isGroup)}
+            seenStr={seenStr}
+            onReply={(m) => setReplyingTo(m as any)}
+            onLongPress={handleLongPress}
+            onContextMenu={handleContextMenu}
+            onToggleReaction={async (msgId, currentReaction) => {
+              if (activeChat) {
+                try {
+                  const { updateDoc, doc } = await import("firebase/firestore");
+                  await updateDoc(
+                    doc(db, "conversations", activeChat, "messages", msgId),
+                    { reaction: currentReaction === "❤️" ? null : "❤️" }
+                  );
+                } catch (err) {}
+              }
+            }}
+            setViewingReel={setViewingReel}
+            setViewingReelContext={setViewingReelContext}
+            setViewingMedia={setViewingMedia}
+            handleStartCall={handleStartCall}
+          />
+        );
+      }),
+    [messages, currentUser, activeContact, activeConversation, userDataCache, chatTheme, activeChat],
+  );
+
+  return (
+    <div
+      className="h-full w-full flex bg-white overflow-hidden relative md:pl-24"
+      onClick={closeContextMenu}
+    >
+      {/* Left Sidebar (Contacts) */}
+      <div
+        className={`w-full md:w-[350px] flex-shrink-0 border-r border-purple-100/50 flex-col h-full bg-transparent backdrop-blur-xl z-10 ${activeChat ? "hidden md:flex" : "flex"}`}
+      >
+        {/* Header */}
+        <div className="px-4 pt-8 pb-3 flex items-center justify-between sticky top-0 bg-transparent z-10 w-full min-h-[88px] md:min-h-[72px]">
+          {isSearchExpanded ? (
+            <div className="relative flex items-center flex-1 animate-in fade-in slide-in-from-right-2">
+              <Search
+                className="w-5 h-5 absolute left-3 text-gray-400"
+                strokeWidth={2}
+              />
+              <input
+                type="text"
+                placeholder="Search friends..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-gray-100 rounded-full pl-10 pr-8 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all font-normal text-gray-900"
+                autoFocus
+              />
+              <button
+                onClick={() => {
+                  setIsSearchExpanded(false);
+                  setSearchQuery("");
+                }}
+                className="absolute right-3 p-1 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" strokeWidth={2} />
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                className="p-2 hover:bg-white/50 rounded-full transition-colors active:scale-95"
+                onClick={() => setShowCreateGroup(true)}
+              >
+                <UserPlus
+                  className="w-6 h-6 text-gray-800"
+                  strokeWidth={1.5}
+                />
+              </button>
+              <div
+                className="flex items-center space-x-1.5 cursor-pointer relative select-none active:scale-95 transition-transform"
+                onClick={() => setShowPrivacySheet(true)}
+              >
+                <h1 className="text-xl font-normal text-gray-900 tracking-tight">
+                  Inbox
+                </h1>
+                <ChevronDown
+                  className="w-4 h-4 text-gray-900 mt-[2px]"
+                  strokeWidth={2}
+                />
+                {privacyMode === "private" && (
+                  <div className="absolute -right-3 top-[-2px]">
+                    <EyeOff className="w-3 h-3 text-gray-500" strokeWidth={2.5} />
+                  </div>
+                )}
+              </div>
+              <button
+                className="p-2 hover:bg-white/50 rounded-full transition-colors active:scale-95"
+                onClick={() => setIsSearchExpanded(true)}
+              >
+                <Search
+                  className="w-6 h-6 text-gray-800"
+                  strokeWidth={1.5}
+                />
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Scrollable Area (Stories + Contacts) */}
+        <PullToRefresh onRefresh={async () => { await new Promise(r => setTimeout(r, 450)); }} className="flex-1 overflow-y-auto scrollbar-hide pb-[80px] [webkit-font-smoothing:antialiased]">
+          <div className="w-full">
+          {/* Small Stories with Notes block */}
+          {!searchQuery.trim() && (
+            <div className="pb-2.5 pt-1 border-b border-gray-100/60">
+              <div className="flex space-x-3.5 overflow-x-auto scrollbar-hide px-3.5">
+                <div className="flex flex-col items-center flex-shrink-0 cursor-pointer pt-6 pb-1">
+                  <div className="relative">
+                    {/* Clean Note Bubble overlapping avatar top */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowStatusInput(true);
+                      }}
+                      className="absolute top-[-10px] left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-white/80 backdrop-blur-md border border-white/80 shadow-xs rounded-full z-20 w-auto max-w-[96px] cursor-pointer hover:bg-white/95 transition-all active:scale-95 flex items-center justify-center"
+                    >
+                      <span className="text-[10px] font-medium text-purple-700 leading-tight block text-center truncate max-w-[80px]">
+                        {(currentUser as any)?.statusNote || "Note+"}
+                      </span>
+                      <div className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/80 border-b border-r border-white/80 rotate-45"></div>
+                    </div>
+                    <div
+                      onClick={() => {
+                        const { setSelectedCreateMode } = useAppStore.getState();
+                        setSelectedCreateMode('story');
+                        pushPage('create');
+                      }}
+                      className="cursor-pointer transition-transform active:scale-95 relative p-[2.5px] rounded-full bg-gradient-to-tr from-cyan-400 to-teal-400"
+                    >
+                      <img
+                        src={
+                          currentUser?.avatar ||
+                          `https://ui-avatars.com/api/?name=${currentUser?.name || "Me"}&background=random`
+                        }
+                        className="w-[84px] h-[84px] rounded-full object-cover border-2 border-white shadow-xs"
+                        alt="Me"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute bottom-0.5 right-0.5 w-6 h-6 bg-[#20D5EC] rounded-full border-[2.5px] border-white flex items-center justify-center shadow-xs">
+                        <Plus className="w-4 h-4 text-white" strokeWidth={3} />
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[12px] font-normal [font-weight:400] text-gray-900 mt-1.5">
+                    Create
+                  </span>
+                </div>
+
+                {(() => {
+                  // Build combined list of users with active stories and followers
+                  const authorMap = new Map<string, { id: string; name: string; avatar: string; statusNote?: string; stories: Story[] }>();
+
+                  // 1. Add all authors who have active stories
+                  inboxStories.forEach((s) => {
+                    if (s.authorId && s.authorId !== currentUser?.uid) {
+                      if (!authorMap.has(s.authorId)) {
+                        authorMap.set(s.authorId, {
+                          id: s.authorId,
+                          name: s.authorName || 'User',
+                          avatar: s.authorAvatar || '',
+                          stories: []
+                        });
+                      }
+                      authorMap.get(s.authorId)!.stories.push(s);
+                    }
+                  });
+
+                  // 2. Merge followers
+                  followers.forEach((f) => {
+                    const fid = f.id as string;
+                    if (fid && fid !== currentUser?.uid) {
+                      if (authorMap.has(fid)) {
+                        const item = authorMap.get(fid)!;
+                        if (f.name) item.name = f.name;
+                        if (f.avatar) item.avatar = f.avatar as string;
+                        item.statusNote = f.statusNote;
+                      } else {
+                        authorMap.set(fid, {
+                          id: fid,
+                          name: f.name || 'User',
+                          avatar: (f.avatar as string) || '',
+                          statusNote: f.statusNote,
+                          stories: []
+                        });
+                      }
+                    }
+                  });
+
+                  const items = Array.from(authorMap.values()).sort((a, b) => {
+                    const hasStoryA = a.stories.length > 0;
+                    const hasStoryB = b.stories.length > 0;
+                    if (hasStoryA && !hasStoryB) return -1;
+                    if (!hasStoryA && hasStoryB) return 1;
+                    if (hasStoryA && hasStoryB) {
+                      const isViewedA = !!viewedInboxStories[a.id];
+                      const isViewedB = !!viewedInboxStories[b.id];
+                      if (!isViewedA && isViewedB) return -1;
+                      if (isViewedA && !isViewedB) return 1;
+                    }
+                    return 0;
+                  });
+
+                  return items.map((item) => {
+                    const authorId = item.id;
+                    const firstStory = item.stories[0];
+                    const isViewed = !!viewedInboxStories[authorId as string];
+                    const hasStory = !!firstStory;
+
+                    const authorInfo = {
+                      name: userDataCache[authorId]?.name || item.name,
+                      avatar: userDataCache[authorId]?.avatar || item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&background=random`,
+                      statusNote: item.statusNote || userDataCache[authorId]?.statusNote,
+                    };
+
+                    return (
+                      <div
+                        key={authorId}
+                        className="flex flex-col items-center flex-shrink-0 cursor-pointer pt-6 pb-1 relative"
+                        onClick={() => {
+                          if (hasStory) {
+                            setViewingStory(firstStory);
+                            const newViewed = {
+                              ...viewedInboxStories,
+                              [authorId as string]: true,
+                            };
+                            setViewedInboxStories(newViewed);
+                            localStorage.setItem(
+                              "viewedInboxStories",
+                              JSON.stringify(newViewed),
+                            );
+                          } else {
+                            // Find conversation and open chat
+                            const conv = conversations.find(
+                              (c) =>
+                                c.participantIds?.includes(
+                                  authorId as string,
+                                ) && c.participantIds?.length === 2,
+                            );
+                            if (conv) {
+                              setActiveChat(conv.id);
+                            } else if (currentUser) {
+                              import("../services/chatService").then(async ({ createConversation }) => {
+                                const newConvId = await createConversation(
+                                  [currentUser.uid, authorId],
+                                  {
+                                    [currentUser.uid]: {
+                                      name: currentUser.name || "User",
+                                      avatar: currentUser.avatar || "",
+                                    },
+                                    [authorId]: {
+                                      name: authorInfo.name || "User",
+                                      avatar: authorInfo.avatar || "",
+                                    },
+                                  },
+                                );
+                                setActiveChat(newConvId);
+                              }).catch(err => console.error(err));
+                            }
+                          }
+                        }}
+                      >
+                        <div className="relative">
+                          {/* Follower Note Bubble overlapping top */}
+                          {authorInfo.statusNote && (
+                            <div className="absolute top-[-10px] left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-white/80 backdrop-blur-md border border-white/80 shadow-xs rounded-full z-20 w-auto max-w-[96px]">
+                              <span className="text-[10px] font-medium text-gray-800 leading-tight block text-center truncate max-w-[80px]">
+                                {authorInfo.statusNote}
+                              </span>
+                              <div className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/80 border-b border-r border-white/80 rotate-45"></div>
+                            </div>
+                          )}
+                          <div
+                            className={`w-[88px] h-[88px] rounded-full p-[2.5px] transition-all duration-300 active:scale-95 ${
+                              hasStory
+                                ? isViewed
+                                  ? "bg-gray-300/80 opacity-60 border border-gray-200"
+                                  : "bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600 shadow-xs ring-2 ring-rose-500/20"
+                                : "bg-gray-200/60 border border-gray-100"
+                            }`}
+                          >
+                            <div className="w-full h-full rounded-full border-[2.5px] border-white overflow-hidden bg-gray-100 relative">
+                              <img
+                                src={authorInfo.avatar}
+                                alt={authorInfo.name}
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[12px] font-normal [font-weight:400] text-gray-900 mt-1.5 truncate w-[88px] text-center">
+                          {authorInfo.name.split(" ")[0]}
+                        </span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* Contacts List */}
+          <div className="pt-0.5">
+            {!searchQuery.trim() && (
+              <div className="grid grid-cols-2 gap-2 px-3 py-1.5">
+                {/* New Followers Option */}
+                <div
+                  onClick={() => {
+                    setLastCheckedFollowers(followers.length);
+                    setActiveChat("followers");
+                  }}
+                  className="flex items-center justify-between p-2.5 bg-gray-50/70 hover:bg-purple-50/50 border border-gray-200/60 rounded-2xl cursor-pointer transition-all active:scale-[0.98] min-w-0"
+                >
+                  <div className="flex items-center space-x-2.5 min-w-0 flex-1 pr-1">
+                    <div className="flex-shrink-0 w-11 h-11 bg-gradient-to-tr from-[#0095F6] via-[#1DA1F2] to-sky-400 rounded-full flex items-center justify-center border border-white/50 shadow-xs">
+                      <Users
+                        className="w-5 h-5 text-white"
+                        strokeWidth={2.2}
+                      />
+                    </div>
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <h3 className="text-[13px] font-medium text-gray-900 truncate">
+                        New followers
+                      </h3>
+                      <p className={`text-[11px] truncate ${followers.length > lastCheckedFollowers ? "font-semibold text-gray-900" : "font-normal text-gray-400"}`}>
+                        {(() => {
+                          if (followers.length === 0) return "No new followers";
+                          const firstFollower = followers[0];
+                          const followerTime = (firstFollower as any)?.followedAt || (firstFollower as any)?.createdAt;
+                          const fTime = followerTime ? ((followerTime as any)?.toMillis?.() || new Date(followerTime).getTime()) : 0;
+                          const isFollowerOlderThan5Days = fTime > 0 && ((Date.now() - fTime) > 5 * 24 * 3600 * 1000);
+                          if (isFollowerOlderThan5Days) {
+                            const days = Math.floor((Date.now() - fTime) / (1000 * 3600 * 24));
+                            return `${days} days ago`;
+                          }
+                          return `${firstFollower.name || "Someone"} started following you`;
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+                  {followers.length > lastCheckedFollowers && (
+                    <div className="flex-shrink-0 bg-[#FF3366] text-white text-[11px] font-bold rounded-full min-w-[20px] h-[20px] px-1.5 flex items-center justify-center shadow-xs">
+                      {followers.length - lastCheckedFollowers > 5
+                        ? "5+"
+                        : followers.length - lastCheckedFollowers}
+                    </div>
+                  )}
+                </div>
+
+                {/* Activity Option */}
+                <div
+                  onClick={() => {
+                    setNotifications((prev) =>
+                      prev.map((n) => ({ ...n, read: true, isRead: true })),
+                    );
+                    setLastCheckedActivity(Date.now());
+                    if (currentUser?.uid) {
+                      import("../services/notificationService").then((m) =>
+                        m.markAllRead(currentUser.uid),
+                      );
+                    }
+                    setActiveChat("activity");
+                  }}
+                  className="flex items-center justify-between p-2.5 bg-gray-50/70 hover:bg-purple-50/50 border border-gray-200/60 rounded-2xl cursor-pointer transition-all active:scale-[0.98] min-w-0"
+                >
+                  {(() => {
+                    const actNotifs = notifications.filter((n) => n.type !== "follow");
+                    const lastNotif = actNotifs[0];
+                    const notifTime = lastNotif?.createdAt
+                      ? ((lastNotif.createdAt as any)?.toMillis?.() || new Date(lastNotif.createdAt).getTime())
+                      : 0;
+                    const isNotifOlderThan5Days = notifTime > 0 && ((Date.now() - notifTime) > 5 * 24 * 3600 * 1000);
+
+                    let actText = "No new activity";
+                    if (actNotifs.length > 0 && lastNotif) {
+                      if (isNotifOlderThan5Days) {
+                        const days = Math.floor((Date.now() - notifTime) / (1000 * 3600 * 24));
+                        actText = `${days} days ago`;
+                      } else {
+                        switch (lastNotif.type) {
+                          case "like":
+                            actText = `${lastNotif.actorName || "Someone"} liked your post`;
+                            break;
+                          case "comment":
+                            actText = `${lastNotif.actorName || "Someone"} left a comment`;
+                            break;
+                          default:
+                            actText = `${lastNotif.actorName || "Someone"} interacted with you`;
+                            break;
+                        }
+                      }
+                    }
+
+                    const actUnread = notifications.filter((n) => {
+                      if (n.type === "follow") return false;
+                      if (n.read || n.isRead) return false;
+                      const nTime = (n.createdAt as any)?.toMillis
+                        ? (n.createdAt as any).toMillis()
+                        : (n.createdAt as any)?.seconds
+                          ? (n.createdAt as any).seconds * 1000
+                          : typeof n.createdAt === "number"
+                            ? n.createdAt
+                            : Date.now();
+                      return nTime > (lastCheckedActivity || 0);
+                    }).length;
+
+                    return (
+                      <>
+                        <div className="flex items-center space-x-2.5 min-w-0 flex-1 pr-1">
+                          <div className="flex-shrink-0 w-11 h-11 bg-gradient-to-tr from-[#FF2C55] via-[#FE2C55] to-rose-400 rounded-full flex items-center justify-center border border-white/50 shadow-xs">
+                            <Sparkles
+                              className="w-5 h-5 text-white fill-white"
+                              strokeWidth={2}
+                            />
+                          </div>
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <h3 className="text-[13px] font-medium text-gray-900 truncate">
+                              Activity
+                            </h3>
+                            <p className={`text-[11px] truncate ${actUnread > 0 ? "font-semibold text-gray-900" : "font-normal text-gray-400"}`}>
+                              {actText}
+                            </p>
+                          </div>
+                        </div>
+                        {actUnread > 0 && (
+                          <div className="flex-shrink-0 bg-[#FF3366] text-white text-[11px] font-bold rounded-full min-w-[20px] h-[20px] px-1.5 flex items-center justify-center shadow-xs">
+                            {actUnread > 5 ? "5+" : actUnread}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* Pinned Ennvo Jarvis AI Assistant Item */}
+            <div
+              onClick={() => setActiveChat("jarvis")}
+              className={`flex items-center justify-between px-3.5 py-2.5 cursor-pointer transition-colors border-b border-gray-100 ${
+                activeChat === "jarvis" ? "bg-purple-50/80" : "hover:bg-gray-50/80"
+              }`}
+            >
+              <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <div className="relative flex-shrink-0">
+                  <div className="w-[50px] h-[50px] rounded-full p-[2px] bg-gradient-to-tr from-purple-500 via-indigo-500 to-pink-500 shadow-xs flex items-center justify-center">
+                    <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center border border-white/20">
+                      <Sparkles className="w-5 h-5 text-purple-300 animate-pulse" />
+                    </div>
+                  </div>
+                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+                </div>
+                <div className="flex flex-col min-w-0 pr-2 space-y-0.5 flex-1">
+                  <div className="flex items-center space-x-1.5">
+                    <h3 className="text-[14px] truncate tracking-tight font-medium text-gray-900">
+                      Ennvo Jarvis
+                    </h3>
+                  </div>
+                  <p className="text-[12px] truncate text-gray-500 font-normal">
+                    {jarvisMessages[jarvisMessages.length - 1]?.content || "কিরে বন্ধু! কী খবর তোর?"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {filteredConversations.map((conv, idx) => {
+              const isGroup =
+                (conv as any).isGroup ||
+                !!(conv as any).groupName ||
+                (conv.participantIds ? conv.participantIds.length > 2 : false);
+              const otherId = isGroup
+                ? undefined
+                : conv.participantIds?.find((id) => id !== currentUser?.uid);
+              const name = isGroup
+                ? (conv as any).groupName || "Group Chat"
+                : userDataCache[otherId || ""]?.name ||
+                  (conv.participantNames || {})[otherId || ""] ||
+                  "User";
+              const avatar = isGroup
+                ? (conv as any).groupAvatar
+                : userDataCache[otherId || ""]?.avatar ||
+                  (conv.participantAvatars || {})[otherId || ""] ||
+                  `https://ui-avatars.com/api/?name=${name}&background=random`;
+              const unreadMessages =
+                conv.id === activeChat
+                  ? 0
+                  : currentUser &&
+                    conv.unreadCount &&
+                    conv.unreadCount[currentUser.uid]
+                  ? conv.unreadCount[currentUser.uid]
+                  : 0;
+
+              const isUnread = typeof unreadMessages === "number" && unreadMessages > 0;
+
+              let timeStr = "Just now";
+              let lastMsgDate: Date | null = null;
+              if (conv.lastMessageTime) {
+                lastMsgDate =
+                  (conv.lastMessageTime as any)?.toDate?.() ||
+                  new Date(conv.lastMessageTime);
+                if (lastMsgDate && !isNaN(lastMsgDate.getTime())) {
+                  const diff = Math.floor(
+                    (new Date().getTime() - lastMsgDate.getTime()) / 1000,
+                  );
+                  if (diff < 45) {
+                    timeStr = "Just now";
+                  } else if (diff < 3600) {
+                    const mins = Math.max(1, Math.floor(diff / 60));
+                    timeStr = `${mins} min ago`;
+                  } else if (diff < 86400) {
+                    const hours = Math.floor(diff / 3600);
+                    timeStr = `${hours} hour${hours > 1 ? "s" : ""} ago`;
+                  } else if (diff < 2592000) {
+                    const days = Math.floor(diff / 86400);
+                    timeStr = `${days} day${days > 1 ? "s" : ""} ago`;
+                  } else {
+                    const months = Math.floor(diff / 2592000);
+                    timeStr = `${months} month${months > 1 ? "s" : ""} ago`;
+                  }
+                }
+              }
+
+              const isOlderThan5Days = !!(
+                lastMsgDate &&
+                !isNaN(lastMsgDate.getTime()) &&
+                Date.now() - lastMsgDate.getTime() > 5 * 24 * 60 * 60 * 1000
+              );
+
+              const hasStory =
+                otherId && inboxStories.some((s) => s.authorId === otherId);
+
+              const otherMembers = isGroup
+                ? conv.participantIds.filter((id) => id !== currentUser?.uid)
+                : [];
+
+              return (
+                <React.Fragment key={conv.id}>
+                  <div
+                    onClick={(e) => {
+                      if (longPressedRef.current) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                      }
+                      if (
+                        document.querySelector(
+                          ".fixed.bg-white.rounded-2xl.shadow-2xl.border.border-gray-100.py-2.w-48.z-50",
+                        )
+                      )
+                        return;
+                      setActiveChat(conv.id);
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setChatContextMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        convId: conv.id,
+                        otherUid: !isGroup ? otherId : undefined,
+                      });
+                    }}
+                    onTouchStart={(e) =>
+                      handleChatTouchStart(
+                        e,
+                        conv.id,
+                        !isGroup ? otherId : undefined,
+                      )
+                    }
+                    onTouchEnd={handleChatTouchEnd}
+                    onTouchMove={handleChatTouchEnd}
+                    onMouseDown={(e) =>
+                      handleChatTouchStart(
+                        e,
+                        conv.id,
+                        !isGroup ? otherId : undefined,
+                      )
+                    }
+                    onMouseUp={handleChatTouchEnd}
+                    onMouseMove={handleChatTouchEnd}
+                    className="flex items-center justify-between px-3.5 py-1.5 cursor-pointer hover:bg-white/50 active:bg-gray-100/60 transition-colors group"
+                  >
+                    <div className="flex items-center space-x-3 min-w-0 flex-1">
+                      <div
+                        className="relative flex-shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isGroup) {
+                            setActiveChat(conv.id);
+                            setShowChatSettings(true);
+                          } else {
+                            setViewingUser({
+                              uid: otherId || "",
+                              name,
+                              avatar: avatar as string,
+                            });
+                            pushPage("profile");
+                          }
+                        }}
+                      >
+                        {isGroup && !avatar ? (
+                          <div className="group-hover:opacity-90 transition-opacity">
+                            <GroupAvatar
+                              members={otherMembers
+                                .slice(0, 3)
+                                .map(
+                                  (id) =>
+                                    userDataCache[id]?.avatar ||
+                                    (conv.participantAvatars || {})[id] ||
+                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(userDataCache[id]?.name || (conv.participantNames || {})[id] || "User")}&background=random`,
+                                )}
+                              sizeClass="w-[54px] h-[54px]"
+                            />
+                          </div>
+                        ) : (
+                          <div className={`rounded-full p-[2px] transition-all shrink-0 ${hasStory ? "bg-gradient-to-tr from-[#20D5EC] via-pink-500 to-yellow-400" : "bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500"}`}>
+                            <img
+                              src={avatar as string}
+                              alt={name}
+                              loading="lazy"
+                              className="w-[54px] h-[54px] rounded-full object-cover group-hover:opacity-90 transition-opacity border-2 border-white"
+                              referrerPolicy="no-referrer"
+                            />
+                            {otherId && (presenceData[otherId]?.isOnline || (presenceData[otherId] as any)?.state === "online") && (
+                              <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-[#22c55e] border-2 border-white rounded-full"></div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col min-w-0 pr-2 space-y-0 -mt-0.5 flex-1">
+                        <h3 className="text-[14px] truncate tracking-tight leading-tight font-normal text-black">
+                          {name}
+                        </h3>
+                        <div className="flex items-center text-[12px] leading-tight pt-0.5">
+                          {isOlderThan5Days ? (
+                            <p className="truncate max-w-[170px] md:max-w-[220px] text-[12px] text-gray-400 font-normal">
+                              {timeStr}
+                            </p>
+                          ) : isUnread ? (
+                            unreadMessages >= 2 ? (
+                              <>
+                                <p className="truncate max-w-[150px] md:max-w-[200px] text-[12px] font-semibold text-black">
+                                  {unreadMessages > 5
+                                    ? "5+ new messages"
+                                    : `${unreadMessages} new messages`}
+                                </p>
+                                <span className="mx-1 text-[11px] text-gray-400 font-normal">·</span>
+                                <span className="whitespace-nowrap text-[11px] font-normal text-gray-400">
+                                  {timeStr}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <p className="truncate max-w-[150px] md:max-w-[200px] text-[12px] font-semibold text-black">
+                                  {conv.lastMessage || "Sent a message"}
+                                </p>
+                                <span className="mx-1 text-[11px] text-gray-400 font-normal">·</span>
+                                <span className="whitespace-nowrap text-[11px] font-normal text-gray-400">
+                                  {timeStr}
+                                </span>
+                              </>
+                            )
+                          ) : (conv as any).lastSenderId === currentUser?.uid ? (() => {
+                            const isSeenByOther = otherId && conv.unreadCount && conv.unreadCount[otherId] === 0;
+                            return (
+                              <p className="truncate max-w-[170px] md:max-w-[220px] text-[12px] text-gray-400 font-normal">
+                                {isSeenByOther ? `Seen · ${timeStr}` : `Sent ${timeStr}`}
+                              </p>
+                            );
+                          })() : (
+                            <>
+                              <p className="truncate max-w-[150px] md:max-w-[200px] text-[12px] text-gray-400 font-normal">
+                                {conv.lastMessage || "Sent a message"}
+                              </p>
+                              <span className="mx-1 text-[11px] text-gray-400 font-normal">·</span>
+                              <span className="whitespace-nowrap text-[11px] font-normal text-gray-400">
+                                {timeStr}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex-shrink-0 ml-2">
+                      {typeof unreadMessages === "number" &&
+                      unreadMessages > 0 ? (
+                        <div className="bg-[#FF3366] text-white text-[11px] font-bold rounded-full min-w-[20px] h-[20px] px-1.5 flex items-center justify-center shadow-xs">
+                          {unreadMessages > 5 ? "5+" : unreadMessages}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </div>
+          </div>
+        </PullToRefresh>
+      </div>
+
+      {/* Right Chat Area */}
+      <AnimatePresence>
+        {activeChat ? (
+          isSpecialChat ? (
+            <motion.div
+              key="special"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-full bg-white will-change-opacity"
+            >
+              <div className="min-h-[88px] md:min-h-[72px] px-4 pt-8 md:pt-0 pb-2 md:pb-0 border-b border-gray-100 flex items-center space-x-4 bg-white/90 backdrop-blur-md sticky top-0 z-20">
+                <button
+                  className="md:hidden p-2 -ml-2 hover:bg-black/5 rounded-full"
+                  onClick={() => setActiveChat(null)}
+                >
+                  <ArrowLeft className="w-6 h-6 text-gray-900" />
+                </button>
+                <h2 className="font-normal text-[16px] leading-tight text-gray-900">
+                  {activeChat === "followers" ? "New followers" : "Activity"}
+                </h2>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 md:p-4">
+                {activeChat === "followers" ? (
+                  <div className="space-y-0">
+                    {followers.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-4 py-20">
+                        <UserPlus className="w-16 h-16 text-gray-200" />
+                        <p className="font-normal text-lg">
+                          No new followers yet
+                        </p>
+                      </div>
+                    ) : (
+                      followers
+                        .slice(0, 50)
+                        .map((f: any) => (
+                          <FollowerItem
+                            key={f.id}
+                            follower={f}
+                            currentUser={currentUser}
+                            onFollowBack={handleFollowBack}
+                          />
+                        ))
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    className="space-y-0"
+                    onScroll={(e) => {
+                      if (
+                        e.currentTarget.scrollHeight -
+                          e.currentTarget.scrollTop <=
+                        e.currentTarget.clientHeight + 50
+                      ) {
+                        setActivityLimit((prev) => prev + 15);
+                      }
+                    }}
+                  >
+                    {notifications.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-4 py-20">
+                        <Bell className="w-16 h-16 text-gray-200" />
+                        <p className="font-normal text-lg">No activity yet</p>
+                      </div>
+                    ) : (
+                      notifications.slice(0, activityLimit || 15).map((n) => (
+                        <div
+                          key={n.id}
+                          className="flex items-center space-x-3 px-4 py-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-all group"
+                          onClick={() => {
+                            if (n.postId && n.postMedia) {
+                              const {
+                                setHighlightedCommentId,
+                                setHighlightedPostId,
+                                setShowLikesList,
+                                setTargetLikesPostId,
+                                setViewingReel,
+                                setViewingMedia,
+                              } = useAppStore.getState();
+
+                              if (n.type === "like") {
+                                setTargetLikesPostId(n.postId);
+                                setShowLikesList(true);
+                              } else if (
+                                n.type === "comment" ||
+                                n.type === "reply" ||
+                                n.type === "mention" ||
+                                n.type === "comment_like"
+                              ) {
+                                setHighlightedCommentId(n.targetId);
+                                setHighlightedPostId(n.postId);
+                              }
+
+                              const isReel =
+                                n.postMedia.includes(".mp4") ||
+                                n.postMedia.includes("video");
+                              const postAuthor = {
+                                name: n.postAuthorName || n.actorName,
+                                avatar: n.postAuthorAvatar || n.actorAvatar,
+                              };
+
+                              if (isReel) {
+                                import("../services/postService").then(({ getPost }) => {
+                                  getPost(n.postId!).then((realPost) => {
+                                    if (realPost) {
+                                      setViewingReel({ ...realPost, single: true });
+                                    } else {
+                                      setViewingReel({
+                                        id: n.postId,
+                                        authorId: n.postAuthorId || "",
+                                        authorName: postAuthor.name,
+                                        authorAvatar: postAuthor.avatar,
+                                        media: [n.postMedia!],
+                                        text: "",
+                                        type: "reel",
+                                        likesCount: 0,
+                                        commentsCount: 0,
+                                        single: true,
+                                      });
+                                    }
+                                  });
+                                });
+                              } else {
+                                setViewingMedia({
+                                  url: n.postMedia,
+                                  type: "post",
+                                  user: postAuthor,
+                                });
+                              }
+                            } else {
+                              setViewingUser({
+                                uid: n.actorId,
+                                name: n.actorName,
+                                avatar: n.actorAvatar,
+                              });
+                              pushPage("profile");
+                            }
+                          }}
+                        >
+                          <div
+                            className="relative flex-shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewingUser({
+                                uid: n.actorId,
+                                name: n.actorName,
+                                avatar: n.actorAvatar,
+                              });
+                              pushPage("profile");
+                            }}
+                          >
+                            <img
+                              src={
+                                n.actorAvatar ||
+                                `https://ui-avatars.com/api/?name=${encodeURIComponent(n.actorName || "User")}&background=random`
+                              }
+                              className="w-12 h-12 rounded-full object-cover shadow-sm border border-gray-100"
+                              alt="actor"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 scale-90">
+                              {n.type === "like" && (
+                                <Heart className="w-3 h-3 text-red-500 fill-red-500" />
+                              )}
+                              {n.type === "comment" && (
+                                <MessageCircle className="w-3 h-3 text-blue-500 fill-blue-500" />
+                              )}
+                              {n.type === "follow" && (
+                                <UserPlus className="w-3 h-3 text-purple-500" />
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[14px] leading-snug">
+                              <span className="font-normal text-gray-900 hover:underline">
+                                {n.actorName || "User"}
+                              </span>
+                              <span
+                                className={`${n.type === "follow" ? "text-gray-900 font-normal" : "text-gray-600"} ml-1`}
+                              >
+                                {n.type === "like" && "liked your post."}
+                                {n.type === "comment" &&
+                                  `commented: ${n.content}`}
+                                {n.type === "follow" &&
+                                  "started following you."}
+                                {n.type === "mention" && "mentioned you."}
+                                {n.type === "favorite" && "saved your post."}
+                                {n.type === "reply" &&
+                                  `replied to your comment: ${n.content}`}
+                                {n.type === "comment_like" &&
+                                  "liked your comment."}
+                              </span>
+                            </p>
+                            <p className="text-[10px] text-gray-400 mt-0.5 font-normal uppercase tracking-tight">
+                              {(() => {
+                                const timestamp = n.createdAt;
+                                if (!timestamp) return "Just now";
+                                try {
+                                  const date = timestamp?.toDate
+                                    ? timestamp.toDate()
+                                    : timestamp instanceof Date
+                                      ? timestamp
+                                      : new Date(timestamp);
+                                  if (isNaN(date.getTime())) return "Just now";
+                                  const now = new Date();
+                                  const diff = Math.floor(
+                                    (now.getTime() - date.getTime()) / 1000,
+                                  );
+                                  if (diff < 60) return "Just now";
+                                  if (diff < 3600)
+                                    return `${Math.floor(diff / 60)}m ago`;
+                                  if (diff < 86400)
+                                    return `${Math.floor(diff / 3600)}h ago`;
+                                  return date.toLocaleDateString();
+                                } catch (e) {
+                                  return "Just now";
+                                }
+                              })()}
+                            </p>
+                          </div>
+                          {n.postMedia && (
+                            <div className="w-12 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-gray-100 shadow-sm group-hover:opacity-80 transition-opacity bg-gray-50">
+                              {n.postMedia.includes(".mp4") ||
+                              n.postMedia.includes("video") ? (
+                                <div className="relative w-full h-full">
+                                  <video
+                                    src={n.postMedia}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                                    <Play className="w-4 h-4 text-white fill-white" />
+                                  </div>
+                                </div>
+                              ) : (
+                                <img
+                                  src={n.postMedia}
+                                  className="w-full h-full object-cover"
+                                  alt="thumb"
+                                  referrerPolicy="no-referrer"
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="regular"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
+              className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-full overflow-hidden bg-white"
+            >
+              {/* Chat Background Layer - Completely fixed GPU hardware layer so it never resizes or zooms when keyboard opens */}
+              {(!chatTheme || chatTheme === "bg-image" || chatTheme === "bg-white") ? (
+                <>
+                  {/* Mobile Only: Chat Background Image */}
+                  <img
+                    src="/chat-background.png"
+                    alt=""
+                    className="fixed md:hidden pointer-events-none z-0 select-none object-cover"
+                    style={{ 
+                      position: 'fixed',
+                      top: 0,
+                      left: 0,
+                      width: fixedScreenSize.width,
+                      height: fixedScreenSize.height,
+                      minHeight: fixedScreenSize.height,
+                      maxHeight: fixedScreenSize.height,
+                      objectFit: 'cover',
+                      objectPosition: 'center top',
+                      transform: 'translate3d(0, 0, 0)',
+                      WebkitTransform: 'translate3d(0, 0, 0)',
+                      backfaceVisibility: 'hidden',
+                      willChange: 'transform',
+                      pointerEvents: 'none'
+                    }}
+                  />
+
+                  {/* PC Only: Beautiful wallpaper design (image removed on PC, replaced with aesthetic ambient background) */}
+                  <div 
+                    className="hidden md:block absolute inset-0 pointer-events-none z-0 select-none overflow-hidden"
+                    style={{
+                      background: 'linear-gradient(135deg, #f1f5f9 0%, #eef2ff 35%, #faf5ff 70%, #fdf4ff 100%)',
+                    }}
+                  >
+                    <div className="absolute -top-28 -right-28 w-[480px] h-[480px] rounded-full bg-gradient-to-br from-indigo-200/40 via-purple-200/30 to-pink-200/20 blur-3xl pointer-events-none" />
+                    <div className="absolute top-1/2 -left-32 w-[420px] h-[420px] rounded-full bg-gradient-to-tr from-blue-200/35 via-cyan-100/25 to-purple-200/20 blur-3xl pointer-events-none" />
+                    <div className="absolute -bottom-24 right-1/4 w-[440px] h-[440px] rounded-full bg-gradient-to-t from-purple-200/30 via-pink-100/30 to-amber-100/20 blur-3xl pointer-events-none" />
+                    <div 
+                      className="absolute inset-0 opacity-[0.04] pointer-events-none" 
+                      style={{
+                        backgroundImage: `radial-gradient(#4f46e5 1px, transparent 1px), radial-gradient(#9333ea 1px, #f8fafc 1px)`,
+                        backgroundSize: '28px 28px',
+                        backgroundPosition: '0 0, 14px 14px',
+                      }}
+                    />
+                  </div>
+                </>
+              ) : (chatTheme.startsWith("http") || chatTheme.startsWith("/") || chatTheme.startsWith("data:")) ? (
+                <img
+                  src={chatTheme}
+                  alt=""
+                  className="fixed pointer-events-none z-0 select-none object-cover"
+                  style={{ 
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: fixedScreenSize.width,
+                    height: fixedScreenSize.height,
+                    minHeight: fixedScreenSize.height,
+                    maxHeight: fixedScreenSize.height,
+                    objectFit: 'cover',
+                    objectPosition: 'center top',
+                    transform: 'translate3d(0, 0, 0)',
+                    WebkitTransform: 'translate3d(0, 0, 0)',
+                    backfaceVisibility: 'hidden',
+                    willChange: 'transform',
+                    pointerEvents: 'none'
+                  }}
+                />
+              ) : (
+                <div
+                  className={`fixed inset-0 ${chatTheme} z-0 pointer-events-none`}
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: fixedScreenSize.width,
+                    height: fixedScreenSize.height,
+                    transform: 'translate3d(0, 0, 0)',
+                    WebkitTransform: 'translate3d(0, 0, 0)'
+                  }}
+                />
+              )}
+
+              {/* Chat Header */}
+              <div
+                className="min-h-[88px] md:min-h-[72px] px-3 md:px-5 pt-8 md:pt-0 pb-2 md:pb-0 border-b border-white/20 flex items-center justify-between bg-white/40 backdrop-blur-xl relative z-20 shadow-xs transition-all duration-200"
+              >
+                <div
+                  className="flex items-center space-x-3 cursor-pointer group min-w-0"
+                  onClick={() => setShowChatSettings(true)}
+                >
+                  <button
+                    className="md:hidden p-2 -ml-1 hover:bg-black/5 active:scale-90 rounded-full transition-all text-gray-800"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveChat(null);
+                    }}
+                  >
+                    <ArrowLeft
+                      className="w-6 h-6 text-gray-900"
+                      strokeWidth={2.2}
+                    />
+                  </button>
+                  <div className="relative">
+                    {activeContact?.isGroup && !activeContact.avatar ? (
+                      <div className="cursor-pointer group-hover:opacity-90 transition-opacity">
+                        <GroupAvatar
+                          members={
+                            activeConversation?.participantIds
+                              ?.filter((id) => id !== currentUser?.uid)
+                              .slice(0, 3)
+                              .map(
+                                (id) =>
+                                  userDataCache[id]?.avatar ||
+                                  (activeConversation?.participantAvatars || {})[id] ||
+                                  `https://ui-avatars.com/api/?name=${encodeURIComponent(userDataCache[id]?.name || (activeConversation?.participantNames || {})[id] || "User")}&background=random`,
+                              ) || []
+                          }
+                          sizeClass="w-10 h-10 md:w-11 md:h-11"
+                        />
+                      </div>
+                    ) : (
+                      <img
+                        src={activeContact?.avatar as string}
+                        alt="Avatar"
+                        className="w-10 h-10 md:w-11 md:h-11 rounded-full object-cover group-hover:opacity-90 transition-opacity shadow-xs border border-gray-100"
+                      />
+                    )}
+                    {activeContact?.online && (
+                      <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full shadow-xs" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h2
+                      className="font-semibold text-[15px] md:text-[16px] text-gray-900 truncate leading-tight tracking-tight"
+                    >
+                      {activeContact?.name}
+                    </h2>
+                    <p
+                      className="text-[12px] font-medium text-emerald-600 truncate flex items-center gap-1 mt-0.5"
+                    >
+                      {activeContact?.online ? (
+                        <>
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                          <span>Active now</span>
+                        </>
+                      ) : activeContact?.lastSeen ? (
+                        <span className="text-gray-400 font-normal">Active {formatTime(activeContact.lastSeen)}</span>
+                      ) : (
+                        <span className="text-gray-400 font-normal">Offline</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-1">
+                  {activeChat === "jarvis" ? (
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => {
+                          const welcome = [{
+                            id: "jarvis-welcome-1",
+                            senderId: "jarvis",
+                            type: "text",
+                            content: `কিরে বন্ধু ${currentUser?.name ? currentUser.name : ""}! কী খবর তোর? আমি তোর বেস্ট ফ্রেন্ড এনভো জার্ভিস! আজকে কী করতে চাস বল?`,
+                            createdAt: { toMillis: () => Date.now() },
+                            status: "sent"
+                          }];
+                          setJarvisMessages(welcome);
+                          try { localStorage.setItem("jarvis_chat_history", JSON.stringify(welcome)); } catch(e){}
+                        }}
+                        className="px-2.5 py-1 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs font-semibold rounded-full transition-all active:scale-95"
+                      >
+                        Reset Chat
+                      </button>
+                    </div>
+                  ) : activeContact && !activeContact.isGroup && (
+                    <>
+                      <button
+                        onClick={() => handleStartCall('audio')}
+                        title="Audio Call"
+                        className="p-2.5 hover:bg-purple-100 active:scale-95 rounded-full transition-all text-purple-700"
+                      >
+                        <Phone className="w-5 h-5" strokeWidth={2} />
+                      </button>
+                      <button
+                        onClick={() => handleStartCall('video')}
+                        title="Video Call"
+                        className="p-2.5 hover:bg-purple-100 active:scale-95 rounded-full transition-all text-purple-700"
+                      >
+                        <Video className="w-5 h-5" strokeWidth={2} />
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setShowChatSettings(true)}
+                    className="p-2.5 hover:bg-gray-100 active:scale-95 rounded-full transition-all text-gray-700"
+                  >
+                    <Info
+                      className="w-5 h-5 text-gray-700"
+                      strokeWidth={2}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Messages Area */}
+              <div
+                ref={messagesContainerRef}
+                className="flex-1 overflow-y-auto p-4 pb-3 space-y-0.5 scrollbar-hide flex flex-col justify-start relative z-10 overscroll-contain transform-gpu"
+                onScroll={(e) => {
+                  if (e.currentTarget.scrollTop < 20) {
+                    setMessageLimit((prev: number) => prev + 20);
+                  }
+                  // Update auto-scroll ref based on regular scrolling
+                  const { scrollTop, scrollHeight, clientHeight } =
+                    e.currentTarget;
+                  shouldAutoScrollRef.current =
+                    scrollHeight - scrollTop - clientHeight < 200;
+                }}
+              >
+                <div className="flex flex-col items-center justify-center py-8">
+                  <img
+                    src={activeContact?.avatar}
+                    className="w-24 h-24 rounded-full object-cover shadow-md mb-4 cursor-pointer hover:opacity-80 transition-opacity"
+                    alt="Profile"
+                    onClick={() => {
+                      if (activeContact?.uid) {
+                        setViewingUser({
+                          uid: activeContact.uid,
+                          name: activeContact.name,
+                          avatar: activeContact.avatar,
+                        });
+                        pushPage("profile");
+                      }
+                    }}
+                  />
+                  <h2
+                    className={`text-xl font-normal cursor-pointer hover:underline ${chatTheme === "bg-white" ? "text-gray-900" : "text-gray-900"}`}
+                    onClick={() => {
+                      if (activeContact?.isGroup) {
+                        setShowChatSettings(true);
+                      } else if (activeContact?.uid) {
+                        setViewingUser({
+                          uid: activeContact.uid,
+                          name: activeContact.name,
+                          avatar: activeContact.avatar,
+                        });
+                        pushPage("profile");
+                      }
+                    }}
+                  >
+                    {activeContact?.name}
+                  </h2>
+                  {!activeContact?.isGroup && (
+                    <button
+                      onClick={() => {
+                        if (activeContact?.uid) {
+                          setViewingUser({
+                            uid: activeContact.uid,
+                            name: activeContact.name,
+                            avatar: activeContact.avatar,
+                          });
+                          pushPage("profile");
+                        }
+                      }}
+                      className="mt-4 bg-black/5 hover:bg-black/10 text-gray-900 font-normal px-4 py-1.5 rounded-lg transition-colors text-sm"
+                    >
+                      View Profile
+                    </button>
+                  )}
+                </div>
+
+                {renderedMessages}
+
+                {(typingUsers.length > 0 || isJarvisTyping) && (
+                  <div className="flex justify-start mt-3">
+                    <img
+                      src={
+                        activeChat === "jarvis"
+                          ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80"
+                          : activeContact?.isGroup
+                          ? ((activeConversation as any)?.participantAvatars ||
+                              {})[typingUsers[0]] ||
+                            userDataCache[typingUsers[0]]?.avatar ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(((activeConversation as any)?.participantNames || {})[typingUsers[0]] || userDataCache[typingUsers[0]]?.name || "User")}&background=random`
+                          : activeContact?.avatar
+                      }
+                      className="w-7 h-7 rounded-full mr-2 self-end mb-1 object-cover"
+                      alt="Avatar"
+                    />
+                    <div
+                      className={`px-4 py-3 rounded-3xl rounded-bl-md flex items-center space-x-1.5 ${chatTheme === "bg-white" ? "bg-purple-100/90 text-purple-900 border border-purple-200/60" : "bg-purple-900/40 text-purple-200"}`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-purple-600 animate-pulse mr-0.5" />
+                      <div
+                        className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"
+                        style={{ animationDelay: "0ms" }}
+                      ></div>
+                      <div
+                        className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"
+                        style={{ animationDelay: "150ms" }}
+                      ></div>
+                      <div
+                        className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"
+                        style={{ animationDelay: "300ms" }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Floating Input Area */}
+              <div
+                className="sticky bottom-0 z-30 pb-3.5 pt-2 px-3 md:px-6 w-full flex flex-col justify-end pointer-events-none bg-transparent"
+              >
+                {selectedImagePreview && (
+                  <div className="pointer-events-auto flex items-center justify-between bg-white border border-gray-200/90 rounded-2xl p-2 mx-auto mb-2 max-w-3xl w-full shadow-md relative transition-all">
+                    <div className="flex items-center space-x-3 min-w-0">
+                      {selectedMediaType === "video" ? (
+                        <video
+                          src={selectedImagePreview}
+                          className="w-14 h-14 rounded-xl object-cover border border-gray-100 shadow-xs shrink-0 bg-black"
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                        />
+                      ) : (
+                        <img src={selectedImagePreview} className="w-14 h-14 rounded-xl object-cover border border-gray-100 shadow-xs shrink-0" alt="Selected" />
+                      )}
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[12px] font-semibold text-gray-900">
+                          {selectedMediaType === "video" ? "Video attached" : "Photo attached"}
+                        </span>
+                        <span className="text-[11px] text-gray-500">Type a message or press send</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedImagePreview(null)}
+                      className="p-1.5 hover:bg-gray-100 active:scale-90 rounded-full transition-all shrink-0 text-gray-400 hover:text-gray-800"
+                    >
+                      <X className="w-4 h-4" strokeWidth={2.5} />
+                    </button>
+                  </div>
+                )}
+
+                {replyingTo && (
+                  <div className="pointer-events-auto flex items-center justify-between ultra-glass-reply-box px-3.5 py-2 mx-auto mb-2 max-w-3xl w-full relative overflow-hidden transition-all">
+                    <div className="absolute left-0 top-0 bottom-0 w-[3.5px] bg-purple-500 rounded-r"></div>
+                    <div className="flex-1 min-w-0 pl-2 flex items-center">
+                      {replyingTo.type === "reel" && replyingTo.mediaUrl && (
+                        <div className="w-6 h-8 rounded shrink-0 overflow-hidden mr-2 bg-gray-900 border border-gray-200">
+                          <video
+                            src={`${replyingTo.mediaUrl}#t=0.001`}
+                            className="w-full h-full object-cover"
+                            preload="metadata"
+                          />
+                        </div>
+                      )}
+                      <div className="flex flex-col justify-center min-w-0">
+                        <span className="text-[10px] font-semibold text-purple-600 tracking-tight leading-none">
+                          Replying to{" "}
+                          {replyingTo.senderId === currentUser?.uid
+                            ? "yourself"
+                            : activeContact?.name}
+                        </span>
+                        <p className="text-[12px] font-normal text-gray-800 truncate leading-tight mt-0.5">
+                          {replyingTo.content ||
+                            (replyingTo.type === "image"
+                              ? "Photo"
+                              : replyingTo.type === "voice"
+                                ? "Voice message"
+                                : "Reel")}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReplyingTo(null)}
+                      className="p-1 hover:bg-gray-200/60 active:scale-90 rounded-full transition-all shrink-0 text-gray-400 hover:text-gray-700 ml-2"
+                    >
+                      <X className="w-3.5 h-3.5" strokeWidth={2} />
+                    </button>
+                  </div>
+                )}
+
+                <form
+                  onSubmit={handleSend}
+                  className="pointer-events-auto flex items-end space-x-1.5 w-full max-w-3xl mx-auto ultra-glass-chat-container px-3 py-1.5 transform-gpu"
+                >
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50/60 active:scale-90 rounded-full transition-all shrink-0 mb-0.5"
+                  >
+                    <Plus className="w-5 h-5" strokeWidth={2.2} />
+                  </button>
+                  <button
+                    type="button"
+                    className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50/60 rounded-full shrink-0 transition-all active:scale-90 hidden sm:flex mb-0.5"
+                  >
+                    <Smile className="w-5 h-5" strokeWidth={2} />
+                  </button>
+                  <input
+                    type="file"
+                    className="hidden"
+                    ref={fileInputRef}
+                    onChange={handleImageSelect}
+                    accept="image/*,video/*"
+                  />
+
+                  {isRecording ? (
+                    <div className="flex-1 flex items-center justify-between bg-red-50/80 backdrop-blur-md border border-red-200/90 rounded-2xl px-3 py-1.5 mr-1 my-0.5">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                        <span className="text-red-600 text-[13px] font-mono font-semibold tabular-nums">
+                          {Math.floor(recordingDuration / 60)}:
+                          {(recordingDuration % 60).toString().padStart(2, "0")}
+                        </span>
+                        <div className="flex items-center space-x-0.5 ml-1">
+                          <div className="w-1 h-3 bg-red-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <div className="w-1 h-4 bg-red-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <div className="w-1 h-2 bg-red-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          type="button"
+                          onClick={cancelRecording}
+                          className="flex items-center space-x-1 px-2.5 py-1 bg-white hover:bg-red-100 border border-red-200 text-red-600 rounded-full text-xs font-medium transition-colors active:scale-95 shadow-2xs"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                          <span>Cancel</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={stopRecording}
+                          className="p-2 bg-red-500 hover:bg-red-600 active:scale-90 text-white rounded-full transition-transform shadow-xs flex items-center justify-center"
+                          title="Send Voice Message"
+                        >
+                          <Send className="w-4 h-4" strokeWidth={2.2} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <textarea
+                      ref={textareaRef}
+                      rows={1}
+                      value={inputText}
+                      onChange={(e) => {
+                        handleTyping(e);
+                        e.target.style.height = 'auto';
+                        e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                      }}
+                      onFocus={() => {
+                        if (shouldAutoScrollRef.current) {
+                          const scrollToBottomSmooth = () => {
+                            if (messagesContainerRef.current) {
+                              messagesContainerRef.current.scrollTo({
+                                top: messagesContainerRef.current.scrollHeight,
+                                behavior: 'smooth'
+                              });
+                            }
+                          };
+                          requestAnimationFrame(scrollToBottomSmooth);
+                          setTimeout(scrollToBottomSmooth, 80);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSend(e as any);
+                          e.currentTarget.style.height = 'auto';
+                        }
+                      }}
+                      placeholder="Message..."
+                      className="flex-1 bg-transparent py-2 px-1 focus:outline-none focus:ring-0 focus:border-transparent text-[15px] font-normal text-gray-900 placeholder-gray-400 min-w-0 resize-none max-h-[120px] overflow-y-auto no-scrollbar leading-snug"
+                    />
+                  )}
+
+                  {!isRecording && (
+                    <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                      {(inputText.trim() || selectedImagePreview) ? (
+                        <motion.button
+                          type="submit"
+                          whileTap={{ scale: 0.82 }}
+                          whileHover={{ scale: 1.06 }}
+                          className="w-9 h-9 bg-[#FE2C55] hover:bg-[#E60045] text-white rounded-full transition-all duration-200 flex items-center justify-center shadow-[0_4px_14px_rgba(254,44,85,0.35)] border border-white/40 backdrop-blur-md"
+                        >
+                          <Send className="w-4 h-4" strokeWidth={2.5} />
+                        </motion.button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={startRecording}
+                          className="p-2 text-gray-400 hover:text-[#FE2C55] active:scale-90 rounded-full transition-colors"
+                        >
+                          <Mic className="w-5 h-5" strokeWidth={2} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </form>
+              </div>
+
+              {/* Theme Settings Modal */}
+              {showThemeSettings && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                  <div className="bg-white rounded-3xl w-full max-w-sm flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                    <div className="flex justify-between items-center p-4 border-b border-gray-100">
+                      <h3 className="font-normal text-gray-900 text-[16px] text-center flex-1">
+                        Customize Chat
+                      </h3>
+                      <button
+                        onClick={() => setShowThemeSettings(false)}
+                        className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+                      >
+                        <X className="w-5 h-5 text-gray-500" />
+                      </button>
+                    </div>
+                    <div className="p-6">
+                      <h4 className="font-normal text-[14px] text-gray-900 mb-4">
+                        Background Theme
+                      </h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        {[
+                          { name: "Wallpaper", class: "bg-image", bgUrl: "/chat-background.png" },
+                          { name: "Pure White", class: "bg-white" },
+                          { name: "Sky", class: "bg-blue-50" },
+                          { name: "Rose", class: "bg-rose-50" },
+                          { name: "Mint", class: "bg-emerald-50" },
+                          { name: "Lavender", class: "bg-purple-50" },
+                          {
+                            name: "Sunset",
+                            class:
+                              "bg-gradient-to-br from-orange-50 to-rose-50",
+                          },
+                          {
+                            name: "Ocean",
+                            class: "bg-gradient-to-br from-cyan-50 to-blue-50",
+                          },
+                          { name: "Dark", class: "bg-gray-900" },
+                        ].map((theme) => {
+                          const isSelected = chatTheme === theme.class || (theme.class === "bg-image" && (!chatTheme || chatTheme === "bg-white"));
+                          return (
+                            <button
+                              key={theme.name}
+                              onClick={() => setChatTheme(theme.class)}
+                              className={`flex flex-col items-center space-y-2 group`}
+                            >
+                              <div
+                                className={`w-14 h-14 rounded-2xl border-2 ${isSelected ? "border-purple-600 scale-105 shadow-md" : "border-gray-200 group-hover:border-gray-300"} transition-all ${theme.class} shadow-inner bg-cover bg-center overflow-hidden`}
+                                style={theme.bgUrl ? { backgroundImage: `url(${theme.bgUrl})` } : {}}
+                              ></div>
+                              <span
+                                className={`text-[12px] ${isSelected ? "text-purple-600 font-semibold" : "text-gray-600 font-normal"}`}
+                              >
+                                {theme.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Context Menu */}
+              <AnimatePresence>
+                {contextMenu && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-[240] bg-black/20"
+                      onClick={closeContextMenu}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        closeContextMenu();
+                      }}
+                    ></div>
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.1 }}
+                      className="fixed bg-white rounded-2xl shadow-xl border border-gray-200 p-2 w-64 z-[250] overflow-hidden"
+                      style={{
+                        top: Math.max(70, Math.min(contextMenu.y, (window.innerHeight || 800) - 260)),
+                        left: Math.max(16, Math.min(contextMenu.x, (window.innerWidth || 400) - 270)),
+                      }}
+                    >
+                      {/* Reaction Emojis Bar */}
+                      <div className="flex items-center justify-around px-2 py-1.5 bg-gray-50 rounded-xl mb-1.5 border border-gray-100">
+                        {["❤️", "😂", "😮", "😢", "🔥", "👏"].map((emoji) => (
+                          <button
+                            key={emoji}
+                            onClick={async () => {
+                              if (activeChat) {
+                                try {
+                                  const { updateDoc, doc } =
+                                    await import("firebase/firestore");
+                                  await updateDoc(
+                                    doc(
+                                      db,
+                                      "conversations",
+                                      activeChat,
+                                      "messages",
+                                      contextMenu.msgId,
+                                    ),
+                                    {
+                                      reaction: emoji,
+                                    },
+                                  );
+                                } catch (e) {
+                                  console.error("Failed to react", e);
+                                }
+                              }
+                              closeContextMenu();
+                            }}
+                            className="text-2xl hover:scale-110 active:scale-95 transition-transform p-0.5"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Action Items */}
+                      <div className="space-y-0.5 font-sans">
+                        <button
+                          onClick={() => {
+                            const msg = messages.find(
+                              (m) => m.id === contextMenu.msgId,
+                            );
+                            if (msg) {
+                              setReplyingTo(msg as any);
+                              setTimeout(() => {
+                                textareaRef.current?.focus();
+                              }, 100);
+                            }
+                            closeContextMenu();
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-gray-100 active:bg-gray-200 rounded-xl flex items-center space-x-3 transition-colors text-gray-800"
+                        >
+                          <Reply className="w-4 h-4 text-purple-600" />
+                          <span className="font-medium text-[14px]">Reply to message</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            const msg = messages.find(
+                              (m) => m.id === contextMenu.msgId,
+                            );
+                            if (msg?.content) {
+                              navigator.clipboard.writeText(msg.content);
+                            }
+                            closeContextMenu();
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-gray-100 active:bg-gray-200 rounded-xl flex items-center space-x-3 transition-colors text-gray-800"
+                        >
+                          <Copy className="w-4 h-4 text-gray-600" />
+                          <span className="font-medium text-[14px]">Copy text</span>
+                        </button>
+
+                        <div className="h-px bg-gray-100 my-1"></div>
+
+                        <button
+                          onClick={async () => {
+                            if (activeChat) {
+                              try {
+                                const targetMsgId = contextMenu.msgId;
+                                const { deleteDoc, doc, updateDoc, getDocs, collection, query, orderBy, limit } =
+                                  await import("firebase/firestore");
+                                await deleteDoc(
+                                  doc(
+                                    db,
+                                    "conversations",
+                                    activeChat,
+                                    "messages",
+                                    targetMsgId,
+                                  ),
+                                );
+
+                                // Fetch remaining latest message to update conversation preview
+                                const q = query(
+                                  collection(db, "conversations", activeChat, "messages"),
+                                  orderBy("createdAt", "desc"),
+                                  limit(1)
+                                );
+                                const snap = await getDocs(q);
+                                let newLastMsg = "";
+                                if (!snap.empty) {
+                                  const latestData = snap.docs[0].data();
+                                  newLastMsg = latestData.content || (latestData.type === "image" ? "Sent a photo" : "Sent a message");
+                                }
+                                await updateDoc(doc(db, "conversations", activeChat), { lastMessage: newLastMsg });
+                              } catch (err) {
+                                console.error("Failed to unsend message", err);
+                              }
+                            }
+                            closeContextMenu();
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-red-50 active:bg-red-100 rounded-xl flex items-center space-x-3 transition-colors text-red-600"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                          <span className="font-medium text-[14px]">
+                            {messages.find((m) => m.id === contextMenu.msgId)
+                              ?.senderId === currentUser?.uid
+                              ? "Unsend message"
+                              : "Delete for me"}
+                          </span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )
+        ) : (
+          <div 
+            className="hidden md:flex flex-1 flex-col items-center justify-center relative overflow-hidden h-full select-none"
+            style={{
+              background: 'linear-gradient(135deg, #f1f5f9 0%, #eef2ff 35%, #faf5ff 70%, #fdf4ff 100%)',
+            }}
+          >
+            {/* Ambient artwork floating orbs */}
+            <div className="absolute -top-28 -right-28 w-[480px] h-[480px] rounded-full bg-gradient-to-br from-indigo-200/40 via-purple-200/30 to-pink-200/20 blur-3xl pointer-events-none" />
+            <div className="absolute top-1/2 -left-32 w-[420px] h-[420px] rounded-full bg-gradient-to-tr from-blue-200/35 via-cyan-100/25 to-purple-200/20 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 right-1/4 w-[440px] h-[440px] rounded-full bg-gradient-to-t from-purple-200/30 via-pink-100/30 to-amber-100/20 blur-3xl pointer-events-none" />
+            <div 
+              className="absolute inset-0 opacity-[0.035] pointer-events-none" 
+              style={{
+                backgroundImage: `radial-gradient(#4f46e5 1px, transparent 1px), radial-gradient(#9333ea 1px, #f8fafc 1px)`,
+                backgroundSize: '28px 28px',
+                backgroundPosition: '0 0, 14px 14px',
+              }}
+            />
+
+            <div className="relative z-10 flex flex-col items-center text-center max-w-sm px-8 py-10 rounded-3xl bg-white/75 backdrop-blur-2xl border border-white/90 shadow-xl shadow-purple-500/5">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-purple-500/25 mb-4 text-white">
+                <Send className="w-7 h-7 -rotate-12 translate-x-0.5" />
+              </div>
+              <h3 className="text-xl font-normal text-gray-900 mb-1.5">
+                Your Messages
+              </h3>
+              <p className="text-sm text-gray-500 leading-relaxed font-normal mb-5">
+                Send private messages, share reels, and connect seamlessly with friends.
+              </p>
+              <button 
+                onClick={() => setShowCreateGroup(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-normal px-6 py-2.5 rounded-xl transition-all shadow-sm active:scale-95 text-sm"
+              >
+                Start Conversation
+              </button>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Chat Context Menu */}
+      <AnimatePresence>
+        {chatContextMenu && (
+          <>
+            <div
+              className="fixed inset-0 z-[340]"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeContextMenu();
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                closeContextMenu();
+              }}
+            ></div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, x: "-50%", y: "-50%" }}
+              animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+              exit={{ opacity: 0, scale: 0.95, x: "-50%", y: "-50%" }}
+              className="fixed bg-white rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.2)] border border-gray-100 py-2 w-64 z-[350] overflow-hidden left-1/2 top-1/2"
+            >
+              <button
+                onClick={async () => {
+                  try {
+                    const { deleteDoc, doc } =
+                      await import("firebase/firestore");
+                    await deleteDoc(
+                      doc(db, "conversations", chatContextMenu.convId),
+                    );
+                    setChatContextMenu(null);
+                    if (activeChat === chatContextMenu.convId)
+                      setActiveChat(null);
+                    setConversations((c) =>
+                      c.filter((x) => x.id !== chatContextMenu.convId),
+                    );
+                  } catch (e) {
+                    console.error("Error deleting chat", e);
+                  }
+                }}
+                className="w-full text-left px-4 py-2 hover:bg-red-50 flex items-center space-x-3 transition-colors text-red-600"
+              >
+                <Trash2 className="w-5 h-5" />
+                <span className="font-normal text-[14px]">Delete Chat</span>
+              </button>
+              {chatContextMenu.otherUid && (
+                <button
+                  onClick={async () => {
+                    try {
+                      if (!currentUser) return;
+                      const { unfollowUser } =
+                        await import("../services/followService");
+                      await unfollowUser(
+                        currentUser.uid,
+                        chatContextMenu.otherUid!,
+                      );
+                      const { deleteDoc, doc } =
+                        await import("firebase/firestore");
+                      await deleteDoc(
+                        doc(db, "conversations", chatContextMenu.convId),
+                      );
+                      setChatContextMenu(null);
+                      if (activeChat === chatContextMenu.convId)
+                        setActiveChat(null);
+                      setConversations((c) =>
+                        c.filter((x) => x.id !== chatContextMenu.convId),
+                      );
+                    } catch (e) {
+                      console.error("Error deleting friend", e);
+                    }
+                  }}
+                  className="w-full text-left px-4 py-2 hover:bg-red-50 flex items-center space-x-3 transition-colors text-red-600"
+                >
+                  <UserX className="w-5 h-5" />
+                  <span className="font-normal text-[14px]">Delete Friend</span>
+                </button>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Story Camera Overlay */}
+      {showCreateStory && (
+        <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center animate-in fade-in duration-200 p-4">
+          {storyPreview ? (
+            <div className="relative w-full max-w-sm max-h-[85vh] h-full overflow-hidden flex flex-col bg-black rounded-3xl shadow-2xl">
+              <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-10 bg-gradient-to-b from-black/50 to-transparent">
+                <button
+                  onClick={() => {
+                    setStoryPreview(null);
+                    setStoryFile(null);
+                  }}
+                  className="p-2 text-white bg-black/40 rounded-full"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="flex-1 flex items-center justify-center min-h-0 bg-black">
+                {storyFile?.type.startsWith("video") ? (
+                  <video
+                    src={storyPreview}
+                    className="max-w-full max-h-full"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                  />
+                ) : (
+                  <img
+                    src={storyPreview}
+                    className="max-w-full max-h-full object-contain"
+                    alt="Story preview"
+                  />
+                )}
+              </div>
+              <div className="p-4 bg-black flex justify-between items-center shrink-0 z-10 border-t border-white/10">
+                <button
+                  onClick={() => {
+                    setStoryPreview(null);
+                    setStoryFile(null);
+                  }}
+                  className="px-6 py-2.5 bg-gray-800 text-white rounded-full font-normal"
+                >
+                  Discard
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!storyFile || !currentUser) return;
+                    setStoryUploading(true);
+                    try {
+                      const { uploadStory } =
+                        await import("../services/storyService");
+                      await uploadStory(
+                        currentUser.uid,
+                        currentUser.name,
+                        currentUser.avatar || "",
+                        storyFile,
+                        undefined,
+                        "inbox",
+                      );
+                      setStoryFile(null);
+                      setStoryPreview(null);
+                      setShowCreateStory(false);
+                    } catch (e) {
+                      console.error(e);
+                      alert("Failed to upload story");
+                    } finally {
+                      setStoryUploading(false);
+                    }
+                  }}
+                  disabled={storyUploading}
+                  className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-normal flex items-center space-x-2 transition-colors"
+                >
+                  {storyUploading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <span>Post</span>
+                      <ChevronRight className="w-5 h-5" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="relative w-full max-w-sm max-h-[85vh] h-full overflow-hidden bg-black rounded-3xl shadow-2xl">
+              <video
+                autoPlay
+                playsInline
+                muted
+                className="absolute inset-0 w-full h-full object-cover"
+                ref={(ref) => {
+                  if (ref && !ref.srcObject) {
+                    navigator.mediaDevices
+                      .getUserMedia({
+                        video: { facingMode: "user" },
+                        audio: true,
+                      })
+                      .then((stream) => {
+                        ref.srcObject = stream;
+                      })
+                      .catch((err) =>
+                        console.error("Camera access denied:", err),
+                      );
+                  }
+                }}
+              />
+              <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-10 bg-gradient-to-b from-black/50 to-transparent pt-safe">
+                <button
+                  onClick={() => setShowCreateStory(false)}
+                  className="p-2 text-white"
+                >
+                  <X className="w-7 h-7" />
+                </button>
+                <button className="flex items-center space-x-2 bg-black/60 px-4 py-1.5 rounded-full text-white font-normal text-sm">
+                  <Music className="w-4 h-4" />
+                  <span>Add Sound</span>
+                </button>
+                <div className="flex flex-col space-y-4 items-center">
+                  <button className="flex flex-col items-center text-white">
+                    <Type className="w-6 h-6 mb-1" />
+                    <span className="text-[10px] font-normal">Text</span>
+                  </button>
+                  <button className="flex flex-col items-center text-white">
+                    <Smile className="w-6 h-6 mb-1" />
+                    <span className="text-[10px] font-normal">Stickers</span>
+                  </button>
+                  <button className="flex flex-col items-center text-white">
+                    <Settings2 className="w-6 h-6 mb-1" />
+                    <span className="text-[10px] font-normal">Filters</span>
+                  </button>
+                </div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 p-6 flex flex-col items-center z-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent pb-safe">
+                <div className="flex space-x-8 mb-6 text-white/80 font-normal text-sm">
+                  <button className="text-white border-b-2 border-white pb-1">
+                    Story
+                  </button>
+                  <button className="hover:text-white">Photo</button>
+                  <button className="hover:text-white">Video</button>
+                </div>
+                <div className="flex items-center justify-between w-full px-4">
+                  <div className="flex flex-col items-center">
+                    <div className="w-10 h-10 rounded-xl bg-gray-800 border border-gray-600 overflow-hidden relative">
+                      <input
+                        type="file"
+                        accept="image/*,video/*"
+                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setStoryFile(file);
+                            setStoryPreview(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                      <img
+                        src="https://picsum.photos/seed/gallery/100/100"
+                        className="w-full h-full object-cover"
+                        alt="Gallery"
+                      />
+                    </div>
+                    <span className="text-white text-[11px] font-normal mt-2">
+                      Upload
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*,video/*"
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setStoryFile(file);
+                          setStoryPreview(URL.createObjectURL(file));
+                        }
+                      }}
+                    />
+                    <button className="w-20 h-20 rounded-full border-4 border-white/50 flex items-center justify-center transition-transform active:scale-95 bg-white/20">
+                      <div className="w-16 h-16 bg-white rounded-full transition-all"></div>
+                    </button>
+                  </div>
+                  <div className="flex flex-col items-center opacity-0">
+                    <div className="w-10 h-10"></div>
+                    <span className="text-white text-[11px] font-normal mt-2">
+                      Effects
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Chat Settings Overlay */}
+      <AnimatePresence>
+        {showChatSettings && activeContact && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[110] bg-white flex flex-col md:w-[350px] md:left-auto md:border-l border-gray-100 shadow-2xl will-change-opacity"
+          >
+            <div className="h-[96px] md:h-[72px] px-4 pt-8 md:pt-0 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => {
+                    if (showSharedMedia) {
+                      setShowSharedMedia(false);
+                    } else {
+                      setShowChatSettings(false);
+                    }
+                  }}
+                  className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
+                >
+                  <ArrowLeft className="w-6 h-6 text-gray-900" />
+                </button>
+                <h2 className="font-normal text-[17px] text-gray-900">
+                  {showSharedMedia ? "Shared Media" : "Details"}
+                </h2>
+              </div>
+            </div>
+
+            {showSharedMedia ? (
+              <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
+                {/* Filter Tabs */}
+                <div className="flex items-center space-x-1 px-3 py-2 border-b border-gray-100 bg-gray-50/80 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSharedMediaTab("all")}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-xl transition-all ${
+                      sharedMediaTab === "all"
+                        ? "bg-white text-gray-900 shadow-2xs font-semibold"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    All ({sharedMediaItems.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSharedMediaTab("media")}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-xl transition-all ${
+                      sharedMediaTab === "media"
+                        ? "bg-white text-gray-900 shadow-2xs font-semibold"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    Photos/Videos ({sharedMediaItems.filter((i: any) => i.isImg || i.isVid).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSharedMediaTab("reels")}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-xl transition-all ${
+                      sharedMediaTab === "reels"
+                        ? "bg-white text-gray-900 shadow-2xs font-semibold"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    Reels ({sharedMediaItems.filter((i: any) => i.isReel).length})
+                  </button>
+                </div>
+
+                {/* Media Grid / Empty State */}
+                <div className="flex-1 overflow-y-auto p-1.5 scrollbar-thin">
+                  {displayedSharedItems.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+                      <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                        <ImageIcon className="w-7 h-7 text-gray-400" />
+                      </div>
+                      <p className="font-semibold text-gray-800 text-sm">
+                        {sharedMediaTab === "reels"
+                          ? "No shared reels"
+                          : sharedMediaTab === "media"
+                          ? "No shared photos or videos"
+                          : "No shared media yet"}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1 max-w-[200px]">
+                        Photos, videos, and reels sent in this chat will appear here.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-1">
+                      {displayedSharedItems.map((item: any) => (
+                        <div
+                          key={item.id}
+                          className="relative aspect-square bg-gray-950 overflow-hidden cursor-pointer group rounded-sm"
+                          onClick={() => {
+                            if (item.isReel) {
+                              setViewingReel({
+                                id: item.postId || item.id,
+                                authorId: item.senderId,
+                                authorName: "Reel",
+                                authorAvatar: "",
+                                media: [item.mediaUrl || item.cover],
+                                text: "",
+                                type: "reel",
+                                single: true,
+                              });
+                              setViewingReelContext("chat");
+                            } else if (item.isVid) {
+                              setViewingMedia({
+                                type: "video",
+                                url: item.mediaUrl || item.cover,
+                                user: { name: "", avatar: "" },
+                              });
+                            } else {
+                              setViewingMedia({
+                                type: "image",
+                                url: item.mediaUrl || item.cover,
+                                user: { name: "", avatar: "" },
+                              });
+                            }
+                          }}
+                        >
+                          {item.isVid && !item.isReel ? (
+                            <video
+                              src={`${item.cover || item.mediaUrl}#t=0.001`}
+                              className="w-full h-full object-cover"
+                              preload="metadata"
+                              muted
+                              playsInline
+                            />
+                          ) : (
+                            <img
+                              src={item.cover || item.mediaUrl}
+                              alt="Shared media"
+                              className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                            />
+                          )}
+
+                          {/* Media Type Icon Badge */}
+                          {item.isReel && (
+                            <div className="absolute top-1 left-1 p-1 bg-black/60 backdrop-blur-xs rounded-md text-white pointer-events-none">
+                              <Film className="w-3 h-3" />
+                            </div>
+                          )}
+                          {item.isVid && !item.isReel && (
+                            <div className="absolute top-1 left-1 p-1 bg-black/60 backdrop-blur-xs rounded-md text-white pointer-events-none">
+                              <Play className="w-3 h-3 fill-white" />
+                            </div>
+                          )}
+
+                          {/* Quick Download Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const ext = item.isVid || item.isReel ? "mp4" : "jpg";
+                              downloadMediaFile(
+                                item.mediaUrl || item.cover,
+                                `shared_${item.mediaType}_${item.id || Date.now()}.${ext}`
+                              );
+                            }}
+                            className="absolute bottom-1 right-1 p-1.5 bg-black/65 hover:bg-black/90 active:scale-90 rounded-full text-white transition-all shadow-md"
+                            title="Download"
+                          >
+                            <Download className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : activeContact.isGroup ? (
+              <div className="flex-1 overflow-y-auto">
+                <div className="flex flex-col items-center py-8 border-b border-gray-100">
+                  <div className="relative mb-4 cursor-pointer">
+                    <input
+                      type="file"
+                      id="groupAvatarUpload"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file && currentUser) {
+                          try {
+                            const { uploadMedia } =
+                              await import("../services/githubStorage");
+                            const { updateDoc, doc } =
+                              await import("firebase/firestore");
+                            const url = await uploadMedia(
+                              file,
+                              `group_avatars/${activeContact.id}_${Date.now()}`,
+                            );
+                            await updateDoc(
+                              doc(db, "conversations", activeContact.id),
+                              { groupAvatar: url },
+                            );
+                            if (activeContact) activeContact.avatar = url;
+                          } catch (err) {
+                            console.error(err);
+                          }
+                        }
+                      }}
+                    />
+                    {activeContact.avatar ? (
+                      <img
+                        src={activeContact.avatar}
+                        className="w-24 h-24 rounded-full object-cover shadow-md border-2 border-white"
+                        alt={activeContact.name}
+                        onClick={() =>
+                          document.getElementById("groupAvatarUpload")?.click()
+                        }
+                      />
+                    ) : (
+                      <div
+                        onClick={() =>
+                          document.getElementById("groupAvatarUpload")?.click()
+                        }
+                      >
+                        <GroupAvatar
+                          members={
+                            activeConversation?.participantIds
+                              ?.filter((id) => id !== currentUser?.uid)
+                              .slice(0, 3)
+                              .map(
+                                (id) =>
+                                  userDataCache[id]?.avatar ||
+                                  (activeConversation?.participantAvatars || {})[id] ||
+                                  `https://ui-avatars.com/api/?name=${encodeURIComponent(userDataCache[id]?.name || (activeConversation?.participantNames || {})[id] || "User")}&background=random`,
+                              ) || []
+                          }
+                          sizeClass="w-24 h-24 shadow-md border-2 border-white"
+                        />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/20 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+                      <Camera className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                  <div
+                    className="flex items-center space-x-2 cursor-pointer group hover:bg-gray-50 px-4 py-2 rounded-xl transition-colors"
+                    onClick={async () => {
+                      const newName = prompt(
+                        "Enter new group name:",
+                        activeContact.name,
+                      );
+                      if (newName && newName.trim() && currentUser) {
+                        try {
+                          const { updateDoc, doc } =
+                            await import("firebase/firestore");
+                          await updateDoc(
+                            doc(db, "conversations", activeContact.id),
+                            { groupName: newName.trim() },
+                          );
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      }
+                    }}
+                  >
+                    <h3 className="text-xl font-normal text-gray-900 border-b-2 border-transparent group-hover:border-gray-200 transition-colors">
+                      {activeContact.name}
+                    </h3>
+                    <div className="p-1.5 bg-gray-100 rounded-full group-hover:bg-gray-200 transition-colors text-gray-500">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500 font-normal mt-1">
+                    {activeConversation?.participantIds?.length || 0} Members
+                  </p>
+                </div>
+
+                <div className="p-2 space-y-1">
+                  <div className="flex items-center justify-between w-full">
+                    <h4 className="px-4 py-2 text-[12px] font-normal text-gray-400 uppercase tracking-widest">
+                      Group Members
+                    </h4>
+                    <button
+                      onClick={() => {
+                        const currentIds =
+                          activeConversation?.participantIds || [];
+                        const availableFriends = followers.filter(
+                          (f) => !currentIds.includes(f.id),
+                        );
+                        if (availableFriends.length === 0) {
+                          alert("No more friends to add!");
+                          return;
+                        }
+                        const addMenu = document.createElement("div");
+                        addMenu.className =
+                          "fixed inset-0 z-[300] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm";
+                        addMenu.innerHTML = `
+                           <div class="bg-white rounded-3xl w-full max-w-sm max-h-[70vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95">
+                             <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+                               <h3 class="font-normal text-gray-900">Add Members</h3>
+                               <button id="closeAdd" class="p-1 hover:bg-gray-100 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+                             </div>
+                             <div class="flex-1 overflow-y-auto p-2" id="addList">
+                             </div>
+                             <div class="p-4 border-t border-gray-100">
+                               <button id="confirmAdd" class="w-full bg-blue-500 text-white font-normal py-3 rounded-xl">Add Selected</button>
+                             </div>
+                           </div>
+                         `;
+                        document.body.appendChild(addMenu);
+
+                        const list = addMenu.querySelector("#addList");
+                        availableFriends.forEach((f) => {
+                          const el = document.createElement("label");
+                          el.className =
+                            "flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-xl cursor-pointer";
+                          el.innerHTML = `
+                             <input type="checkbox" value="${f.id}" class="add-checkbox w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                             <img src="${f.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(f.name || 'User')}&background=random`}" class="w-10 h-10 rounded-full object-cover" />
+                             <span class="font-normal text-gray-900">${f.name}</span>
+                           `;
+                          list?.appendChild(el);
+                        });
+
+                        addMenu
+                          .querySelector("#closeAdd")
+                          ?.addEventListener("click", () => addMenu.remove());
+                        addMenu
+                          .querySelector("#confirmAdd")
+                          ?.addEventListener("click", async () => {
+                            const checkboxes = addMenu.querySelectorAll(
+                              ".add-checkbox:checked",
+                            ) as NodeListOf<HTMLInputElement>;
+                            const selectedIds = Array.from(checkboxes).map(
+                              (c) => c.value,
+                            );
+                            if (selectedIds.length > 0) {
+                              try {
+                                const { doc, updateDoc, getDoc } =
+                                  await import("firebase/firestore");
+                                const newIds = [...currentIds, ...selectedIds];
+
+                                const pNames = {
+                                  ...(activeConversation?.participantNames ||
+                                    {}),
+                                };
+                                const pAvatars = {
+                                  ...(activeConversation?.participantAvatars ||
+                                    {}),
+                                };
+
+                                await Promise.all(
+                                  selectedIds.map(async (id) => {
+                                    const u = await getDoc(
+                                      doc(db, "users", id),
+                                    );
+                                    if (u.exists()) {
+                                      pNames[id] = u.data().name;
+                                      pAvatars[id] = u.data().avatar;
+                                    }
+                                  }),
+                                );
+
+                                await updateDoc(
+                                  doc(db, "conversations", activeContact.id),
+                                  {
+                                    participantIds: newIds,
+                                    participantNames: pNames,
+                                    participantAvatars: pAvatars,
+                                  },
+                                );
+                                addMenu.remove();
+                              } catch (e) {
+                                console.error(e);
+                              }
+                            }
+                          });
+                      }}
+                      className="mr-2 text-blue-500 p-1.5 hover:bg-blue-50 rounded-full transition-colors"
+                    >
+                      <UserPlus className="w-5 h-5" />
+                    </button>
+                  </div>
+                  {activeConversation?.participantIds?.map((pid) => {
+                    const isMe = pid === currentUser?.uid;
+                    const pName = isMe
+                      ? `${currentUser.name} (You)`
+                      : userDataCache[pid]?.name ||
+                        (activeConversation.participantNames || {})[pid] ||
+                        "User";
+                    const pAvatar = isMe
+                      ? currentUser.avatar
+                      : (activeConversation.participantAvatars || {})[pid] ||
+                        userDataCache[pid]?.avatar ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(pName.replace(" (You)", ""))}&background=random`;
+                    const isAdmin =
+                      activeConversation.participantIds[0] === pid;
+
+                    return (
+                      <div
+                        key={pid}
+                        className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-2xl transition-colors cursor-pointer text-left"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <img
+                            src={pAvatar}
+                            className="w-10 h-10 rounded-full object-cover border border-gray-100"
+                          />
+                          <div className="flex flex-col">
+                            <span className="font-normal text-gray-900 text-[15px]">
+                              {isMe ? "You" : pName}
+                            </span>
+                            {isAdmin && (
+                              <span className="text-[11px] text-blue-500 font-normal uppercase tracking-wide">
+                                Admin
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="p-2 space-y-1 border-t border-gray-100 mt-2">
+                  <h4 className="px-4 py-2 text-[12px] font-normal text-gray-400 uppercase tracking-widest">
+                    Media & Settings
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowSharedMedia(true)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors cursor-pointer text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-blue-50 rounded-lg">
+                        <ImageIcon className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <span className="font-normal text-gray-900 text-[15px]">
+                        Shared Media
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1.5 text-gray-400">
+                      {sharedMediaItems.length > 0 && (
+                        <span className="text-xs bg-gray-100 text-gray-600 font-medium px-2 py-0.5 rounded-full">
+                          {sharedMediaItems.length}
+                        </span>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </div>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (
+                        confirm("Are you sure you want to leave this group?")
+                      ) {
+                        try {
+                          const { doc, getDoc, updateDoc } =
+                            await import("firebase/firestore");
+                          if (!currentUser) return;
+                          const convRef = doc(
+                            db,
+                            "conversations",
+                            activeContact.id,
+                          );
+                          const snap = await getDoc(convRef);
+                          if (snap.exists()) {
+                            const d = snap.data();
+                            const newIds = d.participantIds.filter(
+                              (id: string) => id !== currentUser.uid,
+                            );
+                            if (newIds.length === 0) {
+                              const { deleteDoc } =
+                                await import("firebase/firestore");
+                              await deleteDoc(convRef);
+                            } else {
+                              await updateDoc(convRef, {
+                                participantIds: newIds,
+                              });
+                            }
+                            setShowChatSettings(false);
+                            setActiveChat(null);
+                          }
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      }
+                    }}
+                    className="w-full flex items-center space-x-3 p-4 hover:bg-red-50 rounded-2xl transition-colors group text-left"
+                  >
+                    <div className="p-2 bg-red-50 group-hover:bg-red-100 rounded-lg">
+                      <Trash2 className="w-5 h-5 text-red-600" />
+                    </div>
+                    <div className="flex-1">
+                      <span className="font-normal text-red-600 text-[15px]">
+                        Leave Group
+                      </span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto">
+                <div className="flex flex-col items-center py-8 border-b border-gray-100">
+                  <div className="relative mb-4">
+                    <img
+                      src={activeContact.avatar}
+                      className="w-24 h-24 rounded-full object-cover shadow-md border-2 border-white"
+                      alt={activeContact.name}
+                    />
+                    {activeContact.online && (
+                      <div className="absolute bottom-1 right-1 w-5 h-5 bg-green-500 border-4 border-white rounded-full"></div>
+                    )}
+                  </div>
+                  <h3 className="text-xl font-normal text-gray-900">
+                    {activeContact.name}
+                  </h3>
+                  <p className="text-sm text-gray-500 font-normal">
+                    @{activeContact.name.toLowerCase().replace(/ /g, "_")}
+                  </p>
+                  <div className="flex items-center space-x-4 mt-6">
+                    <div className="flex flex-col items-center space-y-1">
+                      <button
+                        onClick={() => {
+                          setViewingUser({
+                            uid: activeContact.uid!,
+                            name: activeContact.name,
+                            avatar: activeContact.avatar,
+                          });
+                          pushPage("profile");
+                        }}
+                        className="p-3 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                      >
+                        <UserSquare className="w-5 h-5 text-gray-900" />
+                      </button>
+                      <span className="text-[10px] font-normal text-gray-500 uppercase tracking-tighter">
+                        Profile
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-center space-y-1">
+                      <button className="p-3 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
+                        <Bell className="w-5 h-5 text-gray-900" />
+                      </button>
+                      <span className="text-[10px] font-normal text-gray-500 uppercase tracking-tighter">
+                        Mute
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-center space-y-1">
+                      <button className="p-3 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
+                        <Search
+                          className="w-5 h-5 text-gray-900"
+                          strokeWidth={2}
+                        />
+                      </button>
+                      <span className="text-[10px] font-normal text-gray-500 uppercase tracking-tighter">
+                        Search
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-2 space-y-1">
+                  <h4 className="px-4 py-2 text-[12px] font-normal text-gray-400 uppercase tracking-widest">
+                    Chat Settings
+                  </h4>
+                  <button
+                    onClick={() => setShowThemeSettings(true)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-indigo-50 rounded-lg">
+                        <Palette className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <span className="font-normal text-gray-900 text-[15px]">
+                        Themes
+                      </span>
+                    </div>
+                    <span className="text-sm text-gray-400 font-normal capitalize">
+                      {
+                        chatTheme
+                          .replace("bg-", "")
+                          .replace("gradient-to-tr from-", "")
+                          .split("-")[0]
+                      }
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowSharedMedia(true)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors cursor-pointer text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-blue-50 rounded-lg">
+                        <ImageIcon className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <span className="font-normal text-gray-900 text-[15px]">
+                        Shared Media
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1.5 text-gray-400">
+                      {sharedMediaItems.length > 0 && (
+                        <span className="text-xs bg-gray-100 text-gray-600 font-medium px-2 py-0.5 rounded-full">
+                          {sharedMediaItems.length}
+                        </span>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </div>
+                  </button>
+                </div>
+
+                <div className="p-2 space-y-1 border-t border-gray-100 mt-2">
+                  <h4 className="px-4 py-2 text-[12px] font-normal text-gray-400 uppercase tracking-widest">
+                    Privacy & Support
+                  </h4>
+                  <button
+                    onClick={() => setIsBlocked(!isBlocked)}
+                    className="w-full flex items-center space-x-3 p-4 hover:bg-red-50 rounded-2xl transition-colors group"
+                  >
+                    <div className="p-2 bg-red-50 group-hover:bg-red-100 rounded-lg">
+                      <EyeOff className="w-5 h-5 text-red-600" />
+                    </div>
+                    <span className="font-normal text-red-600 text-[15px]">
+                      {isBlocked ? "Unblock" : "Block"} User
+                    </span>
+                  </button>
+                  <button className="w-full flex items-center space-x-3 p-4 hover:bg-red-50 rounded-2xl transition-colors group">
+                    <div className="p-2 bg-red-50 group-hover:bg-red-100 rounded-lg">
+                      <Shield className="w-5 h-5 text-red-600" />
+                    </div>
+                    <span className="font-normal text-red-600 text-[15px]">
+                      Report User
+                    </span>
+                  </button>
+                  <button className="w-full flex items-center space-x-3 p-4 hover:bg-red-50 rounded-2xl transition-colors group text-left">
+                    <div className="p-2 bg-red-50 group-hover:bg-red-100 rounded-lg">
+                      <Trash2 className="w-5 h-5 text-red-600" />
+                    </div>
+                    <div className="flex-1">
+                      <span className="font-normal text-red-600 text-[15px]">
+                        Delete Chat
+                      </span>
+                      <p className="text-[11px] text-red-400 font-normal -mt-0.5">
+                        This will clear message history
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Create Group Modal */}
+      <AnimatePresence>
+        {showCreateGroup && (
+          <motion.div 
+            initial={{ y: "100%", opacity: 1 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: "100%", opacity: 1 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed inset-0 z-[999] flex flex-col bg-white h-[100dvh] w-full"
+          >
+            <input
+              type="file"
+              ref={groupPfpInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  const img = new Image();
+                  img.onload = () => {
+                    const canvas = document.createElement("canvas");
+                    const MAX_WIDTH = 500;
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * scaleSize;
+                    const ctx = canvas.getContext("2d");
+                    ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    setNewGroupAvatar(canvas.toDataURL("image/jpeg", 0.8));
+                  };
+                  img.src = event.target?.result as string;
+                };
+                reader.readAsDataURL(file);
+              }}
+            />
+
+            <div className="px-4 py-3.5 border-b border-gray-100 flex items-center justify-between pt-8 md:pt-4 bg-white shrink-0 z-10">
+              <div className="flex items-center">
+                <button
+                  onClick={() => {
+                    setShowCreateGroup(false);
+                    setNewGroupAvatar(null);
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors active:scale-95"
+                >
+                  <ArrowLeft className="w-6 h-6 text-gray-900" />
+                </button>
+                <h3 className="font-normal text-gray-900 text-[19px] ml-2 tracking-tight">
+                  New Group
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col no-scrollbar">
+              <div className="flex justify-center mt-2 mb-4 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => groupPfpInputRef.current?.click()}
+                  className="w-20 h-20 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center relative shadow-sm hover:opacity-90 active:scale-95 transition-all overflow-visible group"
+                >
+                  {newGroupAvatar ? (
+                    <img src={newGroupAvatar} className="w-full h-full rounded-full object-cover" alt="Group PFP" />
+                  ) : (
+                    <UserPlus className="w-8 h-8 text-blue-500" strokeWidth={1.5} />
+                  )}
+                  <div className="absolute bottom-0 right-0 w-7 h-7 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center shadow-sm group-hover:bg-blue-600 transition-colors">
+                    <Plus className="w-4 h-4 text-white" strokeWidth={2.5} />
+                  </div>
+                </button>
+              </div>
+
+              <input
+                type="text"
+                placeholder="Group Name"
+                className="w-full text-2xl font-normal text-center outline-none border-none placeholder-gray-300 pb-3 mb-4 bg-transparent shrink-0"
+                id="groupNameInput"
+                autoFocus
+              />
+
+              <div className="w-full h-[1px] bg-gray-100 mb-3 shrink-0"></div>
+
+              <h4 className="font-normal text-[13px] text-gray-500 mb-2 uppercase tracking-wider px-2 shrink-0">
+                Select Members
+              </h4>
+
+              <div className="flex-1 space-y-1.5 overflow-y-auto min-h-[220px] pb-4">
+                {followers.map((f) => (
+                  <label
+                    key={f.id}
+                    className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-2xl cursor-pointer transition-colors group active:scale-[0.98]"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <img
+                        src={
+                          f.avatar ||
+                          `https://ui-avatars.com/api/?name=${f.name}&background=random`
+                        }
+                        className="w-[46px] h-[46px] rounded-full object-cover shadow-sm border border-gray-100"
+                        alt="Avatar"
+                      />
+                      <span className="font-normal text-[16px] text-gray-900">
+                        {f.name}
+                      </span>
+                    </div>
+                    <div className="relative flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        value={f.id}
+                        className="peer sr-only group-checkbox"
+                      />
+                      <div className="w-6 h-6 rounded-full border-[1.5px] border-gray-300 peer-checked:bg-blue-500 peer-checked:border-blue-500 flex items-center justify-center transition-all shadow-sm">
+                        <Check
+                          className="w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 scale-50 peer-checked:scale-100 transition-all duration-200"
+                          strokeWidth={3}
+                        />
+                      </div>
+                    </div>
+                  </label>
+                ))}
+                {followers.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-10 text-gray-400 space-y-3">
+                    <UserPlus className="w-8 h-8 opacity-50" />
+                    <p className="text-sm font-normal">
+                      You need friends to create a group!
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="shrink-0 px-6 py-4 border-t border-gray-100 bg-white z-20 pb-[max(env(safe-area-inset-bottom),16px)]">
+              <button
+                onClick={async () => {
+                  const groupNameInput = document.getElementById(
+                    "groupNameInput",
+                  ) as HTMLInputElement;
+                  const checkboxes = document.querySelectorAll(
+                    ".group-checkbox:checked",
+                  ) as NodeListOf<HTMLInputElement>;
+                  const selectedIds = Array.from(checkboxes).map(
+                    (c) => c.value,
+                  );
+                  if (selectedIds.length > 0 && currentUser) {
+                    try {
+                      const { createGroupConversation } =
+                        await import("../services/chatService");
+                      const newChatId = await createGroupConversation(
+                        currentUser.uid,
+                        selectedIds,
+                        groupNameInput.value || "New Group",
+                        newGroupAvatar || undefined,
+                      );
+                      setActiveChat(newChatId);
+                      setShowCreateGroup(false);
+                      setNewGroupAvatar(null);
+                    } catch (err) {}
+                  }
+                }}
+                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3.5 rounded-2xl transition-all active:scale-98 shadow-lg shadow-purple-500/20 flex items-center justify-center text-[16px]"
+              >
+                Create Group Chat
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Inbox Privacy Sheet */}
+      <AnimatePresence>
+        {showPrivacySheet && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 z-[200]"
+              onClick={() => setShowPrivacySheet(false)}
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[210] px-6 pt-5 pb-10 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] border-t border-purple-100 animate-in slide-in-from-bottom"
+            >
+              <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6"></div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[19px] font-normal text-gray-950 tracking-tight">
+                  Activity Status
+                </h3>
+                <button
+                  onClick={() => setShowPrivacySheet(false)}
+                  className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <p className="text-[13px] font-normal text-gray-500 mb-6 leading-relaxed">
+                Choose who can see when you're active on the app.
+              </p>
+              
+              <div className="space-y-3">
+                <button
+                  onClick={async () => {
+                    setPrivacyMode("public");
+                    setShowPrivacySheet(false);
+                    if (currentUser) {
+                      localStorage.setItem("privacyMode", "public");
+                      const { setOnline } =
+                        await import("../services/presenceService");
+                      setOnline(currentUser.uid);
+                      try {
+                        const { doc, updateDoc } =
+                          await import("firebase/firestore");
+                        await updateDoc(doc(db, "users", currentUser.uid), {
+                          privacyMode: "public",
+                        });
+                      } catch (e) {}
+                    }
+                  }}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${privacyMode === "public" ? "border-purple-200 bg-purple-50/40" : "border-gray-100 hover:border-gray-200 bg-white"}`}
+                >
+                  <div className="flex items-center space-x-3.5">
+                    <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
+                      <div className="w-3.5 h-3.5 rounded-full bg-green-500 shadow-sm shadow-green-500/50"></div>
+                    </div>
+                    <div>
+                      <span className="font-normal text-[15px] text-gray-900 block leading-none mb-1">Public (Active)</span>
+                      <span className="text-[12px] text-gray-500 font-light block leading-tight">Everyone can see when you are online</span>
+                    </div>
+                  </div>
+                  {privacyMode === "public" && (
+                    <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center shrink-0">
+                      <Check className="w-4 h-4 text-white" strokeWidth={3} />
+                    </div>
+                  )}
+                </button>
+
+                <button
+                  onClick={async () => {
+                    setPrivacyMode("private");
+                    setShowPrivacySheet(false);
+                    if (currentUser) {
+                      localStorage.setItem("privacyMode", "private");
+                      const { setOffline } =
+                        await import("../services/presenceService");
+                      setOffline(currentUser.uid);
+                      try {
+                        const { doc, updateDoc } =
+                          await import("firebase/firestore");
+                        await updateDoc(doc(db, "users", currentUser.uid), {
+                          privacyMode: "private",
+                        });
+                      } catch (e) {}
+                    }
+                  }}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${privacyMode === "private" ? "border-purple-200 bg-purple-50/40" : "border-gray-100 hover:border-gray-200 bg-white"}`}
+                >
+                  <div className="flex items-center space-x-3.5">
+                    <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
+                      <EyeOff className="w-5 h-5 text-gray-500" />
+                    </div>
+                    <div>
+                      <span className="font-normal text-[15px] text-gray-900 block leading-none mb-1">Private (Hidden)</span>
+                      <span className="text-[12px] text-gray-500 font-light block leading-tight">Hide your online status from everyone</span>
+                    </div>
+                  </div>
+                  {privacyMode === "private" && (
+                    <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center shrink-0">
+                      <Check className="w-4 h-4 text-white" strokeWidth={3} />
+                    </div>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Status Input Modal */}
+      <AnimatePresence>
+        {showStatusInput && (
+          <motion.div 
+            initial={{ opacity: 0, y: "100%" }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 220 }}
+            className="fixed inset-0 z-[200] flex flex-col bg-gradient-to-b from-[#faf5ff] via-white to-white p-6 font-sans"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pt-8 pb-4 border-b border-purple-50/50">
+              <button
+                onClick={() => setShowStatusInput(false)}
+                className="p-2.5 hover:bg-purple-50 rounded-full transition-colors active:scale-90"
+              >
+                <ArrowLeft className="w-6 h-6 text-gray-900" />
+              </button>
+              <h2 className="text-xl font-normal text-gray-950 tracking-tight">Create a Note</h2>
+              <div className="w-11"></div> {/* Spacer for symmetry */}
+            </div>
+
+            {/* Content Body */}
+            <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col items-center py-8">
+              {/* Note Live Preview over Avatar */}
+              <div className="relative mb-10 flex flex-col items-center pt-8">
+                <div className="relative">
+                  {/* Note Bubble Preview */}
+                  <div className="absolute top-[-10px] left-1/2 -translate-x-1/2 px-3 py-1.5 bg-white border border-purple-100 shadow-[0_4px_16px_rgba(168,85,247,0.18)] rounded-full z-20 w-auto max-w-[120px] transition-all duration-300">
+                    <span className="text-[11px] font-semibold text-purple-700 leading-tight block text-center truncate max-w-[100px]">
+                      {statusNoteText || "Share a thought..."}
+                    </span>
+                    <div className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white border-b border-r border-purple-100 rotate-45"></div>
+                  </div>
+
+                  <img
+                    src={
+                      currentUser?.avatar ||
+                      `https://ui-avatars.com/api/?name=${currentUser?.name || "Me"}&background=random`
+                    }
+                    className="w-[100px] h-[100px] rounded-full object-cover border-2 border-white shadow-md"
+                    alt="Me"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <span className="text-sm font-normal text-gray-500 mt-4">
+                  Your note will appear above your picture
+                </span>
+              </div>
+
+              {/* Input Area */}
+              <div className="w-full max-w-sm px-4">
+                <input
+                  type="text"
+                  placeholder="What's on your mind?"
+                  value={statusNoteText}
+                  onChange={(e) => setStatusNoteText(e.target.value)}
+                  maxLength={60}
+                  className="w-full text-center text-xl font-normal outline-none border-b-2 border-purple-100 focus:border-purple-500 pb-3 transition-colors placeholder:text-gray-300 bg-transparent text-gray-950"
+                  autoFocus
+                  onKeyDown={async (e) => {
+                    if (e.key === "Enter" && currentUser) {
+                      try {
+                        const { updateDoc, doc } =
+                          await import("firebase/firestore");
+                        await updateDoc(doc(db, "users", currentUser.uid), {
+                          statusNote: statusNoteText,
+                        });
+                        if ((currentUser as any).statusNote !== undefined) {
+                          (currentUser as any).statusNote = statusNoteText;
+                        }
+                        setShowStatusInput(false);
+                      } catch (err) {}
+                    }
+                  }}
+                />
+                
+                {/* Character Counter */}
+                <div className="flex justify-end mt-2 text-xs text-gray-400 font-light">
+                  {statusNoteText.length} / 60
+                </div>
+
+                {/* Status Suggestions */}
+                <div className="mt-8">
+                  <p className="text-xs font-semibold text-purple-600/80 uppercase tracking-widest text-center mb-4">
+                    Quick suggestions
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2.5">
+                    {["☕ Chillin", "✍️ Studying", "🎮 Gaming", "🎧 Music", "😴 Sleepy", "✈️ Travel", "✨ Happy", "🔥 Hustling"].map((sug) => (
+                      <button
+                        key={sug}
+                        onClick={() => setStatusNoteText(sug)}
+                        className="px-3.5 py-1.5 bg-purple-50/80 hover:bg-purple-100 text-purple-700 rounded-full text-xs font-medium transition-all active:scale-95 border border-purple-100/30 shadow-sm"
+                      >
+                        {sug}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Actions sticky to bottom */}
+            <div className="sticky bottom-0 pt-4 pb-[max(env(safe-area-inset-bottom),24px)] w-full max-w-sm mx-auto flex flex-col space-y-3 shrink-0 z-20 bg-white/90 backdrop-blur-lg px-2">
+              <button
+                onClick={async () => {
+                  if (currentUser) {
+                    try {
+                      const { updateDoc, doc } =
+                        await import("firebase/firestore");
+                      await updateDoc(doc(db, "users", currentUser.uid), {
+                        statusNote: statusNoteText,
+                      });
+                      if ((currentUser as any).statusNote !== undefined) {
+                        (currentUser as any).statusNote = statusNoteText;
+                      }
+                      setShowStatusInput(false);
+                    } catch (err) {}
+                  }
+                }}
+                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3.5 rounded-2xl transition-all shadow-lg shadow-purple-500/20 active:scale-98 text-center"
+              >
+                Share Note
+              </button>
+              {(currentUser as any)?.statusNote && (
+                <button
+                  onClick={async () => {
+                    if (currentUser) {
+                      try {
+                        const { updateDoc, doc, deleteField } =
+                          await import("firebase/firestore");
+                        await updateDoc(doc(db, "users", currentUser.uid), {
+                          statusNote: deleteField(),
+                        });
+                        delete (currentUser as any).statusNote;
+                        setStatusNoteText("");
+                        setShowStatusInput(false);
+                      } catch (err) {}
+                    }
+                  }}
+                  className="w-full bg-red-50 hover:bg-red-100 text-red-500 font-medium py-3.5 rounded-2xl transition-all active:scale-98 text-center"
+                >
+                  Delete Status Note
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

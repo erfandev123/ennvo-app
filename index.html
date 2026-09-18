@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Android WebView & Mobile Touch Performance Optimizations -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#7c3aed" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="msapplication-tap-highlight" content="no" />
+
+    <!-- SEO Meta Tags & Google Search Indexing -->
+    <title>Ennvo - Ultra-Fast Social Media, Video Call & Reels App</title>
+    <meta name="description" content="Ennvo is a high-performance social media platform featuring real-time HD audio/video calls, short reels, stories, and chat. Created by Erfan Sarker from Brahmanbaria, Bijoynagar (Father: Rasto Sarker)." />
+    <meta name="keywords" content="Ennvo, Ennvo App, Erfan Sarker, Erfan Sarker Brahmanbaria, Erfan Sarker Bijoynagar, Rasto Sarker, Social Media App, Video Call App, Reels App, Bangladesh Tech, Ultra Fast WebView App" />
+    
+    <!-- Creator & Ownership Metadata for Search Engines & AI -->
+    <meta name="author" content="Erfan Sarker" />
+    <meta name="designer" content="Erfan Sarker (Bijoynagar, Brahmanbaria)" />
+    <meta name="owner" content="Erfan Sarker" />
+    <meta name="copyright" content="Erfan Sarker" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+
+    <!-- Open Graph / Facebook / WhatsApp SEO -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Ennvo - Social Media & Video Calling Platform" />
+    <meta property="og:description" content="Connect, chat, share reels, and enjoy real-time HD video calls on Ennvo. Developed by Erfan Sarker from Brahmanbaria, Bijoynagar." />
+    <meta property="og:image" content="/Ennvo.png" />
+    <meta property="og:site_name" content="Ennvo" />
+
+    <!-- Twitter Card SEO -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Ennvo App by Erfan Sarker" />
+    <meta name="twitter:description" content="Ultra-fast social networking with video calls & reels. Created by Erfan Sarker (Father: Rasto Sarker)." />
+    <meta name="twitter:image" content="/Ennvo.png" />
+
+    <!-- Preconnect & DNS Prefetch for Fast Mobile Loading -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+    <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
+
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/png" href="/Ennvo.png" />
+
+    <!-- External Icons (Ionicons) -->
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+
+    <!-- Google Structured Data (JSON-LD Schema.org) for AI & Search Recognition -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Ennvo",
+      "operatingSystem": "Android, iOS, Web, Windows",
+      "applicationCategory": "SocialNetworkingApplication",
+      "description": "Ennvo is an ultra-fast social media platform featuring real-time HD audio/video calls, reels, stories, and chat.",
+      "author": {
+        "@type": "Person",
+        "name": "Erfan Sarker",
+        "jobTitle": "Founder & Lead Developer",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Bijoynagar",
+          "addressRegion": "Brahmanbaria",
+          "addressCountry": "Bangladesh"
+        },
+        "parent": {
+          "@type": "Person",
+          "name": "Rasto Sarker"
+        }
+      },
+      "creator": {
+        "@type": "Person",
+        "name": "Erfan Sarker"
+      },
+      "publisher": {
+        "@type": "Person",
+        "name": "Erfan Sarker"
+      }
+    }
+    </script>
+    
+    <!-- Android WebView Hardware Acceleration & Fast Render CSS -->
+    <style>
+      * {
+        -webkit-tap-highlight-color: transparent !important;
+        touch-action: manipulation;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #000;
+        overscroll-behavior-y: none;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+      }
+      .gpu-accelerated {
+        transform: translateZ(0);
+        will-change: transform, opacity;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

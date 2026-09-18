@@ -1,0 +1,511 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  --animate-infinite-scroll: infinite-scroll 1.5s linear infinite;
+  @keyframes infinite-scroll {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(200%); }
+  }
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
+  -webkit-text-stroke: 0px transparent;
+  text-rendering: optimizeLegibility;
+  font-weight: 400;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  background-color: #000;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+button, a, input, select, textarea {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.select-none-ui {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+body::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
+@utility snap-always {
+  scroll-snap-stop: always;
+}
+
+@utility content-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 400px;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.9), 0 0 30px rgba(168, 85, 247, 0.5);
+  }
+}
+
+@utility animate-pulse-glow {
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Hide massive play button and default media placeholders in WebViews for video */
+video::-webkit-media-controls-start-playback-button,
+video::-webkit-media-controls-play-button,
+video::-webkit-media-controls-overlay-play-button,
+video::-webkit-media-controls,
+video::-webkit-media-controls-panel,
+video::-webkit-media-controls-enclosure,
+video::-internal-media-controls-overlay-cast-button,
+video::-webkit-media-controls-current-time-display,
+video::-webkit-media-controls-time-remaining-display,
+::-webkit-media-controls-start-playback-button,
+::-webkit-media-controls-play-button,
+::-webkit-media-controls-overlay-play-button,
+::-webkit-media-controls-panel {
+  display: none !important;
+  -webkit-appearance: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+video {
+  -webkit-tap-highlight-color: transparent;
+  outline: none !important;
+  background-color: transparent !important;
+}
+
+video:not([controls]) {
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+
+/* ===================================================
+   ULTRA-CLEAN STANDALONE LIQUID GLASS NAVIGATION BAR
+   =================================================== */
+.ultra-glass-nav {
+    position: relative;
+    width: clamp(270px, 76vw, 310px);
+    height: 52px;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform: translateZ(0);
+    will-change: transform;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: pan-y;
+}
+
+/* Base Liquid Glass Capsule Styling for Dark Mode (Reels Video Page) */
+.ultra-glass-nav.dark-mode {
+    background: linear-gradient(
+        135deg, 
+        rgba(255, 255, 255, 0.25) 0%, 
+        rgba(255, 255, 255, 0.08) 100%
+    );
+    backdrop-filter: blur(25px) saturate(200%);
+    -webkit-backdrop-filter: blur(25px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-top: 1.5px solid rgba(255, 255, 255, 0.85);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), inset 0 1px 1.5px rgba(255, 255, 255, 0.7);
+}
+
+/* Liquid Glass Capsule Styling for Light/White Pages */
+.ultra-glass-nav.light-mode {
+    background: linear-gradient(
+        135deg, 
+        rgba(255, 255, 255, 0.82) 0%, 
+        rgba(255, 255, 255, 0.52) 100%
+    );
+    backdrop-filter: blur(25px) saturate(200%);
+    -webkit-backdrop-filter: blur(25px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-top: 1.8px solid rgba(255, 255, 255, 0.95);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08), inset 0 1.5px 2px rgba(255, 255, 255, 0.95);
+}
+
+.circle-slot {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 20%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 1;
+    transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.circle-slot.is-dragging {
+    transition: none !important;
+}
+
+/* Active Bubble Circle on Dark Mode Pages */
+.ultra-glass-nav.dark-mode .active-glass-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: linear-gradient(
+        180deg, 
+        rgba(255, 255, 255, 0.45) 0%, 
+        rgba(255, 255, 255, 0.12) 100%
+    );
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-top: 1.5px solid #ffffff;
+    box-shadow: inset 0 1.5px 2px rgba(255, 255, 255, 0.95);
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, border-radius 0.2s ease;
+    will-change: transform;
+}
+
+.ultra-glass-nav.dark-mode .active-glass-circle.is-holding {
+    transform: scaleX(1.24) scaleY(1.06);
+    border-radius: 20px;
+    box-shadow: 0 0 18px rgba(255, 255, 255, 0.6), inset 0 1.5px 2px #ffffff;
+}
+
+/* Active Bubble Circle on Light/White Pages */
+.ultra-glass-nav.light-mode .active-glass-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #ffffff;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), inset 0 1.5px 2px #ffffff;
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, border-radius 0.2s ease;
+    will-change: transform;
+}
+
+.ultra-glass-nav.light-mode .active-glass-circle.is-holding {
+    transform: scaleX(1.24) scaleY(1.06);
+    border-radius: 20px;
+    box-shadow: 0 6px 20px rgba(124, 58, 237, 0.3), inset 0 1.5px 2px #ffffff;
+}
+
+.glass-nav-item {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.glass-nav-item:active {
+    transform: scale(0.82);
+}
+
+.glass-nav-icon {
+    width: 21px;
+    height: 21px;
+    fill: none;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke 0.25s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.25s ease;
+}
+
+/* Icons on Dark Mode Pages */
+.ultra-glass-nav.dark-mode .glass-nav-icon {
+    stroke: rgba(255, 255, 255, 0.65);
+}
+
+.ultra-glass-nav.dark-mode .glass-nav-item.active .glass-nav-icon {
+    stroke: #ffffff;
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8));
+}
+
+/* Icons on White/Light Pages */
+.ultra-glass-nav.light-mode .glass-nav-icon {
+    stroke: rgba(20, 20, 25, 0.65);
+}
+
+.ultra-glass-nav.light-mode .glass-nav-item.active .glass-nav-icon {
+    stroke: #000000;
+    transform: scale(1.1);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+}
+
+/* Post Button (+) Styling */
+.post-btn-glow {
+    width: 33px;
+    height: 33px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s ease;
+}
+
+.ultra-glass-nav.dark-mode .post-btn-glow {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.05));
+    border: 1.2px solid rgba(255, 255, 255, 0.5);
+    box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, 0.8);
+}
+
+.ultra-glass-nav.dark-mode .glass-nav-item.active .post-btn-glow {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.15));
+    border-color: #ffffff;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.4), inset 0 1px 2px #ffffff;
+}
+
+.ultra-glass-nav.light-mode .post-btn-glow {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(240, 240, 245, 0.5));
+    border: 1.2px solid rgba(0, 0, 0, 0.15);
+    box-shadow: inset 0 1px 1.5px #ffffff;
+}
+
+.ultra-glass-nav.light-mode .glass-nav-item.active .post-btn-glow {
+    background: linear-gradient(135deg, #ffffff, rgba(240, 240, 250, 0.9));
+    border-color: rgba(0, 0, 0, 0.3);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1), inset 0 1px 2px #ffffff;
+}
+
+/* ===================================================
+   ULTRA LIQUID GLASS CHAT INPUT BAR & REPLIES
+   =================================================== */
+.ultra-glass-chat-container {
+  background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.72) 0%,
+      rgba(255, 255, 255, 0.45) 100%
+  );
+  backdrop-filter: blur(25px) saturate(200%);
+  -webkit-backdrop-filter: blur(25px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-top: 1.8px solid rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), inset 0 1.5px 2px rgba(255, 255, 255, 0.95);
+  border-radius: 9999px;
+  transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform: translateZ(0);
+}
+
+.ultra-glass-chat-container:focus-within {
+  background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.88) 0%,
+      rgba(255, 255, 255, 0.65) 100%
+  );
+  border-color: rgba(168, 85, 247, 0.45);
+  box-shadow: 0 12px 34px rgba(168, 85, 247, 0.14), inset 0 1.5px 2px #ffffff;
+}
+
+.ultra-glass-reply-box {
+  background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.82) 0%,
+      rgba(255, 255, 255, 0.52) 100%
+  );
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-top: 1.6px solid rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07), inset 0 1.5px 2px rgba(255, 255, 255, 0.95);
+  border-radius: 20px;
+}
+
+/* Smooth GPU Instagram-style Message Pop Entrance */
+@keyframes message-pop {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.animate-message-pop {
+  animation: message-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* ===================================================
+   PC ULTRA LIQUID GLASS SOFT ROUNDED FLOATING DOCK (IOS STYLE)
+   =================================================== */
+@media (max-width: 767px) {
+  .ultra-glass-pc-dock {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+  }
+}
+
+.ultra-glass-pc-dock {
+  position: fixed;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%) translateZ(0);
+  z-index: 70;
+  width: 62px;
+  padding: 12px 0;
+  border-radius: 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.78) 0%,
+    rgba(255, 255, 255, 0.45) 100%
+  );
+  backdrop-filter: blur(28px) saturate(210%);
+  -webkit-backdrop-filter: blur(28px) saturate(210%);
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  border-top: 2px solid rgba(255, 255, 255, 0.98);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.09),
+              0 2px 8px rgba(0, 0, 0, 0.03),
+              inset 0 1.5px 2px rgba(255, 255, 255, 0.95);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+.ultra-glass-pc-dock.dark-mode {
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.25) 0%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.35),
+              inset 0 1.5px 2px rgba(255, 255, 255, 0.7);
+}
+
+.ultra-glass-pc-item {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  margin: 3px 0;
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ultra-glass-pc-item:hover {
+  transform: scale(1.12);
+}
+
+.ultra-glass-pc-item:active {
+  transform: scale(0.92);
+}
+
+.ultra-glass-pc-item.is-drag-hovered {
+  transform: scale(1.22);
+}
+
+.ultra-glass-pc-icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: #64748b;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.2s ease, transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.2s ease;
+}
+
+.ultra-glass-pc-item:hover .ultra-glass-pc-icon {
+  stroke: #1e293b;
+}
+
+.ultra-glass-pc-item.active .ultra-glass-pc-icon {
+  stroke: #0f172a;
+  stroke-width: 2.35;
+  transform: scale(1.08);
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.12));
+}
+
+.ultra-glass-pc-dock.dark-mode .ultra-glass-pc-icon {
+  stroke: rgba(255, 255, 255, 0.7);
+}
+
+.ultra-glass-pc-dock.dark-mode .ultra-glass-pc-item:hover .ultra-glass-pc-icon {
+  stroke: #ffffff;
+}
+
+.ultra-glass-pc-dock.dark-mode .ultra-glass-pc-item.active .ultra-glass-pc-icon {
+  stroke: #ffffff;
+  stroke-width: 2.35;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8));
+}
+
+
+

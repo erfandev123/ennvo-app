@@ -1,0 +1,12 @@
+{
+  "name": "Remix Remix Remix Remix Remix Ennvo Agu 29 -2026",
+  "description": "A high-performance social media platform with real-time messaging, stories, and media sharing.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

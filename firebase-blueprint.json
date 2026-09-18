@@ -1,0 +1,251 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Ennvo user account and public profile data",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "username": { "type": "string", "maxLength": 50, "pattern": "^[a-zA-Z0-9_.]+$" },
+        "email": { "type": "string", "maxLength": 100 },
+        "avatar": { "type": "string" },
+        "bio": { "type": "string", "maxLength": 500 },
+        "link": { "type": "string", "maxLength": 200 },
+        "followersCount": { "type": "number" },
+        "followingCount": { "type": "number" },
+        "postsCount": { "type": "number" },
+        "highlights": { "type": "array" },
+        "verified": { "type": "boolean" },
+        "isPrivate": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "username", "name"]
+    },
+    "Post": {
+      "title": "Post & Reel Item",
+      "description": "Feed post, reel video, text update or photo gallery",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorAvatar": { "type": "string" },
+        "authorUsername": { "type": "string" },
+        "text": { "type": "string", "maxLength": 5000 },
+        "media": { "type": "array" },
+        "type": { "type": "string", "enum": ["post", "reel", "text"] },
+        "likesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "repostsCount": { "type": "number" },
+        "favoritesCount": { "type": "number" },
+        "viewsCount": { "type": "number" },
+        "songId": { "type": "string" },
+        "songTitle": { "type": "string" },
+        "songArtist": { "type": "string" },
+        "songUrl": { "type": "string" },
+        "location": { "type": "string" },
+        "taggedUsers": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorId", "type"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Post comment or reply with support for voice, images, stickers",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorAvatar": { "type": "string" },
+        "text": { "type": "string", "maxLength": 2000 },
+        "parentId": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "audioUrl": { "type": "string" },
+        "audioDuration": { "type": "number" },
+        "stickerUrl": { "type": "string" },
+        "likesCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorId", "text"]
+    },
+    "Like": {
+      "title": "Like",
+      "description": "User like record for post or comment",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userAvatar": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId"]
+    },
+    "Repost": {
+      "title": "Repost",
+      "description": "User repost/reshare record for a post",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userAvatar": { "type": "string" },
+        "text": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId"]
+    },
+    "Favorite": {
+      "title": "Saved Item",
+      "description": "Saved post or song bookmark record",
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Follower": {
+      "title": "Follower / Following Link",
+      "description": "Social graph link record between users",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "avatar": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Story": {
+      "title": "Ephemeral Story",
+      "description": "24-hour photo or short video story",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorAvatar": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "type": { "type": "string", "enum": ["image", "video"] },
+        "viewers": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorId", "mediaUrl"]
+    },
+    "Conversation": {
+      "title": "Chat Conversation",
+      "description": "Direct chat conversation metadata",
+      "type": "object",
+      "properties": {
+        "participantIds": { "type": "array" },
+        "lastMessage": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["participantIds"]
+    },
+    "Message": {
+      "title": "Chat Message",
+      "description": "Message within a conversation",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "content": { "type": "string", "maxLength": 5000 },
+        "mediaUrl": { "type": "string" },
+        "audioUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderId"]
+    },
+    "Song": {
+      "title": "Music Track",
+      "description": "Song or custom audio track for posts and reels",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "artist": { "type": "string" },
+        "url": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "duration": { "type": "number" },
+        "creatorId": { "type": "string" },
+        "creatorName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "url"]
+    },
+    "Notification": {
+      "title": "Notification Item",
+      "description": "In-app alert for likes, comments, mentions, follows",
+      "type": "object",
+      "properties": {
+        "actorId": { "type": "string" },
+        "actorName": { "type": "string" },
+        "actorAvatar": { "type": "string" },
+        "type": { "type": "string" },
+        "targetId": { "type": "string" },
+        "postId": { "type": "string" },
+        "content": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["actorId", "type"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile collection"
+    },
+    "/users/{userId}/followers/{followerId}": {
+      "schema": { "$ref": "#/entities/Follower" },
+      "description": "Subcollection of followers for a user"
+    },
+    "/users/{userId}/following/{followingId}": {
+      "schema": { "$ref": "#/entities/Follower" },
+      "description": "Subcollection of users followed by a user"
+    },
+    "/users/{userId}/favorites/{postId}": {
+      "schema": { "$ref": "#/entities/Favorite" },
+      "description": "Subcollection of saved posts for a user"
+    },
+    "/users/{userId}/reposts/{postId}": {
+      "schema": { "$ref": "#/entities/Repost" },
+      "description": "Subcollection of reposted posts for a user"
+    },
+    "/posts/{postId}": {
+      "schema": { "$ref": "#/entities/Post" },
+      "description": "Main posts and reels collection"
+    },
+    "/posts/{postId}/likes/{userId}": {
+      "schema": { "$ref": "#/entities/Like" },
+      "description": "Likes on a post"
+    },
+    "/posts/{postId}/reposts/{userId}": {
+      "schema": { "$ref": "#/entities/Repost" },
+      "description": "Reposts on a post"
+    },
+    "/posts/{postId}/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/Comment" },
+      "description": "Comments on a post"
+    },
+    "/posts/{postId}/comments/{commentId}/likes/{userId}": {
+      "schema": { "$ref": "#/entities/Like" },
+      "description": "Likes on a comment"
+    },
+    "/stories/{storyId}": {
+      "schema": { "$ref": "#/entities/Story" },
+      "description": "Ephemeral stories collection"
+    },
+    "/conversations/{conversationId}": {
+      "schema": { "$ref": "#/entities/Conversation" },
+      "description": "Direct message conversations"
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Messages inside a conversation"
+    },
+    "/songs/{songId}": {
+      "schema": { "$ref": "#/entities/Song" },
+      "description": "Music library tracks"
+    },
+    "/notifications/{userId}/items/{id}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "In-app user notifications"
+    }
+  }
+}
