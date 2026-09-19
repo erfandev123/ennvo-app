@@ -37,6 +37,7 @@ import {
   Users,
   Zap
 } from 'lucide-react';
+import { StickerPickerModal } from './StickerPickerModal';
 import { useAppStore } from '../store';
 import { db } from '../firebase';
 import { 
@@ -104,7 +105,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
   const [isFollowingUser, setIsFollowingUser] = useState(false);
   const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
   const [floatingHearts, setFloatingHearts] = useState<{ id: number, x: number, y: number }[]>([]);
-  const [isNearScreen, setIsNearScreen] = useState(false);
+  const [isNearScreen, setIsNearScreen] = useState(true);
   const [isVertical, setIsVertical] = useState(true);
   
   const [swipeX, setSwipeX] = useState(0);
@@ -204,18 +205,6 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
 
   const reelBottomSpacing = isModal ? 'bottom-8' : navStyle === 'glass' ? 'bottom-[calc(96px+env(safe-area-inset-bottom))]' : 'bottom-[calc(65px+env(safe-area-inset-bottom))]';
 
-  useEffect(() => {
-    if (currentPage !== 'home' && !isModal) {
-      setPlaying(false);
-      if (videoRef.current) {
-        videoRef.current.pause();
-      }
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-    }
-  }, [currentPage, isModal]);
-
   const cachedAuthor = userCache[reel.authorId];
   const authorName = cachedAuthor?.name || reel.authorName;
   const authorAvatar = cachedAuthor?.avatar || reel.authorAvatar;
@@ -237,7 +226,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
   const followingSet = useMemo(() => new Set(followingIds || []), [followingIds]);
 
   useEffect(() => {
-    if (!isNearScreen || !currentUser) return;
+    if (!playing || !isNearScreen || !currentUser) return;
 
     const repostsColRef = collection(db, 'posts', reel.id, 'reposts');
     const likesColRef = collection(db, 'posts', reel.id, 'likes');
@@ -311,14 +300,14 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
   }, [reel.id, currentUser, isNearScreen, followingSet]);
 
   useEffect(() => {
-    // Optimization: Unmount heavy reel contents if they are further than 2 viewports away
+    // Optimization: Keep nearby reel contents mounted within 1 viewport distance for instant scroll
     const preloadObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           setIsNearScreen(entry.isIntersecting);
         });
       },
-      { rootMargin: '50% 0px' }
+      { rootMargin: '100% 0px' }
     );
     if (containerRef.current) preloadObserver.observe(containerRef.current);
     
@@ -347,7 +336,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
   }, [reel.id]);
 
   useEffect(() => {
-    if (!isNearScreen || !currentUser) return;
+    if (!isNearScreen || !currentUser || (!playing && !showComments)) return;
 
     const reelRef = doc(db, 'posts', reel.id);
     const likeRef = doc(db, 'posts', reel.id, 'likes', currentUser.uid);
@@ -426,28 +415,23 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            if (videoRef.current) {
-              videoRef.current.currentTime = 0;
-            }
-            if (audioRef.current) {
-              audioRef.current.currentTime = 0;
-            }
             setPlaying(true);
             if (currentUser) incrementViewCount(reel.id, currentUser.uid);
+            if (videoRef.current && videoRef.current.paused) {
+              videoRef.current.play().catch(() => {});
+            }
           } else {
             setPlaying(false);
             if (videoRef.current) {
               videoRef.current.pause();
-              videoRef.current.currentTime = 0;
             }
             if (audioRef.current) {
               audioRef.current.pause();
-              audioRef.current.currentTime = 0;
             }
           }
         });
       },
-      { threshold: 0.5 }
+      { threshold: 0.6 }
     );
 
     if (containerRef.current) observer.observe(containerRef.current);
@@ -792,7 +776,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
         transform: `translateX(${swipeX}px)`, 
         transition: isSwiping ? 'none' : 'transform 0.25s ease-out' 
       }}
-      className="w-full h-full snap-start snap-always flex items-center justify-center relative bg-black md:bg-[#f8f9fa] content-auto transform-gpu overflow-hidden"
+      className="w-full h-full min-h-full snap-start flex items-center justify-center relative bg-black md:bg-[#f8f9fa] transform-gpu overflow-hidden shrink-0 select-none"
     >
       {isNearScreen && (
         <div className="flex flex-col md:flex-row items-center md:items-end justify-center w-full h-full max-w-[1200px] mx-auto relative group py-0 md:py-8 md:space-x-4 lg:space-x-8 animate-in fade-in duration-200 md:pl-28 lg:pl-32">
@@ -912,9 +896,9 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
               webkit-playsinline="true"
               // @ts-ignore
               x5-playsinline="true"
-              poster={reel.thumbnailUrl || reel.thumbnail || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E"}
+              poster={reel.thumbnailUrl || reel.thumbnail || undefined}
               autoPlay={playing}
-              preload={playing ? "auto" : isNearScreen ? "metadata" : "none"}
+              preload={playing ? "auto" : isNearScreen ? "auto" : "metadata"}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               className={`w-full h-full mx-auto ${
@@ -1127,10 +1111,10 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
             </button>
           )}
 
-          {/* Timeline / Progress Bar (HIDDEN in New/Glass Navigation, SHOWN in Classic Navigation ONLY when paused) */}
-          {!isImageReel && isNearScreen && navStyle !== 'glass' && !playing && (
+          {/* Timeline / Progress Bar (Ultra-thin Android style in Classic Navigation) */}
+          {!isImageReel && isNearScreen && navStyle !== 'glass' && (
             <div 
-              className={`absolute ${isModal ? 'bottom-2' : 'bottom-[calc(65px+env(safe-area-inset-bottom))]'} left-3 right-3 h-4 z-40 flex items-center cursor-pointer group/timeline touch-none select-none transition-all duration-150 opacity-100 scale-y-110`}
+              className={`absolute ${isModal ? 'bottom-1' : 'bottom-[calc(56px+env(safe-area-inset-bottom))]'} left-0 right-0 h-3 z-40 flex items-end cursor-pointer group/timeline touch-none select-none`}
               onClick={(e) => {
                 e.stopPropagation();
                 if (videoRef.current && videoRef.current.duration) {
@@ -1171,10 +1155,10 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                 }
               }}
             >
-              <div className="w-full h-1.5 bg-white/30 rounded-full relative overflow-hidden backdrop-blur-xs">
+              <div className="w-full h-[2px] group-hover/timeline:h-[3.5px] bg-white/20 relative overflow-hidden transition-all duration-150">
                 <div 
                   ref={progressBarRef} 
-                  className="h-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500 shadow-[0_0_8px_rgba(236,72,153,0.8)] rounded-full" 
+                  className="h-full bg-white group-hover/timeline:bg-gradient-to-r group-hover/timeline:from-purple-400 group-hover/timeline:to-pink-500 shadow-[0_0_4px_rgba(255,255,255,0.8)]" 
                   style={{ width: '0%', transition: 'none' }}
                 />
               </div>
@@ -2774,62 +2758,6 @@ export const CommentsPortal = ({ postId, onClose, authorId, authorName, authorAv
           </div>
         )}
 
-        {/* Sticker / GIF Picker Drawer */}
-        {showStickerPicker && (
-          <div className="bg-gray-50 border-t border-gray-200 p-3 flex flex-col space-y-2 animate-in slide-in-from-bottom duration-150 max-h-52 overflow-y-auto">
-            <div className="flex items-center space-x-2 border-b border-gray-200 pb-2">
-              <button 
-                type="button"
-                onClick={() => setStickerTab('giphy')} 
-                className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${stickerTab === 'giphy' ? 'bg-black text-white' : 'bg-gray-200 text-gray-700'}`}
-              >
-                GIPHY GIFs
-              </button>
-              <button 
-                type="button"
-                onClick={() => setStickerTab('emoji')} 
-                className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${stickerTab === 'emoji' ? 'bg-black text-white' : 'bg-gray-200 text-gray-700'}`}
-              >
-                Stickers
-              </button>
-            </div>
-
-            {stickerTab === 'giphy' ? (
-              <div className="grid grid-cols-4 gap-2">
-                {giphyStickers.map((gif, i) => (
-                  <button 
-                    key={i} 
-                    type="button"
-                    onClick={() => {
-                      setSelectedSticker(gif);
-                      setShowStickerPicker(false);
-                    }}
-                    className="h-16 w-full rounded-lg overflow-hidden border border-gray-200 hover:scale-105 active:scale-95 transition-transform"
-                  >
-                    <img src={gif} className="w-full h-full object-cover" alt="GIF" />
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-7 gap-2">
-                {stickerList.map((stk, i) => (
-                  <button 
-                    key={i} 
-                    type="button"
-                    onClick={() => {
-                      setSelectedSticker(stk);
-                      setShowStickerPicker(false);
-                    }}
-                    className="text-2xl hover:scale-125 active:scale-90 transition-transform p-1.5 rounded-lg hover:bg-white shadow-2xs"
-                  >
-                    {stk}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Hidden File Input */}
         <input 
           type="file" 
@@ -2861,13 +2789,15 @@ export const CommentsPortal = ({ postId, onClose, authorId, authorName, authorAv
                 </div>
               )}
               {selectedSticker && (
-                <div className="relative group flex items-center bg-white px-2.5 py-1 rounded-lg border border-gray-200">
-                  {selectedSticker.startsWith('http') ? (
-                    <img src={selectedSticker} className="w-8 h-8 object-contain" alt="Sticker" />
+                <div className="relative group flex items-center bg-white px-2.5 py-1.5 rounded-2xl border border-gray-200 shadow-2xs">
+                  {selectedSticker.endsWith('.mp4') || selectedSticker.endsWith('.webm') ? (
+                    <video src={selectedSticker} autoPlay loop muted playsInline className="w-10 h-10 object-contain rounded-lg" />
+                  ) : selectedSticker.startsWith('http') || selectedSticker.startsWith('data:') ? (
+                    <img src={selectedSticker} className="w-10 h-10 object-contain" alt="Sticker" referrerPolicy="no-referrer" />
                   ) : (
                     <span className="text-2xl">{selectedSticker}</span>
                   )}
-                  <button type="button" onClick={() => setSelectedSticker(null)} className="ml-2 text-gray-400 hover:text-red-500">
+                  <button type="button" onClick={() => setSelectedSticker(null)} className="ml-2 p-1 text-gray-400 hover:text-red-500 rounded-full hover:bg-gray-100 transition-colors">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -2969,6 +2899,21 @@ export const CommentsPortal = ({ postId, onClose, authorId, authorName, authorAv
             </div>
           )}
         </form>
+
+        {/* Global Sticker Picker Modal */}
+        <StickerPickerModal
+          isOpen={showStickerPicker}
+          onClose={() => setShowStickerPicker(false)}
+          onSelectSticker={(url) => {
+            setSelectedSticker(url);
+            setShowStickerPicker(false);
+          }}
+          onSelectEmoji={(emoji) => {
+            setText((prev) => prev + emoji);
+            setShowStickerPicker(false);
+          }}
+          currentUser={currentUser}
+        />
       </motion.div>
     </motion.div>, document.body
   );

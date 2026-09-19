@@ -24,6 +24,7 @@ import { collection, query, where, getDocs, limit, orderBy } from 'firebase/fire
 import { db } from '../firebase';
 import { followUser, unfollowUser } from '../services/followService';
 import { VerifiedBadge } from '../components/VerifiedBadge';
+import { FacebookSearchSkeleton } from '../components/Skeletons';
 
 const POPULAR_TRENDS = [
   '#funny', '#music', '#dance', '#tech', 
@@ -41,21 +42,7 @@ const searchCacheMap = new Map<string, { users: any[]; posts: any[] }>();
 
 // Skeleton Loader Component for fast visual feedback
 const SearchSkeleton = () => (
-  <div className="space-y-4 animate-pulse pt-2">
-    <div className="flex space-x-3 items-center p-3 bg-white rounded-2xl border border-gray-100">
-      <div className="w-12 h-12 rounded-full bg-gray-200"></div>
-      <div className="flex-1 space-y-2">
-        <div className="h-4 bg-gray-200 rounded-md w-1/3"></div>
-        <div className="h-3 bg-gray-100 rounded-md w-1/4"></div>
-      </div>
-      <div className="w-20 h-8 bg-gray-200 rounded-xl"></div>
-    </div>
-    <div className="grid grid-cols-3 gap-2">
-      <div className="aspect-square bg-gray-200 rounded-xl"></div>
-      <div className="aspect-square bg-gray-200 rounded-xl"></div>
-      <div className="aspect-square bg-gray-200 rounded-xl"></div>
-    </div>
-  </div>
+  <FacebookSearchSkeleton />
 );
 
 // Memoized User Card
@@ -254,6 +241,7 @@ export default function SearchPage() {
     setViewingMedia, 
     setViewingUser, 
     setViewingReel, 
+    setViewingReelList,
     pushPage, 
     popPage, 
     currentUser,
@@ -802,7 +790,9 @@ export default function SearchPage() {
                         item={post} 
                         onClick={() => {
                           if (post.type === 'reel') {
-                            setViewingReel({ ...post, single: true });
+                            const searchReels = filteredPosts.filter(p => p.type === 'reel');
+                            setViewingReelList(searchReels.length > 0 ? searchReels : [post]);
+                            setViewingReel(post);
                           } else {
                             setViewingMedia({ type: 'post', url: post.media?.[0], user: { name: post.authorName, avatar: post.authorAvatar }, likes: post.likesCount, comments: post.commentsCount });
                           }
@@ -942,7 +932,9 @@ export default function SearchPage() {
                     item={item} 
                     onClick={() => {
                       if (item.type === 'reel') {
-                        setViewingReel({ ...item, single: true });
+                        const discReels = cachedDiscovery.filter(p => p.type === 'reel');
+                        setViewingReelList(discReels.length > 0 ? discReels : [item]);
+                        setViewingReel(item);
                       } else {
                         setViewingMedia({ type: 'post', url: item.media?.[0], user: { name: item.authorName, avatar: item.authorAvatar }, likes: item.likesCount, comments: item.commentsCount });
                       }

@@ -80,17 +80,37 @@ export interface Conversation {
   unreadCount: { [uid: string]: number };
   updatedAt: any;
   typing?: { [uid: string]: boolean };
+  theme?: string;
+  isGroup?: boolean;
+  groupName?: string;
+  groupAvatar?: string;
+}
+
+export interface CustomSticker {
+  id: string;
+  url: string;
+  title?: string;
+  type: 'image' | 'video' | 'animated';
+  authorId: string;
+  authorName: string;
+  authorAvatar?: string;
+  tags?: string[];
+  isPublic?: boolean;
+  createdAt: any;
 }
 
 export interface Message {
   id: string;
   senderId: string;
-  type: 'text' | 'image' | 'video' | 'voice' | 'reel';
+  type: 'text' | 'image' | 'video' | 'voice' | 'reel' | 'sticker' | 'system';
   content: string;
   mediaUrl?: string;
+  stickerUrl?: string;
+  stickerType?: 'image' | 'video' | 'animated';
   postId?: string;
   status?: 'sending' | 'sent' | 'delivered' | 'seen';
   voiceDuration?: number;
+  reaction?: string;
   createdAt: any;
   replyTo?: {
     id: string;

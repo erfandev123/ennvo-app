@@ -14,6 +14,8 @@ import { createConversation, sendMessage } from '../services/chatService';
 import { uploadMedia } from '../services/githubStorage';
 import { Post, User } from '../types';
 import { formatTime, formatCount } from '../utils';
+import { FacebookProfileSkeleton, FacebookPostSkeleton, FacebookGridSkeleton } from '../components/Skeletons';
+import { AccountSwitcherModal } from '../components/AccountSwitcherModal';
 
 const UserRowWithFollow = React.memo(({ user, currentUser, onSelectUser }: { user: any, currentUser: any, onSelectUser: (user: any) => void }) => {
   const [friendship, setFriendship] = useState({ following: false, followedBy: false, isFriend: false });
@@ -81,7 +83,7 @@ const UserRowWithFollow = React.memo(({ user, currentUser, onSelectUser }: { use
 
 export default function Profile() {
   const [activeTab, setActiveTab] = useState<'posts' | 'reels' | 'saved' | 'reposts' | 'private'>('reels');
-  const { viewingUser, setViewingUser, setViewingMedia, setViewingPost, setViewingReel, setViewingReelContext, currentUser, pushPage, popPage, setActiveChat, cachedProfilePosts, setCachedProfilePosts, cachedSavedPosts, setCachedSavedPosts, setIsBottomNavHidden, setSelectedCreateSong } = useAppStore();
+  const { viewingUser, setViewingUser, setViewingMedia, setViewingPost, setViewingReel, setViewingReelList, setViewingReelContext, currentUser, pushPage, popPage, setActiveChat, cachedProfilePosts, setCachedProfilePosts, cachedSavedPosts, setCachedSavedPosts, setIsBottomNavHidden, setSelectedCreateSong, setShowAccountSwitcherModal } = useAppStore();
   const isCurrentUser = !viewingUser || viewingUser.uid === currentUser?.uid;
   const targetUserId = isCurrentUser ? currentUser?.uid : viewingUser.uid;
   const [profilePosts, setProfilePosts] = useState<Post[]>(cachedProfilePosts[targetUserId || ''] || []);
@@ -625,136 +627,174 @@ export default function Profile() {
                </svg>
             </div>
 
-            {!isCurrentUser && (
-              <button 
-                onClick={() => popPage()}
-                className="absolute top-12 left-4 z-30 text-gray-800 p-1 hover:text-purple-600 transition-colors rounded-full active:scale-90"
-              >
-                <ArrowLeft className="w-6 h-6" strokeWidth={2.5} />
-              </button>
-            )}
-
-            {/* Top Right Icons */}
-            <div className="absolute top-12 right-4 z-30 flex items-center space-x-3">
-              <button className="p-1.5 text-gray-800 hover:text-purple-600 transition-colors">
-                <LinkIcon className="w-[22px] h-[22px]" strokeWidth={2.5} />
-              </button>
-              <button 
-                className="p-1.5 text-gray-800 hover:text-purple-600 transition-colors relative flex items-center justify-center"
-                onClick={() => {
-                  if (isCurrentUser) {
-                    localStorage.setItem('lastCheckedProfileViewsCount', profileViewsCount.toString());
-                    setUnreadViewsCount(0);
-                    setShowProfileViews(true);
-                  }
-                }}
-              >
-                {isCurrentUser && profileViewers.length > 0 ? (
-                  <div className="w-[24px] h-[24px] rounded-full overflow-hidden border border-gray-300 bg-white">
-                    <img src={profileViewers[0].avatar} alt="View" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  </div>
-                ) : (
-                  <Eye className="w-[22px] h-[22px]" strokeWidth={2.5} />
-                )}
-                {(isCurrentUser && unreadViewsCount > 0) ? (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-normal px-1 rounded-full border-2 border-[#f3e8ff] min-w-[14px] h-[14px] flex items-center justify-center">
-                    {unreadViewsCount > 99 ? '99+' : unreadViewsCount}
-                  </span>
-                ) : null}
-              </button>
-              {isCurrentUser && (
+            {/* iOS Top Bar for Mobile & Clean Header */}
+            <div className="w-full px-4 pt-4 pb-2 z-30 flex items-center justify-between">
+              {isCurrentUser ? (
+                /* Multi-Account Switcher Trigger: Clean iOS Pill with Lock + @username + Chevron */
                 <button 
-                  onClick={() => pushPage('settings')}
-                  className="p-1.5 text-gray-800 hover:text-purple-600 transition-colors"
+                  onClick={() => setShowAccountSwitcherModal(true)}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-white/80 hover:bg-white active:scale-95 transition-all shadow-xs border border-purple-100 backdrop-blur-md"
+                  title="Switch or Add Account"
                 >
-                  <Settings className="w-[22px] h-[22px]" strokeWidth={2.5} />
+                  <Lock className="w-3.5 h-3.5 text-purple-700 shrink-0" />
+                  <span className="font-semibold text-[14px] text-gray-900 tracking-tight max-w-[140px] truncate">
+                    {userData?.username || profileHandle.replace('@', '')}
+                  </span>
+                  <svg className="w-3.5 h-3.5 text-gray-500 ml-0.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
                 </button>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <button 
+                    onClick={() => popPage()} 
+                    className="p-1.5 rounded-full bg-white/80 backdrop-blur-md text-gray-800 hover:bg-white active:scale-90 transition-all shadow-xs border border-white/80"
+                  >
+                    <ArrowLeft className="w-5 h-5 text-gray-900" strokeWidth={2.2} />
+                  </button>
+                  <span className="font-semibold text-[15px] text-gray-900 truncate max-w-[150px]">
+                    {userData?.username || profileHandle.replace('@', '')}
+                  </span>
+                </div>
               )}
+
+              {/* Action Icons (iOS soft frosted buttons) */}
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={handleShare}
+                  className="w-9 h-9 rounded-full bg-white/80 backdrop-blur-md border border-white/80 flex items-center justify-center text-gray-700 hover:text-purple-600 hover:bg-white active:scale-95 transition-all shadow-xs"
+                  title="Share profile"
+                >
+                  <LinkIcon className="w-4 h-4" strokeWidth={2} />
+                </button>
+
+                <button 
+                  className="w-9 h-9 rounded-full bg-white/80 backdrop-blur-md border border-white/80 flex items-center justify-center text-gray-700 hover:text-purple-600 hover:bg-white active:scale-95 transition-all shadow-xs relative"
+                  onClick={() => {
+                    if (isCurrentUser) {
+                      localStorage.setItem('lastCheckedProfileViewsCount', profileViewsCount.toString());
+                      setUnreadViewsCount(0);
+                      setShowProfileViews(true);
+                    }
+                  }}
+                  title="Profile views"
+                >
+                  {isCurrentUser && profileViewers.length > 0 ? (
+                    <div className="w-6 h-6 rounded-full overflow-hidden border border-gray-200 bg-white">
+                      <img src={profileViewers[0].avatar} alt="View" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                  ) : (
+                    <Eye className="w-4 h-4" strokeWidth={2} />
+                  )}
+                  {(isCurrentUser && unreadViewsCount > 0) ? (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold px-1 rounded-full border-2 border-[#f3e8ff] min-w-[15px] h-[15px] flex items-center justify-center shadow-xs">
+                      {unreadViewsCount > 99 ? '99+' : unreadViewsCount}
+                    </span>
+                  ) : null}
+                </button>
+
+                {isCurrentUser && (
+                  <button 
+                    onClick={() => pushPage('settings')}
+                    className="w-9 h-9 rounded-full bg-white/80 backdrop-blur-md border border-white/80 flex items-center justify-center text-gray-700 hover:text-purple-600 hover:bg-white active:scale-95 transition-all shadow-xs"
+                    title="Settings"
+                  >
+                    <Settings className="w-4 h-4" strokeWidth={2} />
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Profile Picture */}
-            <div className="relative mt-14 mb-1 z-20">
-              <div className="w-[115px] h-[115px] rounded-full p-1 bg-gradient-to-br from-purple-200 to-purple-400 ">
-                <div className="w-full h-full rounded-full border-[3px] border-white overflow-hidden bg-white">
+            {/* Profile Picture with soft iridescent border */}
+            <div className="relative mt-2 mb-2 z-20">
+              <div className="w-[102px] h-[102px] rounded-full p-[3px] bg-gradient-to-tr from-purple-400 via-pink-400 to-indigo-400 shadow-md shadow-purple-200/50">
+                <div className="w-full h-full rounded-full border-[2.5px] border-white overflow-hidden bg-white">
                   <img src={userData?.avatar || profileAvatar} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 </div>
               </div>
               {isCurrentUser && (
                 <div 
-                  className="absolute bottom-0 right-0 p-2 bg-white rounded-full  border border-gray-100 cursor-pointer text-gray-700 hover:bg-gray-50 active:scale-95 transition-all"
+                  className="absolute bottom-0 right-0 p-2 bg-white rounded-full border border-purple-100 shadow-md cursor-pointer text-gray-700 hover:bg-purple-50 active:scale-90 transition-all"
                   onClick={() => pushPage('edit-profile')}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
                 </div>
               )}
             </div>
 
             {/* Name & Username */}
-            <div className="text-center mb-1 z-20">
-              <h1 className="text-[17px] font-normal text-gray-900 tracking-tight flex items-center justify-center">
-                {userData?.name || profileName || 'User'}
-                {user?.isVerified && (
-                  <VerifiedBadge />
-                )}
+            <div className="text-center mb-2.5 z-20">
+              <h1 className="text-[18px] font-bold text-gray-900 tracking-tight flex items-center justify-center space-x-1">
+                <span>{userData?.name || profileName || 'User'}</span>
+                {user?.isVerified && <VerifiedBadge />}
               </h1>
-              <p className="text-purple-600 font-normal text-[13px] mt-0">@{userData?.username || profileHandle.replace('@', '')}</p>
+              <p className="text-purple-600/90 font-normal text-[13px] mt-0.5">@{userData?.username || profileHandle.replace('@', '')}</p>
             </div>
 
-            {/* Stats */}
-            <div className="flex items-center justify-center space-x-5 md:space-x-8 mb-2 z-20 w-full px-6">
+            {/* Unboxed Stats Counters - Compact & Closer Together */}
+            <div className="w-full max-w-[240px] mx-auto py-0.5 px-1 flex items-center justify-around mb-2.5 z-20">
               <div 
-                className="flex flex-col items-center cursor-pointer hover:opacity-70 transition-opacity"
+                className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform px-1.5 py-0.5"
                 onClick={() => setShowFollowersList('following')}
               >
                 {!userData && (user?.followingCount === undefined || user?.followingCount === null) ? (
-                  <div className="w-10 h-4 bg-purple-200/60 rounded animate-pulse my-0.5" />
+                  <div className="w-8 h-3.5 bg-purple-200/60 rounded animate-pulse my-0.5" />
                 ) : (
-                  <span className="text-[14px] font-normal text-gray-900 leading-tight">
+                  <span className="text-[15px] font-bold text-gray-900 leading-tight tracking-tight">
                     {formatCount(userData?.followingCount ?? user?.followingCount ?? 0)}
                   </span>
                 )}
-                <span className="text-gray-500 text-[11px] font-normal mt-0.5">Following</span>
+                <span className="text-gray-500 text-[11px] font-medium mt-0.5">Following</span>
               </div>
+              <div className="w-[1px] h-4 bg-purple-200/80 shrink-0" />
               <div 
-                className="flex flex-col items-center cursor-pointer hover:opacity-70 transition-opacity"
+                className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform px-1.5 py-0.5"
                 onClick={() => setShowFollowersList('followers')}
               >
                 {!userData && (user?.followersCount === undefined || user?.followersCount === null) ? (
-                  <div className="w-10 h-4 bg-purple-200/60 rounded animate-pulse my-0.5" />
+                  <div className="w-8 h-3.5 bg-purple-200/60 rounded animate-pulse my-0.5" />
                 ) : (
-                  <span className="text-[14px] font-normal text-gray-900 leading-tight">
+                  <span className="text-[15px] font-bold text-gray-900 leading-tight tracking-tight">
                     {formatCount(userData?.followersCount ?? user?.followersCount ?? 0)}
                   </span>
                 )}
-                <span className="text-gray-500 text-[11px] font-normal mt-0.5">Followers</span>
+                <span className="text-gray-500 text-[11px] font-medium mt-0.5">Followers</span>
               </div>
-              <div className="flex flex-col items-center cursor-pointer">
+              <div className="w-[1px] h-4 bg-purple-200/80 shrink-0" />
+              <div className="flex flex-col items-center px-1.5 py-0.5">
                 {!userData && totalLikes === 0 && profilePosts.length === 0 ? (
-                  <div className="w-10 h-4 bg-purple-200/60 rounded animate-pulse my-0.5" />
+                  <div className="w-8 h-3.5 bg-purple-200/60 rounded animate-pulse my-0.5" />
                 ) : (
-                  <span className="text-[14px] font-normal text-gray-900 leading-tight">
+                  <span className="text-[15px] font-bold text-gray-900 leading-tight tracking-tight">
                     {formatCount(userData?.totalLikes ?? (totalLikes || profilePosts.reduce((sum, p) => sum + (p.likesCount || 0), 0)))}
                   </span>
                 )}
-                <span className="text-gray-500 text-[11px] font-normal mt-0.5">Likes</span>
+                <span className="text-gray-500 text-[11px] font-medium mt-0.5">Likes</span>
               </div>
             </div>
 
             {/* Buttons */}
-            <div className="flex items-center justify-center space-x-3 w-full px-6 mb-2 z-20 max-w-[320px]">
+            <div className="flex items-center justify-center space-x-2.5 w-full px-6 mb-3 z-20 max-w-[340px]">
               {isCurrentUser ? (
                 <>
                   <button 
                     onClick={() => pushPage('edit-profile')}
-                    className="flex-1 bg-purple-100 hover:bg-purple-200 active:bg-purple-300 text-purple-700 font-normal text-[13px] px-3 py-2 rounded-full flex items-center justify-center transition-colors"
+                    className="flex-1 bg-white/80 hover:bg-white active:scale-95 text-gray-800 font-medium text-[13px] py-2 px-3 rounded-xl backdrop-blur-md border border-white/80 shadow-xs flex items-center justify-center transition-all"
                   >
                     <span>Edit profile</span>
                   </button>
                   <button 
                     onClick={handleShare}
-                    className="flex-1 bg-purple-100 hover:bg-purple-200 active:bg-purple-300 text-purple-700 font-normal text-[13px] px-3 py-2 rounded-full flex items-center justify-center transition-colors"
+                    className="flex-1 bg-white/80 hover:bg-white active:scale-95 text-gray-800 font-medium text-[13px] py-2 px-3 rounded-xl backdrop-blur-md border border-white/80 shadow-xs flex items-center justify-center transition-all"
                   >
                     <span>Share profile</span>
+                  </button>
+                  <button 
+                    onClick={() => setShowAccountSwitcherModal(true)}
+                    className="w-9 h-9 bg-white/80 hover:bg-white active:scale-95 text-purple-600 rounded-xl backdrop-blur-md border border-white/80 shadow-xs flex items-center justify-center transition-all shrink-0"
+                    title="Switch or Add Account"
+                  >
+                    <UserPlus className="w-4 h-4" />
                   </button>
                 </>
               ) : (
@@ -762,17 +802,17 @@ export default function Profile() {
                   <button 
                     onClick={handleFollow}
                     disabled={loading}
-                    className={`flex-1 font-normal text-[13px] px-3 py-2.5 rounded-full flex items-center justify-center disabled:opacity-50 transition-all active:scale-95 ${
+                    className={`flex-1 font-medium text-[13px] px-3 py-2 rounded-xl flex items-center justify-center disabled:opacity-50 transition-all active:scale-95 shadow-xs ${
                       friendship.following 
-                        ? 'bg-purple-100 hover:bg-purple-200 active:bg-purple-300 text-purple-700' 
-                        : 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm'
+                        ? 'bg-white/80 hover:bg-white text-purple-700 border border-purple-200' 
+                        : 'bg-purple-600 text-white hover:bg-purple-700 shadow-purple-200'
                     }`}
                   >
                     {friendship.isFriend ? 'Friends' : friendship.following ? 'Following' : friendship.followedBy ? 'Follow Back' : 'Follow'}
                   </button>
                   <button 
                     onClick={handleMessage}
-                    className="flex-1 bg-purple-100 hover:bg-purple-200 active:bg-purple-300 text-purple-700 font-normal text-[13px] px-3 py-2 rounded-full flex items-center justify-center transition-colors"
+                    className="flex-1 bg-white/80 hover:bg-white text-gray-800 font-medium text-[13px] px-3 py-2 rounded-xl border border-white/80 shadow-xs flex items-center justify-center transition-all active:scale-95"
                   >
                     <span>Message</span>
                   </button>
@@ -924,19 +964,9 @@ export default function Profile() {
             {activeTab === 'posts' && (
               <div className="flex flex-col pb-20 max-w-[600px] mx-auto w-full pt-1">
                 {isPostsLoading ? (
-                  <div className="space-y-4 px-4 py-3">
-                    {[1, 2, 3].map((k) => (
-                      <div key={k} className="bg-white rounded-3xl border border-gray-100 p-4 animate-pulse">
-                        <div className="flex items-center space-x-3 mb-3">
-                          <div className="w-10 h-10 bg-purple-100 rounded-full"></div>
-                          <div className="flex-1 space-y-1.5">
-                            <div className="w-28 h-3.5 bg-purple-100 rounded"></div>
-                            <div className="w-16 h-2.5 bg-purple-50 rounded"></div>
-                          </div>
-                        </div>
-                        <div className="w-full h-48 bg-purple-50/70 rounded-2xl"></div>
-                      </div>
-                    ))}
+                  <div className="space-y-3 px-3 py-2">
+                    <FacebookPostSkeleton hasMedia={true} />
+                    <FacebookPostSkeleton hasMedia={false} />
                   </div>
                 ) : regularPosts.length > 0 ? (
                   regularPosts.slice(0, visibleCount).map((post) => (
@@ -962,7 +992,9 @@ export default function Profile() {
                       className="relative aspect-[3/4] md:aspect-[9/16] bg-gray-900 overflow-hidden cursor-pointer group md:rounded-2xl md:border md:border-white/60 md:shadow-xs hover:md:shadow-md transition-all duration-200 hover:md:scale-[1.02]"
                       onClick={() => {
                         if (isReel) {
-                          setViewingReel({ ...post, single: true });
+                          const repostReels = repostedPosts.filter(p => p.type === 'reel' || p.media?.[0]?.includes('.mp4') || p.media?.[0]?.includes('video'));
+                          setViewingReelList(repostReels.length > 0 ? repostReels : [post]);
+                          setViewingReel(post);
                         } else {
                           setViewingMedia({ type: 'post', url: post.media?.[0] || '', user: { name: post.authorName, avatar: post.authorAvatar } });
                         }
@@ -1011,15 +1043,16 @@ export default function Profile() {
             {activeTab === 'reels' && (
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-px md:gap-3.5 pb-20 w-full">
                 {isPostsLoading ? (
-                  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((k) => (
-                    <div key={k} className="aspect-[3/4] md:aspect-[9/16] bg-purple-100/60 md:rounded-2xl animate-pulse" />
-                  ))
+                  <div className="col-span-3 sm:col-span-4 md:col-span-5 lg:col-span-6 w-full">
+                    <FacebookGridSkeleton count={9} />
+                  </div>
                 ) : reels.length > 0 ? (
                   reels.slice(0, visibleCount).map((reel) => (
                     <div 
                       key={reel.id} 
                       className="relative aspect-[3/4] md:aspect-[9/16] bg-gray-900 overflow-hidden cursor-pointer group md:rounded-2xl md:border md:border-white/60 md:shadow-xs hover:md:shadow-md transition-all duration-200 hover:md:scale-[1.02]"
                       onClick={() => {
+                        setViewingReelList(reels);
                         setViewingReelContext(user?.uid || 'all');
                         setViewingReel(reel);
                       }}
@@ -1228,7 +1261,9 @@ export default function Profile() {
                           className="relative aspect-[3/4] md:aspect-[9/16] bg-gray-900 overflow-hidden cursor-pointer group md:rounded-2xl md:border md:border-white/60 md:shadow-xs hover:md:shadow-md transition-all duration-200 hover:md:scale-[1.02]"
                           onClick={() => {
                             if (isReel) {
-                              setViewingReel({ ...post, single: true } as any);
+                              const savedReels = filteredSavedPosts.filter(p => p.type === 'reel' || p.media?.[0]?.includes('.mp4') || p.media?.[0]?.includes('video'));
+                              setViewingReelList(savedReels.length > 0 ? savedReels : [post]);
+                              setViewingReel(post as any);
                             } else {
                               setViewingPost(post);
                             }
@@ -1316,7 +1351,9 @@ export default function Profile() {
                           className="absolute inset-0 cursor-pointer"
                           onClick={() => {
                             if (isReel) {
-                              setViewingReel({ ...post, single: true } as any);
+                              const pReels = privatePosts.filter(p => p.type === 'reel' || p.media?.[0]?.includes('.mp4') || p.media?.[0]?.includes('video'));
+                              setViewingReelList(pReels.length > 0 ? pReels : [post]);
+                              setViewingReel(post as any);
                             } else {
                               setViewingPost(post);
                             }

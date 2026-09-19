@@ -11,6 +11,7 @@ import { Post, Comment, User as AppUser } from '../types';
 import { PostItem } from '../components/PostItem';
 import { CreatePostModal } from '../components/CreatePostModal';
 import { PullToRefresh } from '../components/PullToRefresh';
+import { FacebookStorySkeleton, FacebookPostSkeleton } from '../components/Skeletons';
 
 const contacts = [
   { id: 1, name: 'cute_coder', avatar: 'https://picsum.photos/seed/cute/32/32', online: true },
@@ -376,6 +377,7 @@ export default function Home() {
 
   const [posts, setPosts] = useState<Post[]>(initialCached);
   const [stories, setStories] = useState<any[]>([]);
+  const [isStoriesLoading, setIsStoriesLoading] = useState(true);
   const [fallbackReels, setFallbackReels] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
   const [isFeedLoading, setIsFeedLoading] = useState(initialCached.length === 0);
@@ -447,9 +449,11 @@ export default function Home() {
     });
     const unsubscribeStories = subscribeStories((newStories) => {
       setStories(newStories);
+      setIsStoriesLoading(false);
     });
     const unsubscribeReels = subscribeReels((allReels) => {
       setFallbackReels(allReels.slice(0, 4));
+      setIsStoriesLoading(false);
     });
     return () => {
       unsubscribeFeed();
@@ -663,63 +667,56 @@ export default function Home() {
 
           {/* Stories List */}
           <div className="bg-white border-b border-gray-100 md:border md:border-gray-200/80 rounded-none sm:rounded-3xl p-3 sm:p-4 shadow-xs overflow-hidden">
-            <div className="flex space-x-3 overflow-x-auto no-scrollbar py-0.5 px-1">
-              <StoryItem 
-                story={{ isUser: true, bg: currentUser?.avatar || 'https://picsum.photos/seed/myprofile/200/300', name: 'Create Story' }} 
-                onClick={() => {
-                  const { setSelectedCreateMode } = useAppStore.getState();
-                  setSelectedCreateMode('story');
-                  pushPage('create');
-                }} 
-              />
-              {stories.map(story => (
-                <StoryItem key={story.id} story={story} onClick={() => setViewingStory(story)} />
-              ))}
+            {isStoriesLoading && stories.length === 0 ? (
+              <FacebookStorySkeleton />
+            ) : (
+              <div className="flex space-x-3 overflow-x-auto no-scrollbar py-0.5 px-1">
+                <StoryItem 
+                  story={{ isUser: true, bg: currentUser?.avatar || 'https://picsum.photos/seed/myprofile/200/300', name: 'Create Story' }} 
+                  onClick={() => {
+                    const { setSelectedCreateMode } = useAppStore.getState();
+                    setSelectedCreateMode('story');
+                    pushPage('create');
+                  }} 
+                />
+                {stories.map(story => (
+                  <StoryItem key={story.id} story={story} onClick={() => setViewingStory(story)} />
+                ))}
 
-              {/* Fallback stories from reels ONLY if there are no active stories */}
-              {stories.length < 1 && fallbackReels.map((reel) => {
-                const storyObj = {
-                  id: reel.id,
-                  authorId: reel.authorId,
-                  authorName: reel.authorName,
-                  authorAvatar: reel.authorAvatar,
-                  mediaUrl: reel.media?.[0],
-                  thumbnailUrl: reel.thumbnailUrl || reel.thumbnail,
-                  type: 'video' as const,
-                  text: reel.text,
-                  songTitle: reel.songTitle,
-                  songArtist: reel.songArtist,
-                  songUrl: reel.songUrl
-                };
-                return (
-                  <StoryItem 
-                    key={`fallback-story-${reel.id}`} 
-                    story={storyObj}
-                    onClick={() => setViewingStory(storyObj)} 
-                  />
-                );
-              })}
-            </div>
+                {/* Fallback stories from reels ONLY if there are no active stories */}
+                {stories.length < 1 && fallbackReels.map((reel) => {
+                  const storyObj = {
+                    id: reel.id,
+                    authorId: reel.authorId,
+                    authorName: reel.authorName,
+                    authorAvatar: reel.authorAvatar,
+                    mediaUrl: reel.media?.[0],
+                    thumbnailUrl: reel.thumbnailUrl || reel.thumbnail,
+                    type: 'video' as const,
+                    text: reel.text,
+                    songTitle: reel.songTitle,
+                    songArtist: reel.songArtist,
+                    songUrl: reel.songUrl
+                  };
+                  return (
+                    <StoryItem 
+                      key={`fallback-story-${reel.id}`} 
+                      story={storyObj}
+                      onClick={() => setViewingStory(storyObj)} 
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Feed Posts */}
           <div className="flex flex-col pb-20 space-y-3 sm:space-y-4">
-            {isFeedLoading ? (
+            {isFeedLoading && posts.length === 0 ? (
               <>
-                {[1, 2, 3].map((key) => (
-                  <div key={key} className="bg-white rounded-none sm:rounded-3xl border border-gray-100 md:border-gray-200/80 p-5 shadow-xs animate-pulse">
-                    <div className="flex items-center space-x-2 mb-4">
-                      <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
-                      <div className="flex-1 space-y-2">
-                        <div className="w-1/3 h-3 bg-gray-200 rounded"></div>
-                        <div className="w-1/4 h-2 bg-gray-100 rounded"></div>
-                      </div>
-                    </div>
-                    <div className="w-full h-4 bg-gray-200 rounded mb-2"></div>
-                    <div className="w-5/6 h-4 bg-gray-200 rounded mb-4"></div>
-                    <div className="w-full h-64 bg-gray-100 rounded-2xl mb-3"></div>
-                  </div>
-                ))}
+                <FacebookPostSkeleton hasMedia={true} />
+                <FacebookPostSkeleton hasMedia={true} />
+                <FacebookPostSkeleton hasMedia={false} />
               </>
             ) : (
               <>

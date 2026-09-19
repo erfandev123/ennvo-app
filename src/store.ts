@@ -38,6 +38,8 @@ type AppState = {
   setViewingStory: (story: any | null) => void;
   viewingReel: any | null;
   setViewingReel: (reel: any | null) => void;
+  viewingReelList: any[] | null;
+  setViewingReelList: (list: any[] | null) => void;
   viewingReelContext: 'all' | string; // 'all' or userId
   setViewingReelContext: (ctx: 'all' | string) => void;
   activeChat: string | null;
@@ -123,6 +125,8 @@ type AppState = {
   setActiveCallState: (state: any) => void;
   navStyle: 'classic' | 'glass';
   setNavStyle: (style: 'classic' | 'glass') => void;
+  showAccountSwitcherModal: boolean;
+  setShowAccountSwitcherModal: (show: boolean) => void;
 };
 
 const getInitialPage = (): PageType => {
@@ -258,6 +262,8 @@ export const useAppStore = create<AppState>((set) => ({
     if (reel) try { window.history.pushState({ modal: 'reel' }, ''); } catch (e) {}
     set({ viewingReel: reel });
   },
+  viewingReelList: null,
+  setViewingReelList: (list) => set({ viewingReelList: list }),
   viewingReelContext: 'all',
   setViewingReelContext: (ctx) => set({ viewingReelContext: ctx }),
   activeChat: null,
@@ -392,10 +398,12 @@ export const useAppStore = create<AppState>((set) => ({
   setSelectedCreateMode: (mode) => set({ selectedCreateMode: mode }),
   activeCallState: null,
   setActiveCallState: (state) => set({ activeCallState: state }),
-  navStyle: (typeof window !== 'undefined' && (localStorage.getItem('ennvo_nav_style') as 'classic' | 'glass')) || 'classic',
+  navStyle: (typeof window !== 'undefined' && (localStorage.getItem('ennvo_nav_style') as 'classic' | 'glass')) || 'glass',
   setNavStyle: (style) => {
     try { localStorage.setItem('ennvo_nav_style', style); } catch (e) {}
     set({ navStyle: style });
   },
+  showAccountSwitcherModal: false,
+  setShowAccountSwitcherModal: (show) => set({ showAccountSwitcherModal: show }),
 }));
 

@@ -1,16 +1,35 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, VolumeX, Play, X, ArrowLeft, ChevronUp, ChevronDown, Share2, Share, SendHorizontal, Trash2, UserPlus, Search } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { Play, UserPlus, Search } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useAppStore } from '../store';
-import { subscribeReels, toggleLike, toggleFavorite, incrementViewCount, addComment, getComments, toggleCommentLike } from '../services/postService';
-import { Post, Comment } from '../types';
-import { followUser, unfollowUser, isFollowing, getFollowing } from '../services/followService';
-import { sendNotification } from '../services/notificationService';
-import { sendMessage, subscribeConversations } from '../services/chatService';
-
+import { subscribeReels } from '../services/postService';
+import { Post } from '../types';
+import { getFollowing } from '../services/followService';
 import { ReelItem } from '../components/ReelItem';
+import { FacebookReelSkeleton } from '../components/Skeletons';
+
+const SEEN_REELS_STORAGE_KEY = 'ennvo_seen_reels_v2';
+
+const getSeenReelIds = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem(SEEN_REELS_STORAGE_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch (e) {
+    return new Set();
+  }
+};
+
+const markReelAsSeen = (reelId: string) => {
+  try {
+    const current = getSeenReelIds();
+    current.add(reelId);
+    // Keep max 250 most recent seen IDs to avoid unbounded storage
+    const arr = Array.from(current).slice(-250);
+    localStorage.setItem(SEEN_REELS_STORAGE_KEY, JSON.stringify(arr));
+  } catch (e) {}
+};
 
 export default function Reels() {
   const { pushPage, currentUser, cachedReels, setCachedReels, isReelsCleanZoom } = useAppStore();
@@ -18,14 +37,15 @@ export default function Reels() {
   const [loading, setLoading] = useState(reels.length === 0);
   const [activeTab, setActiveTab] = useState<'forYou' | 'following'>('forYou');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const CATEGORIES = ['All', 'Music', 'Gaming', 'Comedy', 'Tech', 'Lifestyle', 'Trending'];
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
-  const [visibleCount, setVisibleCount] = useState(5);
+  const [visibleCount, setVisibleCount] = useState(6);
+  const [seenIds, setSeenIds] = useState<Set<string>>(getSeenReelIds);
   const reelsContainerRef = useRef<HTMLDivElement>(null);
   const initialLoadDone = useRef(false);
+  const activeReelTimerRef = useRef<any>(null);
 
   useEffect(() => {
-    // Re-attach keyboard listener logic strictly for reels container
+    // Keyboard listener for desktop arrow keys
     const handleKeyDown = (e: KeyboardEvent) => {
       const c = reelsContainerRef.current;
       if (!c) return;
@@ -38,11 +58,7 @@ export default function Reels() {
       }
     };
     
-    // Set scroll position to top initially when component mounts
-    if (reelsContainerRef.current) {
-       reelsContainerRef.current.scrollTop = 0;
-    }
-    
+    // Refresh reels and rotate seen pool
     const handleRefresh = () => {
       if (reelsContainerRef.current) {
         reelsContainerRef.current.scrollTop = 0;
@@ -50,9 +66,10 @@ export default function Reels() {
       setVisibleCount(5);
       setLoading(true);
       setTimeout(() => {
+        setSeenIds(getSeenReelIds());
         setReels(prev => [...prev].sort(() => Math.random() - 0.5));
         setLoading(false);
-      }, 250);
+      }, 200);
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -70,15 +87,28 @@ export default function Reels() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('refreshReels', handleRefresh);
       window.removeEventListener('reelPrivacyUpdated', handlePrivacyUpdate);
+      if (activeReelTimerRef.current) clearTimeout(activeReelTimerRef.current);
     };
   }, []);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    if (scrollTop + clientHeight >= scrollHeight - 800) {
+    if (scrollTop + clientHeight >= scrollHeight - 1200) {
       setVisibleCount(prev => prev + 5);
     }
-  }, []);
+
+    // Determine current index to mark reel as seen after 2.5 seconds of viewing
+    if (clientHeight > 0) {
+      const activeIdx = Math.round(scrollTop / clientHeight);
+      if (activeReelTimerRef.current) clearTimeout(activeReelTimerRef.current);
+      activeReelTimerRef.current = setTimeout(() => {
+        const activeReel = reels[activeIdx];
+        if (activeReel?.id) {
+          markReelAsSeen(activeReel.id);
+        }
+      }, 2500);
+    }
+  }, [reels]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -86,16 +116,11 @@ export default function Reels() {
       setCachedReels(fetchedReels.slice(0, 30));
       setReels(prev => {
         if (!initialLoadDone.current && prev.length === 0) {
-          const shuffled = [...fetchedReels].sort(() => Math.random() - 0.5);
           initialLoadDone.current = true;
-          setTimeout(() => {
-             if (reelsContainerRef.current) reelsContainerRef.current.scrollTop = 0;
-          }, 50);
-          return shuffled;
+          return fetchedReels;
         } else if (prev.length === 0) {
           return fetchedReels;
         } else {
-          // If already loaded from cache or state, merge new items
           const prevMap = new Map(prev.map(r => [r.id, true]));
           const newReels = fetchedReels.filter(r => !prevMap.has(r.id));
           const updatedPrev = prev.map(r => fetchedReels.find(f => f.id === r.id) || r).filter(r => fetchedReels.some(f => f.id === r.id));
@@ -113,36 +138,26 @@ export default function Reels() {
   }, [currentUser, setCachedReels]);
 
   const filteredReels = useMemo(() => {
-    // Hide private reels from the global reels feed (visible only in author's profile private section)
     let list = reels.filter(r => r.privacy !== 'private' && !(r as any).isPrivate);
 
     if (activeTab === 'following') {
       list = list.filter(r => followingIds.has(r.authorId));
     } else {
-      // TikTok-like AI Recommendation Algorithm
-      try {
-        const categoryWeights = JSON.parse(localStorage.getItem('reel_category_weights') || '{}');
-        list.sort((a, b) => {
-          const getCat = (r: Post) => {
-            if (r.category) return r.category;
-            const txt = (r.text || '').toLowerCase();
-            if (txt.includes('music') || txt.includes('song')) return 'Music';
-            if (txt.includes('funny') || txt.includes('comedy') || txt.includes('lol')) return 'Comedy';
-            if (txt.includes('gaming') || txt.includes('game')) return 'Gaming';
-            if (txt.includes('tech') || txt.includes('code') || txt.includes('ai')) return 'Tech';
-            if (txt.includes('life') || txt.includes('vlog')) return 'Lifestyle';
-            return 'Trending';
-          };
+      // Smart Random + Viral Recommendation Algorithm with Seen-Deduplication
+      const currentSeen = seenIds;
+      list.sort((a, b) => {
+        const isSeenA = currentSeen.has(a.id);
+        const isSeenB = currentSeen.has(b.id);
 
-          const catA = getCat(a);
-          const catB = getCat(b);
+        const viralA = ((a.likesCount || 0) * 1.5) + ((a.commentsCount || 0) * 3) + ((a.viewsCount || 0) * 0.1);
+        const viralB = ((b.likesCount || 0) * 1.5) + ((b.commentsCount || 0) * 3) + ((b.viewsCount || 0) * 0.1);
 
-          const scoreA = (categoryWeights[catA] || 0) * 15 + (a.likesCount || 0) * 0.2 + (a.viewsCount || 0) * 0.05;
-          const scoreB = (categoryWeights[catB] || 0) * 15 + (b.likesCount || 0) * 0.2 + (b.viewsCount || 0) * 0.05;
+        // Heavy penalty if already seen so the user always sees fresh viral videos
+        const scoreA = (isSeenA ? 0 : 500) + viralA + ((a.id.charCodeAt(0) % 30));
+        const scoreB = (isSeenB ? 0 : 500) + viralB + ((b.id.charCodeAt(0) % 30));
 
-          return scoreB - scoreA;
-        });
-      } catch (e) {}
+        return scoreB - scoreA;
+      });
     }
 
     if (selectedCategory !== 'All') {
@@ -154,15 +169,19 @@ export default function Reels() {
     }
 
     return list;
-  }, [reels, activeTab, followingIds, selectedCategory]);
+  }, [reels, activeTab, followingIds, selectedCategory, seenIds]);
 
-  // Extract next 3 video URLs to preload in background for zero lag playback
+  // Preload top 2 adjacent videos
   const preloadVideoUrls = useMemo(() => {
     return filteredReels
-      .slice(1, 6)
+      .slice(1, 4)
       .map(r => r.media?.[0])
-      .filter((url): url is string => !!url && (url.includes('.mp4') || url.includes('video') || url.includes('github')));
+      .filter((url): url is string => !!url && (url.includes('.mp4') || url.includes('video') || url.includes('github') || url.includes('blob')));
   }, [filteredReels]);
+
+  if (reels.length === 0 && loading) {
+    return <FacebookReelSkeleton />;
+  }
 
   if (reels.length === 0 && !loading) {
     return (
@@ -217,8 +236,7 @@ export default function Reels() {
         id="global-reels-container"
         ref={reelsContainerRef}
         onScroll={handleScroll}
-        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-        className="h-full w-full overflow-y-auto snap-y snap-mandatory no-scrollbar overscroll-y-contain transform-gpu will-change-scroll bg-black md:bg-[#f8f9fa]"
+        className="h-full w-full overflow-y-auto reels-scroll-viewport no-scrollbar bg-black md:bg-[#f8f9fa]"
       >
         {filteredReels.length === 0 && activeTab === 'following' ? (
           <div className="h-full w-full flex flex-col items-center justify-center bg-black text-white p-6 text-center">
@@ -229,15 +247,17 @@ export default function Reels() {
           </div>
         ) : (
           filteredReels.slice(0, visibleCount).map((reel) => (
-            <ReelItem key={reel.id} reel={reel} />
+            <div key={reel.id} className="reel-snap-item w-full h-full">
+              <ReelItem reel={reel} />
+            </div>
           ))
         )}
       </div>
 
-      {/* Background Video Preloader for Ultra-Fast Zero-Lag Scrolling */}
+      {/* Background Video Preloader for Fast Scrolling */}
       <div className="hidden" aria-hidden="true">
-        {preloadVideoUrls.map((url, i) => (
-          <video key={i} src={`${url}#t=0.001`} preload="auto" muted playsInline />
+        {preloadVideoUrls.slice(0, 2).map((url, i) => (
+          <video key={i} src={`${url}#t=0.001`} preload="metadata" muted playsInline />
         ))}
       </div>
     </div>

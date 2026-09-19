@@ -376,3 +376,21 @@ export const addParticipantsToGroup = async (conversationId: string, newParticip
     throw new Error(err.message);
   }
 };
+
+export const updateConversationTheme = async (conversationId: string, theme: string, userName?: string, userId?: string) => {
+  try {
+    const convRef = doc(db, 'conversations', conversationId);
+    await updateDoc(convRef, {
+      theme,
+      updatedAt: serverTimestamp()
+    });
+
+    if (userId) {
+      await sendMessage(conversationId, userId, 'system', `Wallpaper changed by ${userName || 'User'}`);
+    }
+  } catch (err: any) {
+    console.error('Failed to update conversation theme:', err);
+    throw new Error(err.message);
+  }
+};
+

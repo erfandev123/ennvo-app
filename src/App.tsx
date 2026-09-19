@@ -18,11 +18,21 @@ const Auth = lazy(() => import('./pages/Auth'));
 
 import MiniChat from './components/MiniChat';
 import { CallOverlay } from './components/CallOverlay';
+import { AccountSwitcherModal } from './components/AccountSwitcherModal';
 import { useAppStore, PageType } from './store';
 import { onAuthChange } from './services/authService';
+import { 
+  FacebookPostSkeleton, 
+  FacebookStorySkeleton, 
+  FacebookReelSkeleton, 
+  FacebookProfileSkeleton, 
+  FacebookMessageListSkeleton,
+  FacebookSearchSkeleton 
+} from './components/Skeletons';
 import { setOnline } from './services/presenceService';
 import { deleteStory } from './services/storyService';
 import { subscribeReels } from './services/postService';
+import { deviceNotification } from './services/deviceNotification';
 import { formatTime, downloadMediaFile } from './utils';
 import { doc, onSnapshot, collection, query, where, getDocFromServer } from 'firebase/firestore';
 import { db } from './firebase';
@@ -244,6 +254,7 @@ export default function App() {
     viewingMedia, setViewingMedia, 
     viewingStory, setViewingStory, 
     viewingReel, setViewingReel, 
+    viewingReelList, setViewingReelList,
     viewingReelContext, setViewingReelContext,
     activeChat, showCreatePost, 
     isAuthenticated, isAuthLoading, 
@@ -359,13 +370,20 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated || !currentUser?.uid) return;
     
-    // Request push notification permission
+    // Request device/browser push notification permission
+    deviceNotification.requestPermission().catch(() => {});
     requestFirebaseNotificationPermission(currentUser.uid).catch(err => console.warn(err));
     try {
       const msgListener = onMessageListener();
       if (msgListener && typeof (msgListener as any).then === 'function') {
         (msgListener as Promise<any>).then(payload => {
-          if (payload) console.log('Received foreground message', payload);
+          if (payload) {
+            deviceNotification.show({
+              title: payload.notification?.title || 'New Message',
+              body: payload.notification?.body || '',
+              type: 'message'
+            });
+          }
         }).catch(err => console.warn(err));
       }
     } catch (err) {
@@ -503,34 +521,20 @@ export default function App() {
       )}
       <main className={`w-full flex-1 h-full overflow-hidden relative gpu-accelerated`}>
         <Suspense fallback={
-          (currentPage === 'home' || currentPage === 'reels') ? (
-            <div className="w-full h-full bg-black p-4 flex flex-col space-y-4 animate-pulse">
-              <div className="w-full h-14 bg-zinc-900 rounded-2xl border border-zinc-800 flex items-center px-4 justify-between">
-                <div className="w-28 h-5 bg-zinc-800 rounded-lg"></div>
-                <div className="flex space-x-2">
-                  <div className="w-8 h-8 bg-zinc-800 rounded-full"></div>
-                  <div className="w-8 h-8 bg-zinc-800 rounded-full"></div>
-                </div>
-              </div>
-              <div className="flex-1 w-full bg-zinc-900 rounded-3xl border border-zinc-800"></div>
+          currentPage === 'home' ? (
+            <FacebookReelSkeleton />
+          ) : currentPage === 'profile' ? (
+            <FacebookProfileSkeleton />
+          ) : currentPage === 'messages' ? (
+            <div className="w-full h-full bg-white max-w-[480px]">
+              <FacebookMessageListSkeleton count={9} />
             </div>
+          ) : currentPage === 'search' ? (
+            <FacebookSearchSkeleton />
           ) : (
-            <div className="w-full h-full bg-white p-4 flex flex-col space-y-4 animate-pulse">
-              <div className="w-full h-14 bg-gray-50 rounded-2xl border border-gray-100 flex items-center px-4 justify-between">
-                <div className="w-28 h-5 bg-gray-200 rounded-lg"></div>
-                <div className="flex space-x-2">
-                  <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
-                  <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
-                </div>
-              </div>
-              <div className="w-full h-24 bg-gray-50 rounded-2xl border border-gray-100 p-4 flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gray-200 rounded-full shrink-0"></div>
-                <div className="flex-1 space-y-2">
-                  <div className="w-1/2 h-3 bg-gray-200 rounded"></div>
-                  <div className="w-1/3 h-2 bg-gray-100 rounded"></div>
-                </div>
-              </div>
-              <div className="w-full h-64 bg-gray-50 rounded-2xl border border-gray-100"></div>
+            <div className="w-full h-full overflow-hidden bg-white max-w-[620px] mx-auto pt-2 px-3 space-y-4">
+              <FacebookStorySkeleton />
+              <FacebookPostSkeleton />
             </div>
           )
         }>
@@ -557,6 +561,7 @@ export default function App() {
         </Suspense>
       </main>
       {!isNavHidden && <BottomNav />}
+      <AccountSwitcherModal />
 
       {/* Exit Toast Notification */}
       {showExitToast && (
@@ -646,13 +651,23 @@ export default function App() {
       {/* Global Reel Viewer (Modal) */}
       {viewingReel && (
         <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center animate-in fade-in duration-200">
-          <div id="global-reels-container" className="h-[100dvh] w-full overflow-y-auto snap-y snap-mandatory no-scrollbar overscroll-none overflow-x-hidden">
-            {/* If we have a specific reel to view (e.g. from notification), show it first or alone */}
+          <div id="global-reels-container" className="h-[100dvh] w-full overflow-y-auto reels-scroll-viewport no-scrollbar overscroll-none overflow-x-hidden">
+            {/* If we have a single reel or specific list */}
             {viewingReel.single ? (
-              <ReelItem key={viewingReel.id} reel={viewingReel as any} isModal onClose={() => setViewingReel(null)} />
+              <div className="reel-snap-item w-full h-full">
+                <ReelItem key={viewingReel.id} reel={viewingReel as any} isModal onClose={() => { setViewingReel(null); setViewingReelList(null); }} />
+              </div>
             ) : (
               (() => {
-                const reelsList = viewingReelContext && viewingReelContext !== 'all' ? realReels.filter(r => r.authorId === viewingReelContext) : realReels;
+                let reelsList: any[] = [];
+                if (viewingReelList && viewingReelList.length > 0) {
+                  reelsList = viewingReelList;
+                } else if (viewingReelContext && viewingReelContext !== 'all') {
+                  reelsList = realReels.filter(r => r.authorId === viewingReelContext);
+                } else {
+                  reelsList = realReels;
+                }
+
                 const activeIndex = viewingReel ? reelsList.findIndex(r => r.id === viewingReel.id) : 0;
                 const sortedReels = activeIndex > -1 ? [...reelsList.slice(activeIndex), ...reelsList.slice(0, activeIndex)] : reelsList;
 
@@ -660,13 +675,15 @@ export default function App() {
                   return (
                     <div className="h-full w-full flex flex-col items-center justify-center text-white bg-black">
                       <p className="mb-4">No reels found</p>
-                      <button onClick={() => setViewingReel(null)} className="px-6 py-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">Close</button>
+                      <button onClick={() => { setViewingReel(null); setViewingReelList(null); }} className="px-6 py-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">Close</button>
                     </div>
                   );
                 }
 
                 return sortedReels.map((reel) => (
-                  <ReelItem key={reel.id} reel={reel} isModal onClose={() => setViewingReel(null)} />
+                  <div key={reel.id} className="reel-snap-item w-full h-full">
+                    <ReelItem reel={reel} isModal onClose={() => { setViewingReel(null); setViewingReelList(null); }} />
+                  </div>
                 ));
               })()
             )}

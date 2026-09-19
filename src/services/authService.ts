@@ -2,6 +2,7 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signInWithPopup, 
+  signInAnonymously,
   signOut, 
   onAuthStateChanged,
   User as FirebaseUser
@@ -111,7 +112,12 @@ export const signInWithGoogle = async () => {
   }
 };
 
-export const logout = () => signOut(auth);
+export const logout = async () => {
+  try {
+    localStorage.removeItem('ennvo_last_active_user_v1');
+  } catch (e) {}
+  return signOut(auth);
+};
 
 export const updateUserProfile = async (userId: string, data: Partial<User>) => {
   try {
@@ -142,7 +148,11 @@ export const updateUserProfile = async (userId: string, data: Partial<User>) => 
     }
 
     const updatedSnap = await getDoc(userRef);
-    return { uid: updatedSnap.id, ...updatedSnap.data() } as User;
+    const updatedUser = { uid: updatedSnap.id, ...updatedSnap.data() } as User;
+    try {
+      localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(updatedUser));
+    } catch (e) {}
+    return updatedUser;
   } catch (error: any) {
     throw new Error(error.message);
   }
@@ -155,18 +165,23 @@ export const onAuthChange = (callback: (user: User | null) => void) => {
       userUnsub();
       userUnsub = null;
     }
-    if (firebaseUser) {
+    if (firebaseUser && !firebaseUser.isAnonymous) {
       const docRef = doc(db, 'users', firebaseUser.uid);
       userUnsub = onSnapshot(docRef, async (docSnap) => {
         if (docSnap.exists()) {
-          callback(docSnap.data() as User);
+          const uData = docSnap.data() as User;
+          try {
+            localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(uData));
+          } catch (e) {}
+          callback(uData);
         } else {
+          // Real authenticated user without doc (e.g. fresh Google signin)
           const fallbackUser: User = {
             uid: firebaseUser.uid,
             name: firebaseUser.displayName || 'User',
             username: firebaseUser.email?.split('@')[0] || `user_${firebaseUser.uid.substring(0, 5)}`,
             email: firebaseUser.email || '',
-            avatar: firebaseUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(firebaseUser.displayName || 'User')}&background=random`,
+            avatar: firebaseUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(firebaseUser.displayName || 'User')}&background=5633D8&color=fff`,
             bio: '',
             followersCount: 0,
             followingCount: 0,
@@ -175,6 +190,7 @@ export const onAuthChange = (callback: (user: User | null) => void) => {
           };
           try {
             await setDoc(docRef, fallbackUser, { merge: true });
+            localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(fallbackUser));
           } catch (e) {
             console.warn('Auto-create user doc notice:', e);
           }
@@ -182,8 +198,38 @@ export const onAuthChange = (callback: (user: User | null) => void) => {
         }
       }, (err) => {
         console.warn('User listener error:', err);
+        try {
+          const raw = localStorage.getItem('ennvo_last_active_user_v1');
+          if (raw) {
+            const saved = JSON.parse(raw);
+            if (saved?.uid && saved.name !== 'User') callback(saved);
+          }
+        } catch (e) {}
       });
     } else {
+      // Anonymous user or signed out - check if a real user profile was previously active
+      try {
+        const raw = localStorage.getItem('ennvo_last_active_user_v1');
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (saved && saved.uid && saved.name && saved.name !== 'User') {
+            // Subscribe to real saved user document
+            const userDocRef = doc(db, 'users', saved.uid);
+            userUnsub = onSnapshot(userDocRef, (snap) => {
+              if (snap.exists()) {
+                const liveData = snap.data() as User;
+                localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(liveData));
+                callback(liveData);
+              } else {
+                callback(saved);
+              }
+            }, () => {
+              callback(saved);
+            });
+            return;
+          }
+        }
+      } catch (e) {}
       callback(null);
     }
   });

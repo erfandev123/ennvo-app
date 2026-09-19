@@ -41,6 +41,9 @@ import {
   Sparkles,
   Download,
   Film,
+  Bookmark,
+  Star,
+  Sticker as StickerIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { PullToRefresh } from "../components/PullToRefresh";
@@ -61,7 +64,17 @@ import {
   subscribeMessages,
   sendMessage,
   createConversation,
+  updateConversationTheme,
 } from "../services/chatService";
+import { ChatThemeStudioModal } from "../components/ChatThemeStudioModal";
+import { StickerPickerModal } from "../components/StickerPickerModal";
+import {
+  getSmartStickerSuggestions,
+  CuratedSticker,
+  fetchCommunityStickers,
+  toggleSaveSticker,
+  isStickerSaved,
+} from "../services/stickerService";
 import {
   subscribePresence,
   setTyping,
@@ -72,6 +85,7 @@ import { initiateCall } from "../services/callService";
 import { playMessageSentSound } from "../services/soundService";
 import { subscribeStories, Story } from "../services/storyService";
 import { Conversation, Message as AppMessage, Notification } from "../types";
+import { FacebookMessageListSkeleton } from "../components/Skeletons";
 
 const GroupAvatar = ({
   members,
@@ -358,36 +372,39 @@ const VoiceMessageBubble = ({ msg, isMe, borderRadius }: { msg: any; isMe: boole
   };
 
   return (
-    <div className={`px-3.5 py-2.5 flex items-center space-x-3 min-w-[190px] sm:min-w-[220px] ${borderRadius} ${isMe ? "bg-[#FE2C55] text-white shadow-2xs" : "bg-gray-100 text-gray-900 border border-gray-200/80 shadow-2xs"}`}>
+    <div className={`px-4 py-2.5 flex items-center space-x-3 min-w-[210px] sm:min-w-[240px] rounded-[26px] ${isMe ? "bg-[#FE2C55] text-white shadow-2xs" : "bg-white text-gray-900 border border-gray-100/90 shadow-2xs"}`}>
       <button
         type="button"
         onClick={togglePlay}
-        className={`p-2 rounded-full flex-shrink-0 transition-transform active:scale-90 ${isMe ? "bg-white text-[#FE2C55] hover:bg-gray-100" : "bg-[#FE2C55] text-white hover:bg-red-600"}`}
+        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 ${isMe ? "bg-white text-[#FE2C55] shadow-2xs hover:bg-gray-50" : "bg-[#FE2C55] text-white shadow-2xs hover:bg-red-600"}`}
       >
         {isPlaying ? (
-          <Pause className="w-3.5 h-3.5 fill-current" />
+          <Pause className="w-4 h-4 fill-current" />
         ) : (
-          <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+          <Play className="w-4 h-4 fill-current ml-0.5" />
         )}
       </button>
 
       <div className="flex-1 flex flex-col justify-center space-y-1 min-w-0">
-        <div className="flex items-center space-x-0.5 h-4 w-full">
-          {[40, 70, 30, 85, 50, 90, 60, 40, 80, 55, 35, 75, 45, 95, 65, 30].map((height, i) => (
+        <div className="flex items-center space-x-0.5 h-4 w-full px-0.5">
+          {[35, 65, 25, 80, 45, 95, 55, 35, 85, 50, 30, 70, 40, 90, 60, 25, 75, 45].map((height, i) => (
             <div
               key={i}
-              className={`flex-1 rounded-full transition-all duration-150 ${isMe ? "bg-white" : "bg-gray-400"}`}
+              className={`flex-1 rounded-full transition-all duration-150 ${isMe ? "bg-white" : "bg-rose-500"}`}
               style={{
-                height: isPlaying ? `${Math.max(20, (height + (i % 3) * 15) % 100)}%` : `${height * 0.4}%`,
-                opacity: (i / 16) <= (currentTime / (duration || 1)) ? 1 : 0.45,
+                height: isPlaying ? `${Math.max(22, (height + (i % 3) * 20) % 100)}%` : `${height * 0.45}%`,
+                opacity: (i / 18) <= (currentTime / (duration || 1)) ? 1 : 0.35,
               }}
             />
           ))}
         </div>
 
-        <div className="flex justify-between items-center text-[10px] opacity-80 font-mono">
+        <div className={`flex justify-between items-center text-[10.5px] font-medium tracking-tight ${isMe ? "text-white/90" : "text-gray-500"}`}>
           <span>{formatSecs(currentTime)}</span>
-          <span>{formatSecs(duration)}</span>
+          <div className="flex items-center space-x-1">
+            <Mic className={`w-3 h-3 ${isMe ? "text-white/80" : "text-rose-500"}`} />
+            <span>{formatSecs(duration)}</span>
+          </div>
         </div>
       </div>
 
@@ -617,10 +634,10 @@ const MessageBubble = React.memo(function MessageBubble({
           {/* Reply preview inside message bubble if it's a reply */}
           {msg.replyTo && (
             <div
-              className={`mb-1 px-2.5 py-1 rounded-xl text-[11px] border-l-2 transition-all max-w-full overflow-hidden flex items-center cursor-pointer ${
+              className={`mb-1 px-2.5 py-1.5 rounded-xl text-[11px] border-l-2 transition-all max-w-full overflow-hidden flex items-center space-x-2 cursor-pointer ${
                 isMe
                   ? "bg-black/15 text-white/95 border-white/70"
-                  : "bg-gray-200/80 text-gray-800 border-gray-400"
+                  : "bg-gray-200/80 text-gray-800 border-purple-500"
               }`}
               onClick={() => {
                 const el = document.getElementById(`msg-${msg.replyTo.id}`);
@@ -631,17 +648,30 @@ const MessageBubble = React.memo(function MessageBubble({
                 }
               }}
             >
-              <div className="flex-1 min-w-0 pr-1">
-                {msg.replyTo.type === "reel" ? (
-                  <div className="flex items-center space-x-1">
-                    <Play className={`w-3 h-3 ${isMe ? "text-white/80" : "text-gray-500"}`} />
-                    <span className="font-normal text-[11px]">Reel</span>
-                  </div>
-                ) : (
-                  <p className="line-clamp-1 italic text-ellipsis break-words font-normal text-[11px] max-w-[200px]">
-                    {msg.replyTo.content || "Media"}
-                  </p>
-                )}
+              {/* Media Thumbnails inside Bubble Reply Box */}
+              {msg.replyTo.mediaUrl && (msg.replyTo.type === "image" || (!msg.replyTo.type && !msg.replyTo.stickerUrl)) && (
+                <img src={msg.replyTo.mediaUrl} className="w-5 h-5 rounded object-cover shrink-0 border border-black/10" alt="Reply thumbnail" referrerPolicy="no-referrer" />
+              )}
+              {(msg.replyTo.type === "sticker" || msg.replyTo.stickerUrl) && (
+                <img src={msg.replyTo.stickerUrl || msg.replyTo.mediaUrl} className="w-5 h-5 object-contain shrink-0" alt="Sticker thumbnail" referrerPolicy="no-referrer" />
+              )}
+              {msg.replyTo.type === "reel" && (
+                <div className="w-4 h-5 rounded overflow-hidden shrink-0 bg-black flex items-center justify-center">
+                  <Play className="w-2.5 h-2.5 text-white fill-white" />
+                </div>
+              )}
+              {msg.replyTo.type === "voice" && (
+                <Mic className={`w-3.5 h-3.5 shrink-0 ${isMe ? "text-white" : "text-rose-500"}`} />
+              )}
+
+              <div className="flex-1 min-w-0">
+                <p className="line-clamp-1 italic text-ellipsis break-words font-normal text-[11px] max-w-[200px]">
+                  {msg.replyTo.content ||
+                    (msg.replyTo.type === "sticker" || msg.replyTo.stickerUrl ? "Sticker" :
+                     msg.replyTo.type === "image" ? "Photo" :
+                     msg.replyTo.type === "voice" ? "Voice message" :
+                     msg.replyTo.type === "reel" ? "Reel" : "Media")}
+                </p>
               </div>
             </div>
           )}
@@ -749,6 +779,39 @@ const MessageBubble = React.memo(function MessageBubble({
                     >
                       <Download className="w-3.5 h-3.5" />
                     </button>
+                  </div>
+                );
+              } else if (msg.type === "sticker" || msg.stickerUrl) {
+                const isVideoSticker = msg.stickerType === "video" || (msg.mediaUrl && (msg.mediaUrl.includes(".mp4") || msg.mediaUrl.includes(".webm") || msg.mediaUrl.includes(".mov")));
+                const stickerSrc = msg.stickerUrl || msg.mediaUrl;
+                return (
+                  <div
+                    className="relative group/stk cursor-pointer p-0.5 transition-all duration-200 active:scale-95 max-w-[170px] sm:max-w-[210px] select-none hover:scale-[1.03]"
+                    onClick={(e) => onLongPress(e, msg.id)}
+                    title="Click or Long-press for Sticker actions"
+                  >
+                    {isVideoSticker ? (
+                      <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-[28px] overflow-hidden bg-transparent flex items-center justify-center drop-shadow-md">
+                        <video
+                          src={stickerSrc}
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          className="w-full h-full object-cover rounded-[28px] pointer-events-none"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-[28px] overflow-hidden bg-transparent flex items-center justify-center drop-shadow-md">
+                        <img
+                          src={stickerSrc}
+                          alt="Sticker"
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-contain pointer-events-none select-none rounded-[28px] mix-blend-multiply dark:mix-blend-normal"
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               } else if (isEmojiOnly) {
@@ -1083,13 +1146,14 @@ export default function Messages() {
     const updateViewport = () => {
       if (!window.visualViewport) return;
       const diff = window.innerHeight - window.visualViewport.height;
-      setViewportBottomOffset(Math.max(0, diff));
-      if (shouldAutoScrollRef.current && messagesContainerRef.current) {
+      const offset = Math.max(0, diff);
+      setViewportBottomOffset(offset);
+      if (messagesContainerRef.current) {
         requestAnimationFrame(() => {
           if (messagesContainerRef.current) {
             messagesContainerRef.current.scrollTo({
               top: messagesContainerRef.current.scrollHeight,
-              behavior: 'smooth'
+              behavior: offset > 0 ? 'smooth' : 'auto'
             });
           }
         });
@@ -1141,6 +1205,88 @@ export default function Messages() {
   const groupPfpInputRef = useRef<HTMLInputElement>(null);
   const [showStatusInput, setShowStatusInput] = useState(false);
   const [statusNoteText, setStatusNoteText] = useState("");
+  const [showStickerModal, setShowStickerModal] = useState(false);
+  const [communityStickersCache, setCommunityStickersCache] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (showStickerModal && messagesContainerRef.current) {
+      setTimeout(() => {
+        messagesContainerRef.current?.scrollTo({
+          top: messagesContainerRef.current.scrollHeight,
+          behavior: "smooth"
+        });
+      }, 100);
+    }
+  }, [showStickerModal]);
+
+  useEffect(() => {
+    fetchCommunityStickers().then(setCommunityStickersCache).catch(() => {});
+  }, []);
+
+  const stickerSuggestions = React.useMemo(() => {
+    if (!inputText || !inputText.trim()) return [];
+    return getSmartStickerSuggestions(inputText, communityStickersCache);
+  }, [inputText, communityStickersCache]);
+
+  const handleSendStickerDirect = async (stickerUrl: string, stickerType?: 'image' | 'video' | 'animated') => {
+    if (!activeChat || !currentUser) return;
+    playMessageSentSound();
+    
+    const replyData = replyingTo
+      ? {
+          id: replyingTo.id,
+          content: replyingTo.content,
+          senderId: replyingTo.senderId,
+          type: replyingTo.type,
+          mediaUrl: replyingTo.mediaUrl,
+        }
+      : undefined;
+
+    // Reset inputs
+    setInputText("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+    setReplyingTo(null);
+    setShowStickerModal(false);
+    shouldAutoScrollRef.current = true;
+
+    // Optimistic message in UI
+    const tempId = 'temp_' + Date.now();
+    const optMsg: any = {
+      id: tempId,
+      tempId: tempId,
+      senderId: currentUser.uid,
+      type: 'sticker',
+      content: '',
+      mediaUrl: stickerUrl,
+      stickerUrl: stickerUrl,
+      stickerType: stickerType || 'image',
+      createdAt: { toMillis: () => Date.now() },
+      status: 'sent',
+      replyTo: replyData
+    };
+
+    setMessagesCache((prev) => ({
+      ...prev,
+      [activeChat]: [...(prev[activeChat] || []), optMsg]
+    }));
+
+    try {
+      await sendMessage(
+        activeChat,
+        currentUser.uid,
+        'sticker' as any,
+        '',
+        stickerUrl,
+        undefined,
+        replyData
+      );
+    } catch (err) {
+      console.error("Failed to send sticker:", err);
+    }
+  };
+
   const [privacyMode, setPrivacyMode] = useState<"public" | "private">(() => {
     return (
       (localStorage.getItem("privacyMode") as "public" | "private") || "public"
@@ -1827,9 +1973,41 @@ export default function Messages() {
     }
   };
 
-  const filteredConversations = conversations.filter((conv) => {
+  const jarvisLastMsg = jarvisMessages[jarvisMessages.length - 1];
+  const jarvisTimeMs = jarvisLastMsg?.createdAt
+    ? (typeof (jarvisLastMsg.createdAt as any)?.toMillis === "function"
+        ? (jarvisLastMsg.createdAt as any).toMillis()
+        : (jarvisLastMsg.createdAt instanceof Date ? jarvisLastMsg.createdAt.getTime() : (typeof jarvisLastMsg.createdAt === 'number' ? jarvisLastMsg.createdAt : new Date(jarvisLastMsg.createdAt).getTime())))
+    : 0;
+
+  const jarvisConvItem: any = {
+    id: "jarvis",
+    participantIds: [currentUser?.uid || "", "jarvis"],
+    participantNames: { jarvis: "Ennvo Jarvis" },
+    participantAvatars: { jarvis: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80" },
+    lastMessage: jarvisLastMsg?.content || "কিরে বন্ধু! কী খবর তোর?",
+    lastMessageTime: jarvisTimeMs,
+    updatedAt: { toMillis: () => jarvisTimeMs },
+    unreadCount: { [currentUser?.uid || ""]: 0 },
+    isAi: true,
+  };
+
+  const allUnifiedConversations = [jarvisConvItem, ...conversations].sort((a: any, b: any) => {
+    const timeA = typeof a.updatedAt?.toMillis === "function"
+      ? a.updatedAt.toMillis()
+      : (typeof a.lastMessageTime === "number" ? a.lastMessageTime : (a.lastMessageTime?.toMillis ? a.lastMessageTime.toMillis() : 0));
+    const timeB = typeof b.updatedAt?.toMillis === "function"
+      ? b.updatedAt.toMillis()
+      : (typeof b.lastMessageTime === "number" ? b.lastMessageTime : (b.lastMessageTime?.toMillis ? b.lastMessageTime.toMillis() : 0));
+    return timeB - timeA;
+  });
+
+  const filteredConversations = allUnifiedConversations.filter((conv: any) => {
     if (!searchQuery.trim()) return true;
-    const otherId = conv.participantIds?.find((id) => id !== currentUser?.uid);
+    if (conv.id === "jarvis") {
+      return "ennvo jarvis".includes(searchQuery.toLowerCase());
+    }
+    const otherId = conv.participantIds?.find((id: string) => id !== currentUser?.uid);
     const name =
       (conv.participantNames || {})[otherId || ""] ||
       userDataCache[otherId || ""]?.name ||
@@ -1852,7 +2030,7 @@ export default function Messages() {
         id: "jarvis",
         uid: "jarvis",
         name: "Ennvo Jarvis",
-        avatar: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80",
+        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80",
         online: true,
         lastSeen: Date.now(),
         isGroup: false,
@@ -1895,6 +2073,10 @@ export default function Messages() {
         isGroup: false
       }
     : null;
+
+  const activeConvTheme = (activeConversation as any)?.theme || 
+    (activeChat === "jarvis" ? (localStorage.getItem("jarvis_chat_theme") || chatTheme) : chatTheme) || 
+    "/chat-background.png";
 
   const scrollToBottom = (force = false) => {
     if (messagesContainerRef.current && (shouldAutoScrollRef.current || force)) {
@@ -2035,6 +2217,16 @@ export default function Messages() {
         const senderName = activeContact?.isGroup && !isMe
           ? ((activeConversation as any)?.participantNames?.[msg.senderId] || userDataCache[msg.senderId]?.name || "User")
           : undefined;
+
+        if (msg.type === "system") {
+          return (
+            <div key={messageKey} className="my-2.5 flex items-center justify-center">
+              <div className="px-3.5 py-1 bg-black/40 backdrop-blur-md text-white/95 text-[11.5px] font-medium rounded-full border border-white/10 shadow-xs tracking-tight text-center max-w-[85%] animate-in fade-in zoom-in-95">
+                {msg.content}
+              </div>
+            </div>
+          );
+        }
 
         return (
           <MessageBubble
@@ -2486,202 +2678,194 @@ export default function Messages() {
               </div>
             )}
 
-            {/* Pinned Ennvo Jarvis AI Assistant Item */}
-            <div
-              onClick={() => setActiveChat("jarvis")}
-              className={`flex items-center justify-between px-3.5 py-2.5 cursor-pointer transition-colors border-b border-gray-100 ${
-                activeChat === "jarvis" ? "bg-purple-50/80" : "hover:bg-gray-50/80"
-              }`}
-            >
-              <div className="flex items-center space-x-3 min-w-0 flex-1">
-                <div className="relative flex-shrink-0">
-                  <div className="w-[50px] h-[50px] rounded-full p-[2px] bg-gradient-to-tr from-purple-500 via-indigo-500 to-pink-500 shadow-xs flex items-center justify-center">
-                    <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center border border-white/20">
-                      <Sparkles className="w-5 h-5 text-purple-300 animate-pulse" />
-                    </div>
-                  </div>
-                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
-                </div>
-                <div className="flex flex-col min-w-0 pr-2 space-y-0.5 flex-1">
-                  <div className="flex items-center space-x-1.5">
-                    <h3 className="text-[14px] truncate tracking-tight font-medium text-gray-900">
-                      Ennvo Jarvis
-                    </h3>
-                  </div>
-                  <p className="text-[12px] truncate text-gray-500 font-normal">
-                    {jarvisMessages[jarvisMessages.length - 1]?.content || "কিরে বন্ধু! কী খবর তোর?"}
-                  </p>
-                </div>
+            {conversations.length === 0 ? (
+              <FacebookMessageListSkeleton count={7} />
+            ) : filteredConversations.length === 0 && searchQuery.trim() ? (
+              <div className="text-center py-12 text-gray-400 text-sm">
+                No chats found for "{searchQuery}"
               </div>
-            </div>
-
-            {filteredConversations.map((conv, idx) => {
-              const isGroup =
-                (conv as any).isGroup ||
-                !!(conv as any).groupName ||
-                (conv.participantIds ? conv.participantIds.length > 2 : false);
-              const otherId = isGroup
-                ? undefined
-                : conv.participantIds?.find((id) => id !== currentUser?.uid);
-              const name = isGroup
-                ? (conv as any).groupName || "Group Chat"
-                : userDataCache[otherId || ""]?.name ||
-                  (conv.participantNames || {})[otherId || ""] ||
-                  "User";
-              const avatar = isGroup
-                ? (conv as any).groupAvatar
-                : userDataCache[otherId || ""]?.avatar ||
-                  (conv.participantAvatars || {})[otherId || ""] ||
-                  `https://ui-avatars.com/api/?name=${name}&background=random`;
-              const unreadMessages =
-                conv.id === activeChat
-                  ? 0
-                  : currentUser &&
-                    conv.unreadCount &&
-                    conv.unreadCount[currentUser.uid]
-                  ? conv.unreadCount[currentUser.uid]
-                  : 0;
-
-              const isUnread = typeof unreadMessages === "number" && unreadMessages > 0;
-
-              let timeStr = "Just now";
-              let lastMsgDate: Date | null = null;
-              if (conv.lastMessageTime) {
-                lastMsgDate =
-                  (conv.lastMessageTime as any)?.toDate?.() ||
-                  new Date(conv.lastMessageTime);
-                if (lastMsgDate && !isNaN(lastMsgDate.getTime())) {
-                  const diff = Math.floor(
-                    (new Date().getTime() - lastMsgDate.getTime()) / 1000,
+            ) : (
+              filteredConversations.map((conv, idx) => {
+                const isJarvis = conv.id === "jarvis";
+                const isGroup =
+                  !isJarvis && (
+                    (conv as any).isGroup ||
+                    !!(conv as any).groupName ||
+                    (conv.participantIds ? conv.participantIds.length > 2 : false)
                   );
-                  if (diff < 45) {
-                    timeStr = "Just now";
-                  } else if (diff < 3600) {
-                    const mins = Math.max(1, Math.floor(diff / 60));
-                    timeStr = `${mins} min ago`;
-                  } else if (diff < 86400) {
-                    const hours = Math.floor(diff / 3600);
-                    timeStr = `${hours} hour${hours > 1 ? "s" : ""} ago`;
-                  } else if (diff < 2592000) {
-                    const days = Math.floor(diff / 86400);
-                    timeStr = `${days} day${days > 1 ? "s" : ""} ago`;
-                  } else {
-                    const months = Math.floor(diff / 2592000);
-                    timeStr = `${months} month${months > 1 ? "s" : ""} ago`;
+                const otherId = isJarvis
+                  ? "jarvis"
+                  : isGroup
+                  ? undefined
+                  : conv.participantIds?.find((id) => id !== currentUser?.uid);
+                const name = isJarvis
+                  ? "Ennvo Jarvis"
+                  : isGroup
+                  ? (conv as any).groupName || "Group Chat"
+                  : userDataCache[otherId || ""]?.name ||
+                    (conv.participantNames || {})[otherId || ""] ||
+                    "User";
+                const avatar = isJarvis
+                  ? "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"
+                  : isGroup
+                  ? (conv as any).groupAvatar
+                  : userDataCache[otherId || ""]?.avatar ||
+                    (conv.participantAvatars || {})[otherId || ""] ||
+                    `https://ui-avatars.com/api/?name=${name}&background=random`;
+                const unreadMessages =
+                  conv.id === activeChat || isJarvis
+                    ? 0
+                    : currentUser &&
+                      conv.unreadCount &&
+                      conv.unreadCount[currentUser.uid]
+                    ? conv.unreadCount[currentUser.uid]
+                    : 0;
+
+                const isUnread = typeof unreadMessages === "number" && unreadMessages > 0;
+
+                let timeStr = "Just now";
+                let lastMsgDate: Date | null = null;
+                if (conv.lastMessageTime) {
+                  lastMsgDate =
+                    (conv.lastMessageTime as any)?.toDate?.() ||
+                    new Date(conv.lastMessageTime);
+                  if (lastMsgDate && !isNaN(lastMsgDate.getTime())) {
+                    const diff = Math.floor(
+                      (new Date().getTime() - lastMsgDate.getTime()) / 1000,
+                    );
+                    if (diff < 45) {
+                      timeStr = "Just now";
+                    } else if (diff < 3600) {
+                      const mins = Math.max(1, Math.floor(diff / 60));
+                      timeStr = `${mins} min ago`;
+                    } else if (diff < 86400) {
+                      const hours = Math.floor(diff / 3600);
+                      timeStr = `${hours} hour${hours > 1 ? "s" : ""} ago`;
+                    } else if (diff < 2592000) {
+                      const days = Math.floor(diff / 86400);
+                      timeStr = `${days} day${days > 1 ? "s" : ""} ago`;
+                    } else {
+                      const months = Math.floor(diff / 2592000);
+                      timeStr = `${months} month${months > 1 ? "s" : ""} ago`;
+                    }
                   }
                 }
-              }
 
-              const isOlderThan5Days = !!(
-                lastMsgDate &&
-                !isNaN(lastMsgDate.getTime()) &&
-                Date.now() - lastMsgDate.getTime() > 5 * 24 * 60 * 60 * 1000
-              );
+                const isOlderThan5Days = !!(
+                  lastMsgDate &&
+                  !isNaN(lastMsgDate.getTime()) &&
+                  Date.now() - lastMsgDate.getTime() > 5 * 24 * 60 * 60 * 1000
+                );
 
-              const hasStory =
-                otherId && inboxStories.some((s) => s.authorId === otherId);
+                const hasStory =
+                  otherId && otherId !== "jarvis" && inboxStories.some((s) => s.authorId === otherId);
 
-              const otherMembers = isGroup
-                ? conv.participantIds.filter((id) => id !== currentUser?.uid)
-                : [];
+                const otherMembers = isGroup
+                  ? conv.participantIds.filter((id) => id !== currentUser?.uid)
+                  : [];
 
-              return (
-                <React.Fragment key={conv.id}>
-                  <div
-                    onClick={(e) => {
-                      if (longPressedRef.current) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        return;
-                      }
-                      if (
-                        document.querySelector(
-                          ".fixed.bg-white.rounded-2xl.shadow-2xl.border.border-gray-100.py-2.w-48.z-50",
-                        )
-                      )
-                        return;
-                      setActiveChat(conv.id);
-                    }}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setChatContextMenu({
-                        x: e.clientX,
-                        y: e.clientY,
-                        convId: conv.id,
-                        otherUid: !isGroup ? otherId : undefined,
-                      });
-                    }}
-                    onTouchStart={(e) =>
-                      handleChatTouchStart(
-                        e,
-                        conv.id,
-                        !isGroup ? otherId : undefined,
-                      )
-                    }
-                    onTouchEnd={handleChatTouchEnd}
-                    onTouchMove={handleChatTouchEnd}
-                    onMouseDown={(e) =>
-                      handleChatTouchStart(
-                        e,
-                        conv.id,
-                        !isGroup ? otherId : undefined,
-                      )
-                    }
-                    onMouseUp={handleChatTouchEnd}
-                    onMouseMove={handleChatTouchEnd}
-                    className="flex items-center justify-between px-3.5 py-1.5 cursor-pointer hover:bg-white/50 active:bg-gray-100/60 transition-colors group"
-                  >
-                    <div className="flex items-center space-x-3 min-w-0 flex-1">
-                      <div
-                        className="relative flex-shrink-0"
-                        onClick={(e) => {
+                return (
+                  <React.Fragment key={conv.id}>
+                    <div
+                      onClick={(e) => {
+                        if (longPressedRef.current) {
+                          e.preventDefault();
                           e.stopPropagation();
-                          if (isGroup) {
-                            setActiveChat(conv.id);
-                            setShowChatSettings(true);
-                          } else {
-                            setViewingUser({
-                              uid: otherId || "",
-                              name,
-                              avatar: avatar as string,
-                            });
-                            pushPage("profile");
-                          }
-                        }}
-                      >
-                        {isGroup && !avatar ? (
-                          <div className="group-hover:opacity-90 transition-opacity">
-                            <GroupAvatar
-                              members={otherMembers
-                                .slice(0, 3)
-                                .map(
-                                  (id) =>
-                                    userDataCache[id]?.avatar ||
-                                    (conv.participantAvatars || {})[id] ||
-                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(userDataCache[id]?.name || (conv.participantNames || {})[id] || "User")}&background=random`,
-                                )}
-                              sizeClass="w-[54px] h-[54px]"
-                            />
-                          </div>
-                        ) : (
-                          <div className={`rounded-full p-[2px] transition-all shrink-0 ${hasStory ? "bg-gradient-to-tr from-[#20D5EC] via-pink-500 to-yellow-400" : "bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500"}`}>
-                            <img
-                              src={avatar as string}
-                              alt={name}
-                              loading="lazy"
-                              className="w-[54px] h-[54px] rounded-full object-cover group-hover:opacity-90 transition-opacity border-2 border-white"
-                              referrerPolicy="no-referrer"
-                            />
-                            {otherId && (presenceData[otherId]?.isOnline || (presenceData[otherId] as any)?.state === "online") && (
-                              <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-[#22c55e] border-2 border-white rounded-full"></div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col min-w-0 pr-2 space-y-0 -mt-0.5 flex-1">
-                        <h3 className="text-[14px] truncate tracking-tight leading-tight font-normal text-black">
-                          {name}
-                        </h3>
+                          return;
+                        }
+                        if (
+                          document.querySelector(
+                            ".fixed.bg-white.rounded-2xl.shadow-2xl.border.border-gray-100.py-2.w-48.z-50",
+                          )
+                        )
+                          return;
+                        setActiveChat(conv.id);
+                      }}
+                      onContextMenu={(e) => {
+                        if (isJarvis) return;
+                        e.preventDefault();
+                        setChatContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          convId: conv.id,
+                          otherUid: !isGroup ? otherId : undefined,
+                        });
+                      }}
+                      onTouchStart={(e) =>
+                        !isJarvis &&
+                        handleChatTouchStart(
+                          e,
+                          conv.id,
+                          !isGroup ? otherId : undefined,
+                        )
+                      }
+                      onTouchEnd={handleChatTouchEnd}
+                      onTouchMove={handleChatTouchEnd}
+                      onMouseDown={(e) =>
+                        !isJarvis &&
+                        handleChatTouchStart(
+                          e,
+                          conv.id,
+                          !isGroup ? otherId : undefined,
+                        )
+                      }
+                      onMouseUp={handleChatTouchEnd}
+                      onMouseMove={handleChatTouchEnd}
+                      className="flex items-center justify-between px-3.5 py-1.5 cursor-pointer hover:bg-white/50 active:bg-gray-100/60 transition-colors group"
+                    >
+                      <div className="flex items-center space-x-3 min-w-0 flex-1">
+                        <div
+                          className="relative flex-shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isJarvis) {
+                              setActiveChat("jarvis");
+                            } else if (isGroup) {
+                              setActiveChat(conv.id);
+                              setShowChatSettings(true);
+                            } else {
+                              setViewingUser({
+                                uid: otherId || "",
+                                name,
+                                avatar: avatar as string,
+                              });
+                              pushPage("profile");
+                            }
+                          }}
+                        >
+                          {isGroup && !avatar ? (
+                            <div className="group-hover:opacity-90 transition-opacity">
+                              <GroupAvatar
+                                members={otherMembers
+                                  .slice(0, 3)
+                                  .map(
+                                    (id) =>
+                                      userDataCache[id]?.avatar ||
+                                      (conv.participantAvatars || {})[id] ||
+                                      `https://ui-avatars.com/api/?name=${encodeURIComponent(userDataCache[id]?.name || (conv.participantNames || {})[id] || "User")}&background=random`,
+                                  )}
+                                sizeClass="w-[54px] h-[54px]"
+                              />
+                            </div>
+                          ) : (
+                            <div className={`rounded-full p-[2px] transition-all shrink-0 ${hasStory ? "bg-gradient-to-tr from-[#20D5EC] via-pink-500 to-yellow-400" : "bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500"}`}>
+                              <img
+                                src={avatar as string}
+                                alt={name}
+                                loading="lazy"
+                                className="w-[54px] h-[54px] rounded-full object-cover group-hover:opacity-90 transition-opacity border-2 border-white"
+                                referrerPolicy="no-referrer"
+                              />
+                              {otherId && (otherId === "jarvis" || presenceData[otherId]?.isOnline || (presenceData[otherId] as any)?.state === "online") && (
+                                <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-[#22c55e] border-2 border-white rounded-full"></div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col min-w-0 pr-2 space-y-0 -mt-0.5 flex-1">
+                          <h3 className="text-[14px] truncate tracking-tight leading-tight font-normal text-black">
+                            {name}
+                          </h3>
                         <div className="flex items-center text-[12px] leading-tight pt-0.5">
                           {isOlderThan5Days ? (
                             <p className="truncate max-w-[170px] md:max-w-[220px] text-[12px] text-gray-400 font-normal">
@@ -2744,7 +2928,8 @@ export default function Messages() {
                   </div>
                 </React.Fragment>
               );
-            })}
+            })
+          )}
           </div>
           </div>
         </PullToRefresh>
@@ -3008,89 +3193,118 @@ export default function Messages() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.12 }}
               className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-full overflow-hidden bg-white"
+              style={{
+                paddingBottom: viewportBottomOffset > 0 ? `${viewportBottomOffset}px` : undefined
+              }}
             >
-              {/* Chat Background Layer - Completely fixed GPU hardware layer so it never resizes or zooms when keyboard opens */}
-              {(!chatTheme || chatTheme === "bg-image" || chatTheme === "bg-white") ? (
-                <>
-                  {/* Mobile Only: Chat Background Image */}
-                  <img
-                    src="/chat-background.png"
-                    alt=""
-                    className="fixed md:hidden pointer-events-none z-0 select-none object-cover"
-                    style={{ 
+              {/* Chat Background Layer - Ultra-fast GPU hardware layer with original bright, clean aesthetic */}
+              {(() => {
+                const isImage = 
+                  activeConvTheme === 'bg-image' || 
+                  activeConvTheme === '/chat-background.png' ||
+                  activeConvTheme.startsWith('http') || 
+                  activeConvTheme.startsWith('/') || 
+                  activeConvTheme.startsWith('data:') ||
+                  activeConvTheme.includes('.png') ||
+                  activeConvTheme.includes('.jpg') ||
+                  activeConvTheme.includes('.webp');
+
+                const isDefaultWallpaper = 
+                  !activeConvTheme || 
+                  activeConvTheme === 'bg-image' || 
+                  activeConvTheme === '/chat-background.png' || 
+                  activeConvTheme === 'bg-white';
+
+                if (isDefaultWallpaper) {
+                  return (
+                    <>
+                      {/* Mobile: Original Crisp Clean Background Image (No darkening filter) */}
+                      <img
+                        src="/chat-background.png"
+                        alt=""
+                        className="fixed md:hidden pointer-events-none z-0 select-none object-cover"
+                        style={{ 
+                          position: 'fixed',
+                          top: 0,
+                          left: 0,
+                          width: fixedScreenSize.width,
+                          height: fixedScreenSize.height,
+                          minHeight: fixedScreenSize.height,
+                          maxHeight: fixedScreenSize.height,
+                          objectFit: 'cover',
+                          objectPosition: 'center top',
+                          transform: 'translate3d(0, 0, 0)',
+                          WebkitTransform: 'translate3d(0, 0, 0)',
+                          backfaceVisibility: 'hidden',
+                          willChange: 'transform',
+                          pointerEvents: 'none'
+                        }}
+                      />
+
+                      {/* Desktop/PC: Original Aesthetic Ambient Pastel Glow Background */}
+                      <div 
+                        className="hidden md:block absolute inset-0 pointer-events-none z-0 select-none overflow-hidden"
+                        style={{
+                          background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 35%, #faf5ff 70%, #fdf4ff 100%)',
+                        }}
+                      >
+                        <div className="absolute -top-28 -right-28 w-[480px] h-[480px] rounded-full bg-gradient-to-br from-indigo-200/40 via-purple-200/30 to-pink-200/20 blur-3xl pointer-events-none" />
+                        <div className="absolute top-1/2 -left-32 w-[420px] h-[420px] rounded-full bg-gradient-to-tr from-blue-200/35 via-cyan-100/25 to-purple-200/20 blur-3xl pointer-events-none" />
+                        <div className="absolute -bottom-24 right-1/4 w-[440px] h-[440px] rounded-full bg-gradient-to-t from-purple-200/30 via-pink-100/30 to-amber-100/20 blur-3xl pointer-events-none" />
+                        <div 
+                          className="absolute inset-0 opacity-[0.04] pointer-events-none" 
+                          style={{
+                            backgroundImage: `radial-gradient(#4f46e5 1px, transparent 1px), radial-gradient(#9333ea 1px, #f8fafc 1px)`,
+                            backgroundSize: '28px 28px',
+                            backgroundPosition: '0 0, 14px 14px',
+                          }}
+                        />
+                      </div>
+                    </>
+                  );
+                }
+
+                if (isImage) {
+                  return (
+                    <img
+                      src={activeConvTheme}
+                      alt="Wallpaper"
+                      className="fixed inset-0 w-full h-full object-cover object-center pointer-events-none z-0 select-none"
+                      style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        width: '100vw',
+                        height: '100dvh',
+                        objectFit: 'cover',
+                        objectPosition: 'center center',
+                        transform: 'translateZ(0)',
+                        WebkitTransform: 'translateZ(0)',
+                        pointerEvents: 'none'
+                      }}
+                    />
+                  );
+                }
+
+                return (
+                  <div
+                    className={`fixed inset-0 ${activeConvTheme} z-0 pointer-events-none`}
+                    style={{
                       position: 'fixed',
                       top: 0,
                       left: 0,
-                      width: fixedScreenSize.width,
-                      height: fixedScreenSize.height,
-                      minHeight: fixedScreenSize.height,
-                      maxHeight: fixedScreenSize.height,
-                      objectFit: 'cover',
-                      objectPosition: 'center top',
-                      transform: 'translate3d(0, 0, 0)',
-                      WebkitTransform: 'translate3d(0, 0, 0)',
-                      backfaceVisibility: 'hidden',
-                      willChange: 'transform',
-                      pointerEvents: 'none'
+                      right: 0,
+                      bottom: 0,
+                      width: '100vw',
+                      height: '100dvh',
+                      transform: 'translateZ(0)',
+                      WebkitTransform: 'translateZ(0)'
                     }}
                   />
-
-                  {/* PC Only: Beautiful wallpaper design (image removed on PC, replaced with aesthetic ambient background) */}
-                  <div 
-                    className="hidden md:block absolute inset-0 pointer-events-none z-0 select-none overflow-hidden"
-                    style={{
-                      background: 'linear-gradient(135deg, #f1f5f9 0%, #eef2ff 35%, #faf5ff 70%, #fdf4ff 100%)',
-                    }}
-                  >
-                    <div className="absolute -top-28 -right-28 w-[480px] h-[480px] rounded-full bg-gradient-to-br from-indigo-200/40 via-purple-200/30 to-pink-200/20 blur-3xl pointer-events-none" />
-                    <div className="absolute top-1/2 -left-32 w-[420px] h-[420px] rounded-full bg-gradient-to-tr from-blue-200/35 via-cyan-100/25 to-purple-200/20 blur-3xl pointer-events-none" />
-                    <div className="absolute -bottom-24 right-1/4 w-[440px] h-[440px] rounded-full bg-gradient-to-t from-purple-200/30 via-pink-100/30 to-amber-100/20 blur-3xl pointer-events-none" />
-                    <div 
-                      className="absolute inset-0 opacity-[0.04] pointer-events-none" 
-                      style={{
-                        backgroundImage: `radial-gradient(#4f46e5 1px, transparent 1px), radial-gradient(#9333ea 1px, #f8fafc 1px)`,
-                        backgroundSize: '28px 28px',
-                        backgroundPosition: '0 0, 14px 14px',
-                      }}
-                    />
-                  </div>
-                </>
-              ) : (chatTheme.startsWith("http") || chatTheme.startsWith("/") || chatTheme.startsWith("data:")) ? (
-                <img
-                  src={chatTheme}
-                  alt=""
-                  className="fixed pointer-events-none z-0 select-none object-cover"
-                  style={{ 
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    width: fixedScreenSize.width,
-                    height: fixedScreenSize.height,
-                    minHeight: fixedScreenSize.height,
-                    maxHeight: fixedScreenSize.height,
-                    objectFit: 'cover',
-                    objectPosition: 'center top',
-                    transform: 'translate3d(0, 0, 0)',
-                    WebkitTransform: 'translate3d(0, 0, 0)',
-                    backfaceVisibility: 'hidden',
-                    willChange: 'transform',
-                    pointerEvents: 'none'
-                  }}
-                />
-              ) : (
-                <div
-                  className={`fixed inset-0 ${chatTheme} z-0 pointer-events-none`}
-                  style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    width: fixedScreenSize.width,
-                    height: fixedScreenSize.height,
-                    transform: 'translate3d(0, 0, 0)',
-                    WebkitTransform: 'translate3d(0, 0, 0)'
-                  }}
-                />
-              )}
+                );
+              })()}
 
               {/* Chat Header */}
               <div
@@ -3214,56 +3428,29 @@ export default function Messages() {
                 </div>
               </div>
 
-              {/* Messages Area */}
-              <div
-                ref={messagesContainerRef}
-                className="flex-1 overflow-y-auto p-4 pb-3 space-y-0.5 scrollbar-hide flex flex-col justify-start relative z-10 overscroll-contain transform-gpu"
-                onScroll={(e) => {
-                  if (e.currentTarget.scrollTop < 20) {
-                    setMessageLimit((prev: number) => prev + 20);
-                  }
-                  // Update auto-scroll ref based on regular scrolling
-                  const { scrollTop, scrollHeight, clientHeight } =
-                    e.currentTarget;
-                  shouldAutoScrollRef.current =
-                    scrollHeight - scrollTop - clientHeight < 200;
-                }}
-              >
-                <div className="flex flex-col items-center justify-center py-8">
-                  <img
-                    src={activeContact?.avatar}
-                    className="w-24 h-24 rounded-full object-cover shadow-md mb-4 cursor-pointer hover:opacity-80 transition-opacity"
-                    alt="Profile"
-                    onClick={() => {
-                      if (activeContact?.uid) {
-                        setViewingUser({
-                          uid: activeContact.uid,
-                          name: activeContact.name,
-                          avatar: activeContact.avatar,
-                        });
-                        pushPage("profile");
-                      }
-                    }}
-                  />
-                  <h2
-                    className={`text-xl font-normal cursor-pointer hover:underline ${chatTheme === "bg-white" ? "text-gray-900" : "text-gray-900"}`}
-                    onClick={() => {
-                      if (activeContact?.isGroup) {
-                        setShowChatSettings(true);
-                      } else if (activeContact?.uid) {
-                        setViewingUser({
-                          uid: activeContact.uid,
-                          name: activeContact.name,
-                          avatar: activeContact.avatar,
-                        });
-                        pushPage("profile");
-                      }
-                    }}
-                  >
-                    {activeContact?.name}
-                  </h2>
-                  {!activeContact?.isGroup && (
-                    <button
+              {/* Messages & Floating Input Overlay Container */}
+              <div className="flex-1 relative w-full h-full overflow-hidden">
+                {/* Messages Area - Full container height overlay so bubbles scroll underneath input box */}
+                <div
+                  ref={messagesContainerRef}
+                  className="absolute inset-0 overflow-y-auto p-4 space-y-0.5 scrollbar-hide flex flex-col justify-start z-10 overscroll-contain transform-gpu [webkit-overflow-scrolling:touch] transition-[padding-bottom] duration-300 ease-out"
+                  style={{ paddingBottom: showStickerModal ? '420px' : '110px' }}
+                  onScroll={(e) => {
+                    if (e.currentTarget.scrollTop < 20) {
+                      setMessageLimit((prev: number) => prev + 20);
+                    }
+                    // Update auto-scroll ref based on regular scrolling
+                    const { scrollTop, scrollHeight, clientHeight } =
+                      e.currentTarget;
+                    shouldAutoScrollRef.current =
+                      scrollHeight - scrollTop - clientHeight < 200;
+                  }}
+                >
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <img
+                      src={activeContact?.avatar}
+                      className="w-24 h-24 rounded-full object-cover shadow-md mb-4 cursor-pointer hover:opacity-80 transition-opacity"
+                      alt="Profile"
                       onClick={() => {
                         if (activeContact?.uid) {
                           setViewingUser({
@@ -3274,57 +3461,130 @@ export default function Messages() {
                           pushPage("profile");
                         }
                       }}
-                      className="mt-4 bg-black/5 hover:bg-black/10 text-gray-900 font-normal px-4 py-1.5 rounded-lg transition-colors text-sm"
+                    />
+                    <h2
+                      className={`text-xl font-normal cursor-pointer hover:underline ${chatTheme === "bg-white" ? "text-gray-900" : "text-gray-900"}`}
+                      onClick={() => {
+                        if (activeContact?.isGroup) {
+                          setShowChatSettings(true);
+                        } else if (activeContact?.uid) {
+                          setViewingUser({
+                            uid: activeContact.uid,
+                            name: activeContact.name,
+                            avatar: activeContact.avatar,
+                          });
+                          pushPage("profile");
+                        }
+                      }}
                     >
-                      View Profile
-                    </button>
+                      {activeContact?.name}
+                    </h2>
+                    {!activeContact?.isGroup && (
+                      <button
+                        onClick={() => {
+                          if (activeContact?.uid) {
+                            setViewingUser({
+                              uid: activeContact.uid,
+                              name: activeContact.name,
+                              avatar: activeContact.avatar,
+                            });
+                            pushPage("profile");
+                          }
+                        }}
+                        className="mt-4 bg-black/5 hover:bg-black/10 text-gray-900 font-normal px-4 py-1.5 rounded-lg transition-colors text-sm"
+                      >
+                        View Profile
+                      </button>
+                    )}
+                  </div>
+
+                  {renderedMessages}
+
+                  {(typingUsers.length > 0 || isJarvisTyping) && (
+                    <div className="flex justify-start mt-3">
+                      <img
+                        src={
+                          activeChat === "jarvis"
+                            ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80"
+                            : activeContact?.isGroup
+                            ? ((activeConversation as any)?.participantAvatars ||
+                                {})[typingUsers[0]] ||
+                              userDataCache[typingUsers[0]]?.avatar ||
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(((activeConversation as any)?.participantNames || {})[typingUsers[0]] || userDataCache[typingUsers[0]]?.name || "User")}&background=random`
+                            : activeContact?.avatar
+                        }
+                        className="w-7 h-7 rounded-full mr-2 self-end mb-1 object-cover"
+                        alt="Avatar"
+                      />
+                      <div
+                        className={`px-4 py-3 rounded-3xl rounded-bl-md flex items-center space-x-1.5 ${chatTheme === "bg-white" ? "bg-purple-100/90 text-purple-900 border border-purple-200/60" : "bg-purple-900/40 text-purple-200"}`}
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-purple-600 animate-pulse mr-0.5" />
+                        <div
+                          className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"
+                          style={{ animationDelay: "0ms" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"
+                          style={{ animationDelay: "150ms" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"
+                          style={{ animationDelay: "300ms" }}
+                        ></div>
+                      </div>
+                    </div>
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
 
-                {renderedMessages}
-
-                {(typingUsers.length > 0 || isJarvisTyping) && (
-                  <div className="flex justify-start mt-3">
-                    <img
-                      src={
-                        activeChat === "jarvis"
-                          ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80"
-                          : activeContact?.isGroup
-                          ? ((activeConversation as any)?.participantAvatars ||
-                              {})[typingUsers[0]] ||
-                            userDataCache[typingUsers[0]]?.avatar ||
-                            `https://ui-avatars.com/api/?name=${encodeURIComponent(((activeConversation as any)?.participantNames || {})[typingUsers[0]] || userDataCache[typingUsers[0]]?.name || "User")}&background=random`
-                          : activeContact?.avatar
-                      }
-                      className="w-7 h-7 rounded-full mr-2 self-end mb-1 object-cover"
-                      alt="Avatar"
-                    />
-                    <div
-                      className={`px-4 py-3 rounded-3xl rounded-bl-md flex items-center space-x-1.5 ${chatTheme === "bg-white" ? "bg-purple-100/90 text-purple-900 border border-purple-200/60" : "bg-purple-900/40 text-purple-200"}`}
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-purple-600 animate-pulse mr-0.5" />
-                      <div
-                        className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"
-                        style={{ animationDelay: "0ms" }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"
-                        style={{ animationDelay: "150ms" }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"
-                        style={{ animationDelay: "300ms" }}
-                      ></div>
+                {/* Floating Input Area */}
+                <div
+                  className={`absolute inset-x-0 z-30 pb-3 md:pb-4 pt-2 px-3 md:px-6 w-full flex flex-col justify-end pointer-events-none bg-gradient-to-t from-white/40 via-white/15 to-transparent backdrop-blur-[1px] transition-all duration-300 ease-out ${
+                    showStickerModal ? 'bottom-[340px] md:bottom-[360px]' : 'bottom-0'
+                  }`}
+                >
+                {/* Smart Sticker Suggestions (shown above input bar when typing keywords/emojis) */}
+                {stickerSuggestions.length > 0 && !isRecording && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                    transition={{ duration: 0.18 }}
+                    className="pointer-events-auto flex items-center space-x-3 px-3.5 py-2 mx-auto mb-2 max-w-3xl w-full ultra-glass-reply-box overflow-x-auto no-scrollbar shadow-lg rounded-2xl border border-white/90 bg-white/80 backdrop-blur-xl"
+                  >
+                    <div className="flex items-center space-x-3 py-0.5">
+                      {stickerSuggestions.map((stk) => (
+                        <button
+                          key={stk.id}
+                          type="button"
+                          onClick={() => handleSendStickerDirect(stk.url, stk.type)}
+                          className="shrink-0 p-1.5 bg-white/90 hover:bg-white active:scale-95 rounded-2xl border border-white/90 shadow-xs hover:shadow-md transition-all flex items-center justify-center group"
+                          title={`Send "${stk.name}"`}
+                        >
+                          {stk.type === "video" ? (
+                            <video
+                              src={stk.url}
+                              autoPlay
+                              loop
+                              muted
+                              playsInline
+                              className="w-13 h-13 md:w-15 md:h-15 object-contain rounded-xl pointer-events-none"
+                            />
+                          ) : (
+                            <img
+                              src={stk.url}
+                              alt={stk.name}
+                              referrerPolicy="no-referrer"
+                              className="w-13 h-13 md:w-15 md:h-15 object-contain pointer-events-none group-hover:scale-110 transition-transform"
+                            />
+                          )}
+                        </button>
+                      ))}
                     </div>
-                  </div>
+                  </motion.div>
                 )}
-                <div ref={messagesEndRef} />
-              </div>
 
-              {/* Floating Input Area */}
-              <div
-                className="sticky bottom-0 z-30 pb-3.5 pt-2 px-3 md:px-6 w-full flex flex-col justify-end pointer-events-none bg-transparent"
-              >
                 {selectedImagePreview && (
                   <div className="pointer-events-auto flex items-center justify-between bg-white border border-gray-200/90 rounded-2xl p-2 mx-auto mb-2 max-w-3xl w-full shadow-md relative transition-all">
                     <div className="flex items-center space-x-3 min-w-0">
@@ -3358,41 +3618,68 @@ export default function Messages() {
                 )}
 
                 {replyingTo && (
-                  <div className="pointer-events-auto flex items-center justify-between ultra-glass-reply-box px-3.5 py-2 mx-auto mb-2 max-w-3xl w-full relative overflow-hidden transition-all">
-                    <div className="absolute left-0 top-0 bottom-0 w-[3.5px] bg-purple-500 rounded-r"></div>
-                    <div className="flex-1 min-w-0 pl-2 flex items-center">
-                      {replyingTo.type === "reel" && replyingTo.mediaUrl && (
-                        <div className="w-6 h-8 rounded shrink-0 overflow-hidden mr-2 bg-gray-900 border border-gray-200">
-                          <video
-                            src={`${replyingTo.mediaUrl}#t=0.001`}
-                            className="w-full h-full object-cover"
-                            preload="metadata"
-                          />
+                  <div className="pointer-events-auto flex items-center justify-between ultra-glass-reply-box px-3.5 py-2 mx-auto mb-2 max-w-3xl w-full relative overflow-hidden transition-all rounded-2xl shadow-sm border border-purple-100/60 bg-white/90 backdrop-blur-xl">
+                    <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-purple-600 rounded-r-full"></div>
+                    <div className="flex-1 min-w-0 pl-2.5 flex items-center space-x-2.5">
+                      {/* Photo Preview */}
+                      {(replyingTo.type === "image" || replyingTo.mediaUrl) && replyingTo.type !== "sticker" && replyingTo.type !== "reel" && replyingTo.type !== "voice" && (
+                        <div className="w-8 h-8 rounded-lg shrink-0 overflow-hidden bg-gray-100 border border-gray-200/80 shadow-2xs">
+                          <img src={replyingTo.mediaUrl} className="w-full h-full object-cover" alt="Photo preview" referrerPolicy="no-referrer" />
                         </div>
                       )}
+                      {/* Sticker Preview */}
+                      {(replyingTo.type === "sticker" || replyingTo.stickerUrl) && (
+                        <div className="w-8 h-8 shrink-0 flex items-center justify-center p-0.5">
+                          {replyingTo.stickerType === "video" ? (
+                            <video src={replyingTo.stickerUrl || replyingTo.mediaUrl} autoPlay loop muted playsInline className="w-full h-full object-contain rounded" />
+                          ) : (
+                            <img src={replyingTo.stickerUrl || replyingTo.mediaUrl} className="w-full h-full object-contain" alt="Sticker preview" referrerPolicy="no-referrer" />
+                          )}
+                        </div>
+                      )}
+                      {/* Reel Preview */}
+                      {replyingTo.type === "reel" && replyingTo.mediaUrl && (
+                        <div className="w-7 h-9 rounded-md shrink-0 overflow-hidden bg-gray-900 border border-gray-200/80 shadow-2xs relative">
+                          <video src={`${replyingTo.mediaUrl}#t=0.001`} className="w-full h-full object-cover" preload="metadata" />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                            <Video className="w-3 h-3 text-white fill-white" />
+                          </div>
+                        </div>
+                      )}
+                      {/* Voice Preview */}
+                      {replyingTo.type === "voice" && (
+                        <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 shrink-0 flex items-center justify-center border border-rose-200/60 shadow-2xs">
+                          <Mic className="w-4 h-4" />
+                        </div>
+                      )}
+
                       <div className="flex flex-col justify-center min-w-0">
-                        <span className="text-[10px] font-semibold text-purple-600 tracking-tight leading-none">
+                        <span className="text-[11px] font-semibold text-purple-600 tracking-tight leading-none">
                           Replying to{" "}
                           {replyingTo.senderId === currentUser?.uid
                             ? "yourself"
                             : activeContact?.name}
                         </span>
-                        <p className="text-[12px] font-normal text-gray-800 truncate leading-tight mt-0.5">
+                        <p className="text-[12.5px] font-medium text-gray-800 truncate leading-tight mt-0.5">
                           {replyingTo.content ||
-                            (replyingTo.type === "image"
+                            (replyingTo.type === "sticker" || replyingTo.stickerUrl
+                              ? "Sticker"
+                              : replyingTo.type === "image"
                               ? "Photo"
                               : replyingTo.type === "voice"
-                                ? "Voice message"
-                                : "Reel")}
+                              ? "Voice message"
+                              : replyingTo.type === "reel"
+                              ? "Reel"
+                              : "Message")}
                         </p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setReplyingTo(null)}
-                      className="p-1 hover:bg-gray-200/60 active:scale-90 rounded-full transition-all shrink-0 text-gray-400 hover:text-gray-700 ml-2"
+                      className="p-1.5 hover:bg-gray-200/60 active:scale-90 rounded-full transition-all shrink-0 text-gray-400 hover:text-gray-700 ml-2"
                     >
-                      <X className="w-3.5 h-3.5" strokeWidth={2} />
+                      <X className="w-3.5 h-3.5" strokeWidth={2.5} />
                     </button>
                   </div>
                 )}
@@ -3404,15 +3691,10 @@ export default function Messages() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50/60 active:scale-90 rounded-full transition-all shrink-0 mb-0.5"
+                    className="p-2 text-gray-700 bg-white/50 hover:bg-white/80 active:scale-90 rounded-2xl transition-all shrink-0 mb-0.5 border border-white/80 shadow-2xs flex items-center justify-center backdrop-blur-md"
+                    title="Attach Photo or Video"
                   >
-                    <Plus className="w-5 h-5" strokeWidth={2.2} />
-                  </button>
-                  <button
-                    type="button"
-                    className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50/60 rounded-full shrink-0 transition-all active:scale-90 hidden sm:flex mb-0.5"
-                  >
-                    <Smile className="w-5 h-5" strokeWidth={2} />
+                    <Plus className="w-5 h-5 stroke-[2.2]" />
                   </button>
                   <input
                     type="file"
@@ -3466,18 +3748,28 @@ export default function Messages() {
                         e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
                       }}
                       onFocus={() => {
-                        if (shouldAutoScrollRef.current) {
-                          const scrollToBottomSmooth = () => {
-                            if (messagesContainerRef.current) {
-                              messagesContainerRef.current.scrollTo({
-                                top: messagesContainerRef.current.scrollHeight,
-                                behavior: 'smooth'
-                              });
-                            }
-                          };
-                          requestAnimationFrame(scrollToBottomSmooth);
-                          setTimeout(scrollToBottomSmooth, 80);
-                        }
+                        const scrollToBottomSmooth = () => {
+                          if (messagesContainerRef.current) {
+                            messagesContainerRef.current.scrollTo({
+                              top: messagesContainerRef.current.scrollHeight,
+                              behavior: 'smooth'
+                            });
+                          }
+                        };
+                        requestAnimationFrame(scrollToBottomSmooth);
+                        setTimeout(scrollToBottomSmooth, 60);
+                        setTimeout(scrollToBottomSmooth, 180);
+                      }}
+                      onTouchStart={() => {
+                        const scrollToBottomSmooth = () => {
+                          if (messagesContainerRef.current) {
+                            messagesContainerRef.current.scrollTo({
+                              top: messagesContainerRef.current.scrollHeight,
+                              behavior: 'smooth'
+                            });
+                          }
+                        };
+                        requestAnimationFrame(scrollToBottomSmooth);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
@@ -3487,97 +3779,53 @@ export default function Messages() {
                         }
                       }}
                       placeholder="Message..."
-                      className="flex-1 bg-transparent py-2 px-1 focus:outline-none focus:ring-0 focus:border-transparent text-[15px] font-normal text-gray-900 placeholder-gray-400 min-w-0 resize-none max-h-[120px] overflow-y-auto no-scrollbar leading-snug"
+                      className="flex-1 bg-transparent py-2 px-1.5 focus:outline-none focus:ring-0 focus:border-transparent text-[15px] font-medium text-gray-900 placeholder-gray-500 min-w-0 resize-none max-h-[120px] overflow-y-auto no-scrollbar leading-snug"
                     />
                   )}
 
                   {!isRecording && (
-                    <div className="w-10 h-10 flex items-center justify-center shrink-0">
-                      {(inputText.trim() || selectedImagePreview) ? (
-                        <motion.button
-                          type="submit"
-                          whileTap={{ scale: 0.82 }}
-                          whileHover={{ scale: 1.06 }}
-                          className="w-9 h-9 bg-[#FE2C55] hover:bg-[#E60045] text-white rounded-full transition-all duration-200 flex items-center justify-center shadow-[0_4px_14px_rgba(254,44,85,0.35)] border border-white/40 backdrop-blur-md"
-                        >
-                          <Send className="w-4 h-4" strokeWidth={2.5} />
-                        </motion.button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={startRecording}
-                          className="p-2 text-gray-400 hover:text-[#FE2C55] active:scale-90 rounded-full transition-colors"
-                        >
-                          <Mic className="w-5 h-5" strokeWidth={2} />
-                        </button>
-                      )}
+                    <div className="flex items-center space-x-1.5 shrink-0 mb-0.5">
+                      {/* CUTE ROUNDED SOFT STICKER BUTTON ON RIGHT SIDE (SOFT TRANS-WHITE) */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (document.activeElement instanceof HTMLElement) {
+                            document.activeElement.blur();
+                          }
+                          setShowStickerModal((prev) => !prev);
+                        }}
+                        className="p-2 bg-white/50 hover:bg-white/80 text-gray-700 hover:text-gray-900 active:scale-90 rounded-2xl transition-all shrink-0 border border-white/80 shadow-2xs hover:shadow-xs flex items-center justify-center group backdrop-blur-md"
+                        title="Stickers, Emojis & Creator"
+                      >
+                        <StickerIcon className="w-5 h-5 text-gray-700 transform group-hover:rotate-12 transition-transform" strokeWidth={2.2} />
+                      </button>
+
+                      <div className="w-9 h-9 flex items-center justify-center shrink-0">
+                        {(inputText.trim() || selectedImagePreview) ? (
+                          <motion.button
+                            type="submit"
+                            whileTap={{ scale: 0.82 }}
+                            whileHover={{ scale: 1.06 }}
+                            className="w-9 h-9 bg-[#FE2C55] hover:bg-[#E60045] text-white rounded-full transition-all duration-200 flex items-center justify-center shadow-[0_4px_14px_rgba(254,44,85,0.35)] border border-white/40 backdrop-blur-md"
+                          >
+                            <Send className="w-4 h-4" strokeWidth={2.5} />
+                          </motion.button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={startRecording}
+                            className="p-2 text-gray-700 bg-white/50 hover:bg-white/80 hover:text-gray-900 active:scale-90 rounded-2xl transition-all shrink-0 border border-white/80 shadow-2xs flex items-center justify-center backdrop-blur-md"
+                            title="Voice Message"
+                          >
+                            <Mic className="w-5 h-5" strokeWidth={2} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </form>
               </div>
-
-              {/* Theme Settings Modal */}
-              {showThemeSettings && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                  <div className="bg-white rounded-3xl w-full max-w-sm flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-                    <div className="flex justify-between items-center p-4 border-b border-gray-100">
-                      <h3 className="font-normal text-gray-900 text-[16px] text-center flex-1">
-                        Customize Chat
-                      </h3>
-                      <button
-                        onClick={() => setShowThemeSettings(false)}
-                        className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
-                      >
-                        <X className="w-5 h-5 text-gray-500" />
-                      </button>
-                    </div>
-                    <div className="p-6">
-                      <h4 className="font-normal text-[14px] text-gray-900 mb-4">
-                        Background Theme
-                      </h4>
-                      <div className="grid grid-cols-3 gap-4">
-                        {[
-                          { name: "Wallpaper", class: "bg-image", bgUrl: "/chat-background.png" },
-                          { name: "Pure White", class: "bg-white" },
-                          { name: "Sky", class: "bg-blue-50" },
-                          { name: "Rose", class: "bg-rose-50" },
-                          { name: "Mint", class: "bg-emerald-50" },
-                          { name: "Lavender", class: "bg-purple-50" },
-                          {
-                            name: "Sunset",
-                            class:
-                              "bg-gradient-to-br from-orange-50 to-rose-50",
-                          },
-                          {
-                            name: "Ocean",
-                            class: "bg-gradient-to-br from-cyan-50 to-blue-50",
-                          },
-                          { name: "Dark", class: "bg-gray-900" },
-                        ].map((theme) => {
-                          const isSelected = chatTheme === theme.class || (theme.class === "bg-image" && (!chatTheme || chatTheme === "bg-white"));
-                          return (
-                            <button
-                              key={theme.name}
-                              onClick={() => setChatTheme(theme.class)}
-                              className={`flex flex-col items-center space-y-2 group`}
-                            >
-                              <div
-                                className={`w-14 h-14 rounded-2xl border-2 ${isSelected ? "border-purple-600 scale-105 shadow-md" : "border-gray-200 group-hover:border-gray-300"} transition-all ${theme.class} shadow-inner bg-cover bg-center overflow-hidden`}
-                                style={theme.bgUrl ? { backgroundImage: `url(${theme.bgUrl})` } : {}}
-                              ></div>
-                              <span
-                                className={`text-[12px] ${isSelected ? "text-purple-600 font-semibold" : "text-gray-600 font-normal"}`}
-                              >
-                                {theme.name}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+            </div>
 
               {/* Context Menu */}
               <AnimatePresence>
@@ -3640,40 +3888,81 @@ export default function Messages() {
 
                       {/* Action Items */}
                       <div className="space-y-0.5 font-sans">
-                        <button
-                          onClick={() => {
-                            const msg = messages.find(
-                              (m) => m.id === contextMenu.msgId,
-                            );
-                            if (msg) {
-                              setReplyingTo(msg as any);
-                              setTimeout(() => {
-                                textareaRef.current?.focus();
-                              }, 100);
-                            }
-                            closeContextMenu();
-                          }}
-                          className="w-full text-left px-3 py-2 hover:bg-gray-100 active:bg-gray-200 rounded-xl flex items-center space-x-3 transition-colors text-gray-800"
-                        >
-                          <Reply className="w-4 h-4 text-purple-600" />
-                          <span className="font-medium text-[14px]">Reply to message</span>
-                        </button>
+                        {(() => {
+                          const targetMsg = messages.find((m) => m.id === contextMenu.msgId);
+                          const isSticker = targetMsg?.type === "sticker" || !!targetMsg?.stickerUrl;
+                          const stkUrl = targetMsg?.stickerUrl || targetMsg?.mediaUrl;
+                          const currentUserId = currentUser?.uid || "guest";
+                          const isAlreadySaved = stkUrl ? isStickerSaved(currentUserId, stkUrl) : false;
 
-                        <button
-                          onClick={() => {
-                            const msg = messages.find(
-                              (m) => m.id === contextMenu.msgId,
-                            );
-                            if (msg?.content) {
-                              navigator.clipboard.writeText(msg.content);
-                            }
-                            closeContextMenu();
-                          }}
-                          className="w-full text-left px-3 py-2 hover:bg-gray-100 active:bg-gray-200 rounded-xl flex items-center space-x-3 transition-colors text-gray-800"
-                        >
-                          <Copy className="w-4 h-4 text-gray-600" />
-                          <span className="font-medium text-[14px]">Copy text</span>
-                        </button>
+                          return (
+                            <>
+                              {isSticker && stkUrl && (
+                                <button
+                                  onClick={() => {
+                                    toggleSaveSticker(currentUserId, {
+                                      id: `stk-${Date.now()}`,
+                                      url: stkUrl,
+                                      title: "Sticker",
+                                      type: targetMsg?.stickerType || "image"
+                                    });
+                                    closeContextMenu();
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-purple-50 active:bg-purple-100 rounded-xl flex items-center space-x-3 transition-colors text-purple-700"
+                                >
+                                  <Bookmark className={`w-4 h-4 ${isAlreadySaved ? "fill-purple-600" : ""}`} />
+                                  <span className="font-medium text-[14px]">
+                                    {isAlreadySaved ? "Remove from Saved Stickers" : "Save to My Stickers"}
+                                  </span>
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => {
+                                  if (targetMsg) {
+                                    setReplyingTo(targetMsg as any);
+                                    setTimeout(() => {
+                                      textareaRef.current?.focus();
+                                    }, 100);
+                                  }
+                                  closeContextMenu();
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-gray-100 active:bg-gray-200 rounded-xl flex items-center space-x-3 transition-colors text-gray-800"
+                              >
+                                <Reply className="w-4 h-4 text-purple-600" />
+                                <span className="font-medium text-[14px]">Reply to message</span>
+                              </button>
+
+                              {isSticker && stkUrl && (
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(stkUrl);
+                                    closeContextMenu();
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-gray-100 active:bg-gray-200 rounded-xl flex items-center space-x-3 transition-colors text-gray-800"
+                                >
+                                  <Share2 className="w-4 h-4 text-gray-600" />
+                                  <span className="font-medium text-[14px]">Share / Copy Sticker Link</span>
+                                </button>
+                              )}
+
+                              {!isSticker && (
+                                <button
+                                  onClick={() => {
+                                    if (targetMsg?.content) {
+                                      navigator.clipboard.writeText(targetMsg.content);
+                                    }
+                                    closeContextMenu();
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-gray-100 active:bg-gray-200 rounded-xl flex items-center space-x-3 transition-colors text-gray-800"
+                                >
+                                  <Copy className="w-4 h-4 text-gray-600" />
+                                  <span className="font-medium text-[14px]">Copy text</span>
+                                </button>
+                              )}
+                            </>
+                          );
+                        })()}
 
                         <div className="h-px bg-gray-100 my-1"></div>
 
@@ -4048,18 +4337,19 @@ export default function Messages() {
         </div>
       )}
 
-      {/* Chat Settings Overlay */}
+      {/* Chat Settings Overlay - Soft Rounded 2D Mobile Clean UI */}
       <AnimatePresence>
         {showChatSettings && activeContact && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[110] bg-white flex flex-col md:w-[350px] md:left-auto md:border-l border-gray-100 shadow-2xl will-change-opacity"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-[120] bg-slate-50 md:bg-white flex flex-col md:w-[380px] md:left-auto md:border-l border-gray-100 shadow-2xl will-change-transform"
           >
-            <div className="h-[96px] md:h-[72px] px-4 pt-8 md:pt-0 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
-              <div className="flex items-center space-x-3">
+            {/* Header */}
+            <div className="pt-[calc(env(safe-area-inset-top,0px)+16px)] md:pt-3 pb-3 px-4 min-h-[calc(72px+env(safe-area-inset-top,0px))] md:min-h-[64px] border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-10 shadow-2xs">
+              <div className="flex items-center space-x-2.5">
                 <button
                   onClick={() => {
                     if (showSharedMedia) {
@@ -4068,14 +4358,20 @@ export default function Messages() {
                       setShowChatSettings(false);
                     }
                   }}
-                  className="p-2 -ml-2 hover:bg-black/5 rounded-full transition-colors"
+                  className="p-2.5 -ml-1 hover:bg-gray-100 rounded-full transition-all active:scale-95 cursor-pointer text-gray-800"
                 >
-                  <ArrowLeft className="w-6 h-6 text-gray-900" />
+                  <ArrowLeft className="w-5 h-5 text-gray-800" strokeWidth={2.2} />
                 </button>
-                <h2 className="font-normal text-[17px] text-gray-900">
-                  {showSharedMedia ? "Shared Media" : "Details"}
+                <h2 className="font-bold text-[16px] md:text-[17px] text-gray-900">
+                  {showSharedMedia ? "Shared Media" : (activeContact.isGroup ? "Group Details" : "Conversation Details")}
                 </h2>
               </div>
+              <button
+                onClick={() => setShowChatSettings(false)}
+                className="p-2.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             {showSharedMedia ? (
@@ -4085,9 +4381,9 @@ export default function Messages() {
                   <button
                     type="button"
                     onClick={() => setSharedMediaTab("all")}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-xl transition-all ${
+                    className={`flex-1 py-1.5 text-xs font-semibold rounded-xl transition-all ${
                       sharedMediaTab === "all"
-                        ? "bg-white text-gray-900 shadow-2xs font-semibold"
+                        ? "bg-white text-gray-900 shadow-2xs"
                         : "text-gray-500 hover:text-gray-900"
                     }`}
                   >
@@ -4096,20 +4392,20 @@ export default function Messages() {
                   <button
                     type="button"
                     onClick={() => setSharedMediaTab("media")}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-xl transition-all ${
+                    className={`flex-1 py-1.5 text-xs font-semibold rounded-xl transition-all ${
                       sharedMediaTab === "media"
-                        ? "bg-white text-gray-900 shadow-2xs font-semibold"
+                        ? "bg-white text-gray-900 shadow-2xs"
                         : "text-gray-500 hover:text-gray-900"
                     }`}
                   >
-                    Photos/Videos ({sharedMediaItems.filter((i: any) => i.isImg || i.isVid).length})
+                    Photos ({sharedMediaItems.filter((i: any) => i.isImg || i.isVid).length})
                   </button>
                   <button
                     type="button"
                     onClick={() => setSharedMediaTab("reels")}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-xl transition-all ${
+                    className={`flex-1 py-1.5 text-xs font-semibold rounded-xl transition-all ${
                       sharedMediaTab === "reels"
-                        ? "bg-white text-gray-900 shadow-2xs font-semibold"
+                        ? "bg-white text-gray-900 shadow-2xs"
                         : "text-gray-500 hover:text-gray-900"
                     }`}
                   >
@@ -4140,7 +4436,7 @@ export default function Messages() {
                       {displayedSharedItems.map((item: any) => (
                         <div
                           key={item.id}
-                          className="relative aspect-square bg-gray-950 overflow-hidden cursor-pointer group rounded-sm"
+                          className="relative aspect-square bg-gray-950 overflow-hidden cursor-pointer group rounded-lg"
                           onClick={() => {
                             if (item.isReel) {
                               setViewingReel({
@@ -4187,7 +4483,6 @@ export default function Messages() {
                             />
                           )}
 
-                          {/* Media Type Icon Badge */}
                           {item.isReel && (
                             <div className="absolute top-1 left-1 p-1 bg-black/60 backdrop-blur-xs rounded-md text-white pointer-events-none">
                               <Film className="w-3 h-3" />
@@ -4199,7 +4494,6 @@ export default function Messages() {
                             </div>
                           )}
 
-                          {/* Quick Download Button */}
                           <button
                             type="button"
                             onClick={(e) => {
@@ -4222,9 +4516,10 @@ export default function Messages() {
                 </div>
               </div>
             ) : activeContact.isGroup ? (
-              <div className="flex-1 overflow-y-auto">
-                <div className="flex flex-col items-center py-8 border-b border-gray-100">
-                  <div className="relative mb-4 cursor-pointer">
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+                {/* 2D Soft Card Profile Header */}
+                <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-2xs flex flex-col items-center text-center">
+                  <div className="relative mb-3 cursor-pointer">
                     <input
                       type="file"
                       id="groupAvatarUpload"
@@ -4256,7 +4551,7 @@ export default function Messages() {
                     {activeContact.avatar ? (
                       <img
                         src={activeContact.avatar}
-                        className="w-24 h-24 rounded-full object-cover shadow-md border-2 border-white"
+                        className="w-20 h-20 rounded-2xl object-cover border border-gray-100 shadow-sm"
                         alt={activeContact.name}
                         onClick={() =>
                           document.getElementById("groupAvatarUpload")?.click()
@@ -4280,16 +4575,17 @@ export default function Messages() {
                                   `https://ui-avatars.com/api/?name=${encodeURIComponent(userDataCache[id]?.name || (activeConversation?.participantNames || {})[id] || "User")}&background=random`,
                               ) || []
                           }
-                          sizeClass="w-24 h-24 shadow-md border-2 border-white"
+                          sizeClass="w-20 h-20 shadow-sm rounded-2xl"
                         />
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-black/20 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
-                      <Camera className="w-6 h-6 text-white" />
+                    <div className="absolute inset-0 bg-black/20 rounded-2xl flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+                      <Camera className="w-5 h-5 text-white" />
                     </div>
                   </div>
+
                   <div
-                    className="flex items-center space-x-2 cursor-pointer group hover:bg-gray-50 px-4 py-2 rounded-xl transition-colors"
+                    className="flex items-center space-x-1.5 cursor-pointer group hover:bg-gray-50 px-3 py-1 rounded-xl transition-colors"
                     onClick={async () => {
                       const newName = prompt(
                         "Enter new group name:",
@@ -4309,14 +4605,14 @@ export default function Messages() {
                       }
                     }}
                   >
-                    <h3 className="text-xl font-normal text-gray-900 border-b-2 border-transparent group-hover:border-gray-200 transition-colors">
+                    <h3 className="text-lg font-bold text-gray-900">
                       {activeContact.name}
                     </h3>
-                    <div className="p-1.5 bg-gray-100 rounded-full group-hover:bg-gray-200 transition-colors text-gray-500">
+                    <div className="p-1 bg-gray-100 rounded-lg text-gray-500 group-hover:bg-gray-200 transition-colors">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        width="14"
-                        height="14"
+                        width="12"
+                        height="12"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
@@ -4329,15 +4625,16 @@ export default function Messages() {
                       </svg>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-500 font-normal mt-1">
+                  <span className="text-xs text-gray-500 font-medium mt-0.5">
                     {activeConversation?.participantIds?.length || 0} Members
-                  </p>
+                  </span>
                 </div>
 
-                <div className="p-2 space-y-1">
-                  <div className="flex items-center justify-between w-full">
-                    <h4 className="px-4 py-2 text-[12px] font-normal text-gray-400 uppercase tracking-widest">
-                      Group Members
+                {/* Group Members List */}
+                <div className="bg-white rounded-3xl p-4 border border-gray-100 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Members
                     </h4>
                     <button
                       onClick={() => {
@@ -4356,13 +4653,13 @@ export default function Messages() {
                         addMenu.innerHTML = `
                            <div class="bg-white rounded-3xl w-full max-w-sm max-h-[70vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95">
                              <div class="p-4 border-b border-gray-100 flex items-center justify-between">
-                               <h3 class="font-normal text-gray-900">Add Members</h3>
+                               <h3 class="font-bold text-gray-900">Add Members</h3>
                                <button id="closeAdd" class="p-1 hover:bg-gray-100 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
                              </div>
                              <div class="flex-1 overflow-y-auto p-2" id="addList">
                              </div>
                              <div class="p-4 border-t border-gray-100">
-                               <button id="confirmAdd" class="w-full bg-blue-500 text-white font-normal py-3 rounded-xl">Add Selected</button>
+                               <button id="confirmAdd" class="w-full bg-purple-600 text-white font-bold py-3 rounded-xl shadow-md">Add Selected</button>
                              </div>
                            </div>
                          `;
@@ -4374,9 +4671,9 @@ export default function Messages() {
                           el.className =
                             "flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-xl cursor-pointer";
                           el.innerHTML = `
-                             <input type="checkbox" value="${f.id}" class="add-checkbox w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                             <input type="checkbox" value="${f.id}" class="add-checkbox w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500" />
                              <img src="${f.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(f.name || 'User')}&background=random`}" class="w-10 h-10 rounded-full object-cover" />
-                             <span class="font-normal text-gray-900">${f.name}</span>
+                             <span class="font-medium text-gray-900 text-sm">${f.name}</span>
                            `;
                           list?.appendChild(el);
                         });
@@ -4435,11 +4732,13 @@ export default function Messages() {
                             }
                           });
                       }}
-                      className="mr-2 text-blue-500 p-1.5 hover:bg-blue-50 rounded-full transition-colors"
+                      className="text-purple-600 text-xs font-bold px-2.5 py-1 bg-purple-50 hover:bg-purple-100 rounded-full transition-colors flex items-center space-x-1"
                     >
-                      <UserPlus className="w-5 h-5" />
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>Add</span>
                     </button>
                   </div>
+
                   {activeConversation?.participantIds?.map((pid) => {
                     const isMe = pid === currentUser?.uid;
                     const pName = isMe
@@ -4458,19 +4757,19 @@ export default function Messages() {
                     return (
                       <div
                         key={pid}
-                        className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-2xl transition-colors cursor-pointer text-left"
+                        className="flex items-center justify-between p-2.5 hover:bg-gray-50 rounded-2xl transition-colors cursor-pointer text-left"
                       >
                         <div className="flex items-center space-x-3">
                           <img
                             src={pAvatar}
-                            className="w-10 h-10 rounded-full object-cover border border-gray-100"
+                            className="w-9 h-9 rounded-full object-cover border border-gray-100"
                           />
                           <div className="flex flex-col">
-                            <span className="font-normal text-gray-900 text-[15px]">
+                            <span className="font-semibold text-gray-900 text-sm">
                               {isMe ? "You" : pName}
                             </span>
                             {isAdmin && (
-                              <span className="text-[11px] text-blue-500 font-normal uppercase tracking-wide">
+                              <span className="text-[10px] text-purple-600 font-bold uppercase tracking-wide">
                                 Admin
                               </span>
                             )}
@@ -4481,32 +4780,46 @@ export default function Messages() {
                   })}
                 </div>
 
-                <div className="p-2 space-y-1 border-t border-gray-100 mt-2">
-                  <h4 className="px-4 py-2 text-[12px] font-normal text-gray-400 uppercase tracking-widest">
-                    Media & Settings
-                  </h4>
+                {/* Settings & Leave */}
+                <div className="bg-white rounded-3xl p-3 border border-gray-100 shadow-2xs space-y-1">
+                  <button
+                    onClick={() => setShowThemeSettings(true)}
+                    className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-2xl transition-colors cursor-pointer text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                        <Palette className="w-4 h-4" />
+                      </div>
+                      <span className="font-semibold text-gray-900 text-sm">
+                        Chat Theme
+                      </span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setShowSharedMedia(true)}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors cursor-pointer text-left"
+                    className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-2xl transition-colors cursor-pointer text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-blue-50 rounded-lg">
-                        <ImageIcon className="w-5 h-5 text-blue-600" />
+                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <ImageIcon className="w-4 h-4" />
                       </div>
-                      <span className="font-normal text-gray-900 text-[15px]">
+                      <span className="font-semibold text-gray-900 text-sm">
                         Shared Media
                       </span>
                     </div>
-                    <div className="flex items-center space-x-1.5 text-gray-400">
+                    <div className="flex items-center space-x-1 text-gray-400">
                       {sharedMediaItems.length > 0 && (
-                        <span className="text-xs bg-gray-100 text-gray-600 font-medium px-2 py-0.5 rounded-full">
+                        <span className="text-xs bg-gray-100 text-gray-600 font-semibold px-2 py-0.5 rounded-full">
                           {sharedMediaItems.length}
                         </span>
                       )}
                       <ChevronRight className="w-4 h-4 text-gray-400" />
                     </div>
                   </button>
+
                   <button
                     onClick={async () => {
                       if (
@@ -4544,120 +4857,125 @@ export default function Messages() {
                         }
                       }
                     }}
-                    className="w-full flex items-center space-x-3 p-4 hover:bg-red-50 rounded-2xl transition-colors group text-left"
+                    className="w-full flex items-center space-x-3 p-3 hover:bg-red-50 rounded-2xl transition-colors group text-left cursor-pointer"
                   >
-                    <div className="p-2 bg-red-50 group-hover:bg-red-100 rounded-lg">
-                      <Trash2 className="w-5 h-5 text-red-600" />
+                    <div className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center group-hover:bg-red-100">
+                      <Trash2 className="w-4 h-4" />
                     </div>
-                    <div className="flex-1">
-                      <span className="font-normal text-red-600 text-[15px]">
-                        Leave Group
-                      </span>
-                    </div>
+                    <span className="font-semibold text-red-600 text-sm">
+                      Leave Group
+                    </span>
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto">
-                <div className="flex flex-col items-center py-8 border-b border-gray-100">
-                  <div className="relative mb-4">
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+                {/* 2D Profile Card */}
+                <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-2xs flex flex-col items-center text-center">
+                  <div className="relative mb-3">
                     <img
                       src={activeContact.avatar}
-                      className="w-24 h-24 rounded-full object-cover shadow-md border-2 border-white"
+                      className="w-20 h-20 rounded-2xl object-cover border border-gray-100 shadow-sm"
                       alt={activeContact.name}
                     />
                     {activeContact.online && (
-                      <div className="absolute bottom-1 right-1 w-5 h-5 bg-green-500 border-4 border-white rounded-full"></div>
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full"></div>
                     )}
                   </div>
-                  <h3 className="text-xl font-normal text-gray-900">
+                  <h3 className="text-lg font-bold text-gray-900 leading-tight">
                     {activeContact.name}
                   </h3>
-                  <p className="text-sm text-gray-500 font-normal">
+                  <p className="text-xs text-gray-500 font-medium mt-0.5">
                     @{activeContact.name.toLowerCase().replace(/ /g, "_")}
                   </p>
-                  <div className="flex items-center space-x-4 mt-6">
-                    <div className="flex flex-col items-center space-y-1">
-                      <button
-                        onClick={() => {
-                          setViewingUser({
-                            uid: activeContact.uid!,
-                            name: activeContact.name,
-                            avatar: activeContact.avatar,
-                          });
-                          pushPage("profile");
-                        }}
-                        className="p-3 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
-                      >
-                        <UserSquare className="w-5 h-5 text-gray-900" />
-                      </button>
-                      <span className="text-[10px] font-normal text-gray-500 uppercase tracking-tighter">
+
+                  {/* 3 Quick 2D Action Pills */}
+                  <div className="grid grid-cols-3 gap-3 w-full mt-5">
+                    <button
+                      onClick={() => {
+                        if (activeContact.uid === "jarvis") return;
+                        setViewingUser({
+                          uid: activeContact.uid!,
+                          name: activeContact.name,
+                          avatar: activeContact.avatar,
+                        });
+                        pushPage("profile");
+                      }}
+                      className="flex flex-col items-center justify-center p-3 bg-slate-50 hover:bg-purple-50 hover:text-purple-600 rounded-2xl border border-gray-100 transition-all active:scale-95 group cursor-pointer"
+                    >
+                      <UserSquare className="w-5 h-5 text-gray-700 group-hover:text-purple-600 mb-1" />
+                      <span className="text-[11px] font-semibold text-gray-600 group-hover:text-purple-600">
                         Profile
                       </span>
-                    </div>
-                    <div className="flex flex-col items-center space-y-1">
-                      <button className="p-3 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
-                        <Bell className="w-5 h-5 text-gray-900" />
-                      </button>
-                      <span className="text-[10px] font-normal text-gray-500 uppercase tracking-tighter">
+                    </button>
+
+                    <button
+                      className="flex flex-col items-center justify-center p-3 bg-slate-50 hover:bg-purple-50 hover:text-purple-600 rounded-2xl border border-gray-100 transition-all active:scale-95 group cursor-pointer"
+                    >
+                      <Bell className="w-5 h-5 text-gray-700 group-hover:text-purple-600 mb-1" />
+                      <span className="text-[11px] font-semibold text-gray-600 group-hover:text-purple-600">
                         Mute
                       </span>
-                    </div>
-                    <div className="flex flex-col items-center space-y-1">
-                      <button className="p-3 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
-                        <Search
-                          className="w-5 h-5 text-gray-900"
-                          strokeWidth={2}
-                        />
-                      </button>
-                      <span className="text-[10px] font-normal text-gray-500 uppercase tracking-tighter">
+                    </button>
+
+                    <button
+                      className="flex flex-col items-center justify-center p-3 bg-slate-50 hover:bg-purple-50 hover:text-purple-600 rounded-2xl border border-gray-100 transition-all active:scale-95 group cursor-pointer"
+                    >
+                      <Search className="w-5 h-5 text-gray-700 group-hover:text-purple-600 mb-1" />
+                      <span className="text-[11px] font-semibold text-gray-600 group-hover:text-purple-600">
                         Search
                       </span>
-                    </div>
+                    </button>
                   </div>
                 </div>
 
-                <div className="p-2 space-y-1">
-                  <h4 className="px-4 py-2 text-[12px] font-normal text-gray-400 uppercase tracking-widest">
-                    Chat Settings
+                {/* Chat Customization Options */}
+                <div className="bg-white rounded-3xl p-3 border border-gray-100 shadow-2xs space-y-1">
+                  <h4 className="px-3 pt-1 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                    Customization
                   </h4>
+
                   <button
                     onClick={() => setShowThemeSettings(true)}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors"
+                    className="w-full flex items-center justify-between p-3 hover:bg-purple-50/50 rounded-2xl transition-colors cursor-pointer text-left group"
                   >
                     <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-indigo-50 rounded-lg">
-                        <Palette className="w-5 h-5 text-indigo-600" />
+                      <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                        <Palette className="w-4 h-4" />
                       </div>
-                      <span className="font-normal text-gray-900 text-[15px]">
-                        Themes
-                      </span>
+                      <div>
+                        <span className="font-semibold text-gray-900 text-sm block">
+                          Chat Themes
+                        </span>
+                        <span className="text-[11px] text-gray-400">
+                          Wallpapers, gradients & solids
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-sm text-gray-400 font-normal capitalize">
-                      {
-                        chatTheme
-                          .replace("bg-", "")
-                          .replace("gradient-to-tr from-", "")
-                          .split("-")[0]
-                      }
-                    </span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
                   </button>
+
                   <button
                     type="button"
                     onClick={() => setShowSharedMedia(true)}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors cursor-pointer text-left"
+                    className="w-full flex items-center justify-between p-3 hover:bg-blue-50/50 rounded-2xl transition-colors cursor-pointer text-left group"
                   >
                     <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-blue-50 rounded-lg">
-                        <ImageIcon className="w-5 h-5 text-blue-600" />
+                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                        <ImageIcon className="w-4 h-4" />
                       </div>
-                      <span className="font-normal text-gray-900 text-[15px]">
-                        Shared Media
-                      </span>
+                      <div>
+                        <span className="font-semibold text-gray-900 text-sm block">
+                          Shared Media
+                        </span>
+                        <span className="text-[11px] text-gray-400">
+                          Photos, videos & reels
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-1.5 text-gray-400">
+                    <div className="flex items-center space-x-1 text-gray-400">
                       {sharedMediaItems.length > 0 && (
-                        <span className="text-xs bg-gray-100 text-gray-600 font-medium px-2 py-0.5 rounded-full">
+                        <span className="text-xs bg-gray-100 text-gray-600 font-semibold px-2 py-0.5 rounded-full">
                           {sharedMediaItems.length}
                         </span>
                       )}
@@ -4666,40 +4984,44 @@ export default function Messages() {
                   </button>
                 </div>
 
-                <div className="p-2 space-y-1 border-t border-gray-100 mt-2">
-                  <h4 className="px-4 py-2 text-[12px] font-normal text-gray-400 uppercase tracking-widest">
+                {/* Privacy & Actions */}
+                <div className="bg-white rounded-3xl p-3 border border-gray-100 shadow-2xs space-y-1">
+                  <h4 className="px-3 pt-1 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
                     Privacy & Support
                   </h4>
+
                   <button
                     onClick={() => setIsBlocked(!isBlocked)}
-                    className="w-full flex items-center space-x-3 p-4 hover:bg-red-50 rounded-2xl transition-colors group"
+                    className="w-full flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-2xl transition-colors group cursor-pointer text-left"
                   >
-                    <div className="p-2 bg-red-50 group-hover:bg-red-100 rounded-lg">
-                      <EyeOff className="w-5 h-5 text-red-600" />
+                    <div className="w-9 h-9 rounded-xl bg-slate-100 text-gray-600 flex items-center justify-center">
+                      <EyeOff className="w-4 h-4" />
                     </div>
-                    <span className="font-normal text-red-600 text-[15px]">
+                    <span className="font-semibold text-gray-700 text-sm">
                       {isBlocked ? "Unblock" : "Block"} User
                     </span>
                   </button>
-                  <button className="w-full flex items-center space-x-3 p-4 hover:bg-red-50 rounded-2xl transition-colors group">
-                    <div className="p-2 bg-red-50 group-hover:bg-red-100 rounded-lg">
-                      <Shield className="w-5 h-5 text-red-600" />
+
+                  <button className="w-full flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-2xl transition-colors group cursor-pointer text-left">
+                    <div className="w-9 h-9 rounded-xl bg-slate-100 text-gray-600 flex items-center justify-center">
+                      <Shield className="w-4 h-4" />
                     </div>
-                    <span className="font-normal text-red-600 text-[15px]">
+                    <span className="font-semibold text-gray-700 text-sm">
                       Report User
                     </span>
                   </button>
-                  <button className="w-full flex items-center space-x-3 p-4 hover:bg-red-50 rounded-2xl transition-colors group text-left">
-                    <div className="p-2 bg-red-50 group-hover:bg-red-100 rounded-lg">
-                      <Trash2 className="w-5 h-5 text-red-600" />
+
+                  <button className="w-full flex items-center space-x-3 p-3 hover:bg-red-50 rounded-2xl transition-colors group cursor-pointer text-left">
+                    <div className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center group-hover:bg-red-100">
+                      <Trash2 className="w-4 h-4" />
                     </div>
-                    <div className="flex-1">
-                      <span className="font-normal text-red-600 text-[15px]">
+                    <div>
+                      <span className="font-semibold text-red-600 text-sm block">
                         Delete Chat
                       </span>
-                      <p className="text-[11px] text-red-400 font-normal -mt-0.5">
-                        This will clear message history
-                      </p>
+                      <span className="text-[11px] text-red-400">
+                        Clear entire conversation
+                      </span>
                     </div>
                   </button>
                 </div>
@@ -5138,6 +5460,51 @@ export default function Messages() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Full-Page Chat Theme Studio Modal (Root Level Overlay) */}
+      <ChatThemeStudioModal
+        isOpen={showThemeSettings}
+        onClose={() => setShowThemeSettings(false)}
+        currentTheme={activeConvTheme}
+        partnerName={activeContact?.name || "Friend"}
+        partnerAvatar={activeContact?.avatar || ""}
+        isGroup={!!activeContact?.isGroup}
+        onApplyTheme={async (newTheme) => {
+          setChatTheme(newTheme);
+          if (activeConversation?.id) {
+            try {
+              await updateConversationTheme(
+                activeConversation.id,
+                newTheme,
+                currentUser?.name,
+                currentUser?.uid
+              );
+            } catch (err) {
+              console.error("Theme update error:", err);
+            }
+          } else if (activeChat === "jarvis") {
+            try {
+              localStorage.setItem("jarvis_chat_theme", newTheme);
+            } catch (e) {}
+          }
+        }}
+      />
+
+      {/* Sticker, GIF & Emoji Picker Modal */}
+      <StickerPickerModal
+        isOpen={showStickerModal}
+        onClose={() => setShowStickerModal(false)}
+        onSelectSticker={(url, type) => {
+          handleSendStickerDirect(url, type);
+        }}
+        onSelectEmoji={(emoji) => {
+          setInputText((prev) => prev + emoji);
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+          }
+        }}
+        currentUser={currentUser}
+      />
     </div>
   );
 }
