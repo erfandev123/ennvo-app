@@ -361,32 +361,35 @@ export const CallOverlay = () => {
 
                 {/* Video Streams & Audio Display */}
                 <div className="flex-1 relative flex items-center justify-center overflow-hidden">
-                  {/* Remote Stream Video - FULL SCREEN FIT */}
-                  <video 
-                    ref={remoteVideoRef} 
-                    autoPlay 
-                    playsInline 
-                    poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E"
-                    className={activeCallState.type === 'video' && !isVideoOff && remoteStream ? "absolute inset-0 w-full h-full object-cover z-0" : "absolute inset-0 opacity-0 pointer-events-none w-1 h-1"}
-                  />
+                  {/* Remote Stream Video - FULL SCREEN FIT without inversion */}
+                  {activeCallState.type === 'video' && (
+                    <video 
+                      ref={remoteVideoRef} 
+                      autoPlay 
+                      playsInline 
+                      controls={false}
+                      poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E"
+                      className={!isVideoOff && remoteStream ? "absolute inset-0 w-full h-full object-cover z-0 transform-gpu" : "hidden pointer-events-none"}
+                    />
+                  )}
 
                   {/* Audio Call Display */}
                   {(activeCallState.type === 'audio' || isVideoOff) && (
-                    <div className="flex flex-col items-center justify-center space-y-4 p-4 text-center z-10 my-auto">
+                    <div className="flex flex-col items-center justify-center space-y-5 p-6 text-center z-10 my-auto">
                       <div className="relative flex items-center justify-center">
-                        <div className="absolute w-36 h-36 rounded-full bg-purple-500/10 animate-ping opacity-20 pointer-events-none" />
-                        <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-purple-300/30 shadow-2xl relative z-10 bg-purple-900/40">
+                        <div className="absolute w-44 h-44 rounded-full bg-purple-500/15 animate-ping opacity-25 pointer-events-none" />
+                        <div className="w-28 h-28 md:w-36 md:h-36 rounded-full overflow-hidden border-4 border-white/20 shadow-2xl relative z-10 bg-purple-900/40 backdrop-blur-md">
                           <img 
-                            src={activeCallState.otherAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(activeCallState.otherName)}&background=random`} 
+                            src={activeCallState.otherAvatar || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(activeCallState.otherName || 'User')}&backgroundColor=f1f5f9`} 
                             className="w-full h-full object-cover"
                             alt={activeCallState.otherName}
                           />
                         </div>
                       </div>
 
-                      <div className="space-y-1">
-                        <h3 className="text-xl md:text-2xl font-semibold text-white tracking-tight">{activeCallState.otherName}</h3>
-                        <p className="text-xs text-purple-200/90 font-mono">
+                      <div className="space-y-1.5">
+                        <h3 className="text-2xl md:text-3xl font-semibold text-white tracking-tight">{activeCallState.otherName}</h3>
+                        <p className="text-sm text-purple-200/90 font-mono tracking-wide">
                           {activeCallState.status === 'ringing' 
                             ? (activeCallState.isCaller ? 'Calling...' : 'Ringing...') 
                             : formatDuration(callDuration)}
@@ -455,61 +458,67 @@ export const CallOverlay = () => {
                   )}
                 </div>
 
-                {/* Controls Bar */}
+                {/* Controls Bar - Soft 2D Oversized Action Buttons */}
                 {!isMinimized && (
-                  <div className="pb-[calc(2.5rem+env(safe-area-inset-bottom))] pt-4 px-6 flex items-center justify-center space-x-5 z-20 mb-3">
+                  <div className="pb-[calc(2.5rem+env(safe-area-inset-bottom))] pt-6 px-6 flex items-center justify-center space-x-6 z-20 mb-4">
                     {/* Mute Button */}
-                    <div className="flex flex-col items-center space-y-1.5">
+                    <div className="flex flex-col items-center space-y-2">
                       <button 
                         onClick={toggleMute}
-                        className={`w-14 h-14 rounded-full backdrop-blur-xl flex items-center justify-center transition-all active:scale-90 border shadow-lg cursor-pointer ${
-                          isMuted ? 'bg-rose-500 text-white border-rose-400 shadow-rose-500/30' : 'bg-white/15 text-white hover:bg-white/25 border-white/20'
+                        className={`w-16 h-16 md:w-18 md:h-18 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-md cursor-pointer ${
+                          isMuted 
+                            ? 'bg-rose-500 text-white shadow-rose-500/30' 
+                            : 'bg-white/20 text-white hover:bg-white/30 border border-white/25 backdrop-blur-md'
                         }`}
                       >
-                        {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                        {isMuted ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
                       </button>
-                      <span className="text-[11px] text-purple-200/70 font-medium">{isMuted ? 'Muted' : 'Mute'}</span>
+                      <span className="text-[12px] text-white/80 font-medium">{isMuted ? 'Muted' : 'Mute'}</span>
                     </div>
 
                     {/* Speaker Button */}
                     {activeCallState.type === 'audio' && (
-                      <div className="flex flex-col items-center space-y-1.5">
+                      <div className="flex flex-col items-center space-y-2">
                         <button 
                           onClick={toggleSpeaker}
-                          className={`w-14 h-14 rounded-full backdrop-blur-xl flex items-center justify-center transition-all active:scale-90 border shadow-lg cursor-pointer ${
-                            !isSpeakerOn ? 'bg-gray-700/80 text-gray-400 border-gray-600' : 'bg-white/15 text-white hover:bg-white/25 border-white/20'
+                          className={`w-16 h-16 md:w-18 md:h-18 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-md cursor-pointer ${
+                            !isSpeakerOn 
+                              ? 'bg-gray-800/90 text-gray-400 border border-gray-700' 
+                              : 'bg-white/20 text-white hover:bg-white/30 border border-white/25 backdrop-blur-md'
                           }`}
                         >
-                          {!isSpeakerOn ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                          {!isSpeakerOn ? <VolumeX className="w-7 h-7" /> : <Volume2 className="w-7 h-7" />}
                         </button>
-                        <span className="text-[11px] text-purple-200/70 font-medium">{isSpeakerOn ? 'Speaker' : 'Earpiece'}</span>
+                        <span className="text-[12px] text-white/80 font-medium">{isSpeakerOn ? 'Speaker' : 'Earpiece'}</span>
                       </div>
                     )}
 
                     {/* Video Button */}
                     {activeCallState.type === 'video' && (
-                      <div className="flex flex-col items-center space-y-1.5">
+                      <div className="flex flex-col items-center space-y-2">
                         <button 
                           onClick={toggleVideo}
-                          className={`w-14 h-14 rounded-full backdrop-blur-xl flex items-center justify-center transition-all active:scale-90 border shadow-lg cursor-pointer ${
-                            isVideoOff ? 'bg-rose-500 text-white border-rose-400 shadow-rose-500/30' : 'bg-white/15 text-white hover:bg-white/25 border-white/20'
+                          className={`w-16 h-16 md:w-18 md:h-18 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-md cursor-pointer ${
+                            isVideoOff 
+                              ? 'bg-rose-500 text-white shadow-rose-500/30' 
+                              : 'bg-white/20 text-white hover:bg-white/30 border border-white/25 backdrop-blur-md'
                           }`}
                         >
-                          {isVideoOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                          {isVideoOff ? <VideoOff className="w-7 h-7" /> : <Video className="w-7 h-7" />}
                         </button>
-                        <span className="text-[11px] text-purple-200/70 font-medium">{isVideoOff ? 'Cam Off' : 'Camera'}</span>
+                        <span className="text-[12px] text-white/80 font-medium">{isVideoOff ? 'Cam Off' : 'Camera'}</span>
                       </div>
                     )}
 
                     {/* End Call Button */}
-                    <div className="flex flex-col items-center space-y-1.5">
+                    <div className="flex flex-col items-center space-y-2">
                       <button 
                         onClick={handleEndActiveCall}
-                        className="w-16 h-16 bg-rose-600 hover:bg-rose-700 active:scale-90 text-white rounded-full flex items-center justify-center transition-all shadow-xl shadow-rose-600/50 border border-rose-400 cursor-pointer"
+                        className="w-20 h-20 bg-rose-600 hover:bg-rose-700 active:scale-90 text-white rounded-full flex items-center justify-center transition-all shadow-lg shadow-rose-600/40 cursor-pointer"
                       >
-                        <PhoneOff className="w-7 h-7" />
+                        <PhoneOff className="w-9 h-9" />
                       </button>
-                      <span className="text-[11px] text-rose-300 font-medium">End Call</span>
+                      <span className="text-[12px] text-rose-300 font-medium">End Call</span>
                     </div>
                   </div>
                 )}

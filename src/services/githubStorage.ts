@@ -23,7 +23,7 @@ export const uploadMedia = async (
     formData.append('pathPrefix', pathPrefix);
 
     const response = await axios.post('/api/upload-r2', formData, {
-      timeout: 15000, // 15s timeout for fast response and smooth fallbacks
+      timeout: 120000, // 2 minutes timeout for high-resolution video uploads in WebViews
       onUploadProgress: (progressEvent) => {
         if (onProgress && progressEvent.total) {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -33,9 +33,13 @@ export const uploadMedia = async (
     });
 
     if (response.data && response.data.url) {
-      console.log('Successfully uploaded media to Cloudflare R2 CDN:', response.data.url);
+      let finalUrl = response.data.url;
+      if (finalUrl.startsWith('/')) {
+        finalUrl = `${window.location.origin}${finalUrl}`;
+      }
+      console.log('Successfully uploaded media:', finalUrl);
       if (onProgress) onProgress(100);
-      return response.data.url;
+      return finalUrl;
     }
   } catch (r2Err: any) {
     console.warn('Cloudflare R2 API upload bypassed/failed, attempting fallback storage:', r2Err?.response?.data || r2Err.message);

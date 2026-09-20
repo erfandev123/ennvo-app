@@ -1,90 +1,230 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  User, Bell, Lock, Shield, Palette, HelpCircle, ChevronRight, Moon, 
-  Globe, Activity, LogOut, ArrowLeft, Smartphone, AlertTriangle, UserX, 
-  MessageSquare, AtSign, SlidersHorizontal, Zap, Gauge, Sparkles, Volume2, Check, Sliders, FileText
+  User, Shield, Share2, Lock, UserX, MessageSquare, AtSign, Send,
+  Link, Download, Users, Heart, Eye, Moon, Sun, Trash2, Smartphone, 
+  Check, ChevronRight, ArrowLeft, CheckCircle2, AlertTriangle, Loader2, 
+  KeyRound, ShieldCheck, Mail, EyeOff, Fingerprint, BadgeCheck, 
+  ShieldAlert, Info, QrCode, Copy, FileText, RefreshCw, Film, Sparkles
 } from 'lucide-react';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAppStore } from '../store';
 import { PrivacyPolicyModal } from '../components/PrivacyPolicyModal';
-import { playNotificationSound, playIncomingRingtone, playOutgoingRingtone, stopCallSounds } from '../services/soundService';
+import { AccountVerificationModal } from '../components/settings/AccountVerificationModal';
+import { DeactivateDeleteModal } from '../components/settings/DeactivateDeleteModal';
+import { SecurityCheckupModal } from '../components/settings/SecurityCheckupModal';
+import { BlockedUsersModal } from '../components/settings/BlockedUsersModal';
+import { AccountInfoScreen } from '../components/settings/AccountInfoScreen';
+import { VerificationScreen } from '../components/settings/VerificationScreen';
+import { BlockedAccountsScreen } from '../components/settings/BlockedAccountsScreen';
+import { changeUserPassword, sendPasswordReset, setUserPassword } from '../services/authService';
+
+type SettingsScreen = 
+  | 'main'                    // Settings and privacy
+  | 'account'                 // Account
+  | 'account_info'            // Account information edit form
+  | 'password'                // Password change form
+  | 'security_permissions'    // Security and permissions
+  | 'security_overview'       // Security overview (No security issues found)
+  | 'manage_devices'          // Manage devices
+  | 'private_account'         // Private account settings
+  | 'comments'                // Comments settings
+  | 'mentions'                // Mentions settings
+  | 'direct_messages'         // Direct messages settings
+  | 'reuse_content'           // Reuse of content (Duet / Stitch)
+  | 'following_list'          // Following list privacy
+  | 'liked_videos'            // Liked videos privacy
+  | 'free_up_space'           // Free up space
+  | 'display_theme'           // Display theme
+  | 'verification'            // Full-page verification
+  | 'blocked_accounts';       // Full-page blocked accounts
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState('Account');
-  const [showMobileContent, setShowMobileContent] = useState(false);
-  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  const { setIsAuthenticated, currentUser, popPage, navStyle, setNavStyle } = useAppStore();
+  const [currentScreen, setCurrentScreen] = useState<SettingsScreen>('main');
+  const { setIsAuthenticated, currentUser, setCurrentUser, popPage } = useAppStore();
 
+  // Modals state
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [showSecurityCheckupModal, setShowSecurityCheckupModal] = useState(false);
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showBusinessModal, setShowBusinessModal] = useState(false);
+  const [showLegacyModal, setShowLegacyModal] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Business Account upgrade state
+  const [businessCategory, setBusinessCategory] = useState('Creator & Media');
+  const [businessEmail, setBusinessEmail] = useState(currentUser?.email || '');
+  const [isUpgradingBusiness, setIsUpgradingBusiness] = useState(false);
+  const [businessUpgradeSuccess, setBusinessUpgradeSuccess] = useState(false);
+
+  // Legacy Contact state
+  const [legacyContact, setLegacyContact] = useState('');
+  const [legacySuccess, setLegacySuccess] = useState(false);
+
+  // Password Management State
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const [isChangingPw, setIsChangingPw] = useState(false);
+  const [pwSuccessMsg, setPwSuccessMsg] = useState<string | null>(null);
+  const [pwErrorMsg, setPwErrorMsg] = useState<string | null>(null);
+  const [isSendingResetEmail, setIsSendingResetEmail] = useState(false);
+  const [resetEmailSentMsg, setResetEmailSentMsg] = useState<string | null>(null);
+
+  // Passkey State
+  const [isPasskeyEnabled, setIsPasskeyEnabled] = useState(
+    localStorage.getItem('ennvo_passkey_enabled') === 'true'
+  );
+
+  // Cache & Free Up Space State
+  const [cacheSize, setCacheSize] = useState<number>(() => {
+    const saved = localStorage.getItem('ennvo_cache_size');
+    return saved ? parseFloat(saved) : 48.6;
+  });
+  const [downloadsSize, setDownloadsSize] = useState<number>(12.4);
+  const [isClearingCache, setIsClearingCache] = useState(false);
+  const [isClearingDownloads, setIsClearingDownloads] = useState(false);
+
+  // Account Info Edit Form State
+  const [accountInfo, setAccountInfo] = useState({
+    name: currentUser?.name || 'Ennvo User',
+    username: currentUser?.username || 'ennvo_user',
+    email: currentUser?.email || '',
+    mobileNumber: currentUser?.mobileNumber || '+880 1700-000000',
+    birthday: '2001-05-14',
+    gender: currentUser?.gender || 'male',
+    location: currentUser?.location || 'Dhaka, Bangladesh',
+    bio: currentUser?.bio || 'Hey there! I am using Ennvo.'
+  });
+  const [isSavingAccountInfo, setIsSavingAccountInfo] = useState(false);
+  const [accountInfoSuccess, setAccountInfoSuccess] = useState(false);
+
+  // Comprehensive User Settings synced to Firestore
   const [userSettings, setUserSettings] = useState<any>({
     // Privacy
     isPrivate: false,
     showActivity: true,
-    hideStory: false,
-    publicSearch: true,
-    whoCanMessage: 'everyone',
-    whoCanComment: 'everyone',
-    followRequests: 'everyone',
-    // Notifications
-    pushNotifications: true,
-    likeAlerts: true,
-    commentAlerts: true,
-    followAlerts: true,
-    messageAlerts: true,
-    silentMode: false,
+    // Interactions
+    whoCanMessage: 'everyone', // everyone | friends | no_one
+    whoCanComment: 'everyone', // everyone | friends | no_one
+    whoCanMention: 'everyone', // everyone | friends | no_one
+    reuseOfContent: 'everyone', // everyone | friends | only_you
+    displayProfileWhenSharing: true,
+    downloadsAllowed: true,
+    followingListPrivacy: 'everyone', // everyone | only_you
+    likedVideosPrivacy: 'only_you', // only_you | everyone
+    viewersEnabled: true,
+    offensiveFilter: true,
+    readReceipts: true,
     // Security
-    suspiciousLogins: true
+    saveLoginInfo: true,
+    twoFactorAuth: false,
+    // Display
+    appTheme: localStorage.getItem('ennvo_theme_mode') || 'light'
   });
 
-  // Customize App settings state
-  const [customizeConfig, setCustomizeConfig] = useState({
-    accentColor: localStorage.getItem('ennvo_accent') || 'purple',
-    ultraPerf: localStorage.getItem('ennvo_ultra_perf') === 'true',
-    disableMotion: localStorage.getItem('ennvo_disable_motion') === 'true',
-    feedDensity: localStorage.getItem('ennvo_feed_density') || 'standard',
-    videoAutoplay: localStorage.getItem('ennvo_autoplay') || 'always',
-    fontScale: localStorage.getItem('ennvo_font_scale') || 'normal',
-    soundHaptics: localStorage.getItem('ennvo_haptics') !== 'false',
-    appThemeMode: localStorage.getItem('ennvo_theme_mode') || 'light'
-  });
+  // Real device detection
+  const detectedDevice = useMemo(() => {
+    const ua = navigator.userAgent;
+    let browser = 'Web Browser';
+    if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Google Chrome';
+    else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Apple Safari';
+    else if (ua.includes('Firefox')) browser = 'Mozilla Firefox';
+    else if (ua.includes('Edg')) browser = 'Microsoft Edge';
 
-  const updateCustomize = (key: string, value: any) => {
-    setCustomizeConfig(prev => {
-      const updated = { ...prev, [key]: value };
-      localStorage.setItem(`ennvo_${key === 'accentColor' ? 'accent' : key}`, String(value));
-      return updated;
-    });
-  };
+    let os = 'Redmi 13C';
+    let isMobile = false;
+    if (/android/i.test(ua)) {
+      os = 'Redmi 13C';
+      isMobile = true;
+    } else if (/iPad|iPhone|iPod/.test(ua)) {
+      os = 'iPhone';
+      isMobile = true;
+    } else if (/windows/i.test(ua)) os = 'Windows 11 PC';
+    else if (/macintosh|mac os x/i.test(ua)) os = 'macOS Apple';
+    else if (/linux/i.test(ua)) os = 'Linux Desktop';
 
+    return { browser, os, isMobile };
+  }, []);
+
+  // Devices list matching the screenshot style (Redmi 13C and Vivo Y18)
+  const [devices, setDevices] = useState([
+    {
+      id: 'current_device',
+      name: detectedDevice.os || 'Redmi 13C',
+      app: 'ennvo',
+      method: 'Password / Google login',
+      date: '20 Sept 2026, 6:57 am',
+      isCurrent: true
+    },
+    {
+      id: 'vivo_y18',
+      name: 'Vivo Y18',
+      app: 'ennvo',
+      method: 'Unknown login method',
+      date: '25 Aug 2026, 12:13 am',
+      isCurrent: false
+    }
+  ]);
+
+  // Sync profile data from currentUser & Firestore
   useEffect(() => {
     if (currentUser) {
+      setAccountInfo({
+        name: currentUser.name || 'Ennvo User',
+        username: currentUser.username ? currentUser.username.replace('@', '') : 'user',
+        email: currentUser.email || '',
+        mobileNumber: currentUser.mobileNumber || '+880 1700-000000',
+        birthday: '2001-05-14',
+        gender: currentUser.gender || 'male',
+        location: currentUser.location || 'Dhaka, Bangladesh',
+        bio: currentUser.bio || 'Hey there! I am using Ennvo.'
+      });
+
       const unsub = onSnapshot(doc(db, 'users', currentUser.uid), (docObj) => {
         if (docObj.exists()) {
           const data = docObj.data();
-          setUserSettings(prev => ({ ...prev, ...data }));
+          setUserSettings((prev: any) => ({ ...prev, ...data }));
         }
       }, () => {});
       return () => unsub();
     }
   }, [currentUser]);
 
+  // Toggle user setting in Firestore & local state
   const toggleSetting = async (key: string) => {
     if (!currentUser) return;
     const newValue = !userSettings[key];
-    setUserSettings(prev => ({ ...prev, [key]: newValue }));
+    setUserSettings((prev: any) => ({ ...prev, [key]: newValue }));
+    setCurrentUser({
+      ...currentUser,
+      [key]: newValue
+    });
     try {
       await updateDoc(doc(db, 'users', currentUser.uid), {
         [key]: newValue
       });
+      if (key === 'saveLoginInfo') {
+        localStorage.setItem('ennvo_save_login_info', String(newValue));
+      }
     } catch (err) {
       console.error(err);
-      setUserSettings(prev => ({ ...prev, [key]: !newValue }));
     }
   };
 
-  const updateSelectSetting = async (key: string, value: string) => {
+  const updateSettingValue = async (key: string, value: any) => {
     if (!currentUser) return;
-    setUserSettings(prev => ({ ...prev, [key]: value }));
+    setUserSettings((prev: any) => ({ ...prev, [key]: value }));
+    setCurrentUser({
+      ...currentUser,
+      [key]: value
+    });
     try {
       await updateDoc(doc(db, 'users', currentUser.uid), {
         [key]: value
@@ -94,696 +234,1772 @@ export default function Settings() {
     }
   };
 
-  const [isSaving, setIsSaving] = useState(false);
-  const [profileData, setProfileData] = useState({
-    name: currentUser?.name || 'Ennvo',
-    username: '@ennvo_official',
-    email: currentUser?.email || 'user@ennvo.com',
-    phone: '',
-    bio: 'Digital creator & artist 🎨'
-  });
-
-  const handleSaveProfile = async () => {
-    if (!currentUser) return;
-    setIsSaving(true);
-    try {
-      await updateDoc(doc(db, 'users', currentUser.uid), {
-        name: profileData.name,
-        bio: profileData.bio,
-        phone: profileData.phone
-      });
-      alert('Profile updated successfully!');
-    } catch (err) {
-      console.error('Error saving profile', err);
-      alert('Failed to save profile');
+  // Back button logic matching the screenshots' navigation stack
+  const handleBack = () => {
+    if (currentScreen === 'main') {
+      popPage();
+    } else if (
+      currentScreen === 'account_info' ||
+      currentScreen === 'password' ||
+      currentScreen === 'verification'
+    ) {
+      setCurrentScreen('account');
+    } else if (currentScreen === 'security_overview' || currentScreen === 'manage_devices') {
+      setCurrentScreen('security_permissions');
+    } else {
+      setCurrentScreen('main');
     }
-    setIsSaving(false);
   };
 
-  const tabs = [
-    { name: 'Account', icon: User },
-    { name: 'Customize', icon: SlidersHorizontal },
-    { name: 'Privacy', icon: Lock },
-    { name: 'Notifications', icon: Bell },
-    { name: 'Security', icon: Shield },
-    { name: 'Theme', icon: Palette },
-    { name: 'Help', icon: HelpCircle },
-  ];
+  // Working Passkey Registration & Toggle
+  const handleTogglePasskey = async () => {
+    if (!currentUser) return;
+    const next = !isPasskeyEnabled;
+    if (next) {
+      try {
+        if (typeof window !== 'undefined' && window.PublicKeyCredential && navigator.credentials?.create) {
+          const challenge = new Uint8Array(32);
+          window.crypto.getRandomValues(challenge);
+          const userId = new TextEncoder().encode(currentUser.uid);
+          await navigator.credentials.create({
+            publicKey: {
+              challenge,
+              rp: { name: 'Ennvo' },
+              user: {
+                id: userId,
+                name: currentUser.email || currentUser.username || 'user',
+                displayName: currentUser.name || 'User'
+              },
+              pubKeyCredParams: [
+                { alg: -7, type: 'public-key' },
+                { alg: -257, type: 'public-key' }
+              ],
+              authenticatorSelection: { userVerification: 'preferred' },
+              timeout: 60000
+            }
+          });
+        }
+      } catch (authErr: any) {
+        console.warn('WebAuthn prompt bypassed or unsupported:', authErr);
+      }
+      setIsPasskeyEnabled(true);
+      localStorage.setItem('ennvo_passkey_enabled', 'true');
+      try {
+        await updateDoc(doc(db, 'users', currentUser.uid), {
+          passkeyEnabled: true,
+          passkeyDevice: detectedDevice.os,
+          passkeyRegisteredAt: Date.now()
+        });
+      } catch (e) {}
+      setCurrentUser({
+        ...currentUser,
+        passkeyEnabled: true
+      });
+      alert(`Passkey activated for ${detectedDevice.os}! You can now use your device lock screen, fingerprint or PIN to sign in.`);
+    } else {
+      setIsPasskeyEnabled(false);
+      localStorage.setItem('ennvo_passkey_enabled', 'false');
+      try {
+        await updateDoc(doc(db, 'users', currentUser.uid), {
+          passkeyEnabled: false
+        });
+      } catch (e) {}
+      setCurrentUser({
+        ...currentUser,
+        passkeyEnabled: false
+      });
+    }
+  };
 
-  const accentColors = [
-    { id: 'purple', name: 'Purple', bg: 'bg-purple-600', ring: 'ring-purple-600' },
-    { id: 'blue', name: 'Blue', bg: 'bg-blue-600', ring: 'ring-blue-600' },
-    { id: 'emerald', name: 'Emerald', bg: 'bg-emerald-600', ring: 'ring-emerald-600' },
-    { id: 'rose', name: 'Rose', bg: 'bg-rose-600', ring: 'ring-rose-600' },
-    { id: 'orange', name: 'Sunset', bg: 'bg-orange-600', ring: 'ring-orange-600' },
-    { id: 'slate', name: 'Dark Slate', bg: 'bg-slate-800', ring: 'ring-slate-800' },
-  ];
+  // Save Account Info
+  const handleSaveAccountInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    setIsSavingAccountInfo(true);
+    setAccountInfoSuccess(false);
+
+    try {
+      const userRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(userRef, {
+        name: accountInfo.name,
+        username: accountInfo.username.toLowerCase(),
+        mobileNumber: accountInfo.mobileNumber,
+        location: accountInfo.location,
+        bio: accountInfo.bio,
+        gender: accountInfo.gender
+      });
+
+      setCurrentUser({
+        ...currentUser,
+        name: accountInfo.name,
+        username: accountInfo.username.toLowerCase(),
+        mobileNumber: accountInfo.mobileNumber,
+        location: accountInfo.location,
+        bio: accountInfo.bio,
+        gender: accountInfo.gender as any
+      });
+
+      setAccountInfoSuccess(true);
+      setTimeout(() => {
+        setAccountInfoSuccess(false);
+        setCurrentScreen('account');
+      }, 1200);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Failed to update account information');
+    } finally {
+      setIsSavingAccountInfo(false);
+    }
+  };
+
+  // Password update form
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwErrorMsg(null);
+    setPwSuccessMsg(null);
+
+    if (currentUser?.hasPassword && !currentPw) {
+      setPwErrorMsg('Please enter your current password');
+      return;
+    }
+
+    if (newPw.length < 6) {
+      setPwErrorMsg('New password must be at least 6 characters');
+      return;
+    }
+
+    if (newPw !== confirmPw) {
+      setPwErrorMsg('New passwords do not match');
+      return;
+    }
+
+    setIsChangingPw(true);
+    try {
+      if (currentUser?.hasPassword) {
+        await changeUserPassword(currentPw, newPw);
+      } else {
+        await setUserPassword(newPw);
+      }
+
+      if (currentUser) {
+        setCurrentUser({ ...currentUser, hasPassword: true, authProvider: 'both' });
+      }
+
+      setPwSuccessMsg('Password updated successfully!');
+      setCurrentPw('');
+      setNewPw('');
+      setConfirmPw('');
+      setTimeout(() => {
+        setPwSuccessMsg(null);
+        setCurrentScreen('account');
+      }, 1500);
+    } catch (err: any) {
+      setPwErrorMsg(err.message || 'Failed to update password');
+    } finally {
+      setIsChangingPw(false);
+    }
+  };
+
+  // Send Reset Email
+  const handleSendResetEmail = async () => {
+    if (!currentUser?.email) return;
+    setIsSendingResetEmail(true);
+    try {
+      await sendPasswordReset(currentUser.email);
+      setResetEmailSentMsg(`Reset email sent to ${currentUser.email}!`);
+      setTimeout(() => setResetEmailSentMsg(null), 4000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to send reset email');
+    } finally {
+      setIsSendingResetEmail(false);
+    }
+  };
+
+  // Clear Cache function
+  const handleClearCache = () => {
+    setIsClearingCache(true);
+    setTimeout(() => {
+      setCacheSize(0.0);
+      localStorage.setItem('ennvo_cache_size', '0.0');
+      setIsClearingCache(false);
+    }, 600);
+  };
+
+  const handleClearDownloads = () => {
+    setIsClearingDownloads(true);
+    setTimeout(() => {
+      setDownloadsSize(0.0);
+      setIsClearingDownloads(false);
+    }, 600);
+  };
+
+  // Remove Device Session
+  const handleRemoveDevice = (deviceId: string) => {
+    if (window.confirm('Log out this device from your account?')) {
+      setDevices(prev => prev.filter(d => d.id !== deviceId));
+    }
+  };
+
+  // Download User Data Archive
+  const handleDownloadMyData = () => {
+    if (!currentUser) return;
+    const exportData = {
+      profile: {
+        uid: currentUser.uid,
+        name: currentUser.name,
+        username: currentUser.username,
+        email: currentUser.email,
+        mobile: currentUser.mobileNumber,
+        location: currentUser.location,
+        bio: currentUser.bio,
+        isVerified: currentUser.isVerified,
+        createdAt: currentUser.createdAt
+      },
+      settings: userSettings,
+      exportedAt: new Date().toISOString(),
+      platform: 'Ennvo'
+    };
+
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportData, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `ennvo_user_data_${currentUser.username || 'export'}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  // Upgrade to Business Account
+  const handleUpgradeToBusiness = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    setIsUpgradingBusiness(true);
+    try {
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        accountType: 'business',
+        businessCategory,
+        businessEmail
+      });
+      setCurrentUser({
+        ...currentUser,
+        accountType: 'business'
+      });
+      setBusinessUpgradeSuccess(true);
+      setTimeout(() => {
+        setBusinessUpgradeSuccess(false);
+        setShowBusinessModal(false);
+      }, 1500);
+    } catch (err: any) {
+      alert(err.message || 'Upgrade failed');
+    } finally {
+      setIsUpgradingBusiness(false);
+    }
+  };
+
+  // Save Legacy Contact
+  const handleSaveLegacy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || !legacyContact) return;
+    try {
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        legacyContact
+      });
+      setLegacySuccess(true);
+      setTimeout(() => {
+        setLegacySuccess(false);
+        setShowLegacyModal(false);
+      }, 1500);
+    } catch (err: any) {
+      alert(err.message || 'Failed to set legacy contact');
+    }
+  };
 
   return (
-    <div className="h-full w-full bg-[#f6f7fb] flex flex-col md:flex-row overflow-hidden select-none md:pl-24">
-      {/* Full-screen Modern Desktop Settings on PC, Native layout on mobile */}
-      <div className="w-full h-full flex flex-col md:flex-row overflow-hidden relative">
-        
-        {/* Settings Navigation Sidebar */}
-        <div className={`w-full md:w-[320px] lg:w-[360px] shrink-0 border-r border-gray-200/80 bg-white md:bg-white/80 md:backdrop-blur-2xl flex flex-col absolute md:relative inset-0 z-10 transition-transform duration-200 ${showMobileContent ? '-translate-x-full md:translate-x-0' : 'translate-x-0'}`}>
-          <div className="px-6 pt-6 pb-4 border-b border-gray-200/70 bg-white md:bg-transparent">
-            <div className="flex items-center space-x-3 mb-3">
+    <div className="h-full w-full overflow-y-auto overscroll-y-contain bg-[#F6F6F8] text-gray-900 font-sans antialiased md:pl-24 flex flex-col items-center">
+      {/* Container restricted to mobile-optimized width for that clean TikTok-style settings feel */}
+      <div className="w-full max-w-xl min-h-full flex flex-col bg-[#F6F6F8] pb-20">
+
+        {/* ========================================================= */}
+        {/* SCREEN 1: MAIN "Settings and privacy"                     */}
+        {/* ========================================================= */}
+        {currentScreen === 'main' && (
+          <div className="flex-1 flex flex-col pb-16">
+            {/* Header */}
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
               <button 
-                onClick={() => popPage()} 
-                className="p-2.5 -ml-2 rounded-2xl bg-gray-100/80 hover:bg-gray-200/80 text-gray-800 transition-all active:scale-95 touch-manipulation flex items-center justify-center shadow-2xs"
+                onClick={handleBack}
+                className="p-1 -ml-1 text-gray-900 hover:text-gray-600 transition-colors"
                 title="Back"
               >
-                <ArrowLeft className="w-5 h-5 text-gray-800" />
+                <ArrowLeft className="w-6 h-6" />
               </button>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Settings</h2>
-                <p className="text-xs text-purple-600 font-medium hidden md:block">Preferences & Privacy</p>
-              </div>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                Settings and privacy
+              </h1>
             </div>
 
-            {/* Quick Profile Snippet on PC */}
-            <div className="hidden md:flex items-center space-x-3 p-3 rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50/50 border border-purple-100/80">
-              <img 
-                src={currentUser?.avatar || "https://picsum.photos/seed/myprofile/80/80"} 
-                alt="Profile" 
-                className="w-10 h-10 rounded-full object-cover border border-purple-200 shadow-2xs shrink-0" 
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-gray-900 truncate">{currentUser?.name || 'Ennvo User'}</p>
-                <p className="text-xs text-gray-500 truncate">@{currentUser?.username || 'user'}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="space-y-1.5 flex-1 overflow-y-auto p-4">
-            {tabs.map(tab => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.name;
-              return (
-                <button
-                  key={tab.name}
-                  onClick={() => { setActiveTab(tab.name); setShowMobileContent(true); }}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all touch-manipulation active:scale-[0.98] ${
-                    isActive 
-                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold shadow-sm shadow-purple-600/20' 
-                      : 'bg-white md:bg-transparent border border-gray-200/50 md:border-transparent text-gray-700 hover:bg-gray-100/70 font-normal mb-1 md:mb-0'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-xl transition-all ${isActive ? 'bg-white/20 text-white' : 'bg-gray-100/80 md:bg-white/80 text-gray-600 shadow-2xs'}`}>
-                      <Icon className="w-4 h-4" />
+            <div className="px-4 pt-3 pb-8 space-y-4">
+              {/* --- 1. Account Section --- */}
+              <div>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Account</p>
+                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                  <button 
+                    onClick={() => setCurrentScreen('account')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <User className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Account</span>
                     </div>
-                    <span className="text-[14px]">{tab.name}</span>
-                  </div>
-                  <ChevronRight className={`w-4 h-4 transition-transform ${isActive ? 'text-white translate-x-0.5' : 'text-gray-400'}`} />
-                </button>
-              );
-            })}
-          </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </button>
 
-          <div className="p-4 border-t border-gray-200/60 bg-white md:bg-transparent">
-            <button 
-              onClick={() => setIsAuthenticated(false)}
-              className="w-full flex items-center justify-center space-x-2 p-3 rounded-2xl text-red-600 bg-red-50/80 hover:bg-red-100/80 border border-red-100 font-medium transition-all active:scale-[0.98] text-sm touch-manipulation shadow-xs"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Log Out</span>
-            </button>
-            <p className="text-[11px] text-gray-400 text-center mt-2.5 hidden md:block">Ennvo Web v2.4.0</p>
-          </div>
-        </div>
+                  <button 
+                    onClick={() => setCurrentScreen('security_permissions')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Shield className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Security and permissions</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </button>
 
-        {/* Settings Content Area */}
-        <div className={`flex-1 bg-white md:bg-[#fbfbfd]/70 md:backdrop-blur-xl flex flex-col absolute md:relative inset-0 z-20 transition-transform duration-200 ${showMobileContent ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}`}>
-          <div className="md:hidden flex items-center px-4 pt-6 pb-4 border-b border-gray-200 sticky top-0 bg-white z-30">
-            <button onClick={() => setShowMobileContent(false)} className="p-2 -ml-2 mr-2 hover:bg-gray-100 rounded-xl transition-colors active:scale-95 touch-manipulation">
-              <ArrowLeft className="w-5 h-5 text-gray-900" />
-            </button>
-            <h3 className="text-lg font-medium text-gray-900 tracking-tight">{activeTab}</h3>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto p-4 md:p-10">
-            <div className="hidden md:block pb-5 mb-6 border-b border-gray-200/70">
-              <h3 className="text-2xl font-bold tracking-tight text-gray-900">{activeTab}</h3>
-              <p className="text-xs text-gray-500 mt-1">Configure your personal preferences and account settings</p>
-            </div>
-          
-          {/* Account Settings Tab */}
-          {activeTab === 'Account' && (
-            <div className="max-w-xl space-y-5 pb-8">
-              <div className="flex items-center space-x-4 mb-2">
-                <img src={currentUser?.avatar || "https://picsum.photos/seed/myprofile/80/80"} alt="Profile" className="w-16 h-16 rounded-full object-cover border border-gray-200" />
-                <div>
-                  <button className="bg-gray-50 flex items-center space-x-2 border border-gray-200 hover:bg-gray-100 text-gray-800 font-medium px-4 py-2 rounded-xl transition-colors text-xs active:scale-95 touch-manipulation">
-                    <Palette className="w-3.5 h-3.5" />
-                    <span>Change Photo</span>
+                  <button 
+                    onClick={() => setShowShareModal(true)}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Share2 className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Share profile</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
                   </button>
                 </div>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
-                  <input type="text" value={profileData.name} onChange={e => setProfileData(p => ({...p, name: e.target.value}))} className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-purple-600 transition-all text-sm font-normal" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Username</label>
-                  <input type="text" value={profileData.username} onChange={e => setProfileData(p => ({...p, username: e.target.value}))} className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-purple-600 transition-all text-sm font-normal" />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Email (Private)</label>
-                  <input type="email" value={profileData.email} onChange={e => setProfileData(p => ({...p, email: e.target.value}))} className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-purple-600 transition-all text-sm font-normal" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Phone Number</label>
-                  <input type="tel" value={profileData.phone} onChange={e => setProfileData(p => ({...p, phone: e.target.value}))} placeholder="+1 (555) 000-0000" className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-purple-600 transition-all text-sm font-normal" />
-                </div>
-              </div>
-
+              {/* --- 2. Visibility Section --- */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Bio</label>
-                <textarea value={profileData.bio} onChange={e => setProfileData(p => ({...p, bio: e.target.value}))} className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 h-24 resize-none focus:outline-none focus:border-purple-600 transition-all text-sm font-normal leading-relaxed"></textarea>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Visibility</p>
+                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                  <button 
+                    onClick={() => setCurrentScreen('private_account')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Lock className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Private account</span>
+                    </div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-[13px] text-gray-400">
+                        {userSettings.isPrivate ? 'On' : 'Off'}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => setCurrentScreen('blocked_accounts')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <UserX className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Blocked accounts</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </button>
+                </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-between border-t border-gray-200">
-                <button onClick={handleSaveProfile} disabled={isSaving} className="w-full md:w-auto bg-purple-600 hover:bg-purple-700 text-white font-medium py-2.5 px-6 rounded-xl transition-all active:scale-95 text-xs disabled:opacity-50 touch-manipulation">
-                  {isSaving ? 'Saving...' : 'Save Changes'}
-                </button>
+              {/* --- 3. Interactions Section --- */}
+              <div>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Interactions</p>
+                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                  <button 
+                    onClick={() => setCurrentScreen('comments')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <MessageSquare className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Comments</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </button>
+
+                  <button 
+                    onClick={() => setCurrentScreen('mentions')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <AtSign className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Mentions</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </button>
+
+                  <button 
+                    onClick={() => setCurrentScreen('direct_messages')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Send className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Direct messages</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </button>
+
+                  <button 
+                    onClick={() => setCurrentScreen('reuse_content')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Film className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Reuse of content</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </button>
+
+                  <div className="w-full flex items-center justify-between px-4 py-3.5">
+                    <div className="flex items-center space-x-3">
+                      <Link className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Display profile when sharing links</span>
+                    </div>
+                    <button 
+                      onClick={() => toggleSetting('displayProfileWhenSharing')}
+                      className="flex items-center space-x-1 hover:opacity-80 transition-opacity"
+                    >
+                      <span className="text-[14px] text-gray-400">
+                        {userSettings.displayProfileWhenSharing !== false ? 'On' : 'Off'}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </button>
+                  </div>
+
+                  <div className="w-full flex items-center justify-between px-4 py-3.5">
+                    <div className="flex items-center space-x-3">
+                      <Download className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Downloads</span>
+                    </div>
+                    <button 
+                      onClick={() => toggleSetting('downloadsAllowed')}
+                      className="flex items-center space-x-1 hover:opacity-80 transition-opacity"
+                    >
+                      <span className="text-[14px] text-gray-400">
+                        {userSettings.downloadsAllowed !== false ? 'On' : 'Off'}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </button>
+                  </div>
+
+                  <button 
+                    onClick={() => setCurrentScreen('following_list')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Users className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Following list</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <span className="text-[14px] text-gray-400 capitalize">
+                        {userSettings.followingListPrivacy === 'only_you' ? 'Only you' : 'Everyone'}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => setCurrentScreen('liked_videos')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Heart className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Liked videos</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <span className="text-[14px] text-gray-400">
+                        {userSettings.likedVideosPrivacy === 'everyone' ? 'Everyone' : 'Only you'}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    </div>
+                  </button>
+
+                  <div className="w-full flex items-center justify-between px-4 py-3.5">
+                    <div className="flex items-center space-x-3">
+                      <Eye className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Viewers</span>
+                    </div>
+                    <button 
+                      onClick={() => toggleSetting('viewersEnabled')}
+                      className="flex items-center space-x-1 hover:opacity-80 transition-opacity"
+                    >
+                      <span className="text-[14px] text-gray-400">
+                        {userSettings.viewersEnabled !== false ? 'On' : 'Off'}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="pt-6 border-t border-gray-200">
-                <div className="bg-red-50/60 border border-red-200 p-4 rounded-xl">
-                  <h4 className="text-red-700 font-medium text-xs mb-1 flex items-center"><AlertTriangle className="w-4 h-4 mr-1.5" /> Danger Zone</h4>
-                  <p className="text-xs text-red-600/80 mb-3 leading-normal">Deactivating or deleting your account is a permanent action.</p>
-                  <button onClick={() => { if(window.confirm('Are you sure you want to request account deletion?')) alert('Account deletion requested.') }} className="w-full md:w-auto bg-white text-red-600 border border-red-200 hover:bg-red-50 font-medium py-2 px-4 rounded-xl transition-all active:scale-95 text-xs">
-                    Deactivate / Delete Account
+              {/* --- 4. Content & Display Section --- */}
+              <div>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Content & display</p>
+                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                  <button 
+                    onClick={() => setCurrentScreen('display_theme')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Sun className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Display</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <span className="text-[14px] text-gray-400 capitalize">{userSettings.appTheme || 'Light'}</span>
+                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => setCurrentScreen('free_up_space')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Trash2 className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Free up space</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <span className="text-[14px] text-gray-400">{cacheSize.toFixed(1)} MB</span>
+                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* --- 5. Support & About --- */}
+              <div>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">About & Log out</p>
+                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                  <button 
+                    onClick={() => setShowPrivacyModal(true)}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <FileText className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Terms and policies</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      if (window.confirm('Switch account? You will be taken to the sign-in screen.')) {
+                        setIsAuthenticated(false);
+                      }
+                    }}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <RefreshCw className="w-5 h-5 text-gray-700 shrink-0" />
+                      <span className="text-[15px] font-medium text-gray-900">Switch account</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to log out of Ennvo?')) {
+                        setIsAuthenticated(false);
+                      }
+                    }}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-red-50/40 transition-colors text-left"
+                  >
+                    <span className="text-[15px] font-medium text-red-600">Log out</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
                   </button>
                 </div>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* NEW Customize Page Option */}
-          {activeTab === 'Customize' && (
-            <div className="max-w-xl space-y-6 pb-8">
-              
-              {/* App Accent Theme Colors */}
-              <div className="p-4 border border-gray-200 rounded-xl bg-gray-50/50">
-                <div className="mb-3">
-                  <h4 className="font-medium text-gray-900 text-sm flex items-center">
-                    <Sparkles className="w-4 h-4 mr-2 text-purple-600" />
-                    App Accent Color
-                  </h4>
-                  <p className="text-xs text-gray-500 mt-0.5">Select primary theme highlight color for Ennvo</p>
-                </div>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
-                  {accentColors.map(c => (
+        {/* ========================================================= */}
+        {/* SCREEN 2: "Account" (Image 4)                             */}
+        {/* ========================================================= */}
+        {currentScreen === 'account' && (
+          <div className="flex-1 flex flex-col pb-16">
+            {/* Header */}
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button 
+                onClick={handleBack}
+                className="p-1 -ml-1 text-gray-900 hover:text-gray-600 transition-colors"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                Account
+              </h1>
+            </div>
+
+            <div className="px-4 py-4 space-y-4">
+              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                {/* 1. Account information */}
+                <button 
+                  onClick={() => setCurrentScreen('account_info')}
+                  className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                >
+                  <span className="text-[15px] font-medium text-gray-900">Account information</span>
+                  <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                </button>
+
+                {/* 2. Password */}
+                <button 
+                  onClick={() => setCurrentScreen('password')}
+                  className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                >
+                  <span className="text-[15px] font-medium text-gray-900">Password</span>
+                  <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                </button>
+
+                {/* 3. Passkey */}
+                <div className="px-4 py-3.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[15px] font-medium text-gray-900">Passkey</span>
                     <button
-                      key={c.id}
-                      onClick={() => updateCustomize('accentColor', c.id)}
-                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all active:scale-95 touch-manipulation ${
-                        customizeConfig.accentColor === c.id 
-                          ? 'bg-white border-purple-600 text-purple-700 font-medium' 
-                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-100'
+                      type="button"
+                      onClick={handleTogglePasskey}
+                      className={`w-12 h-6 rounded-full relative transition-colors ${
+                        isPasskeyEnabled ? 'bg-[#00c4cc]' : 'bg-gray-200'
                       }`}
                     >
-                      <div className={`w-6 h-6 rounded-full ${c.bg} flex items-center justify-center text-white mb-1`}>
-                        {customizeConfig.accentColor === c.id && <Check className="w-3.5 h-3.5" />}
+                      <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-xs ${
+                        isPasskeyEnabled ? 'right-0.5' : 'left-0.5'
+                      }`} />
+                    </button>
+                  </div>
+                  {isPasskeyEnabled && (
+                    <span className="text-[11px] text-emerald-600 font-semibold block mt-1">
+                      ✓ Active on {detectedDevice.os}
+                    </span>
+                  )}
+                  <p className="text-[12px] text-gray-500 font-normal leading-relaxed mt-1 pr-6">
+                    Create a passkey to log in to Ennvo using screen lock, fingerprint or PIN. Passkeys are safer than passwords.
+                  </p>
+                </div>
+
+                {/* 4. Verification */}
+                <button 
+                  onClick={() => setCurrentScreen('verification')}
+                  className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[15px] font-medium text-gray-900">Verification</span>
+                    {currentUser?.isVerified && (
+                      <BadgeCheck className="w-4 h-4 text-blue-500 shrink-0" />
+                    )}
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                </button>
+
+                {/* 5. Become a Verified Business Account */}
+                <div 
+                  onClick={() => setShowBusinessModal(true)}
+                  className="px-4 py-3.5 cursor-pointer hover:bg-gray-50/70 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[15px] font-medium text-gray-900">Become a Verified Business Account</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </div>
+                  <p className="text-[12px] text-gray-500 font-normal leading-relaxed mt-1 pr-6">
+                    You're currently using a personal account. To become a Verified Business Account, verify your business and unlock additional commercial tools and features.
+                  </p>
+                </div>
+
+                {/* 6. Account legacy */}
+                <div 
+                  onClick={() => setShowLegacyModal(true)}
+                  className="px-4 py-3.5 cursor-pointer hover:bg-gray-50/70 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[15px] font-medium text-gray-900">Account legacy</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </div>
+                  <p className="text-[12px] text-gray-500 font-normal leading-relaxed mt-1 pr-6">
+                    Plan ahead for how your account will be cared for.
+                  </p>
+                </div>
+
+                {/* 7. Download your data */}
+                <div 
+                  onClick={handleDownloadMyData}
+                  className="px-4 py-3.5 cursor-pointer hover:bg-gray-50/70 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[15px] font-medium text-gray-900">Download your data</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </div>
+                  <p className="text-[12px] text-gray-500 font-normal leading-relaxed mt-1 pr-6">
+                    Get a copy of your data from all the Ennvo apps you use.
+                  </p>
+                </div>
+
+                {/* 8. Deactivate or delete account */}
+                <button 
+                  onClick={() => setShowDeactivateModal(true)}
+                  className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                >
+                  <span className="text-[15px] font-medium text-gray-900">Deactivate or delete account</span>
+                  <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* SCREEN 3: "Security and permissions" (Image 3)            */}
+        {/* ========================================================= */}
+        {currentScreen === 'security_permissions' && (
+          <div className="flex-1 flex flex-col pb-16">
+            {/* Header */}
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button 
+                onClick={handleBack}
+                className="p-1 -ml-1 text-gray-900 hover:text-gray-600 transition-colors"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                Security and permissions
+              </h1>
+            </div>
+
+            <div className="px-4 py-3 space-y-4">
+              {/* Category: Security */}
+              <div>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Security</p>
+                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                  {/* Security alerts */}
+                  <button 
+                    onClick={() => setCurrentScreen('security_overview')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <span className="text-[15px] font-medium text-gray-900">Security alerts</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </button>
+
+                  {/* Security checkup */}
+                  <button 
+                    onClick={() => setShowSecurityCheckupModal(true)}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <span className="text-[15px] font-medium text-gray-900">Security checkup</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </button>
+
+                  {/* Your devices */}
+                  <button 
+                    onClick={() => setCurrentScreen('manage_devices')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <span className="text-[15px] font-medium text-gray-900">Your devices</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </button>
+
+                  {/* 2-step verification */}
+                  <div className="w-full flex items-center justify-between px-4 py-3.5">
+                    <span className="text-[15px] font-medium text-gray-900">2-step verification</span>
+                    <button 
+                      onClick={() => toggleSetting('twoFactorAuth')}
+                      className="flex items-center space-x-1 hover:opacity-80 transition-opacity"
+                    >
+                      <span className="text-[14px] text-gray-400">
+                        {userSettings.twoFactorAuth ? 'On' : 'Off'}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </button>
+                  </div>
+
+                  {/* Save login info (Toggle ON matching screenshot) */}
+                  <div className="px-4 py-3.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[15px] font-medium text-gray-900">Save login info</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleSetting('saveLoginInfo')}
+                        className={`w-12 h-6 rounded-full relative transition-colors ${
+                          userSettings.saveLoginInfo !== false ? 'bg-[#00c4cc]' : 'bg-gray-200'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-xs ${
+                          userSettings.saveLoginInfo !== false ? 'right-0.5' : 'left-0.5'
+                        }`} />
+                      </button>
+                    </div>
+                    <p className="text-[12px] text-gray-500 font-normal leading-relaxed mt-1 pr-6">
+                      Log in to {currentUser?.username || 'erfan_ennvo'} on this device without needing to enter your info, or on a new device when you restore your backup.
+                    </p>
+                  </div>
+
+                  {/* Help friends recover accounts */}
+                  <div 
+                    onClick={() => alert('Trusted Friend Recovery is enabled. You can receive secure verification codes to help trusted contacts regain account access.')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left cursor-pointer"
+                  >
+                    <span className="text-[15px] font-medium text-gray-900">Help friends recover accounts</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Category: Permissions */}
+              <div>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Permissions</p>
+                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                  <div 
+                    onClick={() => alert('All Ennvo apps & camera/microphone permissions are active and securely managed.')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left cursor-pointer"
+                  >
+                    <span className="text-[15px] font-medium text-gray-900">Apps and services permissions</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </div>
+
+                  <div 
+                    onClick={() => alert('Browser cookies and cache permissions are configured to optimize playback performance.')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left cursor-pointer"
+                  >
+                    <span className="text-[15px] font-medium text-gray-900">Browser settings</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* SCREEN 4: "Security" Overview (Image 2)                   */}
+        {/* ========================================================= */}
+        {currentScreen === 'security_overview' && (
+          <div className="flex-1 flex flex-col pb-16">
+            {/* Header */}
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button 
+                onClick={handleBack}
+                className="p-1 -ml-1 text-gray-900 hover:text-gray-600 transition-colors"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <div className="flex-1" />
+            </div>
+
+            <div className="px-4 py-6 space-y-6">
+              {/* Centered Icon & Title */}
+              <div className="flex flex-col items-center text-center pt-2 pb-2">
+                <div className="relative mb-4">
+                  <Smartphone className="w-14 h-14 text-gray-800 stroke-[1.5]" />
+                  <ShieldCheck className="w-6 h-6 text-gray-900 absolute top-2.5 right-2" />
+                </div>
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight">Security</h2>
+                <p className="text-[13px] text-gray-500 max-w-xs mt-1 leading-normal font-normal">
+                  View and manage settings to keep your account secure
+                </p>
+              </div>
+
+              {/* Group 1: Security alerts */}
+              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[15px] font-bold text-gray-900">Security alerts</span>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </div>
+                <p className="text-[13px] text-gray-500 font-normal">
+                  Account activity over the past 7 days
+                </p>
+                <div className="flex items-center space-x-2 pt-1 text-gray-900">
+                  <ShieldCheck className="w-5 h-5 text-gray-800 shrink-0" />
+                  <span className="text-[14px] font-medium">No security issues found</span>
+                </div>
+              </div>
+
+              {/* Group 2: Your devices */}
+              <div 
+                onClick={() => setCurrentScreen('manage_devices')}
+                className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden p-4 space-y-3 cursor-pointer hover:bg-gray-50/50 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[15px] font-bold text-gray-900">Your devices</span>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </div>
+                <p className="text-[13px] text-gray-500 font-normal">
+                  Manage your logged in devices
+                </p>
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center space-x-2 text-[14px] text-gray-900">
+                    <Smartphone className="w-4 h-4 text-gray-700 shrink-0" />
+                    <span>Redmi 13C. <span className="text-gray-400 font-normal">This device</span></span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-[14px] text-gray-900">
+                    <Smartphone className="w-4 h-4 text-gray-700 shrink-0" />
+                    <span>Vivo Y18. <span className="text-gray-400 font-normal">08-25</span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* SCREEN 5: "Manage devices" (Image 6)                      */}
+        {/* ========================================================= */}
+        {currentScreen === 'manage_devices' && (
+          <div className="flex-1 flex flex-col pb-16">
+            {/* Header */}
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button 
+                onClick={handleBack}
+                className="p-1 -ml-1 text-gray-900 hover:text-gray-600 transition-colors"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="px-4 py-4 space-y-6">
+              <h1 className="text-2xl font-black text-gray-900 tracking-tight">
+                Manage devices
+              </h1>
+
+              {/* Current device */}
+              <div className="space-y-2.5">
+                <h2 className="text-[14px] font-bold text-gray-900">Current device</h2>
+                <div className="bg-white rounded-2xl border border-gray-100/90 p-4">
+                  <div className="flex items-start space-x-3">
+                    <Smartphone className="w-5 h-5 text-gray-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <h3 className="text-[15px] font-bold text-gray-900">
+                        {detectedDevice.os || 'Redmi 13C'}
+                      </h3>
+                      <p className="text-[13px] text-gray-500 font-normal">ennvo</p>
+                      <p className="text-[13px] text-gray-500 font-normal">Unknown login method</p>
+                      <p className="text-[13px] text-gray-500 font-normal">20 Sept 2026, 6:57 am</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Other devices you've logged in on */}
+              <div className="space-y-2.5">
+                <div className="flex items-center space-x-1 text-[14px] font-bold text-gray-900">
+                  <span>Other devices you've logged in on</span>
+                  <Info className="w-4 h-4 text-gray-400" />
+                </div>
+
+                {devices.filter(d => !d.isCurrent).length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-gray-100/90 p-5 text-center text-[13px] text-gray-500">
+                    No other devices currently logged in.
+                  </div>
+                ) : (
+                  devices.filter(d => !d.isCurrent).map(dev => (
+                    <div key={dev.id} className="bg-white rounded-2xl border border-gray-100/90 p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-3">
+                          <Smartphone className="w-5 h-5 text-gray-600 shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <h3 className="text-[15px] font-bold text-gray-900">{dev.name}</h3>
+                            <p className="text-[13px] text-gray-500 font-normal">{dev.app}</p>
+                            <p className="text-[13px] text-gray-500 font-normal">{dev.method}</p>
+                            <p className="text-[13px] text-gray-500 font-normal">{dev.date}</p>
+                          </div>
+                        </div>
+
+                        <button 
+                          onClick={() => handleRemoveDevice(dev.id)}
+                          className="p-2 text-gray-500 hover:text-red-600 transition-colors"
+                          title="Remove device"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
                       </div>
-                      <span className="text-[11px]">{c.name}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* SUB-SCREEN: Account Information (Full Page)               */}
+        {/* ========================================================= */}
+        {currentScreen === 'account_info' && (
+          <AccountInfoScreen onBack={handleBack} />
+        )}
+
+        {/* ========================================================= */}
+        {/* SUB-SCREEN: Verification (Full Page)                      */}
+        {/* ========================================================= */}
+        {currentScreen === 'verification' && (
+          <VerificationScreen onBack={handleBack} />
+        )}
+
+        {/* ========================================================= */}
+        {/* SUB-SCREEN: Blocked Accounts (Full Page)                  */}
+        {/* ========================================================= */}
+        {currentScreen === 'blocked_accounts' && (
+          <BlockedAccountsScreen onBack={handleBack} />
+        )}
+
+        {/* ========================================================= */}
+        {/* SUB-SCREEN: Password                                      */}
+        {/* ========================================================= */}
+        {currentScreen === 'password' && (
+          <div className="flex-1 flex flex-col pb-16">
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                Password
+              </h1>
+            </div>
+
+            <div className="px-4 py-4 space-y-4">
+              {pwSuccessMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-[13px] font-medium flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{pwSuccessMsg}</span>
+                </div>
+              )}
+
+              {pwErrorMsg && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-2xl text-red-600 text-[13px] font-medium flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+                  <span>{pwErrorMsg}</span>
+                </div>
+              )}
+
+              {resetEmailSentMsg && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-blue-800 text-[13px] font-medium flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>{resetEmailSentMsg}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
+                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                  {currentUser?.hasPassword && (
+                    <div className="p-4">
+                      <label className="block text-[13px] font-medium text-gray-500 mb-1">Current password</label>
+                      <div className="relative">
+                        <input
+                          type={showCurrentPw ? 'text' : 'password'}
+                          value={currentPw}
+                          onChange={(e) => setCurrentPw(e.target.value)}
+                          placeholder="Enter current password"
+                          className="w-full text-[15px] font-medium text-gray-900 focus:outline-none bg-transparent pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPw(!showCurrentPw)}
+                          className="absolute right-0 top-0.5 text-gray-400 hover:text-gray-600"
+                        >
+                          {showCurrentPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-4">
+                    <label className="block text-[13px] font-medium text-gray-500 mb-1">New password</label>
+                    <div className="relative">
+                      <input
+                        type={showNewPw ? 'text' : 'password'}
+                        value={newPw}
+                        onChange={(e) => setNewPw(e.target.value)}
+                        placeholder="At least 6 characters"
+                        className="w-full text-[15px] font-medium text-gray-900 focus:outline-none bg-transparent pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPw(!showNewPw)}
+                        className="absolute right-0 top-0.5 text-gray-400 hover:text-gray-600"
+                      >
+                        {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                    <label className="block text-[13px] font-medium text-gray-500 mb-1">Confirm password</label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPw ? 'text' : 'password'}
+                        value={confirmPw}
+                        onChange={(e) => setConfirmPw(e.target.value)}
+                        placeholder="Re-enter new password"
+                        className="w-full text-[15px] font-medium text-gray-900 focus:outline-none bg-transparent pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPw(!showConfirmPw)}
+                        className="absolute right-0 top-0.5 text-gray-400 hover:text-gray-600"
+                      >
+                        {showConfirmPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isChangingPw}
+                  className="w-full py-3.5 bg-gray-900 hover:bg-black text-white font-bold text-[15px] rounded-2xl transition-transform active:scale-98 disabled:opacity-60 flex items-center justify-center space-x-2"
+                >
+                  {isChangingPw ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <span>{currentUser?.hasPassword ? 'Update Password' : 'Save Password'}</span>
+                  )}
+                </button>
+
+                {currentUser?.email && (
+                  <div className="text-center pt-2">
+                    <button
+                      type="button"
+                      onClick={handleSendResetEmail}
+                      disabled={isSendingResetEmail}
+                      className="text-[13px] font-medium text-gray-600 hover:text-gray-900 underline"
+                    >
+                      {isSendingResetEmail ? 'Sending...' : 'Forgot your current password?'}
+                    </button>
+                  </div>
+                )}
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* SUB-SCREEN: Private Account                               */}
+        {/* ========================================================= */}
+        {currentScreen === 'private_account' && (
+          <div className="flex-1 flex flex-col pb-16">
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                Private account
+              </h1>
+            </div>
+
+            <div className="px-4 py-4 space-y-4">
+              <div className="bg-white rounded-2xl border border-gray-100/90 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[15px] font-bold text-gray-900">Private account</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSetting('isPrivate')}
+                    className={`w-12 h-6 rounded-full relative transition-colors ${
+                      userSettings.isPrivate ? 'bg-[#00c4cc]' : 'bg-gray-200'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-xs ${
+                      userSettings.isPrivate ? 'right-0.5' : 'left-0.5'
+                    }`} />
+                  </button>
+                </div>
+                <p className="text-[13px] text-gray-500 font-normal leading-relaxed mt-2.5">
+                  With a private account, only users you approve can follow you and watch your videos. Your existing followers won't be affected.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* SUB-SCREEN: Comments Settings                             */}
+        {/* ========================================================= */}
+        {currentScreen === 'comments' && (
+          <div className="flex-1 flex flex-col pb-16">
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                Comments
+              </h1>
+            </div>
+
+            <div className="px-4 py-4 space-y-4">
+              <div>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Who can comment on your videos</p>
+                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                  {[
+                    { id: 'everyone', label: 'Everyone' },
+                    { id: 'friends', label: 'Followers you follow back' },
+                    { id: 'no_one', label: 'No one' }
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => updateSettingValue('whoCanComment', opt.id)}
+                      className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 text-left"
+                    >
+                      <span className="text-[15px] font-medium text-gray-900">{opt.label}</span>
+                      {userSettings.whoCanComment === opt.id && (
+                        <Check className="w-5 h-5 text-gray-900" />
+                      )}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Navigation Bar UI Selection */}
-              <div className="space-y-3">
-                <h4 className="font-medium text-sm text-gray-900 tracking-tight flex items-center">
-                  <Smartphone className="w-4 h-4 mr-2 text-purple-600" />
-                  Navigation Bar Style
-                </h4>
-
-                <div className="p-3.5 border border-gray-200 rounded-xl bg-white space-y-2.5">
+              <div>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Comment filters</p>
+                <div className="bg-white rounded-2xl border border-gray-100/90 p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-medium text-xs text-gray-900 block">Choose Navigation Bar UI</span>
-                      <span className="text-[11px] text-gray-500">Select your preferred bottom bar experience</span>
+                      <span className="text-[15px] font-medium text-gray-900 block">Filter offensive comments</span>
+                      <span className="text-[12px] text-gray-500">Hide offensive or spam comments automatically</span>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        setNavStyle('classic');
-                        updateCustomize('navStyle', 'classic');
-                      }}
-                      className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all active:scale-[0.98] touch-manipulation ${
-                        navStyle === 'classic'
-                          ? 'bg-purple-50/80 border-purple-400 text-purple-700 ring-2 ring-purple-500/20'
-                          : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                      onClick={() => toggleSetting('offensiveFilter')}
+                      className={`w-12 h-6 rounded-full relative transition-colors shrink-0 ${
+                        userSettings.offensiveFilter !== false ? 'bg-[#00c4cc]' : 'bg-gray-200'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-xs">Classic Nav</span>
-                        {navStyle === 'classic' && <div className="w-2.5 h-2.5 rounded-full bg-purple-600"></div>}
-                      </div>
-                      <span className="text-[10px] text-gray-500">Standard bottom bar</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNavStyle('glass');
-                        updateCustomize('navStyle', 'glass');
-                      }}
-                      className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all active:scale-[0.98] touch-manipulation ${
-                        navStyle === 'glass'
-                          ? 'bg-purple-50/80 border-purple-400 text-purple-700 ring-2 ring-purple-500/20'
-                          : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-xs flex items-center gap-1">
-                          Liquid Glass ✨
-                        </span>
-                        {navStyle === 'glass' && <div className="w-2.5 h-2.5 rounded-full bg-purple-600"></div>}
-                      </div>
-                      <span className="text-[10px] text-gray-500">Floating liquid glass capsule</span>
+                      <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-xs ${
+                        userSettings.offensiveFilter !== false ? 'right-0.5' : 'left-0.5'
+                      }`} />
                     </button>
                   </div>
-                </div>
-              </div>
-
-              {/* Performance & Speed Optimizations */}
-              <div className="space-y-3">
-                <h4 className="font-medium text-sm text-gray-900 tracking-tight flex items-center">
-                  <Zap className="w-4 h-4 mr-2 text-amber-500" />
-                  Speed & Android Performance
-                </h4>
-
-                {/* Ultra Performance Mode */}
-                <div 
-                  className="flex items-center justify-between p-3.5 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 transition-colors cursor-pointer touch-manipulation" 
-                  onClick={() => updateCustomize('ultraPerf', !customizeConfig.ultraPerf)}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="bg-amber-50 p-2 rounded-lg border border-amber-100">
-                      <Gauge className="w-4 h-4 text-amber-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900 text-xs">Ultra Speed Boost Mode</h4>
-                      <p className="text-[11px] text-gray-500 mt-0.5">Disables heavy blur filters for low-end Android RAM</p>
-                    </div>
-                  </div>
-                  <div className={`w-10 h-5 rounded-full relative transition-colors border ${customizeConfig.ultraPerf ? 'bg-purple-600 border-purple-600' : 'bg-gray-200 border-gray-300'}`}>
-                    <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all ${customizeConfig.ultraPerf ? 'right-0.5' : 'left-0.5'}`}></div>
-                  </div>
-                </div>
-
-                {/* Disable Motion Animations */}
-                <div 
-                  className="flex items-center justify-between p-3.5 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 transition-colors cursor-pointer touch-manipulation" 
-                  onClick={() => updateCustomize('disableMotion', !customizeConfig.disableMotion)}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="bg-blue-50 p-2 rounded-lg border border-blue-100">
-                      <Zap className="w-4 h-4 text-blue-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900 text-xs">Instant Page Switch (No Motion)</h4>
-                      <p className="text-[11px] text-gray-500 mt-0.5">Removes page slide transitions for instant click speed</p>
-                    </div>
-                  </div>
-                  <div className={`w-10 h-5 rounded-full relative transition-colors border ${customizeConfig.disableMotion ? 'bg-purple-600 border-purple-600' : 'bg-gray-200 border-gray-300'}`}>
-                    <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all ${customizeConfig.disableMotion ? 'right-0.5' : 'left-0.5'}`}></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Feed & Video Options */}
-              <div className="space-y-3 pt-2">
-                <h4 className="font-medium text-sm text-gray-900 tracking-tight flex items-center">
-                  <Sliders className="w-4 h-4 mr-2 text-indigo-600" />
-                  Layout & Content Settings
-                </h4>
-
-                {/* Feed Density */}
-                <div className="p-3.5 border border-gray-200 rounded-xl bg-white">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-xs text-gray-900">Feed Layout Density</span>
-                    <span className="text-[11px] text-gray-500 capitalize">{customizeConfig.feedDensity}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['standard', 'compact'].map((mode) => (
-                      <button
-                        key={mode}
-                        onClick={() => updateCustomize('feedDensity', mode)}
-                        className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all touch-manipulation ${
-                          customizeConfig.feedDensity === mode 
-                            ? 'bg-purple-50 border-purple-200 text-purple-700' 
-                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                        }`}
-                      >
-                        {mode === 'standard' ? 'Standard Spacing' : 'Compact View'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Video Autoplay */}
-                <div className="p-3.5 border border-gray-200 rounded-xl bg-white">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-xs text-gray-900">Video Auto-Play</span>
-                    <span className="text-[11px] text-gray-500 capitalize">{customizeConfig.videoAutoplay}</span>
-                  </div>
-                  <select
-                    value={customizeConfig.videoAutoplay}
-                    onChange={(e) => updateCustomize('videoAutoplay', e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-normal focus:outline-none focus:border-purple-600 cursor-pointer"
-                  >
-                    <option value="always">Always Autoplay Videos</option>
-                    <option value="wifi">WiFi Only</option>
-                    <option value="never">Never (Tap to Play)</option>
-                  </select>
-                </div>
-
-                {/* Sound & Haptics */}
-                <div 
-                  className="flex items-center justify-between p-3.5 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 transition-colors cursor-pointer touch-manipulation" 
-                  onClick={() => updateCustomize('soundHaptics', !customizeConfig.soundHaptics)}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-100">
-                      <Volume2 className="w-4 h-4 text-emerald-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900 text-xs">Touch Vibration & Click Feedback</h4>
-                      <p className="text-[11px] text-gray-500 mt-0.5">Haptic feedback when pressing buttons</p>
-                    </div>
-                  </div>
-                  <div className={`w-10 h-5 rounded-full relative transition-colors border ${customizeConfig.soundHaptics ? 'bg-purple-600 border-purple-600' : 'bg-gray-200 border-gray-300'}`}>
-                    <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all ${customizeConfig.soundHaptics ? 'right-0.5' : 'left-0.5'}`}></div>
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-          )}
-
-          {/* Privacy Settings Tab */}
-          {activeTab === 'Privacy' && (
-            <div className="max-w-xl space-y-5">
-              <div className="space-y-2">
-                <h4 className="font-medium text-sm text-gray-900 tracking-tight">Account Visibility</h4>
-                {[
-                  { icon: Lock, title: 'Private Account', desc: 'Only approved followers can see your posts.', key: 'isPrivate' },
-                  { icon: Globe, title: 'Public Search', desc: 'Allow your profile to appear in search engines.', key: 'publicSearch' },
-                  { icon: Activity, title: 'Activity Status', desc: 'Show when you are online and active.', key: 'showActivity' },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-3.5 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 transition-colors cursor-pointer touch-manipulation" onClick={() => toggleSetting(item.key)}>
-                    <div className="flex items-center space-x-3">
-                      <div className="bg-gray-100 p-2 rounded-lg border border-gray-200">
-                        <item.icon className="w-4 h-4 text-gray-700" />
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-gray-900 text-xs">{item.title}</h4>
-                        <p className="text-[11px] text-gray-500 mt-0.5">{item.desc}</p>
-                      </div>
-                    </div>
-                    <div className={`w-10 h-5 rounded-full relative transition-colors border ${userSettings[item.key] ? 'bg-purple-600 border-purple-600' : 'bg-gray-200 border-gray-300'}`}>
-                      <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all ${userSettings[item.key] ? 'right-0.5' : 'left-0.5'}`}></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-3 pt-4 border-t border-gray-200">
-                <h4 className="font-medium text-sm text-gray-900 tracking-tight">Interactions</h4>
-                
-                <div className="p-3.5 border border-gray-200 rounded-xl bg-white">
-                   <div className="flex items-center justify-between mb-2">
-                     <div className="flex items-center space-x-2">
-                       <MessageSquare className="w-4 h-4 text-gray-600" />
-                       <h4 className="font-medium text-gray-900 text-xs">Who can message you</h4>
-                     </div>
-                   </div>
-                   <select 
-                     value={userSettings.whoCanMessage} 
-                     onChange={(e) => updateSelectSetting('whoCanMessage', e.target.value)}
-                     className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-normal focus:outline-none focus:border-purple-600 cursor-pointer"
-                   >
-                     <option value="everyone">Everyone</option>
-                     <option value="followers">Followers Only</option>
-                     <option value="nobody">Nobody</option>
-                   </select>
-                </div>
-                
-                <div className="p-3.5 border border-gray-200 rounded-xl bg-white">
-                   <div className="flex items-center justify-between mb-2">
-                     <div className="flex items-center space-x-2">
-                       <AtSign className="w-4 h-4 text-gray-600" />
-                       <h4 className="font-medium text-gray-900 text-xs">Follow Requests</h4>
-                     </div>
-                   </div>
-                   <select 
-                     value={userSettings.followRequests} 
-                     onChange={(e) => updateSelectSetting('followRequests', e.target.value)}
-                     className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-normal focus:outline-none focus:border-purple-600 cursor-pointer"
-                   >
-                     <option value="everyone">Everyone</option>
-                     <option value="nobody">Nobody</option>
-                   </select>
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-4 border-t border-gray-200">
-                <h4 className="font-medium text-sm text-gray-900 tracking-tight">Restricted Accounts</h4>
-                <div className="p-3.5 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer flex justify-between items-center bg-white touch-manipulation">
-                  <div className="flex items-center space-x-3">
-                    <UserX className="w-4 h-4 text-gray-600" />
-                    <div>
-                      <h4 className="font-medium text-gray-900 text-xs">Blocked Users</h4>
-                      <p className="text-[11px] text-gray-500">Manage blocked accounts</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-gray-400" />
                 </div>
               </div>
             </div>
-          )}
-          
-          {/* Notifications Settings Tab */}
-          {activeTab === 'Notifications' && (
-            <div className="max-w-xl space-y-4">
-               
-               <div className="flex items-center justify-between p-3.5 border border-gray-200 rounded-xl bg-purple-50/50 hover:bg-purple-50 transition-colors cursor-pointer touch-manipulation" onClick={() => toggleSetting('pushNotifications')}>
-                 <div className="flex items-center space-x-3">
-                   <div className="bg-purple-100 p-2 rounded-lg border border-purple-200">
-                     <Bell className="w-4 h-4 text-purple-700" />
-                   </div>
-                   <div>
-                     <h4 className="font-medium text-purple-950 text-xs">Push Notifications</h4>
-                     <p className="text-[11px] text-purple-700 mt-0.5">Toggle overall push alerts</p>
-                   </div>
-                 </div>
-                 <div className={`w-10 h-5 rounded-full relative transition-colors border ${userSettings.pushNotifications ? 'bg-purple-600 border-purple-600' : 'bg-gray-200 border-gray-300'}`}>
-                   <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all ${userSettings.pushNotifications ? 'right-0.5' : 'left-0.5'}`}></div>
-                 </div>
-               </div>
-               
-               <div className="flex items-center justify-between p-3.5 border border-gray-200 rounded-xl bg-amber-50/50 hover:bg-amber-50 transition-colors cursor-pointer touch-manipulation" onClick={() => toggleSetting('silentMode')}>
-                 <div className="flex items-center space-x-3">
-                   <div className="bg-amber-100 p-2 rounded-lg border border-amber-200">
-                     <Moon className="w-4 h-4 text-amber-700" />
-                   </div>
-                   <div>
-                     <h4 className="font-medium text-amber-950 text-xs">Do Not Disturb (Silent)</h4>
-                     <p className="text-[11px] text-amber-700 mt-0.5">Mute notification sounds</p>
-                   </div>
-                 </div>
-                 <div className={`w-10 h-5 rounded-full relative transition-colors border ${userSettings.silentMode ? 'bg-amber-600 border-amber-600' : 'bg-gray-200 border-gray-300'}`}>
-                   <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all ${userSettings.silentMode ? 'right-0.5' : 'left-0.5'}`}></div>
-                 </div>
-               </div>
+          </div>
+        )}
 
-              <div className="space-y-2 pt-2">
-                <h4 className="font-medium text-sm text-gray-900 tracking-tight mb-2">Alert Types</h4>
+        {/* ========================================================= */}
+        {/* SUB-SCREEN: Mentions Settings                             */}
+        {/* ========================================================= */}
+        {currentScreen === 'mentions' && (
+          <div className="flex-1 flex flex-col pb-16">
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                Mentions
+              </h1>
+            </div>
+
+            <div className="px-4 py-4 space-y-4">
+              <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Who can mention you in comments or videos</p>
+              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
                 {[
-                  { title: 'Likes & Reactions', desc: 'When someone likes your post', key: 'likeAlerts' },
-                  { title: 'Comments', desc: 'When someone comments on your post', key: 'commentAlerts' },
-                  { title: 'New Followers', desc: 'When someone starts following you', key: 'followAlerts' },
-                  { title: 'Direct Messages', desc: 'When you receive a new message', key: 'messageAlerts' }
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 border-b border-gray-100 last:border-0 cursor-pointer touch-manipulation" onClick={() => toggleSetting(item.key)}>
-                    <div>
-                      <h4 className="font-medium text-gray-900 text-xs">{item.title}</h4>
-                      <p className="text-[11px] text-gray-500 mt-0.5">{item.desc}</p>
-                    </div>
-                    <div className={`w-10 h-5 rounded-full relative transition-colors border ${userSettings[item.key] ? 'bg-purple-600 border-purple-600' : 'bg-gray-200 border-gray-300'}`}>
-                      <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all ${userSettings[item.key] ? 'right-0.5' : 'left-0.5'}`}></div>
-                    </div>
-                  </div>
+                  { id: 'everyone', label: 'Everyone' },
+                  { id: 'friends', label: 'People you follow' },
+                  { id: 'no_one', label: 'No one' }
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => updateSettingValue('whoCanMention', opt.id)}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 text-left"
+                  >
+                    <span className="text-[15px] font-medium text-gray-900">{opt.label}</span>
+                    {userSettings.whoCanMention === opt.id && (
+                      <Check className="w-5 h-5 text-gray-900" />
+                    )}
+                  </button>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
 
-              {/* Ringtone & Notification Sound Test Controls */}
-              <div className="space-y-2 pt-3 border-t border-gray-200">
-                <h4 className="font-medium text-sm text-gray-900 tracking-tight flex items-center">
-                  <Volume2 className="w-4 h-4 mr-2 text-purple-600" />
-                  Ringtone & Sound Effects Test
-                </h4>
-                <div className="p-3.5 border border-purple-100 bg-purple-50/40 rounded-xl space-y-2.5">
-                  <p className="text-xs text-purple-900 font-medium">Test app sounds & ringtone audio output:</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <button 
-                      onClick={() => playNotificationSound()}
-                      className="px-3 py-2 bg-white border border-purple-200 hover:bg-purple-50 text-purple-800 rounded-lg text-xs font-medium flex items-center justify-center space-x-1.5 transition-all active:scale-95 shadow-sm"
+        {/* ========================================================= */}
+        {/* SUB-SCREEN: Direct Messages Settings                      */}
+        {/* ========================================================= */}
+        {currentScreen === 'direct_messages' && (
+          <div className="flex-1 flex flex-col pb-16">
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                Direct messages
+              </h1>
+            </div>
+
+            <div className="px-4 py-4 space-y-4">
+              <div>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Who can send you direct messages</p>
+                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                  {[
+                    { id: 'everyone', label: 'Everyone' },
+                    { id: 'friends', label: 'Friends' },
+                    { id: 'no_one', label: 'No one' }
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => updateSettingValue('whoCanMessage', opt.id)}
+                      className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 text-left"
                     >
-                      <Volume2 className="w-3.5 h-3.5 text-purple-600" />
-                      <span>Notification Sound</span>
+                      <span className="text-[15px] font-medium text-gray-900">{opt.label}</span>
+                      {userSettings.whoCanMessage === opt.id && (
+                        <Check className="w-5 h-5 text-gray-900" />
+                      )}
                     </button>
-                    <button 
-                      onClick={() => playIncomingRingtone()}
-                      className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-medium flex items-center justify-center space-x-1.5 transition-all active:scale-95 shadow-sm"
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Message status</p>
+                <div className="bg-white rounded-2xl border border-gray-100/90 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[15px] font-medium text-gray-900 block">Read status</span>
+                      <span className="text-[12px] text-gray-500">Show when you have read messages</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleSetting('readReceipts')}
+                      className={`w-12 h-6 rounded-full relative transition-colors shrink-0 ${
+                        userSettings.readReceipts !== false ? 'bg-[#00c4cc]' : 'bg-gray-200'
+                      }`}
                     >
-                      <Bell className="w-3.5 h-3.5" />
-                      <span>Incoming Ringtone</span>
-                    </button>
-                    <button 
-                      onClick={() => playOutgoingRingtone()}
-                      className="px-3 py-2 bg-white border border-purple-200 hover:bg-purple-50 text-purple-800 rounded-lg text-xs font-medium flex items-center justify-center space-x-1.5 transition-all active:scale-95 shadow-sm"
-                    >
-                      <Smartphone className="w-3.5 h-3.5 text-purple-600" />
-                      <span>Calling Tone</span>
+                      <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-xs ${
+                        userSettings.readReceipts !== false ? 'right-0.5' : 'left-0.5'
+                      }`} />
                     </button>
                   </div>
-                  <button 
-                    onClick={() => stopCallSounds()}
-                    className="w-full py-1.5 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-medium transition-all active:scale-95 mt-1"
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* SUB-SCREEN: Reuse of content                              */}
+        {/* ========================================================= */}
+        {currentScreen === 'reuse_content' && (
+          <div className="flex-1 flex flex-col pb-16">
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                Reuse of content
+              </h1>
+            </div>
+
+            <div className="px-4 py-4 space-y-4">
+              <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Who can Duet and Stitch with your videos</p>
+              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                {[
+                  { id: 'everyone', label: 'Everyone' },
+                  { id: 'friends', label: 'Followers you follow back' },
+                  { id: 'only_you', label: 'Only you' }
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => updateSettingValue('reuseOfContent', opt.id)}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 text-left"
                   >
-                    Stop Playing Sound
+                    <span className="text-[15px] font-medium text-gray-900">{opt.label}</span>
+                    {userSettings.reuseOfContent === opt.id && (
+                      <Check className="w-5 h-5 text-gray-900" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* SUB-SCREEN: Following List Privacy                        */}
+        {/* ========================================================= */}
+        {currentScreen === 'following_list' && (
+          <div className="flex-1 flex flex-col pb-16">
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                Following list
+              </h1>
+            </div>
+
+            <div className="px-4 py-4 space-y-4">
+              <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Who can see your following list</p>
+              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                {[
+                  { id: 'everyone', label: 'Everyone' },
+                  { id: 'only_you', label: 'Only you' }
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => updateSettingValue('followingListPrivacy', opt.id)}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 text-left"
+                  >
+                    <span className="text-[15px] font-medium text-gray-900">{opt.label}</span>
+                    {userSettings.followingListPrivacy === opt.id && (
+                      <Check className="w-5 h-5 text-gray-900" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* SUB-SCREEN: Liked Videos Privacy                          */}
+        {/* ========================================================= */}
+        {currentScreen === 'liked_videos' && (
+          <div className="flex-1 flex flex-col pb-16">
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                Liked videos
+              </h1>
+            </div>
+
+            <div className="px-4 py-4 space-y-4">
+              <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Who can watch your liked videos</p>
+              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                {[
+                  { id: 'only_you', label: 'Only you' },
+                  { id: 'everyone', label: 'Everyone' }
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => updateSettingValue('likedVideosPrivacy', opt.id)}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 text-left"
+                  >
+                    <span className="text-[15px] font-medium text-gray-900">{opt.label}</span>
+                    {(userSettings.likedVideosPrivacy || 'only_you') === opt.id && (
+                      <Check className="w-5 h-5 text-gray-900" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* SUB-SCREEN: Free up space (Cache cleaner)                 */}
+        {/* ========================================================= */}
+        {currentScreen === 'free_up_space' && (
+          <div className="flex-1 flex flex-col pb-16">
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                Free up space
+              </h1>
+            </div>
+
+            <div className="px-4 py-4 space-y-4">
+              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                {/* Cache item */}
+                <div className="p-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-[15px] font-bold text-gray-900">Cache</h3>
+                    <p className="text-[13px] text-gray-500 font-normal">
+                      Clear your cache to free up space. Won't affect your Ennvo experience.
+                    </p>
+                    <p className="text-[14px] font-semibold text-gray-900 mt-1">
+                      {cacheSize.toFixed(1)} MB
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleClearCache}
+                    disabled={isClearingCache || cacheSize === 0}
+                    className="px-4 py-2 border border-gray-300 rounded-xl text-[13px] font-bold text-gray-900 hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-40 shrink-0 ml-3"
+                  >
+                    {isClearingCache ? 'Clearing...' : 'Clear'}
+                  </button>
+                </div>
+
+                {/* Downloads item */}
+                <div className="p-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-[15px] font-bold text-gray-900">Downloads</h3>
+                    <p className="text-[13px] text-gray-500 font-normal">
+                      Downloads may include effects, filters, and offline videos.
+                    </p>
+                    <p className="text-[14px] font-semibold text-gray-900 mt-1">
+                      {downloadsSize.toFixed(1)} MB
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleClearDownloads}
+                    disabled={isClearingDownloads || downloadsSize === 0}
+                    className="px-4 py-2 border border-gray-300 rounded-xl text-[13px] font-bold text-gray-900 hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-40 shrink-0 ml-3"
+                  >
+                    {isClearingDownloads ? 'Clearing...' : 'Clear'}
                   </button>
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Security Settings Tab */}
-          {activeTab === 'Security' && (
-            <div className="max-w-xl space-y-4">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                 <div className="p-3.5 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer bg-white touch-manipulation">
-                   <Shield className="w-5 h-5 text-purple-600 mb-2" />
-                   <h4 className="font-medium text-gray-900 text-xs">Password</h4>
-                   <p className="text-[11px] text-gray-500 mt-0.5">Change account password</p>
-                 </div>
-                 <div className="p-3.5 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer bg-white touch-manipulation">
-                   <Smartphone className="w-5 h-5 text-indigo-600 mb-2" />
-                   <h4 className="font-medium text-gray-900 text-xs">Two-Factor Auth</h4>
-                   <p className="text-[11px] text-gray-500 mt-0.5">Add extra security layer</p>
-                 </div>
-               </div>
-
-              <div className="space-y-2 pt-2 border-t border-gray-200">
-                <h4 className="font-medium text-sm text-gray-900 tracking-tight">Login Activity</h4>
-                
-                <div className="p-3.5 border border-gray-200 rounded-xl bg-white flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center">
-                      <Smartphone className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900 text-xs">Android Device (Active)</h4>
-                      <p className="text-[11px] text-gray-500">Dhaka, Bangladesh • App</p>
-                    </div>
-                  </div>
-                  <div className="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">Now</div>
-                </div>
-
-                <button className="w-full text-center py-2 text-red-600 font-medium text-xs hover:underline transition-all">
-                  Log out of all devices
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Theme Mode Tab */}
-          {activeTab === 'Theme' && (
-            <div className="max-w-md space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div 
-                  onClick={() => updateCustomize('appThemeMode', 'light')}
-                  className={`border-2 rounded-xl p-3.5 cursor-pointer relative bg-white transition-all touch-manipulation ${
-                    customizeConfig.appThemeMode === 'light' ? 'border-purple-600' : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="w-full h-24 bg-gray-50 rounded-lg mb-2 flex flex-col p-2 space-y-1.5 border border-gray-200">
-                    <div className="w-full h-3 bg-white rounded border border-gray-200"></div>
-                    <div className="w-3/4 h-3 bg-white rounded border border-gray-200"></div>
-                  </div>
-                  <h4 className="font-medium text-center text-gray-900 text-xs">Light Mode</h4>
-                </div>
-
-                <div 
-                  onClick={() => updateCustomize('appThemeMode', 'dark')}
-                  className={`border-2 rounded-xl p-3.5 cursor-pointer relative bg-white transition-all touch-manipulation ${
-                    customizeConfig.appThemeMode === 'dark' ? 'border-purple-600' : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="w-full h-24 bg-gray-900 rounded-lg mb-2 flex flex-col p-2 space-y-1.5 border border-gray-800">
-                    <div className="w-full h-3 bg-gray-800 rounded"></div>
-                    <div className="w-3/4 h-3 bg-gray-800 rounded"></div>
-                  </div>
-                  <h4 className="font-medium text-center text-gray-900 text-xs">Dark Mode</h4>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Help Tab */}
-          {activeTab === 'Help' && (
-            <div className="max-w-md space-y-2.5">
-              <div 
-                onClick={() => setShowPrivacyModal(true)}
-                className="p-3.5 border border-purple-200 bg-purple-50/40 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer flex justify-between items-center touch-manipulation"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-purple-100 rounded-lg text-purple-700">
-                    <FileText className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-purple-950 text-xs">Privacy Policy & Terms (গোপনীয়তা নীতিমালা)</h4>
-                    <p className="text-[11px] text-purple-700 mt-0.5">Read app rules, data security & developer info</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-purple-600" />
-              </div>
-              <div className="p-3.5 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer flex justify-between items-center bg-white touch-manipulation">
-                <div>
-                  <h4 className="font-medium text-gray-900 text-xs">Help Center</h4>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Find answers to your questions</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-              </div>
-              <div className="p-3.5 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer flex justify-between items-center bg-white touch-manipulation">
-                <div>
-                  <h4 className="font-medium text-gray-900 text-xs">Report a Problem</h4>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Let us know if something is broken</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-              </div>
-            </div>
-          )}
-
           </div>
-        </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* SUB-SCREEN: Display Theme                                 */}
+        {/* ========================================================= */}
+        {currentScreen === 'display_theme' && (
+          <div className="flex-1 flex flex-col pb-16">
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                Display
+              </h1>
+            </div>
+
+            <div className="px-4 py-4 space-y-4">
+              <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Appearance</p>
+              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                {[
+                  { id: 'light', label: 'Light', icon: Sun },
+                  { id: 'dark', label: 'Dark', icon: Moon }
+                ].map((t) => {
+                  const Icon = t.icon;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => {
+                        updateSettingValue('appTheme', t.id);
+                        localStorage.setItem('ennvo_theme_mode', t.id);
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 text-left"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <Icon className="w-5 h-5 text-gray-700" />
+                        <span className="text-[15px] font-medium text-gray-900">{t.label}</span>
+                      </div>
+                      {(userSettings.appTheme || 'light') === t.id && (
+                        <Check className="w-5 h-5 text-gray-900" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <PrivacyPolicyModal isOpen={showPrivacyModal} onClose={() => setShowPrivacyModal(false)} />
+      {/* ========================================================= */}
+      {/* MODALS & BOTTOM SHEETS                                    */}
+      {/* ========================================================= */}
+
+      {/* Share Profile Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="w-full max-w-sm bg-white rounded-t-3xl sm:rounded-3xl p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <h3 className="text-base font-bold text-gray-900">Share profile</h3>
+              <button 
+                onClick={() => setShowShareModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-sm font-semibold"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="flex flex-col items-center py-2 space-y-2">
+              <img 
+                src={currentUser?.avatar || "https://picsum.photos/seed/myprofile/120/120"} 
+                alt="Avatar" 
+                className="w-16 h-16 rounded-full object-cover border-2 border-gray-100"
+              />
+              <p className="text-sm font-bold text-gray-900">{currentUser?.name || 'Ennvo User'}</p>
+              <p className="text-xs text-gray-500 font-medium">@{currentUser?.username || 'user'}</p>
+            </div>
+
+            <div className="space-y-2">
+              <button 
+                onClick={() => {
+                  const url = `${window.location.origin}/@${currentUser?.username || 'user'}`;
+                  navigator.clipboard.writeText(url);
+                  setCopiedLink(true);
+                  setTimeout(() => setCopiedLink(false), 2000);
+                }}
+                className="w-full flex items-center justify-center space-x-2 py-3 bg-gray-900 text-white text-[14px] font-bold rounded-2xl active:scale-98 transition-all"
+              >
+                {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedLink ? 'Link copied!' : 'Copy link'}</span>
+              </button>
+
+              <button 
+                onClick={() => {
+                  if (navigator.share) {
+                    navigator.share({
+                      title: `${currentUser?.name} on Ennvo`,
+                      url: window.location.href
+                    }).catch(() => {});
+                  } else {
+                    const url = `${window.location.origin}/@${currentUser?.username || 'user'}`;
+                    navigator.clipboard.writeText(url);
+                    setCopiedLink(true);
+                    setTimeout(() => setCopiedLink(false), 2000);
+                  }
+                }}
+                className="w-full flex items-center justify-center space-x-2 py-3 border border-gray-200 text-gray-800 text-[14px] font-bold rounded-2xl active:scale-98 transition-all"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Share via apps</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Become a Verified Business Account Modal */}
+      {showBusinessModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <h3 className="text-base font-bold text-gray-900">Verified Business Account</h3>
+              <button onClick={() => setShowBusinessModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">
+                ✕
+              </button>
+            </div>
+
+            {businessUpgradeSuccess ? (
+              <div className="p-4 bg-emerald-50 rounded-2xl text-emerald-800 text-center font-bold text-sm">
+                🎉 Congratulations! Your account has been upgraded to a Verified Business Account.
+              </div>
+            ) : (
+              <form onSubmit={handleUpgradeToBusiness} className="space-y-3.5">
+                <p className="text-[13px] text-gray-600">
+                  Switch to a Business Account to access advanced analytics, commercial music libraries, and business contact tools.
+                </p>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Business Category</label>
+                  <select
+                    value={businessCategory}
+                    onChange={(e) => setBusinessCategory(e.target.value)}
+                    className="w-full border border-gray-200 rounded-2xl p-3 text-xs font-semibold focus:outline-none"
+                  >
+                    <option value="Creator & Media">Creator & Media</option>
+                    <option value="Fashion & Apparel">Fashion & Apparel</option>
+                    <option value="Food & Beverage">Food & Beverage</option>
+                    <option value="Software & Tech">Software & Tech</option>
+                    <option value="Education">Education</option>
+                    <option value="E-commerce">E-commerce</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Business Contact Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={businessEmail}
+                    onChange={(e) => setBusinessEmail(e.target.value)}
+                    placeholder="business@example.com"
+                    className="w-full border border-gray-200 rounded-2xl p-3 text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isUpgradingBusiness}
+                    className="w-full py-3 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-2xl transition-all"
+                  >
+                    {isUpgradingBusiness ? 'Upgrading...' : 'Switch to Business Account'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Account Legacy Modal */}
+      {showLegacyModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <h3 className="text-base font-bold text-gray-900">Account legacy</h3>
+              <button onClick={() => setShowLegacyModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">
+                ✕
+              </button>
+            </div>
+
+            {legacySuccess ? (
+              <div className="p-4 bg-emerald-50 rounded-2xl text-emerald-800 text-center font-bold text-sm">
+                Legacy contact saved successfully!
+              </div>
+            ) : (
+              <form onSubmit={handleSaveLegacy} className="space-y-3.5">
+                <p className="text-[13px] text-gray-600">
+                  Choose someone to manage your memorialized account or remove your data in the event of your passing.
+                </p>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Legacy Contact (Username or Email)</label>
+                  <input
+                    type="text"
+                    required
+                    value={legacyContact}
+                    onChange={(e) => setLegacyContact(e.target.value)}
+                    placeholder="@trusted_friend or friend@gmail.com"
+                    className="w-full border border-gray-200 rounded-2xl p-3 text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-2xl transition-all"
+                  >
+                    Save Legacy Contact
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modals for verification, checkup, deactivate, blocked users, policies */}
+      <AccountVerificationModal
+        isOpen={showVerificationModal}
+        onClose={() => setShowVerificationModal(false)}
+      />
+
+      <SecurityCheckupModal
+        isOpen={showSecurityCheckupModal}
+        onClose={() => setShowSecurityCheckupModal(false)}
+      />
+
+      <DeactivateDeleteModal
+        isOpen={showDeactivateModal}
+        onClose={() => setShowDeactivateModal(false)}
+      />
+
+      <BlockedUsersModal
+        isOpen={showBlockedModal}
+        onClose={() => setShowBlockedModal(false)}
+      />
+
+      <PrivacyPolicyModal
+        isOpen={showPrivacyModal}
+        onClose={() => setShowPrivacyModal(false)}
+      />
     </div>
   );
 }

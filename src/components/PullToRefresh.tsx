@@ -74,24 +74,26 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
       onTouchEnd={handleTouchEnd}
       className={`relative overflow-y-auto overscroll-contain ${className}`}
     >
-      {/* Pull Loading Indicator Header */}
+      {/* Native-style Floating Top Spinner Badge */}
       <AnimatePresence>
-        {(pullDistance > 10 || isRefreshing) && (
+        {(pullDistance > 8 || isRefreshing) && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            style={{
-              transform: `translateY(${isRefreshing ? 12 : pullDistance * 0.5}px)`,
+            initial={{ opacity: 0, scale: 0.6, y: -20 }}
+            animate={{ 
+              opacity: 1, 
+              scale: 1,
+              y: isRefreshing ? 14 : Math.min(pullDistance * 0.6, 50)
             }}
-            className="absolute top-2 left-0 right-0 z-50 flex items-center justify-center pointer-events-none"
+            exit={{ opacity: 0, scale: 0.6, y: -20 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+            className="absolute top-1 left-0 right-0 z-[60] flex items-center justify-center pointer-events-none"
           >
-            <div className="bg-white/90 backdrop-blur-md shadow-lg border border-purple-100 rounded-full p-2.5 flex items-center justify-center text-purple-600">
+            <div className="bg-white/95 backdrop-blur-xl shadow-[0_8px_24px_-4px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.06)] rounded-full p-2.5 flex items-center justify-center text-[#FE2C55]">
               {isRefreshing ? (
-                <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
+                <Loader2 className="w-5 h-5 animate-spin text-[#FE2C55]" />
               ) : (
                 <ArrowDown
-                  className="w-5 h-5 text-purple-600 transition-transform duration-200"
+                  className="w-5 h-5 text-[#FE2C55] transition-transform duration-200"
                   style={{
                     transform: `rotate(${Math.min(180, (pullDistance / PULL_THRESHOLD) * 180)}deg)`,
                   }}
@@ -102,16 +104,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         )}
       </AnimatePresence>
 
-      <div
-        style={{
-          transform: isRefreshing
-            ? 'translateY(45px)'
-            : pullDistance > 0
-            ? `translateY(${pullDistance * 0.35}px)`
-            : 'none',
-          transition: isPullingRef.current ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
-        }}
-      >
+      <div className="w-full">
         {children}
       </div>
     </div>

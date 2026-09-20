@@ -49,6 +49,28 @@ export const sendNotification = async (
       isRead: false,
       createdAt: serverTimestamp(),
     });
+
+    // Trigger Android Java / Device Native Notification
+    try {
+      const { deviceNotification } = await import('./deviceNotification');
+      let notifTitle = `${actor.name}`;
+      let notifBody = 'Interaction on Ennvo';
+      if (type === 'like') {
+        notifBody = `${actor.name} liked your post.`;
+      } else if (type === 'comment') {
+        notifBody = `${actor.name}: ${content || 'commented on your post.'}`;
+      } else if (type === 'follow') {
+        notifBody = `${actor.name} started following you.`;
+      } else if ((type as string) === 'repost') {
+        notifBody = `${actor.name} reposted your reel.`;
+      }
+      deviceNotification.show({
+        title: notifTitle,
+        body: notifBody,
+        icon: actor.avatar || '/Ennvo.png',
+        type: type === 'comment' ? 'comment' : type === 'like' ? 'like' : 'activity'
+      });
+    } catch (e) {}
   } catch (error: any) {
     console.error('Notification Error:', error);
   }

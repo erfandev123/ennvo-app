@@ -194,17 +194,31 @@ const SuggestedAccounts = React.memo(() => {
     const fetchSuggested = async () => {
       if (!currentUser) return;
       try {
-        const { collection, query, limit, getDocs, where } = await import('firebase/firestore');
-        const q = query(collection(db, 'users'), limit(20));
+        const { collection, query, limit, getDocs } = await import('firebase/firestore');
+        const q = query(collection(db, 'users'), limit(50));
         const snapshot = await getDocs(q);
-        const users = snapshot.docs
+        const allUsers = snapshot.docs
           .map(d => ({ uid: d.id, ...d.data() } as AppUser))
-          .filter(u => u.uid !== currentUser.uid)
-          .sort(() => Math.random() - 0.5)
-          .slice(0, 10);
-        setSuggested(users);
+          .filter(u => u.uid !== currentUser.uid);
+
+        const myLoc = (currentUser.location || '').toLowerCase().trim();
+        const myCity = myLoc.split(',')[0] || myLoc;
+
+        // Strict filter: User MUST share same location/city or have mutual friends
+        const matched = allUsers.filter(u => {
+          const uLoc = (u.location || '').toLowerCase().trim();
+          if (!uLoc) return false;
+          // Match location or city
+          if (myLoc && (uLoc.includes(myLoc) || myLoc.includes(uLoc))) return true;
+          if (myCity && myCity.length > 2 && uLoc.includes(myCity)) return true;
+          return false;
+        });
+
+        // If no location matches exist, check if there are mutual location/friends matches; if none, keep empty!
+        setSuggested(matched.slice(0, 10));
       } catch (e) {
         console.error(e);
+        setSuggested([]);
       }
     };
     fetchSuggested();

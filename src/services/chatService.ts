@@ -59,10 +59,51 @@ export const createGroupConversation = async (creatorId: string, participantIds:
   }
 }
 
-export const createConversation = async (participantIds: string[], participants: { [uid: string]: { name: string, avatar: string } }) => {
+export const createConversation = async (
+  participantIds: string[], 
+  participants: { [uid: string]: { name: string, avatar: string } },
+  options?: { isRequest?: boolean; requestTo?: string; requestFrom?: string }
+) => {
   try {
     // Check if conversation already exists using current user ID for Firestore rule compliance
     const currentUid = auth.currentUser?.uid || participantIds[0];
+
+    // Privacy and blocking validation for direct chats
+    if (participantIds.length === 2) {
+      const otherId = participantIds.find(id => id !== currentUid);
+      if (otherId) {
+        try {
+          const theirBlockedSnap = await getDoc(doc(db, 'users', otherId, 'blockedUsers', currentUid));
+          if (theirBlockedSnap.exists()) {
+            throw new Error("You cannot send messages to this account.");
+          }
+          const myBlockedSnap = await getDoc(doc(db, 'users', currentUid, 'blockedUsers', otherId));
+          if (myBlockedSnap.exists()) {
+            throw new Error("You have blocked this user. Unblock them first to send a message.");
+          }
+
+          const targetSnap = await getDoc(doc(db, 'users', otherId));
+          if (targetSnap.exists()) {
+            const tData = targetSnap.data();
+            if (tData.whoCanMessage === 'no_one') {
+              throw new Error("This user doesn't allow direct messages.");
+            }
+            if (tData.whoCanMessage === 'friends') {
+              const myFollow = await getDoc(doc(db, 'users', currentUid, 'following', otherId));
+              const theirFollow = await getDoc(doc(db, 'users', otherId, 'following', currentUid));
+              if (!myFollow.exists() || !theirFollow.exists()) {
+                throw new Error("Only friends can send direct messages to this user.");
+              }
+            }
+          }
+        } catch (privErr: any) {
+          if (privErr.message?.includes('cannot') || privErr.message?.includes('blocked') || privErr.message?.includes('messages')) {
+            throw privErr;
+          }
+        }
+      }
+    }
+
     const q = query(
       collection(db, 'conversations'), 
       where('participantIds', 'array-contains', currentUid)
@@ -99,14 +140,46 @@ export const createConversation = async (participantIds: string[], participants:
       }
     });
 
-    const docRef = await addDoc(collection(db, 'conversations'), {
+    // Check if message request should be flagged
+    let isRequest = options?.isRequest || false;
+    let requestTo = options?.requestTo;
+    let requestFrom = options?.requestFrom || currentUid;
+
+    if (!isRequest && participantIds.length === 2) {
+      const otherId = participantIds.find(id => id !== currentUid);
+      if (otherId) {
+        try {
+          // Check if target user is following current user
+          const followerCheck = await getDoc(doc(db, 'users', otherId, 'followers', currentUid));
+          if (!followerCheck.exists()) {
+            isRequest = true;
+            requestTo = otherId;
+            requestFrom = currentUid;
+          }
+        } catch (e) {
+          // Default to non-request if check fails
+        }
+      }
+    }
+
+    const convPayload: any = {
       participantIds,
       participantNames,
       participantAvatars,
       lastMessage: '',
       unreadCount,
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    if (isRequest && requestTo) {
+      convPayload.isRequest = true;
+      convPayload.requestTo = requestTo;
+      convPayload.requestFrom = requestFrom;
+      convPayload.requestStatus = 'pending';
+      convPayload.requestMessageCount = 0;
+    }
+
+    const docRef = await addDoc(collection(db, 'conversations'), convPayload);
 
     return docRef.id;
   } catch (error: any) {
@@ -114,8 +187,57 @@ export const createConversation = async (participantIds: string[], participants:
   }
 };
 
-export const sendMessage = async (conversationId: string, senderId: string, type: Message['type'], content: string, mediaUrl?: string, postId?: string, replyTo?: any) => {
+export const sendMessage = async (
+  conversationId: string, 
+  senderId: string, 
+  type: Message['type'], 
+  content: string, 
+  mediaUrl?: string, 
+  postId?: string, 
+  replyTo?: any,
+  extra?: {
+    mediaUrls?: string[];
+    mediaItems?: { type: 'image' | 'video'; url: string }[];
+  }
+) => {
   try {
+    const convRef = doc(db, 'conversations', conversationId);
+    let convData: any = null;
+    try {
+      const convSnap = await getDoc(convRef);
+      if (convSnap.exists()) {
+        convData = convSnap.data();
+
+        // Check if blocked
+        if (convData.participantIds?.length === 2) {
+          const otherParticipantId = convData.participantIds.find((id: string) => id !== senderId);
+          if (otherParticipantId) {
+            const blockedCheck = await getDoc(doc(db, 'users', otherParticipantId, 'blockedUsers', senderId));
+            if (blockedCheck.exists()) {
+              throw new Error("You cannot send messages to this account.");
+            }
+            const myBlockedCheck = await getDoc(doc(db, 'users', senderId, 'blockedUsers', otherParticipantId));
+            if (myBlockedCheck.exists()) {
+              throw new Error("You have blocked this user. Unblock them first to send a message.");
+            }
+          }
+        }
+
+        if (convData.isRequest && convData.requestStatus === 'pending') {
+          if (convData.requestFrom === senderId) {
+            const currentCount = convData.requestMessageCount || 0;
+            if (currentCount >= 2) {
+              throw new Error("You can only send up to 2 messages until the recipient accepts your message request.");
+            }
+          }
+        }
+      }
+    } catch (e: any) {
+      if (e.message?.includes('up to 2 messages') || e.message?.includes('blocked') || e.message?.includes('cannot send')) {
+        throw e;
+      }
+    }
+
     const messageData: any = {
       senderId,
       type,
@@ -127,31 +249,48 @@ export const sendMessage = async (conversationId: string, senderId: string, type
     
     if (postId) messageData.postId = postId;
     if (replyTo) messageData.replyTo = replyTo;
+    if (extra?.mediaUrls && extra.mediaUrls.length > 0) {
+      messageData.mediaUrls = extra.mediaUrls;
+    }
+    if (extra?.mediaItems && extra.mediaItems.length > 0) {
+      messageData.mediaItems = extra.mediaItems;
+      if (!messageData.mediaUrls) {
+        messageData.mediaUrls = extra.mediaItems.map(m => m.url);
+      }
+    }
 
     await addDoc(collection(db, 'conversations', conversationId, 'messages'), messageData);
 
     // Update conversation and increment unread count for others
-    const convRef = doc(db, 'conversations', conversationId);
     try {
-      const convSnap = await getDoc(convRef);
-      if (convSnap.exists()) {
-        const data = convSnap.data();
-        const unreadCount = data.unreadCount || {};
+      if (convData) {
+        const unreadCount = convData.unreadCount || {};
         
         // Increment for everyone else
-        data.participantIds?.forEach((id: string) => {
+        convData.participantIds?.forEach((id: string) => {
           if (id !== senderId) {
             unreadCount[id] = (unreadCount[id] || 0) + 1;
           }
         });
 
-        await updateDoc(convRef, {
-          lastMessage: type === 'text' ? content : `Sent a ${type}`,
+        const totalItemsCount = extra?.mediaUrls?.length || extra?.mediaItems?.length || 0;
+        const lastMsgLabel = totalItemsCount > 1
+          ? `Sent ${totalItemsCount} photos/videos`
+          : (type === 'text' ? content : `Sent a ${type}`);
+
+        const updatePayload: any = {
+          lastMessage: lastMsgLabel,
           lastSenderId: senderId,
           lastMessageTime: serverTimestamp(),
           updatedAt: serverTimestamp(),
           unreadCount
-        });
+        };
+
+        if (convData.isRequest && convData.requestStatus === 'pending' && convData.requestFrom === senderId) {
+          updatePayload.requestMessageCount = increment(1);
+        }
+
+        await updateDoc(convRef, updatePayload);
       }
     } catch (updateErr) {
       console.warn("Failed updating conversation lastMessage:", updateErr);
@@ -159,6 +298,33 @@ export const sendMessage = async (conversationId: string, senderId: string, type
   } catch (error: any) {
     console.error("SendMessage Error:", error);
     throw new Error(error.message);
+  }
+};
+
+export const acceptConversationRequest = async (conversationId: string) => {
+  try {
+    const convRef = doc(db, 'conversations', conversationId);
+    await updateDoc(convRef, {
+      isRequest: false,
+      requestStatus: 'accepted',
+      updatedAt: serverTimestamp()
+    });
+  } catch (err: any) {
+    console.error("acceptConversationRequest error:", err);
+    throw new Error(err.message);
+  }
+};
+
+export const declineConversationRequest = async (conversationId: string) => {
+  try {
+    const convRef = doc(db, 'conversations', conversationId);
+    await updateDoc(convRef, {
+      requestStatus: 'declined',
+      updatedAt: serverTimestamp()
+    });
+  } catch (err: any) {
+    console.error("declineConversationRequest error:", err);
+    throw new Error(err.message);
   }
 };
 
@@ -233,10 +399,16 @@ export const subscribeConversations = (userId: string, callback: (conversations:
   return onSnapshot(q, (snapshot) => {
     const conversations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Conversation));
     // Sort client-side to avoid index requirement
-    conversations.sort((a, b) => {
-      const timeA = a.updatedAt?.toMillis?.() || 0;
-      const timeB = b.updatedAt?.toMillis?.() || 0;
-      return timeB - timeA;
+    conversations.sort((a: any, b: any) => {
+      const getT = (item: any) => {
+        if (typeof item.updatedAt?.toMillis === 'function') return item.updatedAt.toMillis();
+        if (typeof item.lastMessageTime === 'number') return item.lastMessageTime;
+        if (typeof item.lastMessageTime?.toMillis === 'function') return item.lastMessageTime.toMillis();
+        if (typeof item.createdAt?.toMillis === 'function') return item.createdAt.toMillis();
+        if (typeof item.createdAt === 'number') return item.createdAt;
+        return 0;
+      };
+      return getT(b) - getT(a);
     });
     callback(conversations);
   }, () => {});

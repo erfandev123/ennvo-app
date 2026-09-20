@@ -4,15 +4,32 @@ export interface User {
   username: string;
   email: string;
   mobileNumber?: string;
+  phoneNumber?: string;
   avatar: string;
   bio: string;
+  gender?: 'male' | 'female' | 'other';
+  location?: string;
   link?: string;
   isVerified?: boolean;
+  isPrivate?: boolean;
+  passkeyEnabled?: boolean;
+  verificationStatus?: 'none' | 'pending' | 'verified' | 'rejected';
+  verificationRequestedAt?: any;
+  whoCanComment?: 'everyone' | 'friends' | 'no_one';
+  whoCanMention?: 'everyone' | 'friends' | 'no_one';
+  whoCanMessage?: 'everyone' | 'friends' | 'no_one';
+  offensiveFilter?: boolean;
+  filterMessageRequests?: boolean;
+  readReceipts?: boolean;
+  blockedUserIds?: string[];
   highlights?: string[];
   followersCount: number;
   followingCount: number;
   postsCount: number;
   statusNote?: string;
+  hasPassword?: boolean;
+  authProvider?: 'password' | 'google' | 'both';
+  accountType?: 'personal' | 'business';
   createdAt: any;
 }
 
@@ -84,6 +101,11 @@ export interface Conversation {
   isGroup?: boolean;
   groupName?: string;
   groupAvatar?: string;
+  isRequest?: boolean;
+  requestTo?: string;
+  requestFrom?: string;
+  requestStatus?: 'pending' | 'accepted' | 'blocked' | 'declined';
+  requestMessageCount?: number;
 }
 
 export interface CustomSticker {
@@ -102,9 +124,11 @@ export interface CustomSticker {
 export interface Message {
   id: string;
   senderId: string;
-  type: 'text' | 'image' | 'video' | 'voice' | 'reel' | 'sticker' | 'system';
+  type: 'text' | 'image' | 'video' | 'voice' | 'reel' | 'sticker' | 'system' | 'album';
   content: string;
   mediaUrl?: string;
+  mediaUrls?: string[];
+  mediaItems?: { type: 'image' | 'video'; url: string }[];
   stickerUrl?: string;
   stickerType?: 'image' | 'video' | 'animated';
   postId?: string;

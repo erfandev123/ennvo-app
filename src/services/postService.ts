@@ -124,8 +124,25 @@ const detectMentions = async (text: string, actor: User, postId: string, postMed
       const q = query(collection(db, 'users'), where('username', '==', username), limit(1));
       const snap = await getDocs(q);
       if (!snap.empty) {
-        const targetUser = snap.docs[0];
-        await sendNotification(targetUser.id, 'mention', actor, targetId, postId, postMedia, `mentioned you: "${text.substring(0, 50)}..."`);
+        const targetDoc = snap.docs[0];
+        const targetUserId = targetDoc.id;
+        if (targetUserId !== actor.uid) {
+          const targetData = targetDoc.data();
+          // Check if blocked
+          const { isUserBlocked, isFollowing } = await import('./followService');
+          const blocked = await isUserBlocked(targetUserId, actor.uid);
+          if (blocked) continue;
+
+          // Check whoCanMention privacy settings
+          const whoCanMention = targetData.whoCanMention || targetData.settings?.whoCanMention || 'everyone';
+          if (whoCanMention === 'no_one') continue;
+          if (whoCanMention === 'friends') {
+            const isFriendOrFollowed = await isFollowing(targetUserId, actor.uid);
+            if (!isFriendOrFollowed) continue;
+          }
+
+          await sendNotification(targetUserId, 'mention', actor, targetId, postId, postMedia, `mentioned you: "${text.substring(0, 50)}..."`);
+        }
       }
     } catch (e) {
       console.error("Mention detection error:", e);
@@ -541,6 +558,35 @@ export const addComment = async (
   extraData?: { imageUrl?: string; audioUrl?: string; audioDuration?: number; stickerUrl?: string; replyToName?: string; replyToAuthorId?: string }
 ) => {
   try {
+    // Check if user is allowed to comment on this post
+    const postSnap = await getDoc(doc(db, 'posts', postId));
+    if (!postSnap.exists()) throw new Error("Post not found");
+    const postData = postSnap.data();
+    const postAuthorId = postData?.authorId;
+
+    if (postAuthorId && postAuthorId !== userId) {
+      const { isUserBlocked } = await import('./followService');
+      const blocked = await isUserBlocked(postAuthorId, userId);
+      if (blocked) {
+        throw new Error("You cannot comment on this post.");
+      }
+
+      const authorDoc = await getDoc(doc(db, 'users', postAuthorId));
+      if (authorDoc.exists()) {
+        const authorData = authorDoc.data();
+        const whoCanComment = authorData.whoCanComment || authorData.settings?.whoCanComment || 'everyone';
+        if (whoCanComment === 'no_one') {
+          throw new Error("Comments are turned off for this post.");
+        } else if (whoCanComment === 'friends') {
+          const { isFollowing } = await import('./followService');
+          const isUserFollowing = await isFollowing(postAuthorId, userId);
+          if (!isUserFollowing) {
+            throw new Error("Only friends can comment on this post.");
+          }
+        }
+      }
+    }
+
     const commentData: any = {
       authorId: userId,
       authorName: user.name,
@@ -555,8 +601,7 @@ export const addComment = async (
     await updateDoc(doc(db, 'posts', postId), { commentsCount: increment(1) });
 
     // Detect mentions in comment
-    const postSnap = await getDoc(doc(db, 'posts', postId));
-    const postMedia = postSnap.data()?.media?.[0] || null;
+    const postMedia = postData?.media?.[0] || null;
     await detectMentions(text, user, postId, postMedia, docRef.id);
 
     return { id: docRef.id, ...commentData };

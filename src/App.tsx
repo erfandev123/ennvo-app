@@ -1,5 +1,5 @@
 import React, { useState, useCallback, memo, useEffect, useRef, lazy, Suspense } from 'react';
-import { X, Heart, MessageCircle, Share2, Play, ArrowLeft, MoreHorizontal, Send, Bookmark, VolumeX, ChevronUp, ChevronDown, Globe, ImageIcon, UserPlus, MapPin, Share, Trash2, Download, Music } from 'lucide-react';
+import { X, Heart, MessageCircle, Share2, Play, ArrowLeft, MoreHorizontal, Send, Bookmark, VolumeX, ChevronUp, ChevronDown, Globe, ImageIcon, UserPlus, MapPin, Share, Trash2, Download, Music, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
@@ -19,6 +19,7 @@ const Auth = lazy(() => import('./pages/Auth'));
 import MiniChat from './components/MiniChat';
 import { CallOverlay } from './components/CallOverlay';
 import { AccountSwitcherModal } from './components/AccountSwitcherModal';
+import { SetPasswordModal } from './components/SetPasswordModal';
 import { useAppStore, PageType } from './store';
 import { onAuthChange } from './services/authService';
 import { 
@@ -41,6 +42,7 @@ import { LikesList } from './components/LikesList';
 import { AnalyticsModal } from './components/AnalyticsModal';
 import { UploadProgressBar } from './components/UploadProgressBar';
 import { getPost } from './services/postService';
+import { MediaViewerModal } from './components/MediaViewerModal';
 
 // Test connection strictly once on boot
 async function testFirestoreConnection() {
@@ -128,14 +130,14 @@ const InAppToaster = memo(() => {
   return (
     <AnimatePresence>
       <motion.div 
-        initial={{ y: -100, opacity: 0, scale: 0.9 }}
+        initial={{ y: -80, opacity: 0, scale: 0.95 }}
         animate={{ y: 0, opacity: 1, scale: 1 }}
-        exit={{ y: -100, opacity: 0, scale: 0.9 }}
-        transition={{ type: 'spring', damping: 24, stiffness: 350 }}
-        className="fixed top-10 sm:top-5 left-0 right-0 z-[300] flex justify-center pointer-events-none px-4 pt-safe"
+        exit={{ y: -80, opacity: 0, scale: 0.95 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 350, mass: 0.6 }}
+        className="fixed top-8 sm:top-6 left-0 right-0 z-[300] flex justify-center pointer-events-none px-4 pt-safe"
       >
         <div 
-          className="bg-white/95 backdrop-blur-2xl shadow-[0_10px_35px_-5px_rgba(0,0,0,0.15)] border border-gray-100 rounded-2xl flex items-center p-3 pointer-events-auto cursor-pointer max-w-sm w-full transition-transform active:scale-95 relative overflow-hidden group"
+          className="bg-white/85 backdrop-blur-xl shadow-[0_12px_32px_-8px_rgba(0,0,0,0.16),0_0_1px_1px_rgba(255,255,255,0.9)_inset] border border-white/70 rounded-[22px] flex items-center px-3.5 py-2.5 pointer-events-auto cursor-pointer max-w-sm w-full transition-transform active:scale-[0.98] relative overflow-hidden group backdrop-saturate-150 transform-gpu"
           onClick={async () => {
              setToast(null);
              if (toast.type === 'message') {
@@ -168,19 +170,33 @@ const InAppToaster = memo(() => {
              }
           }}
         >
-          <img 
-            src={toast.actorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(toast.actorName || 'User')}&background=random`} 
-            className="w-11 h-11 rounded-full object-cover border border-gray-100 shrink-0 ml-0.5" 
-            alt="avatar" 
-            referrerPolicy="no-referrer"
-          />
+          <div className="relative shrink-0">
+            <img 
+              src={toast.actorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(toast.actorName || 'User')}&background=random`} 
+              className="w-10 h-10 rounded-full object-cover border border-white/90 shadow-2xs" 
+              alt="avatar" 
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-2xs border border-gray-100 scale-90">
+              {toast.type === 'message' ? (
+                <MessageCircle className="w-2.5 h-2.5 text-blue-500 fill-blue-500" />
+              ) : toast.type === 'like' ? (
+                <Heart className="w-2.5 h-2.5 text-red-500 fill-red-500" />
+              ) : (
+                <Sparkles className="w-2.5 h-2.5 text-[#FF2C55]" />
+              )}
+            </div>
+          </div>
           
           {toast.type === 'message' ? (
             <>
               <div className="ml-3 flex-1 min-w-0 pr-1 flex flex-col justify-center">
-                <h4 className="text-[13px] font-medium text-gray-900 leading-tight truncate">
-                  {toast.actorName || 'User'}
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[13px] font-semibold text-gray-900 leading-tight truncate">
+                    {toast.actorName || 'User'}
+                  </h4>
+                  <span className="text-[10px] font-medium text-gray-400 ml-2">now</span>
+                </div>
                 <p className="text-[12px] font-normal text-gray-600 truncate leading-tight mt-0.5">
                   {toast.content}
                 </p>
@@ -194,21 +210,26 @@ const InAppToaster = memo(() => {
                   setActiveChat(toast.conversationId);
                   pushPage('messages');
                 }}
-                className="text-[#FE2C55] bg-[#FE2C55]/10 hover:bg-[#FE2C55]/20 font-medium text-[12px] px-3 py-1 rounded-full shrink-0 ml-2 transition-colors active:scale-95"
+                className="text-white bg-black hover:bg-gray-800 font-semibold text-[11.5px] px-3 py-1 rounded-full shrink-0 ml-2 transition-transform active:scale-95 shadow-2xs"
               >
                 Reply
               </button>
             </>
           ) : (
             <div className="ml-3 flex-1 min-w-0 pr-1">
-              <p className="text-[13px] text-gray-900 font-normal leading-snug">
-                <span className="font-normal text-gray-900 mr-1">{toast.actorName || 'User'}</span>
-                <span className="text-gray-900 font-normal">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-medium text-gray-400 tracking-wider uppercase">Ennvo</span>
+                <span className="text-[10px] font-medium text-gray-400 ml-2">now</span>
+              </div>
+              <p className="text-[12.5px] text-gray-900 font-normal leading-snug mt-0.5">
+                <span className="font-semibold text-gray-900 mr-1">{toast.actorName || 'User'}</span>
+                <span className="text-gray-700 font-normal">
                   {toast.type === 'like' && 'liked your post.'}
                   {toast.type === 'comment' && `commented: ${toast.content}`}
                   {toast.type === 'follow' && 'started following you.'}
                   {toast.type === 'mention' && 'mentioned you.'}
                   {toast.type === 'favorite' && 'saved your post.'}
+                  {(toast.type as string) === 'repost' && 'reposted your video.'}
                 </span>
               </p>
             </div>
@@ -216,7 +237,7 @@ const InAppToaster = memo(() => {
 
           {/* Small side media box displaying strictly an Image/Video Thumbnail for Reels */}
           {toast.type !== 'message' && hasMedia && (
-            <div className="w-11 h-11 rounded-xl bg-gray-900 overflow-hidden relative shrink-0 ml-2 border border-gray-100 shadow-xs flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gray-900 overflow-hidden relative shrink-0 ml-2 border border-white/80 shadow-2xs flex items-center justify-center">
               {isVideo ? (
                 <video 
                   src={`${hasMedia}#t=0.001`} 
@@ -235,7 +256,7 @@ const InAppToaster = memo(() => {
               )}
               {isVideo && (
                 <div className="absolute inset-0 bg-black/25 flex items-center justify-center pointer-events-none">
-                  <Play className="w-3.5 h-3.5 text-white fill-white drop-shadow-md" />
+                  <Play className="w-3 h-3 text-white fill-white drop-shadow-md" />
                 </div>
               )}
             </div>
@@ -297,7 +318,22 @@ export default function App() {
   }, [isAuthenticated, isAuthLoading]);
 
   const [showExitToast, setShowExitToast] = useState(false);
+  const [showGoogleSetPasswordModal, setShowGoogleSetPasswordModal] = useState(false);
   const lastBackPressRef = useRef<number>(0);
+
+  // Auto-prompt Google users who do not have a password set yet
+  useEffect(() => {
+    if (currentUser && isAuthenticated && (currentUser.authProvider === 'google' || !currentUser.hasPassword)) {
+      const hasPrompted = sessionStorage.getItem(`ennvo_pw_prompt_${currentUser.uid}`);
+      if (!hasPrompted && !currentUser.hasPassword) {
+        sessionStorage.setItem(`ennvo_pw_prompt_${currentUser.uid}`, 'true');
+        const timer = setTimeout(() => {
+          setShowGoogleSetPasswordModal(true);
+        }, 1800);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [currentUser, isAuthenticated]);
 
   useEffect(() => {
     // Intercept mobile hardware back button
@@ -572,67 +608,10 @@ export default function App() {
 
       {/* Global Media Viewer */}
       {viewingMedia && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl animate-in fade-in duration-200">
-          <div className="absolute top-10 right-4 md:top-6 md:right-6 flex items-center space-x-2 z-50">
-            <button 
-              onClick={() => {
-                const isVid = viewingMedia.type === 'video' || viewingMedia.url?.includes('.mp4') || viewingMedia.url?.includes('video');
-                downloadMediaFile(viewingMedia.url, `ennvo_${isVid ? 'video' : 'photo'}_${Date.now()}.${isVid ? 'mp4' : 'jpg'}`);
-              }} 
-              className="p-3 bg-white/10 hover:bg-white/25 active:scale-90 rounded-full transition-all text-white backdrop-blur-md flex items-center justify-center cursor-pointer shadow-md"
-              title="Download"
-            >
-              <Download className="w-6 h-6" />
-            </button>
-            <button 
-              onClick={() => setViewingMedia(null)} 
-              className="p-3 bg-white/10 hover:bg-white/20 active:scale-90 rounded-full transition-all text-white backdrop-blur-md flex items-center justify-center cursor-pointer"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-          
-          <div className="w-full h-full flex flex-col relative overflow-hidden">
-            {viewingMedia.user && (
-              <div className="absolute top-10 left-4 md:top-6 md:left-6 flex items-center space-x-3 bg-black/40 backdrop-blur-md pl-1.5 pr-4 py-1.5 rounded-full border border-white/10 z-20">
-                <img 
-                  src={viewingMedia.user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(viewingMedia.user.name)}&background=random`} 
-                  className="w-9 h-9 rounded-full border-2 border-white/80 object-cover" 
-                  alt="Avatar" 
-                  referrerPolicy="no-referrer"
-                />
-                <span className="text-white font-normal text-[14px] drop-shadow-md">{viewingMedia.user.name}</span>
-              </div>
-            )}
-            
-            <div className="flex-1 relative flex items-center justify-center p-4 md:p-12 overflow-auto no-scrollbar">
-              {(viewingMedia.type === 'video' || viewingMedia.url?.includes('.mp4') || viewingMedia.url?.includes('video')) ? (
-                <video
-                  src={viewingMedia.url}
-                  controls
-                  autoPlay
-                  playsInline
-                  className="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
-                />
-              ) : (
-                <motion.img 
-                  drag
-                  dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                  dragElastic={0.1}
-                  whileTap={{ scale: 1.2 }}
-                  src={viewingMedia.url} 
-                  referrerPolicy="no-referrer"
-                  className="max-w-full max-h-full object-contain shadow-2xl rounded-lg cursor-zoom-in" 
-                  alt="Media content" 
-                />
-              )}
-              {viewingMedia.type === 'reel' && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <MediaViewerModal
+          media={viewingMedia}
+          onClose={() => setViewingMedia(null)}
+        />
       )}
 
       {/* Global Story Viewer */}
@@ -647,6 +626,10 @@ export default function App() {
       <AnalyticsModal />
       <MiniChat />
       <CallOverlay />
+      <SetPasswordModal 
+        isOpen={showGoogleSetPasswordModal} 
+        onClose={() => setShowGoogleSetPasswordModal(false)} 
+      />
 
       {/* Global Reel Viewer (Modal) */}
       {viewingReel && (

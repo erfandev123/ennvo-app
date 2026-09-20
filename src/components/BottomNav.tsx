@@ -28,6 +28,8 @@ const BottomNav = memo(() => {
   const isPointerDownRef = useRef(false);
   const startXRef = useRef(0);
   const hasDraggedRef = useRef(false);
+  const hoverIndexRef = useRef<number | null>(null);
+  const rafIdRef = useRef<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isHolding, setIsHolding] = useState(false);
   const [dragTranslateX, setDragTranslateX] = useState<number | null>(null);
@@ -83,18 +85,19 @@ const BottomNav = memo(() => {
 
     // Pointer events for drag-to-navigate
     const handlePointerDown = (e: React.PointerEvent<HTMLElement>) => {
-      // Only primary button / touch
       if (e.button !== 0) return;
       isPointerDownRef.current = true;
       startXRef.current = e.clientX;
       hasDraggedRef.current = false;
+      hoverIndexRef.current = activeGlassIndex;
       setIsHolding(true);
       setHoverIndex(activeGlassIndex);
     };
 
     const handlePointerMove = (e: React.PointerEvent<HTMLElement>) => {
       if (!isPointerDownRef.current || !navRef.current) return;
-      const dx = e.clientX - startXRef.current;
+      const clientX = e.clientX;
+      const dx = clientX - startXRef.current;
 
       if (!hasDraggedRef.current && Math.abs(dx) > 7) {
         hasDraggedRef.current = true;
@@ -108,29 +111,36 @@ const BottomNav = memo(() => {
       }
 
       if (hasDraggedRef.current) {
-        const rect = navRef.current.getBoundingClientRect();
-        const navWidth = rect.width;
-        const itemWidth = navWidth / 5;
+        if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = requestAnimationFrame(() => {
+          if (!navRef.current) return;
+          const rect = navRef.current.getBoundingClientRect();
+          const navWidth = rect.width;
+          const itemWidth = navWidth / 5;
 
-        // Position the center of the slot under the finger
-        const targetSlotLeft = e.clientX - rect.left - (itemWidth / 2);
-        const clampedSlotLeft = Math.max(0, Math.min(navWidth - itemWidth, targetSlotLeft));
-        setDragTranslateX(clampedSlotLeft);
+          const targetSlotLeft = clientX - rect.left - (itemWidth / 2);
+          const clampedSlotLeft = Math.max(0, Math.min(navWidth - itemWidth, targetSlotLeft));
+          setDragTranslateX(clampedSlotLeft);
 
-        // Determine current hovered slot 0..4
-        const relativeX = Math.max(0, Math.min(navWidth - 1, e.clientX - rect.left));
-        const currentSlot = Math.min(4, Math.floor(relativeX / itemWidth));
+          const relativeX = Math.max(0, Math.min(navWidth - 1, clientX - rect.left));
+          const currentSlot = Math.min(4, Math.floor(relativeX / itemWidth));
 
-        if (currentSlot !== hoverIndex) {
-          setHoverIndex(currentSlot);
-          if (typeof window !== 'undefined' && window.navigator?.vibrate) {
-            try { window.navigator.vibrate(6); } catch (err) {}
+          if (currentSlot !== hoverIndexRef.current) {
+            hoverIndexRef.current = currentSlot;
+            setHoverIndex(currentSlot);
+            if (typeof window !== 'undefined' && window.navigator?.vibrate) {
+              try { window.navigator.vibrate(6); } catch (err) {}
+            }
           }
-        }
+        });
       }
     };
 
     const handlePointerUp = (e: React.PointerEvent<HTMLElement>) => {
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
       if (!isPointerDownRef.current) return;
       isPointerDownRef.current = false;
 
@@ -140,18 +150,19 @@ const BottomNav = memo(() => {
         } catch (err) {}
       }
 
-      if (hasDraggedRef.current && hoverIndex !== null) {
-        const targetItem = navItems[hoverIndex];
+      const finalHoverIndex = hoverIndexRef.current;
+      if (hasDraggedRef.current && finalHoverIndex !== null) {
+        const targetItem = navItems[finalHoverIndex];
         if (targetItem) {
           handleItemClick(targetItem.id);
         }
       }
 
-      // Smooth release
       setIsDragging(false);
       setIsHolding(false);
       setDragTranslateX(null);
       setHoverIndex(null);
+      hoverIndexRef.current = null;
       hasDraggedRef.current = false;
     };
 

@@ -363,15 +363,15 @@ video:not([controls]) {
 .ultra-glass-chat-container {
   background: linear-gradient(
       135deg,
-      rgba(255, 255, 255, 0.72) 0%,
-      rgba(255, 255, 255, 0.45) 100%
+      rgba(255, 255, 255, 0.38) 0%,
+      rgba(255, 255, 255, 0.20) 100%
   );
-  backdrop-filter: blur(25px) saturate(200%);
-  -webkit-backdrop-filter: blur(25px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  border-top: 1.8px solid rgba(255, 255, 255, 0.95);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), inset 0 1.5px 2px rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.85);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.06), inset 0 1.5px 2px rgba(255, 255, 255, 0.85);
   border-radius: 9999px;
   transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
   transform: translateZ(0);
@@ -380,11 +380,11 @@ video:not([controls]) {
 .ultra-glass-chat-container:focus-within {
   background: linear-gradient(
       135deg,
-      rgba(255, 255, 255, 0.88) 0%,
-      rgba(255, 255, 255, 0.65) 100%
+      rgba(255, 255, 255, 0.50) 0%,
+      rgba(255, 255, 255, 0.30) 100%
   );
-  border-color: rgba(168, 85, 247, 0.45);
-  box-shadow: 0 12px 34px rgba(168, 85, 247, 0.14), inset 0 1.5px 2px #ffffff;
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), inset 0 1.5px 2px #ffffff;
 }
 
 .ultra-glass-reply-box {
@@ -565,50 +565,106 @@ video:not([controls]) {
   backface-visibility: hidden;
 }
 
-/* Remove ugly intrusive default video play buttons and controls in Android/iOS WebView */
-video::-webkit-media-controls {
-  display: none !important;
-  -webkit-appearance: none !important;
-}
-
+/* Remove ugly intrusive default video play buttons, posters, and controls in Android/iOS WebView */
+video::-webkit-media-controls,
+video::-webkit-media-controls-container,
+video::-webkit-media-controls-panel,
 video::-webkit-media-controls-play-button,
 video::-webkit-media-controls-start-playback-button,
 video::-webkit-media-controls-overlay-play-button,
-video::-webkit-media-controls-enclosure,
-video::-webkit-media-controls-panel {
+video::-webkit-media-controls-timeline,
+video::-webkit-media-controls-current-time-display,
+video::-webkit-media-controls-time-remaining-display,
+video::-webkit-media-controls-time-rail,
+video::-webkit-media-controls-mute-button,
+video::-webkit-media-controls-toggle-closed-captions-button,
+video::-webkit-media-controls-volume-slider,
+video::-webkit-media-controls-fullscreen-button,
+video::-webkit-media-controls-enclosure {
   display: none !important;
   -webkit-appearance: none !important;
   opacity: 0 !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
   pointer-events: none !important;
 }
 
-/* Ultra Smooth Crystal Liquid Water Glass Chat Input Styling */
+/* Ultra Smooth Crystal Liquid Water Glass Chat Input Styling - Pure Clear Liquid Water Glass */
 .ultra-glass-chat-container {
-  backdrop-filter: blur(24px) saturate(190%);
-  -webkit-backdrop-filter: blur(24px) saturate(190%);
-  background: rgba(255, 255, 255, 0.48);
-  border: 1px solid rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  background: rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
   box-shadow: 
-    0 12px 36px -4px rgba(0, 0, 0, 0.08),
-    0 4px 16px -2px rgba(124, 58, 237, 0.06),
-    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.85),
-    inset 0 -1px 2px 0 rgba(255, 255, 255, 0.2);
+    0 4px 20px -2px rgba(0, 0, 0, 0.04),
+    inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -0.5px 0.5px 0 rgba(255, 255, 255, 0.2);
   border-radius: 9999px;
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
   will-change: transform, box-shadow;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .ultra-glass-chat-container:focus-within {
-  background: rgba(255, 255, 255, 0.72);
-  border-color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.25) !important;
+  border-color: rgba(255, 255, 255, 0.75) !important;
   box-shadow: 
-    0 16px 42px -4px rgba(147, 51, 234, 0.14),
-    0 6px 20px -2px rgba(0, 0, 0, 0.08),
-    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.95),
-    0 0 0 3px rgba(168, 85, 247, 0.14);
+    0 8px 30px -4px rgba(0, 0, 0, 0.06),
+    inset 0 1.2px 1.5px 0 rgba(255, 255, 255, 0.85),
+    0 0 0 2px rgba(168, 85, 247, 0.15);
 }
+
+/* iOS Ultra Liquid Glass Floating Header Capsules */
+.ios-liquid-glass {
+  background: rgba(255, 255, 255, 0.76) !important;
+  backdrop-filter: blur(28px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 
+    0 8px 32px 0 rgba(0, 0, 0, 0.06),
+    0 2px 8px 0 rgba(0, 0, 0, 0.03),
+    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 1) !important;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+.ios-liquid-glass-button {
+  background: rgba(255, 255, 255, 0.76) !important;
+  backdrop-filter: blur(28px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 
+    0 6px 20px 0 rgba(0, 0, 0, 0.05),
+    0 2px 6px 0 rgba(0, 0, 0, 0.02),
+    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 1) !important;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* iOS Typing Indicator Wave Animation */
+@keyframes ios-typing-wave {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.ios-typing-dot-1 {
+  animation: ios-typing-wave 1.25s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+.ios-typing-dot-2 {
+  animation: ios-typing-wave 1.25s cubic-bezier(0.4, 0, 0.2, 1) infinite 0.16s;
+}
+.ios-typing-dot-3 {
+  animation: ios-typing-wave 1.25s cubic-bezier(0.4, 0, 0.2, 1) infinite 0.32s;
+}
+
 
 
 

@@ -93,10 +93,30 @@ export const deleteFriend = async (currentUserId: string, friendUserId: string) 
   }
 };
 
-export const blockUser = async (currentUserId: string, targetUserId: string) => {
+export const blockUser = async (currentUserId: string, targetUserId: string, targetUserData?: { name?: string; username?: string; avatar?: string }) => {
   try {
+    let name = targetUserData?.name;
+    let username = targetUserData?.username;
+    let avatar = targetUserData?.avatar;
+
+    if (!name || !username) {
+      try {
+        const uDoc = await getDoc(doc(db, 'users', targetUserId));
+        if (uDoc.exists()) {
+          const d = uDoc.data();
+          name = name || d.name;
+          username = username || d.username;
+          avatar = avatar || d.avatar;
+        }
+      } catch (e) {}
+    }
+
     const blockRef = doc(db, 'users', currentUserId, 'blockedUsers', targetUserId);
     await setDoc(blockRef, {
+      uid: targetUserId,
+      name: name || 'User',
+      username: username || 'user',
+      avatar: avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=random`,
       blockedAt: serverTimestamp()
     });
     // Automatically remove mutual friend/follow relationship when blocking
@@ -136,6 +156,17 @@ export const getBlockedUsers = async (currentUserId: string) => {
     return snap.docs.map(d => d.id);
   } catch (error) {
     console.error("getBlockedUsers error:", error);
+    return [];
+  }
+};
+
+export const getBlockedUsersList = async (currentUserId: string) => {
+  try {
+    const blockedRef = collection(db, 'users', currentUserId, 'blockedUsers');
+    const snap = await getDocs(blockedRef);
+    return snap.docs.map(d => ({ uid: d.id, ...(d.data() as any) }));
+  } catch (error) {
+    console.error("getBlockedUsersList error:", error);
     return [];
   }
 };

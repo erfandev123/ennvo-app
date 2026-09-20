@@ -52,20 +52,41 @@ class DeviceNotificationService {
     const tag = options.tag || `ennvo-${Date.now()}`;
     const type = options.type || 'activity';
 
-    // 1. Android WebView Native Bridge Support
+    // 1. Comprehensive Android WebView Native Java Bridge Support
     try {
-      if (typeof (window as any).Android?.showNotification === 'function') {
-        (window as any).Android.showNotification(title, body, type);
+      const win = window as any;
+      if (typeof win.AndroidInterface?.showNotification === 'function') {
+        win.AndroidInterface.showNotification(title, body, icon, type);
         return;
       }
-      if (typeof (window as any).AndroidBridge?.postMessage === 'function') {
-        (window as any).AndroidBridge.postMessage(
+      if (typeof win.AndroidInterface?.sendNotification === 'function') {
+        win.AndroidInterface.sendNotification(title, body);
+        return;
+      }
+      if (typeof win.Android?.showNotification === 'function') {
+        win.Android.showNotification(title, body, type);
+        return;
+      }
+      if (typeof win.AndroidNotification?.push === 'function') {
+        win.AndroidNotification.push(title, body);
+        return;
+      }
+      if (typeof win.NativeApp?.showNotification === 'function') {
+        win.NativeApp.showNotification(title, body);
+        return;
+      }
+      if (typeof win.JSBridge?.postMessage === 'function') {
+        win.JSBridge.postMessage(JSON.stringify({ type: 'notification', title, body, notificationType: type }));
+        return;
+      }
+      if (typeof win.AndroidBridge?.postMessage === 'function') {
+        win.AndroidBridge.postMessage(
           JSON.stringify({ type: 'notification', title, body, notificationType: type })
         );
         return;
       }
-      if (typeof (window as any).webkit?.messageHandlers?.notification?.postMessage === 'function') {
-        (window as any).webkit.messageHandlers.notification.postMessage({ title, body, type });
+      if (typeof win.webkit?.messageHandlers?.notification?.postMessage === 'function') {
+        win.webkit.messageHandlers.notification.postMessage({ title, body, type });
         return;
       }
     } catch (e) {

@@ -100,10 +100,10 @@ export const generateVideoThumbnail = async (fileOrUrl: File | string): Promise<
       video.onseeked = () => {
         try {
           const canvas = document.createElement('canvas');
-          const width = video.videoWidth || 640;
-          const height = video.videoHeight || 360;
-          canvas.width = Math.min(640, width);
-          canvas.height = Math.round((canvas.width * height) / width) || 360;
+          const width = video.videoWidth || 1080;
+          const height = video.videoHeight || 1920;
+          canvas.width = Math.min(1080, width);
+          canvas.height = Math.round((canvas.width * height) / width) || 1920;
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -133,7 +133,7 @@ export const generateVideoThumbnail = async (fileOrUrl: File | string): Promise<
               }
             }
 
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
             cleanup();
             return resolve(dataUrl);
           }
@@ -161,8 +161,15 @@ export const generateVideoThumbnail = async (fileOrUrl: File | string): Promise<
 };
 
 /**
- * Triggers download of an image or video file across mobile & desktop browsers.
+ * Returns a clean, high quality vector SVG avatar for accounts without a custom profile picture
  */
+export const getCleanAvatarUrl = (name?: string | null, avatarUrl?: string | null): string => {
+  if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.trim().length > 0 && !avatarUrl.includes('ui-avatars.com')) {
+    return avatarUrl;
+  }
+  const displayName = encodeURIComponent(name && name.trim().length > 0 ? name : 'User');
+  return `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${displayName}&backgroundColor=f1f5f9`;
+};
 export const downloadMediaFile = async (url: string, filename?: string) => {
   if (!url) return;
   const isVideo = isMediaVideo(url);

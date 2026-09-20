@@ -4,11 +4,13 @@ import { User as AppUser } from './types';
 export type PageType = 'home' | 'search' | 'reels' | 'messages' | 'notifications' | 'create' | 'profile' | 'settings' | 'edit-profile';
 
 export type Media = {
-  type: 'post' | 'reel' | 'image' | 'video';
+  type: 'post' | 'reel' | 'image' | 'video' | 'album';
   url: string;
   user?: { name: string; avatar: string };
   likes?: number;
   comments?: number;
+  mediaList?: { type: 'image' | 'video'; url: string }[];
+  initialIndex?: number;
 };
 
 export type CachedUser = {

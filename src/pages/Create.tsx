@@ -160,12 +160,12 @@ export default function Create() {
       try {
         const v = previewVideoRef.current;
         const canvas = document.createElement("canvas");
-        canvas.width = Math.min(640, v.videoWidth || 640);
-        canvas.height = Math.round((canvas.width * (v.videoHeight || 360)) / (v.videoWidth || 640));
+        canvas.width = Math.min(1080, v.videoWidth || 1080);
+        canvas.height = Math.round((canvas.width * (v.videoHeight || 1920)) / (v.videoWidth || 1080));
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-          const thumb = canvas.toDataURL("image/jpeg", 0.85);
+          const thumb = canvas.toDataURL("image/jpeg", 0.95);
           if (thumb && thumb.length > 100) {
             setVideoThumbnail(thumb);
             return thumb;
@@ -379,8 +379,9 @@ export default function Create() {
           const constraints = {
             video: {
               facingMode: facingMode,
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
+              width: { ideal: 1920, max: 3840 },
+              height: { ideal: 1080, max: 2160 },
+              frameRate: { ideal: 60, max: 60 },
             },
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
           };
@@ -394,11 +395,12 @@ export default function Create() {
 
           // Select best supported MIME type with Opus/AAC audio codec preservation
           const mimeTypes = [
-            'video/webm;codecs=vp8,opus',
-            'video/webm;codecs=vp9,opus',
-            'video/webm',
+            'video/mp4;codecs=avc1.640028,mp4a.40.2',
             'video/mp4;codecs=avc1,mp4a',
             'video/mp4',
+            'video/webm;codecs=vp9,opus',
+            'video/webm;codecs=vp8,opus',
+            'video/webm',
           ];
           let bestMime = '';
           for (const m of mimeTypes) {
@@ -410,8 +412,8 @@ export default function Create() {
 
           const recorderOptions: MediaRecorderOptions = {
             mimeType: bestMime || undefined,
-            videoBitsPerSecond: 2500000,
-            audioBitsPerSecond: 128000,
+            videoBitsPerSecond: 12000000, // 12 Mbps Ultra-HD High Bitrate!
+            audioBitsPerSecond: 192000,
           };
           const recorder = new MediaRecorder(stream, recorderOptions);
           recorder.ondataavailable = (e) => {
