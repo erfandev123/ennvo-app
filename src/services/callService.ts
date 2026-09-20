@@ -214,7 +214,7 @@ export const getMediaStreamWithFallback = async (type: 'audio' | 'video'): Promi
     return createSyntheticAudioStream();
   }
 
-  // 1. Ideal Constraints - Crisp low-latency HD video
+  // 1. Ideal Constraints - Mobile optimized crisp low-latency video & audio
   try {
     return await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -224,9 +224,9 @@ export const getMediaStreamWithFallback = async (type: 'audio' | 'video'): Promi
       },
       video: type === 'video' ? { 
         facingMode: 'user', 
-        width: { ideal: 1280, max: 1920 }, 
-        height: { ideal: 720, max: 1080 },
-        frameRate: { ideal: 30, max: 60 }
+        width: { ideal: 640, max: 1280 }, 
+        height: { ideal: 480, max: 720 },
+        frameRate: { ideal: 24, max: 30 }
       } : false
     });
   } catch (err1) {

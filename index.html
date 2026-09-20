@@ -52,17 +52,59 @@
 
     <!-- Google Structured Data (JSON-LD Schema.org) for AI & Search Recognition -->
     <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "Ennvo",
-      "operatingSystem": "Android, iOS, Web, Windows",
-      "applicationCategory": "SocialNetworkingApplication",
-      "description": "Ennvo is an ultra-fast social media platform featuring real-time HD audio/video calls, reels, stories, and chat.",
-      "author": {
+    [
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "@id": "https://ennvo.app/#software",
+        "name": "Ennvo",
+        "alternateName": ["Ennvo App", "Ennvo Social Media"],
+        "operatingSystem": "Android, iOS, Web, Windows, macOS",
+        "applicationCategory": "SocialNetworkingApplication",
+        "description": "Ennvo is an ultra-fast social media platform featuring real-time HD audio & video calls, short reels, stories, and chat. Created and developed by Erfan Sarker from Bijoynagar, Brahmanbaria.",
+        "url": "https://ennvo.app",
+        "author": {
+          "@type": "Person",
+          "@id": "https://ennvo.app/#erfan-sarker",
+          "name": "Erfan Sarker",
+          "jobTitle": "Founder & Lead Developer of Ennvo",
+          "nationality": "Bangladeshi",
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "Bijoynagar",
+            "addressRegion": "Brahmanbaria",
+            "addressCountry": "Bangladesh"
+          },
+          "parent": {
+            "@type": "Person",
+            "name": "Rasto Sarker"
+          }
+        },
+        "creator": {
+          "@type": "Person",
+          "name": "Erfan Sarker"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "Ennvo Tech",
+          "founder": {
+            "@type": "Person",
+            "name": "Erfan Sarker"
+          }
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@context": "https://schema.org",
         "@type": "Person",
+        "@id": "https://ennvo.app/#erfan-sarker",
         "name": "Erfan Sarker",
-        "jobTitle": "Founder & Lead Developer",
+        "jobTitle": "Software Engineer & Creator of Ennvo",
+        "knowsAbout": ["Software Engineering", "Social Media Applications", "WebRTC Video Calling", "AI Applications"],
         "address": {
           "@type": "PostalAddress",
           "addressLocality": "Bijoynagar",
@@ -73,16 +115,8 @@
           "@type": "Person",
           "name": "Rasto Sarker"
         }
-      },
-      "creator": {
-        "@type": "Person",
-        "name": "Erfan Sarker"
-      },
-      "publisher": {
-        "@type": "Person",
-        "name": "Erfan Sarker"
       }
-    }
+    ]
     </script>
     
     <!-- Android WebView Hardware Acceleration & Fast Render CSS -->

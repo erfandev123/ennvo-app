@@ -218,15 +218,15 @@ export const CallOverlay = () => {
 
   return (
     <>
-      {/* 1. Incoming Call Notification Overlay - Soft Clean UI without harsh effects */}
+      {/* 1. Incoming Call Notification Overlay - Soft Clean Ultra-Fast UI */}
       <AnimatePresence>
         {incomingCall && (
           <motion.div 
             initial={{ y: -80, opacity: 0, scale: 0.95 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: -80, opacity: 0, scale: 0.95 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-            className="fixed top-[calc(1.5rem+env(safe-area-inset-top))] left-4 right-4 md:left-auto md:right-6 md:w-[360px] z-[300] bg-white/95 backdrop-blur-2xl border border-purple-100/90 p-4 rounded-3xl shadow-[0_12px_35px_rgba(0,0,0,0.12)] flex flex-col space-y-3"
+            transition={{ type: 'spring', damping: 30, stiffness: 350 }}
+            className="fixed top-[calc(1.5rem+env(safe-area-inset-top))] left-4 right-4 md:left-auto md:right-6 md:w-[360px] z-[300] bg-white/98 border border-purple-100 p-4 rounded-3xl shadow-2xl flex flex-col space-y-3 transform-gpu will-change-transform"
           >
             <div className="flex items-center space-x-3.5">
               <img 
@@ -377,8 +377,8 @@ export const CallOverlay = () => {
                   {(activeCallState.type === 'audio' || isVideoOff) && (
                     <div className="flex flex-col items-center justify-center space-y-5 p-6 text-center z-10 my-auto">
                       <div className="relative flex items-center justify-center">
-                        <div className="absolute w-44 h-44 rounded-full bg-purple-500/15 animate-ping opacity-25 pointer-events-none" />
-                        <div className="w-28 h-28 md:w-36 md:h-36 rounded-full overflow-hidden border-4 border-white/20 shadow-2xl relative z-10 bg-purple-900/40 backdrop-blur-md">
+                        <div className="absolute w-44 h-44 rounded-full border-2 border-purple-400/30 scale-105 animate-pulse pointer-events-none transform-gpu" />
+                        <div className="w-28 h-28 md:w-36 md:h-36 rounded-full overflow-hidden border-4 border-white/20 shadow-2xl relative z-10 bg-purple-900/60">
                           <img 
                             src={activeCallState.otherAvatar || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(activeCallState.otherName || 'User')}&backgroundColor=f1f5f9`} 
                             className="w-full h-full object-cover"

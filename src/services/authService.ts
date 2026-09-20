@@ -132,36 +132,52 @@ export const signInWithGoogle = async () => {
 
     const hasPasswordProvider = firebaseUser.providerData.some(p => p.providerId === 'password');
 
-    if (!docSnap.exists()) {
-      const username = firebaseUser.email?.split('@')[0] || `user_${firebaseUser.uid.substring(0, 5)}`;
-      const userData: User = {
-        uid: firebaseUser.uid,
-        name: firebaseUser.displayName || 'User',
-        username: username.toLowerCase(),
-        email: firebaseUser.email || '',
-        avatar: firebaseUser.photoURL || `https://picsum.photos/seed/${firebaseUser.uid}/150/150`,
-        bio: '',
-        followersCount: 0,
-        followingCount: 0,
-        postsCount: 0,
-        hasPassword: hasPasswordProvider,
-        authProvider: hasPasswordProvider ? 'both' : 'google',
-        createdAt: serverTimestamp(),
-      };
-      await setDoc(docRef, userData);
-      return userData;
-    }
-    
-    const existing = docSnap.data() as User;
-    if (existing.hasPassword === undefined) {
+    if (docSnap.exists()) {
+      const existing = docSnap.data() as User;
+      const isBoth = existing.hasPassword || hasPasswordProvider;
       await updateDoc(docRef, { 
-        hasPassword: hasPasswordProvider,
-        authProvider: hasPasswordProvider ? 'both' : 'google'
+        hasPassword: isBoth,
+        authProvider: isBoth ? 'both' : 'google'
       });
-      existing.hasPassword = hasPasswordProvider;
-      existing.authProvider = hasPasswordProvider ? 'both' : 'google';
+      existing.hasPassword = isBoth;
+      existing.authProvider = isBoth ? 'both' : 'google';
+      return existing;
     }
-    return existing;
+
+    if (firebaseUser.email) {
+      const emailQ = query(collection(db, 'users'), where('email', '==', firebaseUser.email.toLowerCase()));
+      const emailSnap = await getDocs(emailQ);
+      if (!emailSnap.empty) {
+        const existingDoc = emailSnap.docs[0];
+        const existingUser = existingDoc.data() as User;
+        
+        const updatedData: Partial<User> = {
+          hasPassword: true,
+          authProvider: 'both',
+          avatar: existingUser.avatar || firebaseUser.photoURL || undefined
+        };
+        await updateDoc(doc(db, 'users', existingDoc.id), updatedData);
+        return { ...existingUser, ...updatedData };
+      }
+    }
+
+    const username = firebaseUser.email?.split('@')[0] || `user_${firebaseUser.uid.substring(0, 5)}`;
+    const userData: User = {
+      uid: firebaseUser.uid,
+      name: firebaseUser.displayName || 'User',
+      username: username.toLowerCase(),
+      email: firebaseUser.email || '',
+      avatar: firebaseUser.photoURL || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(firebaseUser.displayName || 'User')}&backgroundColor=f1f5f9`,
+      bio: '',
+      followersCount: 0,
+      followingCount: 0,
+      postsCount: 0,
+      hasPassword: hasPasswordProvider,
+      authProvider: hasPasswordProvider ? 'both' : 'google',
+      createdAt: serverTimestamp(),
+    };
+    await setDoc(docRef, userData);
+    return userData;
   } catch (error: any) {
     throw new Error(error.message);
   }
@@ -206,32 +222,83 @@ export const sendPasswordReset = async (emailOrUsername: string): Promise<string
 /**
  * Set a new password for an account (e.g., Google user who has no password yet)
  */
-export const setUserPassword = async (newPassword: string): Promise<void> => {
-  const user = auth.currentUser;
-  if (!user || !user.email) {
-    throw new Error('You must be signed in to set a password');
-  }
+export const setUserPassword = async (newPassword: string, userEmail?: string): Promise<void> => {
   if (newPassword.length < 6) {
     throw new Error('Password must be at least 6 characters');
+  }
+
+  let user = auth.currentUser;
+
+  if (!user || !user.email) {
+    try {
+      const gRes = await signInWithPopup(auth, googleProvider);
+      user = gRes.user;
+    } catch (popupErr: any) {
+      console.warn('Google popup re-authentication notice:', popupErr);
+    }
+  }
+
+  if (!user || !user.email) {
+    throw new Error('You must be signed in to set a password. Please sign in with Google or log in first.');
+  }
+
+  const targetEmail = user.email || userEmail;
+  if (!targetEmail) {
+    throw new Error('No valid email found for this account.');
   }
 
   try {
     const hasPasswordProvider = user.providerData.some(p => p.providerId === 'password');
     if (!hasPasswordProvider) {
-      // Link email/password credential to this account
-      const credential = EmailAuthProvider.credential(user.email, newPassword);
-      await linkWithCredential(user, credential);
+      try {
+        const credential = EmailAuthProvider.credential(targetEmail, newPassword);
+        await linkWithCredential(user, credential);
+      } catch (linkErr: any) {
+        if (linkErr.code === 'auth/requires-recent-login') {
+          const reauthRes = await signInWithPopup(auth, googleProvider);
+          const credential = EmailAuthProvider.credential(reauthRes.user.email!, newPassword);
+          await linkWithCredential(reauthRes.user, credential);
+          user = reauthRes.user;
+        } else if (linkErr.code === 'auth/credential-already-in-use' || linkErr.code === 'auth/email-already-in-use') {
+          await updatePassword(user, newPassword);
+        } else {
+          throw linkErr;
+        }
+      }
     } else {
-      await updatePassword(user, newPassword);
+      try {
+        await updatePassword(user, newPassword);
+      } catch (upErr: any) {
+        if (upErr.code === 'auth/requires-recent-login') {
+          const reauthRes = await signInWithPopup(auth, googleProvider);
+          await updatePassword(reauthRes.user, newPassword);
+          user = reauthRes.user;
+        } else {
+          throw upErr;
+        }
+      }
     }
 
-    // Update Firestore user document
     const userRef = doc(db, 'users', user.uid);
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
       hasPassword: true,
       authProvider: 'both',
       updatedAt: serverTimestamp()
-    });
+    }, { merge: true });
+
+    try {
+      const q = query(collection(db, 'users'), where('email', '==', targetEmail.toLowerCase()));
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        if (d.id !== user!.uid) {
+          await updateDoc(doc(db, 'users', d.id), {
+            hasPassword: true,
+            authProvider: 'both',
+            updatedAt: serverTimestamp()
+          });
+        }
+      }
+    } catch (e) {}
 
     try {
       const raw = localStorage.getItem('ennvo_last_active_user_v1');
@@ -241,11 +308,11 @@ export const setUserPassword = async (newPassword: string): Promise<void> => {
       }
     } catch (e) {}
   } catch (error: any) {
-    if (error.code === 'auth/credential-already-in-use') {
-      throw new Error('This email is already linked with another account password.');
+    if (error.code === 'auth/credential-already-in-use' || error.code === 'auth/email-already-in-use') {
+      throw new Error('This email is already linked with another password. Please use your current password to update.');
     }
     if (error.code === 'auth/requires-recent-login') {
-      throw new Error('Security check: Please log in again before setting a new password.');
+      throw new Error('Security check: Please sign in again before setting a new password.');
     }
     throw new Error(error.message || 'Failed to set password');
   }
@@ -254,28 +321,56 @@ export const setUserPassword = async (newPassword: string): Promise<void> => {
 /**
  * Change existing password with current password confirmation
  */
-export const changeUserPassword = async (currentPassword: string, newPassword: string): Promise<void> => {
-  const user = auth.currentUser;
-  if (!user || !user.email) {
-    throw new Error('You must be signed in to change password');
-  }
+export const changeUserPassword = async (currentPassword: string, newPassword: string, userEmail?: string): Promise<void> => {
   if (newPassword.length < 6) {
     throw new Error('New password must be at least 6 characters');
   }
 
+  let user = auth.currentUser;
+
+  if ((!user || !user.email) && userEmail && currentPassword) {
+    try {
+      const cred = await signInWithEmailAndPassword(auth, userEmail, currentPassword);
+      user = cred.user;
+    } catch (loginErr: any) {
+      console.warn('Silent re-login attempt before password change:', loginErr);
+    }
+  }
+
+  if (!user || !user.email) {
+    throw new Error('You must be signed in to change password. Please log in first.');
+  }
+
   try {
     const credential = EmailAuthProvider.credential(user.email, currentPassword);
-    await reauthenticateWithCredential(user, credential);
+    try {
+      await reauthenticateWithCredential(user, credential);
+    } catch (reauthErr: any) {
+      if (reauthErr.code === 'auth/wrong-password' || reauthErr.code === 'auth/invalid-credential') {
+        throw new Error('Current password is incorrect. Please check and try again.');
+      }
+      throw reauthErr;
+    }
+
     await updatePassword(user, newPassword);
 
     const userRef = doc(db, 'users', user.uid);
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
       hasPassword: true,
+      authProvider: 'both',
       updatedAt: serverTimestamp()
-    });
+    }, { merge: true });
+
+    try {
+      const raw = localStorage.getItem('ennvo_last_active_user_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify({ ...parsed, hasPassword: true, authProvider: 'both' }));
+      }
+    } catch (e) {}
   } catch (error: any) {
     if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-      throw new Error('Current password is incorrect. Please try again or use "Forgot Password".');
+      throw new Error('Current password is incorrect. Please try again or click "Forgot password".');
     }
     if (error.code === 'auth/requires-recent-login') {
       throw new Error('For security, please log out and log back in to change your password.');

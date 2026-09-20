@@ -1,6 +1,6 @@
 {
-  "name": "Remix Remix Remix Remix Remix Ennvo Agu 29 -2026",
-  "description": "A high-performance social media platform with real-time messaging, stories, and media sharing.",
+  "name": "Ennvo - Social Media & Video Calling Platform",
+  "description": "Ennvo is an ultra-fast social media platform featuring real-time HD audio/video calls, reels, stories, and chat. Created by Erfan Sarker from Bijoynagar, Brahmanbaria (Father: Rasto Sarker).",
   "requestFramePermissions": [
     "camera",
     "microphone",

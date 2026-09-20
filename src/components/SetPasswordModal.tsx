@@ -46,7 +46,7 @@ export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({
 
     setIsLoading(true);
     try {
-      await setUserPassword(password);
+      await setUserPassword(password, currentUser?.email);
       if (currentUser) {
         setCurrentUser({ ...currentUser, hasPassword: true, authProvider: 'both' });
       }

@@ -17,7 +17,8 @@ import { BlockedUsersModal } from '../components/settings/BlockedUsersModal';
 import { AccountInfoScreen } from '../components/settings/AccountInfoScreen';
 import { VerificationScreen } from '../components/settings/VerificationScreen';
 import { BlockedAccountsScreen } from '../components/settings/BlockedAccountsScreen';
-import { changeUserPassword, sendPasswordReset, setUserPassword } from '../services/authService';
+import { changeUserPassword, sendPasswordReset, setUserPassword, logout } from '../services/authService';
+import { saveAccount } from '../services/accountService';
 
 type SettingsScreen = 
   | 'main'                    // Settings and privacy
@@ -41,7 +42,31 @@ type SettingsScreen =
 
 export default function Settings() {
   const [currentScreen, setCurrentScreen] = useState<SettingsScreen>('main');
-  const { setIsAuthenticated, currentUser, setCurrentUser, popPage } = useAppStore();
+  const { setIsAuthenticated, currentUser, setCurrentUser, popPage, setShowAccountSwitcherModal } = useAppStore();
+
+  const handleLogout = async () => {
+    if (window.confirm('Are you sure you want to log out of Ennvo? Your account will be saved on this device for quick login.')) {
+      if (currentUser) {
+        saveAccount(currentUser);
+      }
+      try {
+        localStorage.removeItem('ennvo_last_active_user_v1');
+      } catch (e) {}
+      try {
+        await logout();
+      } catch (e) {}
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+      setShowAccountSwitcherModal(true);
+    }
+  };
+
+  const handleSwitchAccount = () => {
+    if (currentUser) {
+      saveAccount(currentUser);
+    }
+    setShowAccountSwitcherModal(true);
+  };
 
   // Modals state
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
@@ -376,16 +401,16 @@ export default function Settings() {
     setIsChangingPw(true);
     try {
       if (currentUser?.hasPassword) {
-        await changeUserPassword(currentPw, newPw);
+        await changeUserPassword(currentPw, newPw, currentUser?.email);
       } else {
-        await setUserPassword(newPw);
+        await setUserPassword(newPw, currentUser?.email);
       }
 
       if (currentUser) {
         setCurrentUser({ ...currentUser, hasPassword: true, authProvider: 'both' });
       }
 
-      setPwSuccessMsg('Password updated successfully!');
+      setPwSuccessMsg(currentUser?.hasPassword ? 'Password updated successfully!' : 'Password set successfully! You can now log in using either Google or Password.');
       setCurrentPw('');
       setNewPw('');
       setConfirmPw('');
@@ -791,11 +816,7 @@ export default function Settings() {
                   </button>
 
                   <button 
-                    onClick={() => {
-                      if (window.confirm('Switch account? You will be taken to the sign-in screen.')) {
-                        setIsAuthenticated(false);
-                      }
-                    }}
+                    onClick={handleSwitchAccount}
                     className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
@@ -806,11 +827,7 @@ export default function Settings() {
                   </button>
 
                   <button 
-                    onClick={() => {
-                      if (window.confirm('Are you sure you want to log out of Ennvo?')) {
-                        setIsAuthenticated(false);
-                      }
-                    }}
+                    onClick={handleLogout}
                     className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-red-50/40 transition-colors text-left"
                   >
                     <span className="text-[15px] font-medium text-red-600">Log out</span>
