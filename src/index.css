@@ -170,42 +170,34 @@ video:not([controls]) {
     border-radius: 9999px;
     display: flex;
     align-items: center;
-    transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-    transform: translateZ(0);
+    transition: background 0.2s ease, border-color 0.2s ease;
+    transform: translate3d(0, 0, 0);
     will-change: transform;
     user-select: none;
     -webkit-user-select: none;
     touch-action: pan-y;
+    contain: layout style;
 }
 
 /* Base Liquid Glass Capsule Styling for Dark Mode (Reels Video Page) */
 .ultra-glass-nav.dark-mode {
-    background: linear-gradient(
-        135deg, 
-        rgba(255, 255, 255, 0.25) 0%, 
-        rgba(255, 255, 255, 0.08) 100%
-    );
-    backdrop-filter: blur(25px) saturate(200%);
-    -webkit-backdrop-filter: blur(25px) saturate(200%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-top: 1.5px solid rgba(255, 255, 255, 0.85);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), inset 0 1px 1.5px rgba(255, 255, 255, 0.7);
+    background: rgba(20, 20, 28, 0.72);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-top: 1.5px solid rgba(255, 255, 255, 0.65);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
 }
 
 /* Liquid Glass Capsule Styling for Light/White Pages */
 .ultra-glass-nav.light-mode {
-    background: linear-gradient(
-        135deg, 
-        rgba(255, 255, 255, 0.82) 0%, 
-        rgba(255, 255, 255, 0.52) 100%
-    );
-    backdrop-filter: blur(25px) saturate(200%);
-    -webkit-backdrop-filter: blur(25px) saturate(200%);
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    border-top: 1.8px solid rgba(255, 255, 255, 0.95);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08), inset 0 1.5px 2px rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    border-top: 1.8px solid rgba(255, 255, 255, 0.98);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), inset 0 1px 1.5px rgba(255, 255, 255, 0.95);
 }
 
 .circle-slot {
@@ -219,56 +211,52 @@ video:not([controls]) {
     justify-content: center;
     pointer-events: none;
     z-index: 1;
-    transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
+    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .circle-slot.is-dragging {
     transition: none !important;
 }
 
-/* Active Bubble Circle on Dark Mode Pages */
+/* Active Bubble Circle on Dark Mode Pages - Ultra Fast No Nested Blur */
 .ultra-glass-nav.dark-mode .active-glass-circle {
     width: 42px;
     height: 42px;
     border-radius: 50%;
-    background: linear-gradient(
-        180deg, 
-        rgba(255, 255, 255, 0.45) 0%, 
-        rgba(255, 255, 255, 0.12) 100%
-    );
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     border-top: 1.5px solid #ffffff;
-    box-shadow: inset 0 1.5px 2px rgba(255, 255, 255, 0.95);
-    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, border-radius 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 1.5px rgba(255, 255, 255, 0.8);
+    transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease, border-radius 0.15s ease;
     will-change: transform;
+    transform: translate3d(0, 0, 0);
 }
 
 .ultra-glass-nav.dark-mode .active-glass-circle.is-holding {
-    transform: scaleX(1.24) scaleY(1.06);
+    transform: scaleX(1.18) scaleY(1.04) translate3d(0, 0, 0);
     border-radius: 20px;
-    box-shadow: 0 0 18px rgba(255, 255, 255, 0.6), inset 0 1.5px 2px #ffffff;
+    box-shadow: 0 0 14px rgba(255, 255, 255, 0.5);
 }
 
-/* Active Bubble Circle on Light/White Pages */
+/* Active Bubble Circle on Light/White Pages - Ultra Fast */
 .ultra-glass-nav.light-mode .active-glass-circle {
     width: 42px;
     height: 42px;
     border-radius: 50%;
     background: #ffffff;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(220, 225, 235, 0.9);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), inset 0 1.5px 2px #ffffff;
-    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, border-radius 0.2s ease;
+    transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease, border-radius 0.15s ease;
     will-change: transform;
+    transform: translate3d(0, 0, 0);
 }
 
 .ultra-glass-nav.light-mode .active-glass-circle.is-holding {
-    transform: scaleX(1.24) scaleY(1.06);
+    transform: scaleX(1.18) scaleY(1.04) translate3d(0, 0, 0);
     border-radius: 20px;
-    box-shadow: 0 6px 20px rgba(124, 58, 237, 0.3), inset 0 1.5px 2px #ffffff;
+    box-shadow: 0 6px 16px rgba(124, 58, 237, 0.25);
 }
 
 .glass-nav-item {
@@ -590,57 +578,124 @@ video::-webkit-media-controls-enclosure {
   pointer-events: none !important;
 }
 
-/* Ultra Smooth Crystal Liquid Water Glass Chat Input Styling - Pure Clear Liquid Water Glass */
+/* Ultra Smooth Crystal Liquid Water Glass Chat Input Styling - Enhanced Liquid Glass */
 .ultra-glass-chat-container {
-  backdrop-filter: blur(10px) saturate(180%);
-  -webkit-backdrop-filter: blur(10px) saturate(180%);
-  background: rgba(255, 255, 255, 0.15) !important;
-  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.65) 0%,
+    rgba(255, 255, 255, 0.50) 100%
+  ) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.98) !important;
   box-shadow: 
-    0 4px 20px -2px rgba(0, 0, 0, 0.04),
-    inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.7),
-    inset 0 -0.5px 0.5px 0 rgba(255, 255, 255, 0.2);
+    0 4px 20px -2px rgba(0, 0, 0, 0.06),
+    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 2px 0 rgba(0, 0, 0, 0.03) !important;
   border-radius: 9999px;
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
   will-change: transform, box-shadow;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .ultra-glass-chat-container:focus-within {
-  background: rgba(255, 255, 255, 0.25) !important;
-  border-color: rgba(255, 255, 255, 0.75) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.82) 0%,
+    rgba(255, 255, 255, 0.68) 100%
+  ) !important;
+  border-color: rgba(255, 255, 255, 0.95) !important;
   box-shadow: 
-    0 8px 30px -4px rgba(0, 0, 0, 0.06),
-    inset 0 1.2px 1.5px 0 rgba(255, 255, 255, 0.85),
-    0 0 0 2px rgba(168, 85, 247, 0.15);
+    0 8px 28px -3px rgba(0, 0, 0, 0.09),
+    inset 0 1.5px 2px 0 #ffffff,
+    0 0 0 2.5px rgba(168, 85, 247, 0.20) !important;
 }
 
-/* iOS Ultra Liquid Glass Floating Header Capsules */
+/* iOS Ultra Liquid Glass Floating Header Capsules - Matched with Input Box */
 .ios-liquid-glass {
-  background: rgba(255, 255, 255, 0.76) !important;
-  backdrop-filter: blur(28px) saturate(200%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.9) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.62) 0%,
+    rgba(255, 255, 255, 0.48) 100%
+  ) !important;
+  backdrop-filter: blur(22px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.98) !important;
   box-shadow: 
-    0 8px 32px 0 rgba(0, 0, 0, 0.06),
-    0 2px 8px 0 rgba(0, 0, 0, 0.03),
-    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 1) !important;
+    0 6px 20px 0 rgba(0, 0, 0, 0.05),
+    0 2px 6px 0 rgba(0, 0, 0, 0.02),
+    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.95) !important;
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
 }
 
 .ios-liquid-glass-button {
-  background: rgba(255, 255, 255, 0.76) !important;
-  backdrop-filter: blur(28px) saturate(200%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.9) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.62) 0%,
+    rgba(255, 255, 255, 0.48) 100%
+  ) !important;
+  backdrop-filter: blur(22px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.98) !important;
   box-shadow: 
-    0 6px 20px 0 rgba(0, 0, 0, 0.05),
-    0 2px 6px 0 rgba(0, 0, 0, 0.02),
-    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 1) !important;
+    0 4px 16px 0 rgba(0, 0, 0, 0.05),
+    0 2px 5px 0 rgba(0, 0, 0, 0.02),
+    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.95) !important;
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
+}
+
+/* Chat Message Bubbles Ultra Fast Virtual Performance Optimization */
+.chat-msg-row-opt {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 65px;
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+}
+
+/* Ultra Glass Popup Menu - Zero Lag Hardware Accelerated */
+.ultra-glass-popup {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(28px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 
+    0 20px 48px -6px rgba(0, 0, 0, 0.16),
+    0 8px 24px -4px rgba(0, 0, 0, 0.08),
+    inset 0 1.5px 2px 0 rgba(255, 255, 255, 1) !important;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+/* Slim Elevated Input Box */
+.ultra-glass-slim-input {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(24px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
+  border: 1px solid rgba(229, 231, 235, 0.85) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 
+    0 10px 30px -4px rgba(0, 0, 0, 0.08),
+    0 4px 12px -2px rgba(0, 0, 0, 0.03),
+    inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.9) !important;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+.ultra-glass-slim-input:focus-within {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-color: rgba(254, 44, 85, 0.35) !important;
+  box-shadow: 
+    0 12px 32px -4px rgba(254, 44, 85, 0.12),
+    0 4px 14px -2px rgba(0, 0, 0, 0.04),
+    inset 0 1px 1.5px 0 rgba(255, 255, 255, 1),
+    0 0 0 2px rgba(254, 44, 85, 0.15) !important;
 }
 
 /* iOS Typing Indicator Wave Animation */

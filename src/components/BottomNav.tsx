@@ -25,6 +25,7 @@ const BottomNav = memo(() => {
 
   // Gesture Drag-To-Navigate State for Glass Nav
   const navRef = useRef<HTMLElement>(null);
+  const circleSlotRef = useRef<HTMLDivElement>(null);
   const isPointerDownRef = useRef(false);
   const startXRef = useRef(0);
   const hasDraggedRef = useRef(false);
@@ -32,7 +33,6 @@ const BottomNav = memo(() => {
   const rafIdRef = useRef<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isHolding, setIsHolding] = useState(false);
-  const [dragTranslateX, setDragTranslateX] = useState<number | null>(null);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const handleItemClick = useCallback((id: string) => {
@@ -99,7 +99,7 @@ const BottomNav = memo(() => {
       const clientX = e.clientX;
       const dx = clientX - startXRef.current;
 
-      if (!hasDraggedRef.current && Math.abs(dx) > 7) {
+      if (!hasDraggedRef.current && Math.abs(dx) > 6) {
         hasDraggedRef.current = true;
         setIsDragging(true);
 
@@ -120,7 +120,10 @@ const BottomNav = memo(() => {
 
           const targetSlotLeft = clientX - rect.left - (itemWidth / 2);
           const clampedSlotLeft = Math.max(0, Math.min(navWidth - itemWidth, targetSlotLeft));
-          setDragTranslateX(clampedSlotLeft);
+          
+          if (circleSlotRef.current) {
+            circleSlotRef.current.style.transform = `translate3d(${clampedSlotLeft}px, 0, 0)`;
+          }
 
           const relativeX = Math.max(0, Math.min(navWidth - 1, clientX - rect.left));
           const currentSlot = Math.min(4, Math.floor(relativeX / itemWidth));
@@ -150,6 +153,10 @@ const BottomNav = memo(() => {
         } catch (err) {}
       }
 
+      if (circleSlotRef.current) {
+        circleSlotRef.current.style.transform = '';
+      }
+
       const finalHoverIndex = hoverIndexRef.current;
       if (hasDraggedRef.current && finalHoverIndex !== null) {
         const targetItem = navItems[finalHoverIndex];
@@ -160,7 +167,6 @@ const BottomNav = memo(() => {
 
       setIsDragging(false);
       setIsHolding(false);
-      setDragTranslateX(null);
       setHoverIndex(null);
       hoverIndexRef.current = null;
       hasDraggedRef.current = false;
@@ -169,22 +175,21 @@ const BottomNav = memo(() => {
     const displayIndex = isDragging && hoverIndex !== null ? hoverIndex : activeGlassIndex;
 
     return (
-      <div className="md:hidden fixed bottom-8 left-0 right-0 z-[60] flex justify-center pointer-events-none pb-[env(safe-area-inset-bottom)] gpu-accelerated">
+      <div className="md:hidden fixed bottom-6 sm:bottom-8 left-0 right-0 z-[60] flex justify-center pointer-events-none pb-[env(safe-area-inset-bottom)] gpu-accelerated">
         <nav 
           ref={navRef}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          className={`ultra-glass-nav pointer-events-auto select-none ${currentPage === 'home' ? 'dark-mode' : 'light-mode'}`}
+          className={`ultra-glass-nav pointer-events-auto select-none ${currentPage === 'home' ? 'dark-mode' : 'light-mode'} ${isHolding || isDragging ? 'is-holding' : ''}`}
         >
           {/* Dynamic Percentage / Continuous Draggable Indicator Slot */}
           <div 
+            ref={circleSlotRef}
             className={`circle-slot ${isDragging ? 'is-dragging' : ''}`} 
             style={{ 
-              transform: isDragging && dragTranslateX !== null 
-                ? `translateX(${dragTranslateX}px)` 
-                : `translateX(${activeGlassIndex * 100}%)` 
+              transform: `translate3d(${activeGlassIndex * 100}%, 0, 0)` 
             }}
           >
             <div className={`active-glass-circle ${isHolding || isDragging ? 'is-holding' : ''}`}></div>
@@ -282,7 +287,7 @@ const BottomNav = memo(() => {
 
   // Render Classic Standard Android Navigation Bar
   return (
-    <div className={`md:hidden fixed bottom-0 left-0 right-0 ${isReels ? 'bg-black/90 border-white/10' : 'bg-white/95 border-gray-100 shadow-xs'} backdrop-blur-lg border-t flex items-center justify-around h-[calc(54px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] z-[60] px-3 select-none gpu-accelerated`}>
+    <div className={`md:hidden fixed bottom-0 left-0 right-0 ${isReels ? 'bg-black/95 border-white/10 text-white' : 'bg-[#F9FAFB] border-gray-200/80 shadow-md text-gray-900'} backdrop-blur-xl border-t flex items-center justify-around h-[calc(54px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] z-[60] px-3 select-none gpu-accelerated`}>
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = currentPage === item.id && (item.id !== 'profile' || viewingUser === null);

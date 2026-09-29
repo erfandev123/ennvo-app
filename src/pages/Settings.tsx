@@ -4,7 +4,8 @@ import {
   Link, Download, Users, Heart, Eye, Moon, Sun, Trash2, Smartphone, 
   Check, ChevronRight, ArrowLeft, CheckCircle2, AlertTriangle, Loader2, 
   KeyRound, ShieldCheck, Mail, EyeOff, Fingerprint, BadgeCheck, 
-  ShieldAlert, Info, QrCode, Copy, FileText, RefreshCw, Film, Sparkles
+  ShieldAlert, Info, QrCode, Copy, FileText, RefreshCw, Film, Sparkles,
+  Palette, UserCheck, Play
 } from 'lucide-react';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -37,12 +38,23 @@ type SettingsScreen =
   | 'liked_videos'            // Liked videos privacy
   | 'free_up_space'           // Free up space
   | 'display_theme'           // Display theme
+  | 'ui_customize'            // UI Customization
   | 'verification'            // Full-page verification
   | 'blocked_accounts';       // Full-page blocked accounts
 
 export default function Settings() {
   const [currentScreen, setCurrentScreen] = useState<SettingsScreen>('main');
-  const { setIsAuthenticated, currentUser, setCurrentUser, popPage, setShowAccountSwitcherModal } = useAppStore();
+  const { setIsAuthenticated, currentUser, setCurrentUser, popPage, setShowAccountSwitcherModal, navStyle, setNavStyle, profileStyle, setProfileStyle, reelsStyle, setReelsStyle } = useAppStore();
+
+  const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const effectiveScreen: SettingsScreen = isDesktop && currentScreen === 'main' ? 'account' : currentScreen;
 
   const handleLogout = async () => {
     if (window.confirm('Are you sure you want to log out of Ennvo? Your account will be saved on this device for quick login.')) {
@@ -272,7 +284,11 @@ export default function Settings() {
     } else if (currentScreen === 'security_overview' || currentScreen === 'manage_devices') {
       setCurrentScreen('security_permissions');
     } else {
-      setCurrentScreen('main');
+      if (isDesktop) {
+        setCurrentScreen('account');
+      } else {
+        setCurrentScreen('main');
+      }
     }
   };
 
@@ -539,15 +555,154 @@ export default function Settings() {
     }
   };
 
+  const navGroups = useMemo(() => [
+    {
+      title: 'Account & Security',
+      items: [
+        { id: 'account', label: 'Account Overview', icon: User },
+        { id: 'account_info', label: 'Account Information', icon: Info },
+        { id: 'password', label: 'Password & Security', icon: KeyRound },
+        { id: 'security_permissions', label: 'Security & Permissions', icon: Shield },
+        { id: 'manage_devices', label: 'Manage Devices', icon: Smartphone, badge: `${devices.length}` },
+        { id: 'verification', label: 'Verification Request', icon: BadgeCheck }
+      ]
+    },
+    {
+      title: 'Privacy & Safety',
+      items: [
+        { id: 'private_account', label: 'Private Account', icon: Lock, badge: userSettings.isPrivate ? 'On' : 'Off' },
+        { id: 'blocked_accounts', label: 'Blocked Accounts', icon: UserX },
+        { id: 'share_profile', label: 'Share Profile', icon: Share2, action: () => setShowShareModal(true) }
+      ]
+    },
+    {
+      title: 'Interactions',
+      items: [
+        { id: 'comments', label: 'Comments', icon: MessageSquare },
+        { id: 'mentions', label: 'Mentions & Tags', icon: AtSign },
+        { id: 'direct_messages', label: 'Direct Messages', icon: Send },
+        { id: 'reuse_content', label: 'Reuse of Content', icon: Film },
+        { id: 'following_list', label: 'Following List', icon: Users },
+        { id: 'liked_videos', label: 'Liked Videos', icon: Heart }
+      ]
+    },
+    {
+      title: 'Preferences',
+      items: [
+        { id: 'ui_customize', label: 'UI Customization', icon: Palette, badge: navStyle === 'glass' ? 'Glass' : 'Classic' },
+        { id: 'display_theme', label: 'Display & Theme', icon: Sun, badge: userSettings.appTheme === 'dark' ? 'Dark' : 'Light' },
+        { id: 'free_up_space', label: 'Free Up Space & Cache', icon: Trash2 }
+      ]
+    }
+  ], [devices.length, userSettings.isPrivate, userSettings.appTheme, navStyle]);
+
   return (
-    <div className="h-full w-full overflow-y-auto overscroll-y-contain bg-[#F6F6F8] text-gray-900 font-sans antialiased md:pl-24 flex flex-col items-center">
-      {/* Container restricted to mobile-optimized width for that clean TikTok-style settings feel */}
-      <div className="w-full max-w-xl min-h-full flex flex-col bg-[#F6F6F8] pb-20">
+    <div className="h-full w-full overflow-y-auto overscroll-y-contain bg-[#F8F9FA] text-gray-900 font-sans antialiased md:pl-24 flex flex-col items-center">
+      {/* Container: on mobile max-w-xl, on PC max-w-7xl with two columns */}
+      <div className="w-full max-w-xl md:max-w-7xl min-h-full flex flex-col pb-20 px-0 md:px-6 md:py-6">
+        
+        {/* Desktop Top Title Bar */}
+        <div className="hidden md:flex items-center justify-between pb-5 mb-6 border-b border-gray-200/80">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => popPage()}
+              className="p-2.5 rounded-2xl hover:bg-gray-200/60 text-gray-700 transition-colors border border-gray-200/60 bg-white shadow-2xs cursor-pointer"
+              title="Return to app"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-2xl font-black text-gray-900 tracking-tight">Settings & Privacy</h1>
+              <p className="text-xs text-gray-500 font-medium">Manage your personal account, security credentials, and preferences</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 bg-white px-3.5 py-2 rounded-2xl border border-gray-200/70 shadow-2xs">
+            <img 
+              src={currentUser?.avatar || "https://picsum.photos/seed/myprofile/120/120"} 
+              alt="Avatar" 
+              className="w-9 h-9 rounded-full object-cover border border-purple-500/30"
+            />
+            <div className="leading-tight">
+              <p className="text-[13px] font-bold text-gray-900">{currentUser?.name || 'Ennvo User'}</p>
+              <p className="text-[11px] text-purple-700 font-medium">@{currentUser?.username || 'user'}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop 2-Column Split View */}
+        <div className="w-full md:grid md:grid-cols-12 md:gap-6 lg:gap-8 items-start">
+          
+          {/* DESKTOP LEFT NAVIGATION SIDEBAR (Visible on md+) */}
+          <aside className="hidden md:flex md:col-span-5 lg:col-span-4 flex-col bg-white rounded-3xl border border-gray-200/80 shadow-xs p-4 sticky top-6 max-h-[calc(100vh-6rem)] overflow-y-auto space-y-5">
+            {navGroups.map((group) => (
+              <div key={group.title} className="space-y-1">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 px-3 py-1">
+                  {group.title}
+                </p>
+                <div className="space-y-0.5">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = effectiveScreen === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          if (item.action) {
+                            item.action();
+                          } else if (item.id) {
+                            setCurrentScreen(item.id as SettingsScreen);
+                          }
+                        }}
+                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-left text-[14px] font-medium transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-purple-600 text-white font-semibold shadow-xs shadow-purple-600/25'
+                            : 'text-gray-700 hover:bg-gray-100/70 hover:text-gray-900'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-gray-500'}`} />
+                          <span className="truncate">{item.label}</span>
+                        </div>
+                        {item.badge && (
+                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                            isActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {/* Bottom Actions */}
+            <div className="pt-2 border-t border-gray-100 space-y-1">
+              <button
+                onClick={handleSwitchAccount}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-left text-[14px] font-medium text-gray-700 hover:bg-gray-100/70 transition-colors cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4 text-gray-500 shrink-0" />
+                <span>Switch account</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-left text-[14px] font-medium text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+              >
+                <Lock className="w-4 h-4 text-red-500 shrink-0" />
+                <span>Log out</span>
+              </button>
+            </div>
+          </aside>
+
+          {/* RIGHT DETAIL CONTENT PANEL (Full width on mobile, col-span-7/8 on desktop) */}
+          <main className="w-full md:col-span-7 lg:col-span-8 bg-transparent md:bg-white md:rounded-3xl md:border md:border-gray-200/80 md:shadow-xs overflow-hidden min-h-[620px]">
 
         {/* ========================================================= */}
         {/* SCREEN 1: MAIN "Settings and privacy"                     */}
         {/* ========================================================= */}
-        {currentScreen === 'main' && (
+        {(!isDesktop && currentScreen === 'main') && (
           <div className="flex-1 flex flex-col pb-16">
             {/* Header */}
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
@@ -771,6 +926,23 @@ export default function Settings() {
                 <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Content & display</p>
                 <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
                   <button 
+                    onClick={() => setCurrentScreen('ui_customize')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-purple-50/60 transition-colors text-left bg-purple-50/30"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Palette className="w-5 h-5 text-purple-600 shrink-0" />
+                      <div>
+                        <span className="text-[15px] font-bold text-gray-900 block">UI Customization</span>
+                        <span className="text-[12px] text-gray-500 block">Classic vs Glass Nav, Profile & Reels</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <span className="text-[12px] font-bold text-purple-700 bg-purple-100/90 px-2.5 py-0.5 rounded-full capitalize">{navStyle === 'glass' ? 'Glass' : 'Classic'}</span>
+                      <ChevronRight className="w-4 h-4 text-purple-600 shrink-0" />
+                    </div>
+                  </button>
+
+                  <button 
                     onClick={() => setCurrentScreen('display_theme')}
                     className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
                   >
@@ -842,7 +1014,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {/* SCREEN 2: "Account" (Image 4)                             */}
         {/* ========================================================= */}
-        {currentScreen === 'account' && (
+        {effectiveScreen === 'account' && (
           <div className="flex-1 flex flex-col pb-16">
             {/* Header */}
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
@@ -975,7 +1147,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {/* SCREEN 3: "Security and permissions" (Image 3)            */}
         {/* ========================================================= */}
-        {currentScreen === 'security_permissions' && (
+        {effectiveScreen === 'security_permissions' && (
           <div className="flex-1 flex flex-col pb-16">
             {/* Header */}
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
@@ -1096,7 +1268,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {/* SCREEN 4: "Security" Overview (Image 2)                   */}
         {/* ========================================================= */}
-        {currentScreen === 'security_overview' && (
+        {effectiveScreen === 'security_overview' && (
           <div className="flex-1 flex flex-col pb-16">
             {/* Header */}
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
@@ -1167,7 +1339,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {/* SCREEN 5: "Manage devices" (Image 6)                      */}
         {/* ========================================================= */}
-        {currentScreen === 'manage_devices' && (
+        {effectiveScreen === 'manage_devices' && (
           <div className="flex-1 flex flex-col pb-16">
             {/* Header */}
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
@@ -1246,28 +1418,28 @@ export default function Settings() {
         {/* ========================================================= */}
         {/* SUB-SCREEN: Account Information (Full Page)               */}
         {/* ========================================================= */}
-        {currentScreen === 'account_info' && (
+        {effectiveScreen === 'account_info' && (
           <AccountInfoScreen onBack={handleBack} />
         )}
 
         {/* ========================================================= */}
         {/* SUB-SCREEN: Verification (Full Page)                      */}
         {/* ========================================================= */}
-        {currentScreen === 'verification' && (
+        {effectiveScreen === 'verification' && (
           <VerificationScreen onBack={handleBack} />
         )}
 
         {/* ========================================================= */}
         {/* SUB-SCREEN: Blocked Accounts (Full Page)                  */}
         {/* ========================================================= */}
-        {currentScreen === 'blocked_accounts' && (
+        {effectiveScreen === 'blocked_accounts' && (
           <BlockedAccountsScreen onBack={handleBack} />
         )}
 
         {/* ========================================================= */}
         {/* SUB-SCREEN: Password                                      */}
         {/* ========================================================= */}
-        {currentScreen === 'password' && (
+        {effectiveScreen === 'password' && (
           <div className="flex-1 flex flex-col pb-16">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
@@ -1397,7 +1569,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {/* SUB-SCREEN: Private Account                               */}
         {/* ========================================================= */}
-        {currentScreen === 'private_account' && (
+        {effectiveScreen === 'private_account' && (
           <div className="flex-1 flex flex-col pb-16">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
@@ -1435,7 +1607,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {/* SUB-SCREEN: Comments Settings                             */}
         {/* ========================================================= */}
-        {currentScreen === 'comments' && (
+        {effectiveScreen === 'comments' && (
           <div className="flex-1 flex flex-col pb-16">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
@@ -1498,7 +1670,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {/* SUB-SCREEN: Mentions Settings                             */}
         {/* ========================================================= */}
-        {currentScreen === 'mentions' && (
+        {effectiveScreen === 'mentions' && (
           <div className="flex-1 flex flex-col pb-16">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
@@ -1536,7 +1708,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {/* SUB-SCREEN: Direct Messages Settings                      */}
         {/* ========================================================= */}
-        {currentScreen === 'direct_messages' && (
+        {effectiveScreen === 'direct_messages' && (
           <div className="flex-1 flex flex-col pb-16">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
@@ -1599,7 +1771,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {/* SUB-SCREEN: Reuse of content                              */}
         {/* ========================================================= */}
-        {currentScreen === 'reuse_content' && (
+        {effectiveScreen === 'reuse_content' && (
           <div className="flex-1 flex flex-col pb-16">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
@@ -1637,7 +1809,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {/* SUB-SCREEN: Following List Privacy                        */}
         {/* ========================================================= */}
-        {currentScreen === 'following_list' && (
+        {effectiveScreen === 'following_list' && (
           <div className="flex-1 flex flex-col pb-16">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
@@ -1674,7 +1846,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {/* SUB-SCREEN: Liked Videos Privacy                          */}
         {/* ========================================================= */}
-        {currentScreen === 'liked_videos' && (
+        {effectiveScreen === 'liked_videos' && (
           <div className="flex-1 flex flex-col pb-16">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
@@ -1711,7 +1883,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {/* SUB-SCREEN: Free up space (Cache cleaner)                 */}
         {/* ========================================================= */}
-        {currentScreen === 'free_up_space' && (
+        {effectiveScreen === 'free_up_space' && (
           <div className="flex-1 flex flex-col pb-16">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
@@ -1771,7 +1943,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {/* SUB-SCREEN: Display Theme                                 */}
         {/* ========================================================= */}
-        {currentScreen === 'display_theme' && (
+        {effectiveScreen === 'display_theme' && (
           <div className="flex-1 flex flex-col pb-16">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
@@ -1813,6 +1985,200 @@ export default function Settings() {
             </div>
           </div>
         )}
+
+        {/* ========================================================= */}
+        {/* SUB-SCREEN: UI Customization                              */}
+        {/* ========================================================= */}
+        {effectiveScreen === 'ui_customize' && (
+          <div className="flex-1 flex flex-col pb-16">
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                UI Customization
+              </h1>
+            </div>
+
+            <div className="px-4 py-4 space-y-6">
+              {/* Navigation Bar Design */}
+              <div>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Navigation Bar (2 Designs)</p>
+                <div className="space-y-2.5">
+                  <button
+                    onClick={() => setNavStyle('glass')}
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${
+                      navStyle === 'glass' 
+                        ? 'bg-purple-50/70 border-purple-300 shadow-2xs' 
+                        : 'bg-white border-gray-100 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3.5 min-w-0">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        navStyle === 'glass' ? 'bg-purple-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        <Sparkles className="w-5 h-5" />
+                      </div>
+                      <div className="truncate">
+                        <span className="text-[15px] font-bold text-gray-900 block leading-snug">Glass Navigation</span>
+                        <span className="text-[12px] text-gray-500 block leading-tight">Floating glass capsule with drag gesture</span>
+                      </div>
+                    </div>
+                    {navStyle === 'glass' ? (
+                      <Check className="w-5 h-5 text-purple-600 shrink-0 ml-2" />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-2" />
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setNavStyle('classic')}
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${
+                      navStyle === 'classic' 
+                        ? 'bg-purple-50/70 border-purple-300 shadow-2xs' 
+                        : 'bg-white border-gray-100 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3.5 min-w-0">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        navStyle === 'classic' ? 'bg-purple-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        <Smartphone className="w-5 h-5" />
+                      </div>
+                      <div className="truncate">
+                        <span className="text-[15px] font-bold text-gray-900 block leading-snug">Classic Navigation</span>
+                        <span className="text-[12px] text-gray-500 block leading-tight">Standard clean bottom navigation bar</span>
+                      </div>
+                    </div>
+                    {navStyle === 'classic' ? (
+                      <Check className="w-5 h-5 text-purple-600 shrink-0 ml-2" />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-2" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Profile Layout Design */}
+              <div>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Profile Layout (2 Designs)</p>
+                <div className="space-y-2.5">
+                  <button
+                    onClick={() => setProfileStyle('design1')}
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${
+                      profileStyle === 'design1' 
+                        ? 'bg-purple-50/70 border-purple-300 shadow-2xs' 
+                        : 'bg-white border-gray-100 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3.5 min-w-0">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        profileStyle === 'design1' ? 'bg-purple-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        <User className="w-5 h-5" />
+                      </div>
+                      <div className="truncate">
+                        <span className="text-[15px] font-bold text-gray-900 block leading-snug">Design 1 (Standard Modern)</span>
+                        <span className="text-[12px] text-gray-500 block leading-tight">Full banner header, avatar ring & tabs</span>
+                      </div>
+                    </div>
+                    {profileStyle === 'design1' ? (
+                      <Check className="w-5 h-5 text-purple-600 shrink-0 ml-2" />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-2" />
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setProfileStyle('design2')}
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${
+                      profileStyle === 'design2' 
+                        ? 'bg-purple-50/70 border-purple-300 shadow-2xs' 
+                        : 'bg-white border-gray-100 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3.5 min-w-0">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        profileStyle === 'design2' ? 'bg-purple-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        <UserCheck className="w-5 h-5" />
+                      </div>
+                      <div className="truncate">
+                        <span className="text-[15px] font-bold text-gray-900 block leading-snug">Design 2 (Compact Minimal Card)</span>
+                        <span className="text-[12px] text-gray-500 block leading-tight">Centered avatar card with quick stats</span>
+                      </div>
+                    </div>
+                    {profileStyle === 'design2' ? (
+                      <Check className="w-5 h-5 text-purple-600 shrink-0 ml-2" />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-2" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Reels Layout Design */}
+              <div>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Reels Feed (2 Designs)</p>
+                <div className="space-y-2.5">
+                  <button
+                    onClick={() => setReelsStyle('design1')}
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${
+                      reelsStyle === 'design1' 
+                        ? 'bg-purple-50/70 border-purple-300 shadow-2xs' 
+                        : 'bg-white border-gray-100 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3.5 min-w-0">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        reelsStyle === 'design1' ? 'bg-purple-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        <Film className="w-5 h-5" />
+                      </div>
+                      <div className="truncate">
+                        <span className="text-[15px] font-bold text-gray-900 block leading-snug">Design 1 (Immersive Player)</span>
+                        <span className="text-[12px] text-gray-500 block leading-tight">Edge-to-edge full screen with action icons</span>
+                      </div>
+                    </div>
+                    {reelsStyle === 'design1' ? (
+                      <Check className="w-5 h-5 text-purple-600 shrink-0 ml-2" />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-2" />
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setReelsStyle('design2')}
+                    className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${
+                      reelsStyle === 'design2' 
+                        ? 'bg-purple-50/70 border-purple-300 shadow-2xs' 
+                        : 'bg-white border-gray-100 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3.5 min-w-0">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        reelsStyle === 'design2' ? 'bg-purple-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        <Play className="w-5 h-5" />
+                      </div>
+                      <div className="truncate">
+                        <span className="text-[15px] font-bold text-gray-900 block leading-snug">Design 2 (Clean Minimal)</span>
+                        <span className="text-[12px] text-gray-500 block leading-tight">Minimal overlays with focused video view</span>
+                      </div>
+                    </div>
+                    {reelsStyle === 'design2' ? (
+                      <Check className="w-5 h-5 text-purple-600 shrink-0 ml-2" />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-2" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+          </main>
+        </div>
       </div>
 
       {/* ========================================================= */}

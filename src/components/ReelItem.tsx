@@ -31,11 +31,15 @@ import {
   Share2,
   Link,
   PlusCircle,
+  Plus,
   Flag,
   Lock,
   Globe,
   Users,
-  Zap
+  Zap,
+  BarChart2,
+  TrendingUp,
+  Eye
 } from 'lucide-react';
 import { StickerPickerModal } from './StickerPickerModal';
 import { useAppStore } from '../store';
@@ -92,9 +96,9 @@ interface ReelItemProps {
 
 export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, onClose }) => {
   const [playing, setPlaying] = useState(false);
-  const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [reposted, setReposted] = useState(false);
+  const [liked, setLiked] = useState<boolean>(() => !!(reel.isLiked || reel.liked));
+  const [saved, setSaved] = useState<boolean>(() => !!(reel.isSaved || reel.saved));
+  const [reposted, setReposted] = useState<boolean>(() => !!reel.isReposted);
   const [progress, setProgress] = useState(0);
   const [likesCount, setLikesCount] = useState(reel.likesCount || 0);
   const [commentsCount, setCommentsCount] = useState(reel.commentsCount || 0);
@@ -102,7 +106,11 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
   const [showComments, setShowComments] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [isFollowingUser, setIsFollowingUser] = useState(false);
+  const [isFollowingUser, setIsFollowingUser] = useState<boolean>(() => {
+    if (reel.isFollowing !== undefined) return reel.isFollowing;
+    const fIds = useAppStore.getState().followingIds;
+    return fIds ? fIds.includes(reel.authorId) : false;
+  });
   const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
   const [floatingHearts, setFloatingHearts] = useState<{ id: number, x: number, y: number }[]>([]);
   const [isNearScreen, setIsNearScreen] = useState(true);
@@ -121,6 +129,10 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const scrubberThumbRef = useRef<HTMLDivElement>(null);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [scrubTime, setScrubTime] = useState(0);
+  const wasPlayingBeforeScrubRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastTap = useRef<number>(0);
   const touchStartX = useRef<number>(0);
@@ -137,6 +149,10 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
 
   const handleSpeedHoldStart = useCallback((e: React.SyntheticEvent) => {
     if (speedTimerRef.current) clearTimeout(speedTimerRef.current);
+    // Disable 2x speed hold on PC / Desktop screens
+    if (typeof window !== "undefined" && window.innerWidth >= 768) {
+      return;
+    }
     if (isImageReel) {
       speedTimerRef.current = setTimeout(() => {
         if (typeof window !== "undefined" && window.navigator?.vibrate) {
@@ -187,6 +203,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
     pushPage, 
     setViewingReel, 
     highlightedCommentId, 
+    setHighlightedCommentId,
     highlightedPostId, 
     setHighlightedPostId, 
     setShowLikesList, 
@@ -200,14 +217,32 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
     setIsReelsCleanZoom,
     setIsBottomNavHidden,
     setSelectedCreateSong,
-    navStyle
+    navStyle,
+    reelsUiStyle
   } = useAppStore();
 
-  const reelBottomSpacing = isModal ? 'bottom-8' : navStyle === 'glass' ? 'bottom-[calc(96px+env(safe-area-inset-bottom))]' : 'bottom-[calc(65px+env(safe-area-inset-bottom))]';
+  const reelBottomSpacing = isModal ? 'bottom-[78px]' : navStyle === 'glass' ? 'bottom-[calc(98px+env(safe-area-inset-bottom))]' : 'bottom-[calc(72px+env(safe-area-inset-bottom))]';
 
   const cachedAuthor = userCache[reel.authorId];
   const authorName = cachedAuthor?.name || reel.authorName;
   const authorAvatar = cachedAuthor?.avatar || reel.authorAvatar;
+
+  const [mediaSrc, setMediaSrc] = useState<string>(reel.media?.[0] || '');
+
+  useEffect(() => {
+    const original = reel.media?.[0];
+    if (!original) return;
+    setMediaSrc(original);
+
+    // If cached in offline storage, use local blob URL for zero-lag offline playback
+    import('../services/offlineMediaService').then(m => {
+      m.getOfflineMediaBlobUrl(original).then(cachedBlobUrl => {
+        if (cachedBlobUrl) {
+          setMediaSrc(cachedBlobUrl);
+        }
+      });
+    });
+  }, [reel.media?.[0]]);
 
   useEffect(() => {
     if (isCleanZoom || is2XSpeed) {
@@ -316,11 +351,14 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
 
   useEffect(() => {
     if (highlightedPostId === reel.id && highlightedCommentId && currentUser) {
-      // If there's a highlighted comment for THIS reel, automatically show comments
+      // Automatically show comments once and consume the highlighted ID
       setShowComments(true);
-      // We don't clear setHighlightedPostId(null) here yet, might need it for scrolling in CommentsPortal
+      if (typeof setHighlightedPostId === 'function') {
+        setHighlightedPostId(null);
+        setHighlightedCommentId(null);
+      }
     }
-  }, [highlightedCommentId, highlightedPostId, reel.id, currentUser]);
+  }, [highlightedCommentId, highlightedPostId, reel.id, currentUser, setHighlightedPostId, setHighlightedCommentId]);
 
   useEffect(() => {
     return () => {
@@ -336,7 +374,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
   }, [reel.id]);
 
   useEffect(() => {
-    if (!isNearScreen || !currentUser || (!playing && !showComments)) return;
+    if (!isNearScreen || !currentUser) return;
 
     const reelRef = doc(db, 'posts', reel.id);
     const likeRef = doc(db, 'posts', reel.id, 'likes', currentUser.uid);
@@ -478,10 +516,13 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
   }, []);
 
   const handleTimeUpdate = () => {
-    if (videoRef.current) {
+    if (videoRef.current && !isScrubbing) {
       const p = (videoRef.current.currentTime / videoRef.current.duration) * 100;
       if (progressBarRef.current) {
         progressBarRef.current.style.width = `${p}%`;
+      }
+      if (scrubberThumbRef.current) {
+        scrubberThumbRef.current.style.left = `${p}%`;
       }
       if (audioRef.current && isExternalAudioSong && !audioRef.current.paused) {
         const diff = Math.abs(audioRef.current.currentTime - videoRef.current.currentTime);
@@ -491,6 +532,63 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
         }
       }
     }
+  };
+
+  const updateScrubPosition = (clientX: number, target: HTMLElement) => {
+    if (!videoRef.current || !videoRef.current.duration) return;
+    const rect = target.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const percentage = Math.max(0, Math.min(1, x / rect.width));
+    const targetTime = percentage * videoRef.current.duration;
+    videoRef.current.currentTime = targetTime;
+    if (audioRef.current) audioRef.current.currentTime = targetTime;
+    if (progressBarRef.current) {
+      progressBarRef.current.style.transition = 'none';
+      progressBarRef.current.style.width = `${percentage * 100}%`;
+    }
+    if (scrubberThumbRef.current) {
+      scrubberThumbRef.current.style.transition = 'none';
+      scrubberThumbRef.current.style.left = `${percentage * 100}%`;
+    }
+    setScrubTime(targetTime);
+  };
+
+  const handleScrubPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch (err) {}
+    wasPlayingBeforeScrubRef.current = playing;
+    setIsScrubbing(true);
+    updateScrubPosition(e.clientX, e.currentTarget);
+  };
+
+  const handleScrubPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isScrubbing) return;
+    e.stopPropagation();
+    updateScrubPosition(e.clientX, e.currentTarget);
+  };
+
+  const handleScrubPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isScrubbing) return;
+    e.stopPropagation();
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch (err) {}
+    setIsScrubbing(false);
+    if (wasPlayingBeforeScrubRef.current && videoRef.current) {
+      videoRef.current.play().catch(() => {});
+      setPlaying(true);
+    }
+  };
+
+  const formatScrubSecs = (sec: number) => {
+    if (isNaN(sec) || !isFinite(sec)) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
   const handleLike = async () => {
@@ -819,6 +917,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                     onClick={async (e) => {
                       e.stopPropagation();
                       if (!currentUser) return;
+                      setIsFollowingUser(true);
                       await followUser(currentUser, { uid: reel.authorId, name: reel.authorName, avatar: reel.authorAvatar });
                     }}
                     className="text-blue-600 font-normal text-[14px] hover:text-blue-700 transition-colors"
@@ -888,7 +987,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
           ) : (
             <video 
               ref={videoRef}
-              src={reel.media?.[0]} 
+              src={mediaSrc || reel.media?.[0]} 
               loop 
               muted={muted || isExternalAudioSong}
               playsInline
@@ -968,246 +1067,402 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                   setTargetAnalyticsPostId(reel.id);
                   setShowAnalytics(true);
                 }}
-                className="mb-1.5 bg-black/40 hover:bg-black/60 text-white text-[10px] font-normal px-2.5 py-1 rounded-full border border-white/20 backdrop-blur-md transition-all active:scale-95 flex items-center space-x-1 self-start shadow-xs"
+                className="mb-1.5 p-2 bg-black/45 hover:bg-black/70 text-white rounded-full border border-white/20 backdrop-blur-md transition-all active:scale-90 flex items-center justify-center self-start shadow-md cursor-pointer"
+                title="Analytics"
               >
-                <MoreHorizontal className="w-3 h-3 text-white/90" />
-                <span>View Analytics</span>
+                <BarChart2 className="w-3.5 h-3.5 text-white" />
               </button>
             )}
-            <div className="flex items-center space-x-2 mb-2">
-              <img 
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  setViewingUser({ uid: reel.authorId, name: authorName, avatar: authorAvatar }); 
+            {/* Author / Info Details Container */}
+            {reelsUiStyle === 'tiktok' ? (
+              /* TikTok Clean UI Layout (From User Screenshot) */
+              <>
+                <div className="flex items-center space-x-1.5 mb-1.5 cursor-pointer" onClick={(e) => {
+                  e.stopPropagation();
+                  setViewingUser({ uid: reel.authorId, name: authorName, avatar: authorAvatar });
                   if (onClose) onClose();
-                  pushPage('profile'); 
-                }}
-                src={authorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=random`} 
-                className="w-9 h-9 rounded-full object-cover border-2 border-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.3)] cursor-pointer" 
-              />
-              <div className="flex items-center space-x-1">
-                <span className="text-[15px] font-normal text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] cursor-pointer hover:underline" onClick={() => {
-                   setViewingUser({ uid: reel.authorId, name: authorName, avatar: authorAvatar }); 
-                   if (onClose) onClose();
-                   pushPage('profile'); 
+                  pushPage('profile');
                 }}>
-                  {(authorName || 'User').toLowerCase().replace(/\s+/g, '_')}
-                </span>
-                {(reel as any).authorIsVerified && <VerifiedBadge />}
-              </div>
-              {!isCurrentUser && !isFollowingUser && (
-                <>
-                  <span className="text-white/60 text-xs">•</span>
+                  <span className="text-[15px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] hover:underline">
+                    @{authorName.toLowerCase().replace(/\s+/g, '')}
+                  </span>
+                  {(reel as any).authorIsVerified && <VerifiedBadge />}
+                </div>
+
+                {reel.text && (
+                  <div 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsCaptionExpanded(!isCaptionExpanded);
+                    }}
+                    className="cursor-pointer mb-2 pr-12 select-none"
+                  >
+                    <p className={`text-white text-[13.5px] font-normal leading-[1.35] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] ${!isCaptionExpanded ? 'line-clamp-2' : ''} break-words`}>
+                      {reel.text}
+                    </p>
+                    {reel.text.length > 60 && (
+                      <span className="text-[12px] font-bold text-white/90 hover:text-white underline mt-0.5 inline-block">
+                        {isCaptionExpanded ? 'See less' : 'See more'}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Audio Track Info */}
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowSongModal(true);
+                  }}
+                  className="flex items-center space-x-2 text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] cursor-pointer hover:opacity-90 max-w-[220px]"
+                >
+                  <Music className="w-3.5 h-3.5 shrink-0 animate-pulse" />
+                  <span className="text-[12px] font-normal truncate">
+                    {reelSong ? `${reelSong.title} • ${reelSong.artist}` : `Original Sound - ${authorName}`}
+                  </span>
+                </div>
+              </>
+            ) : (
+              /* Ennvo Modern UI Layout (Original) */
+              <>
+                <div className="flex items-center space-x-2 mb-2">
+                  <img 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      setViewingUser({ uid: reel.authorId, name: authorName, avatar: authorAvatar }); 
+                      if (onClose) onClose();
+                      pushPage('profile'); 
+                    }}
+                    src={authorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=random`} 
+                    className="w-9 h-9 rounded-full object-cover border-2 border-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.3)] cursor-pointer" 
+                  />
+                  <div className="flex items-center space-x-1">
+                    <span className="text-[15px] font-normal text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] cursor-pointer hover:underline" onClick={() => {
+                       setViewingUser({ uid: reel.authorId, name: authorName, avatar: authorAvatar }); 
+                       if (onClose) onClose();
+                       pushPage('profile'); 
+                    }}>
+                      {(authorName || 'User').toLowerCase().replace(/\s+/g, '_')}
+                    </span>
+                    {(reel as any).authorIsVerified && <VerifiedBadge />}
+                  </div>
+                  {!isCurrentUser && !isFollowingUser && (
+                    <>
+                      <span className="text-white/60 text-xs">•</span>
+                      <button 
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (!currentUser) return;
+                          setIsFollowingUser(true);
+                          await followUser(currentUser, { uid: reel.authorId, name: reel.authorName, avatar: reel.authorAvatar });
+                        }}
+                        className="text-white border border-white/50 bg-black/20 font-normal text-[12px] px-2 py-0.5 rounded-md hover:bg-white hover:text-black transition-colors"
+                      >
+                        Follow
+                      </button>
+                    </>
+                  )}
+                </div>
+                {reel.text && (
+                  <div 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsCaptionExpanded(!isCaptionExpanded);
+                    }}
+                    className="cursor-pointer mb-2 pr-[60px] select-none"
+                  >
+                    <p className={`text-white text-[14px] font-normal leading-[1.4] drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] ${!isCaptionExpanded ? 'line-clamp-2' : ''} break-words whitespace-pre-line`}>
+                      {reel.text}
+                    </p>
+                    {reel.text.length > 50 && (
+                      <button 
+                        type="button"
+                        className="text-[12px] font-medium text-white/90 hover:text-white underline mt-0.5 inline-block drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+                      >
+                        {isCaptionExpanded ? 'See less' : 'See more...'}
+                      </button>
+                    )}
+                  </div>
+                )}
+                
+                {/* Audio Track Info */}
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowSongModal(true);
+                  }}
+                  className="flex items-center space-x-2 text-white/90 max-w-[200px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] cursor-pointer hover:opacity-90 transition-opacity"
+                >
+                   <Music className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+                   <div className="flex flex-col overflow-hidden">
+                     <span className="text-[12px] truncate font-normal">{reelSong ? reelSong.title : 'Original Audio'}</span>
+                     {reelSong && <span className="text-[9px] truncate font-normal text-white/60">{reelSong.artist}</span>}
+                   </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Vertical Action Buttons (Overlayed on Video - MOBILE ONLY) */}
+          {reelsUiStyle === 'tiktok' ? (
+            /* TikTok Clean UI Vertical Action Stack (Matches User Image) */
+            <div className={`md:hidden absolute right-2.5 ${reelBottomSpacing} flex flex-col items-center space-y-4 z-40 pointer-events-auto transition-all duration-300 ${isCleanZoom || is2XSpeed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+              {/* 1. Profile Avatar with Red/Pink + Follow Badge */}
+              <div className="relative mb-1 flex items-center justify-center">
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewingUser({ uid: reel.authorId, name: authorName, avatar: authorAvatar });
+                    if (onClose) onClose();
+                    pushPage('profile');
+                  }}
+                  className="w-[48px] h-[48px] rounded-full border-2 border-white overflow-hidden shadow-lg cursor-pointer active:scale-95 transition-transform"
+                >
+                  <img 
+                    src={authorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=random`} 
+                    className="w-full h-full object-cover" 
+                    alt={authorName} 
+                  />
+                </div>
+                {!isCurrentUser && !isFollowingUser && (
                   <button 
                     onClick={async (e) => {
                       e.stopPropagation();
                       if (!currentUser) return;
+                      setIsFollowingUser(true);
                       await followUser(currentUser, { uid: reel.authorId, name: reel.authorName, avatar: reel.authorAvatar });
                     }}
-                    className="text-white border border-white/50 bg-black/20 font-normal text-[12px] px-2 py-0.5 rounded-md hover:bg-white hover:text-black transition-colors"
+                    className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 bg-[#FE2C55] rounded-full flex items-center justify-center text-white shadow-md hover:scale-110 active:scale-90 transition-transform cursor-pointer border border-white/40"
+                    title="Follow"
                   >
-                    Follow
-                  </button>
-                </>
-              )}
-            </div>
-            {reel.text && (
-              <div 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsCaptionExpanded(!isCaptionExpanded);
-                }}
-                className="cursor-pointer mb-2 pr-[60px] select-none"
-              >
-                <p className={`text-white text-[14px] font-normal leading-[1.4] drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] ${!isCaptionExpanded ? 'line-clamp-2' : ''} break-words whitespace-pre-line`}>
-                  {reel.text}
-                </p>
-                {reel.text.length > 50 && (
-                  <button 
-                    type="button"
-                    className="text-[12px] font-medium text-white/90 hover:text-white underline mt-0.5 inline-block drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
-                  >
-                    {isCaptionExpanded ? 'See less' : 'See more...'}
+                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
                   </button>
                 )}
               </div>
-            )}
-            
-            {/* Audio Track Info */}
-            <div 
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowSongModal(true);
-              }}
-              className="flex items-center space-x-2 text-white/90 max-w-[200px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] cursor-pointer hover:opacity-90 transition-opacity"
-            >
-               <Music className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
-               <div className="flex flex-col overflow-hidden">
-                 <span className="text-[12px] truncate font-normal">{reelSong ? reelSong.title : 'Original Audio'}</span>
-                 {reelSong && <span className="text-[9px] truncate font-normal text-white/60">{reelSong.artist}</span>}
-               </div>
-            </div>
-          </div>
 
-          {/* Vertical Action Buttons (Overlayed on Video - MOBILE ONLY) */}
-          <div className={`md:hidden absolute right-2.5 ${reelBottomSpacing} flex flex-col items-center space-y-2.5 z-40 pointer-events-auto transition-all duration-300 ${isCleanZoom || is2XSpeed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-            <div 
-              onClick={(e) => { e.stopPropagation(); handleLike(); }} 
-              onTouchStart={(e) => { e.stopPropagation(); }}
-              className={`flex flex-col items-center cursor-pointer select-none active:scale-90 transition-transform ${liked ? 'liked' : ''}`}
-            >
-              <div className="text-[1.85rem] leading-none text-white/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200 active:scale-75" style={liked ? {color: '#fe2c55', filter: 'drop-shadow(0 0 6px rgba(254, 44, 85, 0.5))'} : {}}>
-                <ion-icon name={liked ? "heart" : "heart-outline"}></ion-icon>
-              </div>
-              <span className="text-white text-[0.75rem] font-medium mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{demoCounts.likes}</span>
-            </div>
-            
-            <div onClick={(e) => { e.stopPropagation(); setShowComments(true); }} className="flex flex-col items-center cursor-pointer">
-              <div className="text-[1.85rem] leading-none text-white/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200 active:scale-75">
-                <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
-              </div>
-              <span className="text-white text-[0.75rem] font-medium mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{demoCounts.comments}</span>
-            </div>
-            
-            <div onClick={(e) => { e.stopPropagation(); handleFavorite(); }} className={`flex flex-col items-center cursor-pointer ${saved ? 'saved' : ''}`}>
-              <div className="text-[1.85rem] leading-none text-white/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200 active:scale-75" style={saved ? {color: '#FFD700', filter: 'drop-shadow(0 0 5px rgba(255, 215, 0, 0.4))'} : {}}>
-                <ion-icon name={saved ? "bookmark" : "bookmark-outline"}></ion-icon>
-              </div>
-              <span className="text-white text-[0.75rem] font-medium mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">Save</span>
-            </div>
-
-            <div onClick={(e) => { e.stopPropagation(); setShowShare(true); }} className="flex flex-col items-center cursor-pointer">
-              <div className="text-[1.85rem] leading-none text-white/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200 active:scale-75">
-                <ion-icon name="arrow-redo-outline"></ion-icon>
-              </div>
-              <span className="text-white text-[0.75rem] font-medium mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">Share</span>
-            </div>
-
-            {/* Spinning Record */}
-            <div 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                setShowSongModal(true);
-              }}
-              className={`w-9 h-9 rounded-full border border-white/30 bg-[#111] flex items-center justify-center overflow-hidden shadow-[0_0_12px_rgba(0,0,0,0.8)] cursor-pointer mt-1 active:scale-95 transition-transform relative ${playing ? 'animate-[spin_4s_linear_infinite]' : ''}`}
-            >
-              <img src={reel.authorAvatar || `https://ui-avatars.com/api/?name=Music`} className="w-5 h-5 rounded-full object-cover" />
-              {isSongSaved && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
-                  <Bookmark className="w-3 h-3 text-white fill-white" />
+              {/* 2. Like (Heart) */}
+              <div 
+                onClick={(e) => { e.stopPropagation(); handleLike(); }} 
+                className="flex flex-col items-center cursor-pointer select-none active:scale-90 transition-transform"
+              >
+                <div className="transition-transform duration-200 active:scale-75 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]" style={liked ? {color: '#fe2c55', filter: 'drop-shadow(0 0 8px rgba(254, 44, 85, 0.6))'} : {}}>
+                  <Heart className={`w-8 h-8 ${liked ? 'fill-[#fe2c55] text-[#fe2c55]' : 'text-white fill-white stroke-[1.5]'}`} />
                 </div>
-              )}
-            </div>
-          </div>
+                <span className="text-white text-[12px] font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                  {demoCounts.likes}
+                </span>
+              </div>
 
-          {/* Sound / Mute toggle button when paused or tapped */}
+              {/* 3. Comment */}
+              <div 
+                onClick={(e) => { e.stopPropagation(); setShowComments(true); }} 
+                className="flex flex-col items-center cursor-pointer select-none active:scale-90 transition-transform"
+              >
+                <div className="text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                  <svg className="w-8 h-8 fill-white" viewBox="0 0 24 24">
+                    <path d="M12 3c-4.97 0-9 3.58-9 8 0 1.68.58 3.23 1.58 4.49L3.5 20.5l5.24-1.39C9.8 19.67 10.88 20 12 20c4.97 0 9-3.58 9-8s-4.03-9-9-9zm-4 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm4 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm4 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+                  </svg>
+                </div>
+                <span className="text-white text-[12px] font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                  {demoCounts.comments}
+                </span>
+              </div>
+
+              {/* 4. Bookmark (Save) */}
+              <div 
+                onClick={(e) => { e.stopPropagation(); handleFavorite(); }} 
+                className="flex flex-col items-center cursor-pointer select-none active:scale-90 transition-transform"
+              >
+                <div className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]" style={saved ? {color: '#FFD700', filter: 'drop-shadow(0 0 6px rgba(255, 215, 0, 0.6))'} : {}}>
+                  <Bookmark className={`w-8 h-8 ${saved ? 'fill-[#FFD700] text-[#FFD700]' : 'text-white fill-white'}`} />
+                </div>
+                <span className="text-white text-[12px] font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                  {demoCounts.bookmarks || '441'}
+                </span>
+              </div>
+
+              {/* 5. Share */}
+              <div 
+                onClick={(e) => { e.stopPropagation(); setShowShare(true); }} 
+                className="flex flex-col items-center cursor-pointer select-none active:scale-90 transition-transform"
+              >
+                <div className="text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                  <svg className="w-8 h-8 fill-white" viewBox="0 0 24 24">
+                    <path d="M14 5v4C7 10 4 15 3 20c2.5-3.5 6-5.1 11-5.1V19l8-7-8-7z"/>
+                  </svg>
+                </div>
+                <span className="text-white text-[12px] font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                  {demoCounts.shares || '1,947'}
+                </span>
+              </div>
+
+              {/* 6. Spinning Vinyl Record */}
+              <div 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setShowSongModal(true);
+                }}
+                className={`w-10 h-10 rounded-full bg-[#111] border-[2.5px] border-[#2a2a2a] p-1 flex items-center justify-center overflow-hidden shadow-xl cursor-pointer mt-1 active:scale-95 transition-transform relative ${playing ? 'animate-[spin_4s_linear_infinite]' : ''}`}
+              >
+                <img src={reel.authorAvatar || `https://ui-avatars.com/api/?name=Music`} className="w-6 h-6 rounded-full object-cover" />
+                {isSongSaved && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
+                    <Bookmark className="w-3 h-3 text-white fill-white" />
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Original Ennvo Modern UI Vertical Action Buttons */
+            <div className={`md:hidden absolute right-2.5 ${reelBottomSpacing} flex flex-col items-center space-y-2.5 z-40 pointer-events-auto transition-all duration-300 ${isCleanZoom || is2XSpeed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+              <div 
+                onClick={(e) => { e.stopPropagation(); handleLike(); }} 
+                onTouchStart={(e) => { e.stopPropagation(); }}
+                className={`flex flex-col items-center cursor-pointer select-none active:scale-90 transition-transform ${liked ? 'liked' : ''}`}
+              >
+                <div className="text-[1.85rem] leading-none text-white/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200 active:scale-75" style={liked ? {color: '#fe2c55', filter: 'drop-shadow(0 0 6px rgba(254, 44, 85, 0.5))'} : {}}>
+                  <ion-icon name={liked ? "heart" : "heart-outline"}></ion-icon>
+                </div>
+                <span className="text-white text-[0.75rem] font-medium mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{demoCounts.likes}</span>
+              </div>
+              
+              <div onClick={(e) => { e.stopPropagation(); setShowComments(true); }} className="flex flex-col items-center cursor-pointer">
+                <div className="text-[1.85rem] leading-none text-white/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200 active:scale-75">
+                  <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+                </div>
+                <span className="text-white text-[0.75rem] font-medium mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{demoCounts.comments}</span>
+              </div>
+              
+              <div onClick={(e) => { e.stopPropagation(); handleFavorite(); }} className={`flex flex-col items-center cursor-pointer ${saved ? 'saved' : ''}`}>
+                <div className="text-[1.85rem] leading-none text-white/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200 active:scale-75" style={saved ? {color: '#FFD700', filter: 'drop-shadow(0 0 5px rgba(255, 215, 0, 0.4))'} : {}}>
+                  <ion-icon name={saved ? "bookmark" : "bookmark-outline"}></ion-icon>
+                </div>
+                <span className="text-white text-[0.75rem] font-medium mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">Save</span>
+              </div>
+
+              <div onClick={(e) => { e.stopPropagation(); setShowShare(true); }} className="flex flex-col items-center cursor-pointer">
+                <div className="text-[1.85rem] leading-none text-white/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200 active:scale-75">
+                  <ion-icon name="arrow-redo-outline"></ion-icon>
+                </div>
+                <span className="text-white text-[0.75rem] font-medium mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">Share</span>
+              </div>
+
+              {/* Spinning Record */}
+              <div 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setShowSongModal(true);
+                }}
+                className={`w-9 h-9 rounded-full border border-white/30 bg-[#111] flex items-center justify-center overflow-hidden shadow-[0_0_12px_rgba(0,0,0,0.8)] cursor-pointer mt-1 active:scale-95 transition-transform relative ${playing ? 'animate-[spin_4s_linear_infinite]' : ''}`}
+              >
+                <img src={reel.authorAvatar || `https://ui-avatars.com/api/?name=Music`} className="w-5 h-5 rounded-full object-cover" />
+                {isSongSaved && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
+                    <Bookmark className="w-3 h-3 text-white fill-white" />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Simple lightweight Sound / Mute toggle button centered on video when stopped or paused */}
           {!(isImageReel && !reelSong) && isNearScreen && (
             <button 
               onClick={(e) => { e.stopPropagation(); setMuted(!muted); }}
-              className={`absolute top-10 left-4 z-30 md:top-6 md:left-6 p-2.5 bg-black/40 hover:bg-black/60 rounded-full text-white transition-all active:scale-90 backdrop-blur-md border border-white/20 shadow-lg flex items-center justify-center ${playing ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
+              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 p-3 bg-black/50 hover:bg-black/70 rounded-full text-white transition-opacity flex items-center justify-center cursor-pointer ${playing ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
               title={muted ? "Unmute" : "Mute"}
             >
-              {muted ? <VolumeX className="w-4.5 h-4.5 text-white fill-white" /> : <Volume2 className="w-4.5 h-4.5 text-white fill-white" />}
+              {muted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
             </button>
           )}
 
-          {/* Timeline / Progress Bar (Ultra-thin Android style in Classic Navigation) */}
+          {/* Timeline / Progress Bar (Mobile: Attached directly to top border of navigation bar z-[75]; PC: Attached at bottom of video container) */}
           {!isImageReel && isNearScreen && navStyle !== 'glass' && (
             <div 
-              className={`absolute ${isModal ? 'bottom-1' : 'bottom-[calc(56px+env(safe-area-inset-bottom))]'} left-0 right-0 h-3 z-40 flex items-end cursor-pointer group/timeline touch-none select-none`}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (videoRef.current && videoRef.current.duration) {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const x = e.clientX - rect.left;
-                  const percentage = Math.max(0, Math.min(1, x / rect.width));
-                  const targetTime = percentage * videoRef.current.duration;
-                  videoRef.current.currentTime = targetTime;
-                  if (audioRef.current) audioRef.current.currentTime = targetTime;
-                  if (progressBarRef.current) {
-                    progressBarRef.current.style.transition = 'none';
-                    progressBarRef.current.style.width = `${percentage * 100}%`;
-                  }
-                }
-              }}
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                try {
-                  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-                } catch (err) {}
-                if (progressBarRef.current) {
-                  progressBarRef.current.style.transition = 'none';
-                }
-              }}
-              onPointerMove={(e) => {
-                if (e.buttons === 1 && videoRef.current && videoRef.current.duration) {
-                  e.stopPropagation();
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const x = e.clientX - rect.left;
-                  const percentage = Math.max(0, Math.min(1, x / rect.width));
-                  const targetTime = percentage * videoRef.current.duration;
-                  videoRef.current.currentTime = targetTime;
-                  if (audioRef.current) audioRef.current.currentTime = targetTime;
-                  if (progressBarRef.current) {
-                    progressBarRef.current.style.transition = 'none';
-                    progressBarRef.current.style.width = `${percentage * 100}%`;
-                  }
-                }
-              }}
+              className={`absolute ${isModal ? 'bottom-0' : 'bottom-[calc(54px+env(safe-area-inset-bottom))] md:bottom-0'} left-0 right-0 z-[75] flex items-center h-3 cursor-pointer touch-none select-none group/timeline transition-opacity duration-200 ${(!playing || isScrubbing) ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+              onPointerDown={handleScrubPointerDown}
+              onPointerMove={handleScrubPointerMove}
+              onPointerUp={handleScrubPointerUp}
+              onPointerCancel={handleScrubPointerUp}
             >
-              <div className="w-full h-[2px] group-hover/timeline:h-[3.5px] bg-white/20 relative overflow-hidden transition-all duration-150">
+              {/* Floating Time Preview Bubble during Scrubbing */}
+              {isScrubbing && (
+                <div 
+                  className="absolute -top-8 px-2.5 py-1 rounded-full bg-black/90 text-white text-[11px] font-medium shadow-md -translate-x-1/2 pointer-events-none z-[85] flex items-center space-x-1"
+                  style={{ left: scrubberThumbRef.current?.style.left || '50%' }}
+                >
+                  <span className="text-white">{formatScrubSecs(scrubTime)}</span>
+                  <span className="text-white/40">/</span>
+                  <span className="text-white/75">{formatScrubSecs(videoRef.current?.duration || 0)}</span>
+                </div>
+              )}
+
+              {/* Progress Track */}
+              <div className={`w-full ${isScrubbing ? 'h-[4px]' : 'h-[2px] group-hover/timeline:h-[3.5px]'} bg-white/30 relative transition-[height] duration-150 overflow-visible`}>
+                {/* Active Progress Fill */}
                 <div 
                   ref={progressBarRef} 
-                  className="h-full bg-white group-hover/timeline:bg-gradient-to-r group-hover/timeline:from-purple-400 group-hover/timeline:to-pink-500 shadow-[0_0_4px_rgba(255,255,255,0.8)]" 
+                  className="h-full bg-white relative" 
                   style={{ width: '0%', transition: 'none' }}
+                />
+                {/* Thumb Dot: Centered on track with higher z-index overlaying navigation */}
+                <div 
+                  ref={scrubberThumbRef}
+                  className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-xs pointer-events-none transition-transform duration-100 z-[80] ${isScrubbing || !playing ? 'scale-100 opacity-100' : 'scale-0 opacity-0 group-hover/timeline:scale-100 group-hover/timeline:opacity-100'}`}
+                  style={{ left: '0%' }}
                 />
               </div>
             </div>
           )}
         </div>
 
-        {/* Desktop Right Actions Column */}
-        <div className={`hidden md:flex flex-col items-start justify-end space-y-3 pb-2 pl-4 w-[260px] lg:w-[320px] shrink-0 transition-opacity duration-300 ${isCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+        {/* Desktop Right Actions Column (Compact & Perfectly Proportioned Icons) */}
+        <div className={`hidden md:flex flex-col items-center justify-end space-y-4 pb-6 px-3 w-[80px] shrink-0 transition-opacity duration-300 ${isCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+          {/* Like */}
           <div 
             onClick={(e) => { e.stopPropagation(); handleLike(); }} 
-            className="flex flex-col items-center space-y-1 cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95"
+            className="flex flex-col items-center space-y-1 cursor-pointer group"
           >
-            <div className="text-[2.5rem] leading-none text-gray-900 drop-shadow-sm transition-colors" style={liked ? {color: '#fe2c55'} : {}}>
-              <ion-icon name={liked ? "heart" : "heart-outline"}></ion-icon>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-xs border ${liked ? 'bg-rose-50 border-rose-200 text-[#fe2c55]' : 'bg-gray-100 hover:bg-gray-200 border-gray-200 text-gray-800'}`}>
+              <Heart className={`w-5 h-5 ${liked ? 'fill-[#fe2c55] text-[#fe2c55]' : 'text-gray-800'}`} />
             </div>
-            <span className="text-gray-700 text-[0.85rem] font-normal mt-1.5">{demoCounts.likes}</span>
+            <span className="text-gray-700 text-[11px] font-medium">{demoCounts.likes}</span>
           </div>
           
+          {/* Comment */}
           <div 
             onClick={(e) => { e.stopPropagation(); setShowComments(true); }} 
-            className="flex flex-col items-center space-y-1 cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95"
+            className="flex flex-col items-center space-y-1 cursor-pointer group"
           >
-            <div className="text-[2.5rem] leading-none text-gray-900 drop-shadow-sm">
-              <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+            <div className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 border border-gray-200 flex items-center justify-center transition-all active:scale-90 text-gray-800 shadow-xs">
+              <MessageCircle className="w-5 h-5 text-gray-800" />
             </div>
-            <span className="text-gray-700 text-[0.85rem] font-normal mt-1.5">{demoCounts.comments}</span>
+            <span className="text-gray-700 text-[11px] font-medium">{demoCounts.comments}</span>
           </div>
 
+          {/* Favorite / Save */}
           <div 
             onClick={(e) => { e.stopPropagation(); handleFavorite(); }} 
-            className="flex flex-col items-center space-y-1 cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95"
+            className="flex flex-col items-center space-y-1 cursor-pointer group"
           >
-            <div className="text-[2.5rem] leading-none text-gray-900 drop-shadow-sm" style={saved ? {color: '#FFD700'} : {}}>
-              <ion-icon name={saved ? "bookmark" : "bookmark-outline"}></ion-icon>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-xs border ${saved ? 'bg-amber-50 border-amber-200 text-amber-500' : 'bg-gray-100 hover:bg-gray-200 border-gray-200 text-gray-800'}`}>
+              <Bookmark className={`w-5 h-5 ${saved ? 'fill-amber-500 text-amber-500' : 'text-gray-800'}`} />
             </div>
-            <span className="text-gray-700 text-[0.85rem] font-normal mt-1.5">Save</span>
+            <span className="text-gray-700 text-[11px] font-medium">Save</span>
           </div>
           
+          {/* Share */}
           <div 
             onClick={(e) => { e.stopPropagation(); setShowShare(true); }} 
-            className="flex flex-col items-center space-y-1 cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95"
+            className="flex flex-col items-center space-y-1 cursor-pointer group"
           >
-            <div className="text-[2.5rem] leading-none text-gray-900 drop-shadow-sm">
-              <ion-icon name="arrow-redo-outline"></ion-icon>
+            <div className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 border border-gray-200 flex items-center justify-center transition-all active:scale-90 text-gray-800 shadow-xs">
+              <Share2 className="w-5 h-5 text-gray-800" />
             </div>
-            <span className="text-gray-700 text-[0.85rem] font-normal mt-1.5">Share</span>
+            <span className="text-gray-700 text-[11px] font-medium">Share</span>
           </div>
 
+          {/* Analytics */}
           {isCurrentUser && (
             <button 
               onClick={(e) => {
@@ -1215,9 +1470,10 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                 setTargetAnalyticsPostId(reel.id);
                 setShowAnalytics(true);
               }}
-              className="mt-4 text-xs font-normal text-gray-500 hover:text-blue-600 transition-colors uppercase tracking-wider"
+              className="w-10 h-10 rounded-full bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-600 flex items-center justify-center transition-all active:scale-90 shadow-xs cursor-pointer"
+              title="Analytics"
             >
-              Analytics
+              <BarChart2 className="w-5 h-5 text-blue-600" />
             </button>
           )}
         </div>
@@ -1254,12 +1510,12 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
             <button onClick={onClose} className="absolute top-12 left-4 sm:top-8 sm:left-8 p-3 bg-black/40 sm:bg-white hover:bg-black/60 sm:hover:bg-gray-100 rounded-full text-white sm:text-gray-900 sm:shadow-md sm:border sm:border-gray-200 transition-all active:scale-90 z-[100]">
               <X className="w-6 h-6" strokeWidth={2.5} />
             </button>
-            <div className="md:hidden absolute bottom-0 left-0 right-0 h-[52px] bg-black border-t border-white/10 flex items-center px-4 z-[90] space-x-3 pb-[env(safe-area-inset-bottom)]">
-              <img src={currentUser?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || 'User')}`} className="w-8 h-8 rounded-full object-cover shrink-0" />
+            <div className="md:hidden absolute bottom-3 left-3 right-3 h-[48px] bg-black/80 backdrop-blur-xl border border-white/20 rounded-full flex items-center px-3.5 z-[90] space-x-2.5 shadow-xl mb-[env(safe-area-inset-bottom)]">
+              <img src={currentUser?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || 'User')}`} className="w-7 h-7 rounded-full object-cover shrink-0" />
               <input 
                 type="text" 
                 placeholder="Add comment..."
-                className="flex-1 bg-white/10 text-white placeholder-white/50 rounded-full px-4 py-2 text-sm focus:outline-none border border-transparent focus:border-white/20 transition-all"
+                className="flex-1 bg-white/10 text-white placeholder-white/60 rounded-full px-3.5 py-1.5 text-[13px] focus:outline-none border border-transparent focus:border-white/20 transition-all cursor-pointer"
                 onClick={(e) => { e.stopPropagation(); setShowComments(true); }}
                 readOnly
               />
@@ -2942,6 +3198,8 @@ export const SharePortal = ({
   const [selectedConvs, setSelectedConvs] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [copied, setCopied] = useState(false);
+  const [downloadingOffline, setDownloadingOffline] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   useEffect(() => {
     if (currentUser) {
@@ -3124,6 +3382,53 @@ export const SharePortal = ({
               </span>
             </button>
             
+            <button 
+              type="button"
+              disabled={downloadingOffline}
+              onClick={async () => {
+                const rAny = reel as any;
+                const mediaUrl = rAny.mediaUrls?.[0] || rAny.mediaUrl || rAny.videoUrl || reel.media?.[0] || "";
+                if (!mediaUrl) return;
+
+                setDownloadingOffline(true);
+                try {
+                  const { downloadMediaFile } = await import('../utils');
+                  const { saveMediaOffline } = await import('../services/offlineMediaService');
+                  
+                  // Save into offline cache
+                  await saveMediaOffline({
+                    id: reel.id,
+                    url: mediaUrl,
+                    type: 'video',
+                    title: reel.text || `Reel by ${reel.authorName}`,
+                    authorName: reel.authorName,
+                    authorAvatar: reel.authorAvatar
+                  });
+
+                  // Download to device
+                  await downloadMediaFile(mediaUrl, `reel_${reel.id}.mp4`);
+                  setDownloadSuccess(true);
+                  setTimeout(() => setDownloadSuccess(false), 3000);
+                } catch (err) {
+                  console.error("Offline download failed:", err);
+                } finally {
+                  setDownloadingOffline(false);
+                }
+              }}
+              className="flex flex-col items-center flex-1 cursor-pointer group active:scale-95 transition-transform"
+            >
+              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center mb-1 shadow-2xs transition-all ${downloadSuccess ? 'bg-green-50 border border-green-200 text-green-600' : 'bg-white hover:bg-gray-100 border border-gray-200 text-gray-700'}`}>
+                {downloadingOffline ? (
+                  <div className="w-5 h-5 border-2 border-gray-400 border-t-blue-600 rounded-full animate-spin" />
+                ) : (
+                  <Download className={`w-5 h-5 ${downloadSuccess ? 'text-green-600' : 'text-gray-700'}`} />
+                )}
+              </div>
+              <span className={`text-[11px] font-medium text-center ${downloadSuccess ? 'text-green-600 font-semibold' : 'text-gray-600'}`}>
+                {downloadingOffline ? 'Saving...' : downloadSuccess ? 'Saved!' : 'Save Reel'}
+              </span>
+            </button>
+
             <button 
               type="button"
               onClick={handleCopyLink} 

@@ -175,6 +175,31 @@ export const downloadMediaFile = async (url: string, filename?: string) => {
   const isVideo = isMediaVideo(url);
   const defaultExt = isVideo ? 'mp4' : 'jpg';
   const finalFilename = filename || `ennvo_media_${Date.now()}.${defaultExt}`;
+  const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
+
+  // 1. If running inside Android WebView with native Java download bridge
+  try {
+    const win = window as any;
+    if (typeof win.Android?.downloadMedia === 'function') {
+      win.Android.downloadMedia(url, finalFilename, mimeType);
+      return;
+    }
+    if (typeof win.AndroidInterface?.downloadMedia === 'function') {
+      win.AndroidInterface.downloadMedia(url, finalFilename, mimeType);
+      return;
+    }
+  } catch (e) {
+    console.warn('Android download bridge error:', e);
+  }
+
+  // Also cache media offline in background for instant offline access
+  import('./services/offlineMediaService').then(m => {
+    m.saveMediaOffline({
+      id: finalFilename,
+      url,
+      type: isVideo ? 'video' : 'image'
+    }).catch(() => {});
+  });
 
   try {
     // If it's a data URL or blob URL, trigger instant direct download

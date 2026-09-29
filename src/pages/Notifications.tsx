@@ -23,7 +23,6 @@ const NotificationItem = React.memo(({ notif, isFollowing }: { notif: Notificati
   const { 
     setViewingUser, 
     pushPage, 
-    setViewingMedia, 
     setViewingReel, 
     currentUser, 
     setHighlightedCommentId, 
@@ -50,7 +49,8 @@ const NotificationItem = React.memo(({ notif, isFollowing }: { notif: Notificati
         if (post) {
           setViewingReel({ ...post, single: true });
         } else if (notif.postMedia) {
-          setViewingReel({ id: notif.postId, authorId: notif.postAuthorId || '', authorName: notif.postAuthorName || notif.actorName, authorAvatar: notif.postAuthorAvatar || notif.actorAvatar, media: [notif.postMedia], text: '', type: 'reel', single: true });
+          const isVideo = notif.postMedia.includes('.mp4') || notif.postMedia.includes('video');
+          setViewingReel({ id: notif.postId, authorId: notif.postAuthorId || '', authorName: notif.postAuthorName || notif.actorName, authorAvatar: notif.postAuthorAvatar || notif.actorAvatar, media: [notif.postMedia], text: notif.content || '', type: isVideo ? 'reel' : 'post', single: true });
         }
       } catch (err) {
         console.error("Failed to load post for notification", err);
@@ -79,63 +79,63 @@ const NotificationItem = React.memo(({ notif, isFollowing }: { notif: Notificati
   return (
     <div 
       onClick={handlePostClick}
-      className={`flex items-center justify-between px-4 py-3 hover:bg-gray-50/80 transition-colors cursor-pointer border-b border-gray-50/60 active:bg-gray-100/50 ${!notif.isRead ? 'bg-blue-50/40' : ''}`}
+      className={`flex items-center justify-between px-3.5 py-2.5 hover:bg-gray-50/90 transition-colors cursor-pointer active:bg-gray-100/60 ${!notif.isRead ? 'bg-purple-50/30' : ''}`}
     >
-      <div className="flex items-center flex-1 pr-3">
-        {/* Avatar */}
-        <div className="relative flex-shrink-0" onClick={handleActorClick}>
+      <div className="flex items-center flex-1 pr-2 min-w-0">
+        {/* Flat 2D Avatar */}
+        <div className="relative flex-shrink-0 cursor-pointer" onClick={handleActorClick}>
           <img 
             src={notif.actorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(notif.actorName || 'User')}&background=random`} 
             alt="avatar" 
-            className="w-11 h-11 rounded-full object-cover border border-gray-100 shadow-2xs" 
+            className="w-10 h-10 rounded-full object-cover" 
             referrerPolicy="no-referrer" 
             loading="lazy"
           />
-          <div className="absolute -bottom-1 -right-1">
+          <div className="absolute -bottom-0.5 -right-0.5">
             {getIconForType(notif.type)}
           </div>
         </div>
 
         {/* Text Content */}
-        <div className="ml-3 text-[14px] leading-[18px] flex-1">
-          <p className={!notif.isRead ? 'text-black font-bold' : 'text-gray-900 font-normal'}>
-            <span className={`cursor-pointer hover:underline ${!notif.isRead ? 'font-bold text-black' : 'font-normal text-gray-900'}`} onClick={handleActorClick}>
+        <div className="ml-3 text-[13.5px] leading-snug flex-1 min-w-0">
+          <p className="text-gray-900 font-normal">
+            <span className="font-semibold text-gray-950 cursor-pointer hover:underline" onClick={handleActorClick}>
               {notif.actorName || 'User'}
             </span>
-            <span className={`ml-1 tracking-tight ${!notif.isRead ? 'font-bold text-black' : 'text-gray-700 font-normal'}`}>
+            <span className="ml-1 text-gray-600 font-normal">
               {notif.type === 'like' && 'liked your post.'}
               {notif.type === 'comment' && `commented: ${notif.content}`}
               {notif.type === 'follow' && 'started following you.'}
               {notif.type === 'mention' && 'mentioned you in a post.'}
               {notif.type === 'reply' && `replied to your comment: ${notif.content}`}
-              {notif.type === 'favorite' && 'added your reel to favorites.'}
+              {notif.type === 'favorite' && 'saved your post.'}
               {notif.type === 'comment_like' && 'liked your comment.'}
             </span>
           </p>
-          <span className={`text-[11px] mt-0.5 inline-block ${!notif.isRead ? 'font-bold text-black' : 'text-gray-400 font-normal'}`}>
+          <span className="text-[11px] text-gray-400 font-normal mt-0.5 inline-block">
             {formatTime(notif.createdAt)}
           </span>
         </div>
       </div>
       
       {/* Right Action */}
-      <div className="flex-shrink-0 ml-3">
+      <div className="flex-shrink-0 ml-2">
         {notif.type === 'follow' ? (
           <button 
             onClick={handleFollowToggle}
-            className={`px-4 py-1.5 rounded-xl text-[13px] font-normal transition-all active:scale-95 shadow-2xs ${
+            className={`px-3.5 py-1.5 rounded-full text-[12.5px] font-medium transition-all active:scale-95 ${
                isFollowing
-                ? 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                : 'bg-blue-500 text-white hover:bg-blue-600 shadow-blue-100'
+                ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : 'bg-purple-600 text-white hover:bg-purple-700 shadow-xs'
             }`}
           >
             {isFollowing ? 'Following' : 'Follow back'}
           </button>
         ) : notif.postMedia ? (
-          <div className="w-11 h-14 rounded-lg overflow-hidden border border-gray-200/80 relative bg-gray-100 shadow-2xs">
+          <div className="w-10 h-12 rounded-lg overflow-hidden relative bg-gray-100">
             {isVideoMedia ? (
               <div className="w-full h-full relative flex items-center justify-center bg-gray-900">
-                <Play className="w-4 h-4 text-white fill-white shadow-xs" />
+                <Play className="w-3.5 h-3.5 text-white fill-white" />
               </div>
             ) : (
               <img 
@@ -187,23 +187,23 @@ export default function Notifications() {
   ], [cachedNotifications]);
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-white flex flex-col items-center md:pl-24">
+    <div className="h-full w-full overflow-y-auto bg-white flex flex-col items-center md:pl-28 lg:pl-32">
       {/* Mobile Header */}
-      <div className="sm:hidden w-full px-4 pt-8 pb-3 border-b border-gray-100 flex items-center space-x-3 bg-white sticky top-0 z-20 shadow-2xs">
+      <div className="sm:hidden w-full px-4 pt-8 pb-3 border-b border-gray-100 flex items-center space-x-3 bg-white sticky top-0 z-20">
         <button onClick={() => popPage()} className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors active:scale-95">
           <ArrowLeft className="w-5.5 h-5.5 text-gray-900" />
         </button>
-        <h2 className="text-xl font-normal text-gray-900">Notifications</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
       </div>
 
-      <div className="w-full max-w-[600px] py-2 sm:py-6 px-2 sm:px-4">
-        <h2 className="hidden sm:block text-2xl font-semibold text-gray-900 mb-4 px-2">Notifications</h2>
+      <div className="w-full max-w-[620px] py-2 sm:py-6 px-2 sm:px-4">
+        <h2 className="hidden sm:block text-xl font-bold text-gray-900 mb-3 px-2">Notifications</h2>
         
-        <div className="space-y-4 pb-20">
+        <div className="space-y-3 pb-20">
           {sections.map((group) => group.items.length > 0 && (
-            <div key={group.title} className="bg-white rounded-2xl border border-gray-100/90 shadow-2xs overflow-hidden">
-              <h3 className="font-semibold text-[13px] text-gray-500 uppercase tracking-wider px-4 py-2.5 bg-gray-50/50 border-b border-gray-100/60">{group.title}</h3>
-              <div className="divide-y divide-gray-100/70">
+            <div key={group.title} className="bg-white rounded-2xl border border-gray-100/80 overflow-hidden">
+              <h3 className="font-semibold text-[12px] text-gray-400 uppercase tracking-wider px-4 py-2 bg-gray-50/60 border-b border-gray-100/60">{group.title}</h3>
+              <div className="divide-y divide-gray-100/60">
                 {group.items.map((notif) => (
                   <NotificationItem 
                     key={notif.id} 
@@ -216,9 +216,9 @@ export default function Notifications() {
           ))}
 
           {cachedNotifications.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-24 text-gray-400">
-              <Bell className="w-14 h-14 text-gray-200 mb-3 stroke-1" />
-              <p className="text-base font-normal">No notifications yet</p>
+            <div className="flex flex-col items-center justify-center py-24 text-gray-400 space-y-2">
+              <Bell className="w-12 h-12 text-gray-200 stroke-1" />
+              <p className="text-sm font-normal text-gray-500">No notifications yet</p>
             </div>
           )}
         </div>

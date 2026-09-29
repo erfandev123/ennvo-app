@@ -15,6 +15,7 @@ import {
   Info,
   ChevronDown,
   Send,
+  SendHorizontal,
   X,
   Heart,
   Type,
@@ -45,6 +46,8 @@ import {
   Film,
   Bookmark,
   Star,
+  FileText,
+  Paperclip,
   Sticker as StickerIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -67,6 +70,7 @@ import {
   sendMessage,
   createConversation,
   updateConversationTheme,
+  deleteConversation,
 } from "../services/chatService";
 import { ChatThemeStudioModal } from "../components/ChatThemeStudioModal";
 import { StickerPickerModal } from "../components/StickerPickerModal";
@@ -208,7 +212,7 @@ const FollowerItem = React.memo(
               follower.avatar ||
               `https://ui-avatars.com/api/?name=${encodeURIComponent(realtimeUser.name || follower.name || "User")}&background=random`
             }
-            className="w-14 h-14 rounded-full object-cover shadow-sm border border-gray-100"
+            className="w-13 h-13 rounded-full object-cover"
             alt="follower"
             referrerPolicy="no-referrer"
           />
@@ -315,7 +319,7 @@ const StackedMediaAlbumBubble = React.memo(({
             title="Click to view photo"
           >
             {nextItem2.type === 'video' ? (
-              <video src={`${nextItem2.url}#t=0.001`} className="w-full h-full object-cover" preload="metadata" playsInline />
+              <video src={`${nextItem2.url}#t=0.001`} className="w-full h-full object-cover" preload="none" playsInline />
             ) : (
               <img src={nextItem2.url} alt="album peek 2" className="w-full h-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
             )}
@@ -330,7 +334,7 @@ const StackedMediaAlbumBubble = React.memo(({
             title="Click to view photo"
           >
             {nextItem1.type === 'video' ? (
-              <video src={`${nextItem1.url}#t=0.001`} className="w-full h-full object-cover" preload="metadata" playsInline />
+              <video src={`${nextItem1.url}#t=0.001`} className="w-full h-full object-cover" preload="none" playsInline />
             ) : (
               <img src={nextItem1.url} alt="album peek 1" className="w-full h-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
             )}
@@ -344,7 +348,7 @@ const StackedMediaAlbumBubble = React.memo(({
         >
           {currentItem.type === 'video' ? (
             <div className="w-full h-full relative overflow-hidden bg-gray-950 flex items-center justify-center">
-              <video src={`${currentItem.url}#t=0.001`} className="w-full h-full object-cover" preload="metadata" playsInline />
+              <video src={`${currentItem.url}#t=0.001`} className="w-full h-full object-cover" preload="none" playsInline />
               <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                 <div className="w-10 h-10 rounded-full bg-black/60 text-white backdrop-blur-xs flex items-center justify-center shadow-md">
                   <Play className="w-4 h-4 fill-white ml-0.5" />
@@ -432,6 +436,9 @@ const StackedMediaAlbumBubble = React.memo(({
   );
 });
 
+const reelPostCache = new Map<string, any>();
+const pendingReelRequests = new Map<string, Promise<any>>();
+
 const ReelMessageBubble = React.memo(({
   msg,
   setViewingReel,
@@ -441,19 +448,32 @@ const ReelMessageBubble = React.memo(({
   setViewingReel: any;
   setViewingReelContext: any;
 }) => {
-  const [reel, setReel] = React.useState<any>(null);
+  const cached = msg.postId ? reelPostCache.get(msg.postId) : null;
+  const [reel, setReel] = React.useState<any>(cached || null);
+
   React.useEffect(() => {
-    if (!msg.postId) return;
-    import("../services/postService")
-      .then((s) => s.getPost(msg.postId))
-      .then((fetchedReel) => {
-        if (fetchedReel) setReel(fetchedReel);
-      })
-      .catch(() => {});
+    if (!msg.postId || reelPostCache.has(msg.postId)) return;
+    let isMounted = true;
+    if (!pendingReelRequests.has(msg.postId)) {
+      const p = import("../services/postService")
+        .then((s) => s.getPost(msg.postId))
+        .then((fetchedReel) => {
+          if (fetchedReel) reelPostCache.set(msg.postId, fetchedReel);
+          return fetchedReel;
+        })
+        .catch(() => null);
+      pendingReelRequests.set(msg.postId, p);
+    }
+    pendingReelRequests.get(msg.postId)!.then((res) => {
+      if (isMounted && res) setReel(res);
+    });
+    return () => {
+      isMounted = false;
+    };
   }, [msg.postId]);
 
   const coverPic = reel?.thumbnailUrl || reel?.thumbnail || reel?.coverUrl || msg.thumbnailUrl || msg.coverUrl || reel?.media?.[0] || msg.mediaUrl;
-  const isVideo = coverPic && (coverPic.includes('.mp4') || coverPic.includes('video') || coverPic.includes('firebasestorage'));
+  const isVideo = Boolean(coverPic && (coverPic.includes('.mp4') || coverPic.includes('.webm') || coverPic.includes('.mov') || coverPic.includes('video/')));
 
   return (
     <div className="flex flex-col max-w-[170px] will-change-transform">
@@ -483,7 +503,7 @@ const ReelMessageBubble = React.memo(({
             <video
               src={`${coverPic}#t=0.001`}
               className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-300"
-              preload="metadata"
+              preload="none"
               muted
               playsInline
             />
@@ -759,7 +779,7 @@ const MessageBubble = React.memo(function MessageBubble({
   const bubbleContent = (
     <div
       id={`msg-${msg.id}`}
-      className={`flex ${isMe ? "justify-end" : "justify-start"} ${isFirstInGroup ? "mt-2" : isMe ? "mt-[0.5px]" : "mt-[1.5px]"} group relative touch-pan-y`}
+      className={`flex ${isMe ? "justify-end" : "justify-start"} ${isFirstInGroup ? "mt-2.5" : "mt-[1px]"} group relative touch-pan-y chat-msg-row-opt`}
       onContextMenu={(e) => onLongPress(e, msg.id)}
     >
       {!isMe && isLastInGroup && avatarUrl && (
@@ -906,7 +926,7 @@ const MessageBubble = React.memo(function MessageBubble({
                     <video
                       src={`${msg.mediaUrl}#t=0.001`}
                       className="w-full h-auto max-h-[280px] object-cover"
-                      preload="metadata"
+                      preload="none"
                       playsInline
                     />
                     <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/40 transition-colors">
@@ -950,6 +970,97 @@ const MessageBubble = React.memo(function MessageBubble({
                     setViewingMedia={setViewingMedia}
                     downloadMediaFile={downloadMediaFile}
                   />
+                );
+              } else if (msg.type === "document" || msg.fileName) {
+                const fExt = (msg.fileExt || msg.fileName?.split('.').pop() || 'DOC').toUpperCase();
+                const fName = msg.fileName || msg.content || "Document File";
+                const mediaUser = senderInfo || { name: senderName || "User", avatar: avatarUrl || "" };
+                const isMediaDoc = msg.mediaUrl && (
+                  msg.mediaUrl.startsWith('data:image') || 
+                  msg.mediaUrl.startsWith('data:video') || 
+                  Boolean(msg.mediaUrl.match(/\.(jpg|jpeg|png|heic|heif|webp|gif|mp4|webm|mov)/i))
+                );
+
+                if (isMediaDoc) {
+                  const isVidDoc = msg.mediaUrl?.startsWith('data:video') || Boolean(msg.mediaUrl?.match(/\.(mp4|webm|mov)/i));
+                  return (
+                    <div
+                      className="relative group cursor-pointer rounded-2xl overflow-hidden max-w-[250px] shadow-sm transition-transform duration-200 active:scale-98"
+                      onClick={() =>
+                        setViewingMedia({
+                          type: isVidDoc ? "video" : "image",
+                          url: msg.mediaUrl!,
+                          user: mediaUser,
+                          mediaList: [{ type: isVidDoc ? "video" : "image", url: msg.mediaUrl! }],
+                          initialIndex: 0,
+                        })
+                      }
+                    >
+                      {isVidDoc ? (
+                        <div className="relative w-full h-44 bg-black flex items-center justify-center">
+                          <video
+                            src={msg.mediaUrl}
+                            className="w-full h-full object-cover"
+                            muted
+                            playsInline
+                          />
+                          <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-full bg-white/85 text-gray-900 flex items-center justify-center shadow-md">
+                              <Play className="w-5 h-5 fill-gray-900 translate-x-0.5" />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <img
+                          src={msg.mediaUrl}
+                          alt="Document media"
+                          className="w-full h-auto max-h-72 object-cover transition-transform duration-300 group-hover:scale-102"
+                          loading="lazy"
+                        />
+                      )}
+
+                      {/* Small HD Document Badge top left */}
+                      <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/70 backdrop-blur-md text-white rounded-lg flex items-center space-x-1 border border-white/20 shadow-xs">
+                        <FileText className="w-3 h-3 text-purple-300" />
+                        <span className="text-[9px] font-bold tracking-wider uppercase">{fExt} HD</span>
+                      </div>
+
+                      {/* Download button bottom right */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadMediaFile(msg.mediaUrl!, fName);
+                        }}
+                        className="absolute bottom-2 right-2 p-1.5 bg-black/70 hover:bg-black text-white rounded-full transition-all shadow-md backdrop-blur-sm active:scale-90"
+                        title="Download HD Original File"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className={`flex items-center space-x-3 p-3 rounded-2xl ${isMe ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-900'} max-w-[260px]`}>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isMe ? 'bg-white/20' : 'bg-purple-600 text-white'}`}>
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold truncate">{fName}</p>
+                      <span className="text-[9.5px] opacity-75 uppercase">{fExt} File</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        downloadMediaFile(msg.mediaUrl || msg.content, fName);
+                      }}
+                      className="p-2 rounded-lg bg-white/20 hover:bg-white/30 text-current active:scale-90"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 );
               } else if (msg.type === "image") {
                 const mediaUser = senderInfo || { name: senderName || "User", avatar: avatarUrl || "" };
@@ -1119,15 +1230,17 @@ const MessageBubble = React.memo(function MessageBubble({
           )}
         </div>
 
-        {/* Seen text animation: smooth glide and fade-in */}
+        {/* Seen text animation: soft smooth glide and fade-in */}
         {seenStr && (
           <motion.div
             key="seen-indicator"
-            initial={{ opacity: 0, y: -6, height: 0 }}
+            initial={{ opacity: 0, y: -4, height: 0 }}
             animate={{ opacity: 1, y: 0, height: "auto" }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="text-[11px] text-gray-400 font-normal select-none self-end mt-0.5 pr-0.5 overflow-hidden flex items-center space-x-1"
+            exit={{ opacity: 0, y: -4, height: 0 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            className="text-[10.5px] text-gray-400 dark:text-zinc-400 font-normal select-none self-end mt-0.5 pr-1 overflow-hidden flex items-center space-x-1 transition-colors"
           >
+            <CheckCheck className="w-3 h-3 text-purple-500/80 inline" />
             <span>{seenStr}</span>
           </motion.div>
         )}
@@ -1269,6 +1382,7 @@ export default function Messages() {
     ? jarvisMessages
     : (activeChat && messagesCache[activeChat]) || [];
   const [inputText, setInputText] = useState("");
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [presenceData, setPresenceData] = useState<{
     [uid: string]: { isOnline: boolean; lastSeen: number };
@@ -1293,6 +1407,28 @@ export default function Messages() {
     convId: string;
     otherUid?: string;
   } | null>(null);
+  const [activityTab, setActivityTab] = useState<"activity" | "followers">("activity");
+  const [isOnline, setIsOnline] = useState<boolean>(() =>
+    typeof navigator !== "undefined" ? navigator.onLine : true
+  );
+  const [isDesktop, setIsDesktop] = useState<boolean>(() =>
+    typeof window !== "undefined" ? window.innerWidth >= 768 : false
+  );
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    const handleResize = () => setIsDesktop(window.innerWidth >= 768);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
   const [showThemeSettings, setShowThemeSettings] = useState(false);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -1362,15 +1498,8 @@ export default function Messages() {
       const diff = window.innerHeight - window.visualViewport.height;
       const offset = Math.max(0, diff);
       setViewportBottomOffset(offset);
-      if (messagesContainerRef.current) {
-        requestAnimationFrame(() => {
-          if (messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTo({
-              top: messagesContainerRef.current.scrollHeight,
-              behavior: offset > 0 ? 'smooth' : 'auto'
-            });
-          }
-        });
+      if (messagesContainerRef.current && (shouldAutoScrollRef.current || offset > 0)) {
+        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
       }
     };
     window.visualViewport.addEventListener("resize", updateViewport);
@@ -1433,8 +1562,35 @@ export default function Messages() {
     }
   }, [showStickerModal]);
 
+  const [offlineWallpaperUrl, setOfflineWallpaperUrl] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ennvo_offline_wallpaper_b64") || "/chat-background.png";
+    }
+    return "/chat-background.png";
+  });
+
   useEffect(() => {
     fetchCommunityStickers().then(setCommunityStickersCache).catch(() => {});
+    if (typeof window !== "undefined") {
+      const cachedB64 = localStorage.getItem("ennvo_offline_wallpaper_b64");
+      if (!cachedB64) {
+        fetch("/chat-background.png")
+          .then((res) => res.blob())
+          .then((blob) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              if (typeof reader.result === "string") {
+                try {
+                  localStorage.setItem("ennvo_offline_wallpaper_b64", reader.result);
+                  setOfflineWallpaperUrl(reader.result);
+                } catch (e) {}
+              }
+            };
+            reader.readAsDataURL(blob);
+          })
+          .catch(() => {});
+      }
+    }
   }, []);
 
   const stickerSuggestions = React.useMemo(() => {
@@ -1741,6 +1897,81 @@ export default function Messages() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const docInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDocumentSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files: File[] = Array.from(e.target.files || []);
+    if (files.length === 0 || !activeChat || !currentUser) return;
+
+    for (const file of files) {
+      const extParts = file.name.split('.');
+      const ext = extParts.length > 1 ? extParts.pop()!.toUpperCase() : 'FILE';
+      let sizeStr = `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+      if (file.size < 1024 * 1024) {
+        sizeStr = `${Math.round(file.size / 1024)} KB`;
+      }
+
+      let docUrl = '';
+      try {
+        const { uploadMedia } = await import('../services/githubStorage');
+        docUrl = await uploadMedia(file, 'chat_documents');
+      } catch (err) {
+        docUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve(ev.target?.result as string);
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(file);
+        });
+      }
+
+      if (docUrl) {
+        const tempId = 'temp_doc_' + Date.now();
+        const replyData = replyingTo ? {
+          messageId: replyingTo.id,
+          senderName: userDataCache[replyingTo.senderId]?.name || 'User',
+          text: replyingTo.content,
+          type: replyingTo.type
+        } : undefined;
+
+        const optMsg = {
+          id: tempId,
+          tempId,
+          senderId: currentUser.uid,
+          type: 'document',
+          content: file.name,
+          mediaUrl: docUrl,
+          fileName: file.name,
+          fileSize: sizeStr,
+          fileExt: ext,
+          createdAt: { toMillis: () => Date.now() },
+          status: 'sent',
+          replyTo: replyData
+        };
+
+        setMessagesCache((prev) => ({
+          ...prev,
+          [activeChat]: [...(prev[activeChat] || []), optMsg]
+        }));
+
+        await sendMessage(
+          activeChat,
+          currentUser.uid,
+          'document' as any,
+          file.name,
+          docUrl,
+          undefined,
+          replyData,
+          {
+            fileName: file.name,
+            fileSize: sizeStr,
+            fileExt: ext
+          }
+        );
+      }
+    }
+    if (docInputRef.current) docInputRef.current.value = "";
+  };
+
   useEffect(() => {
     const saved = localStorage.getItem("last_seen_followers");
     if (saved) setLastSeenFollowers(parseInt(saved));
@@ -1945,35 +2176,11 @@ export default function Messages() {
     }
   }, [replyingTo]);
 
-  // Keep chat content aligned smoothly when virtual keyboard opens without forcing scroll if user scrolled up
-  useEffect(() => {
-    if (!activeChat) return;
-    let rafId: number | null = null;
-    const handleViewportChange = () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        if (messagesContainerRef.current && shouldAutoScrollRef.current) {
-          messagesContainerRef.current.scrollTo({
-            top: messagesContainerRef.current.scrollHeight,
-            behavior: 'smooth'
-          });
-        }
-      });
-    };
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleViewportChange);
-    }
-    return () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleViewportChange);
-      }
-    };
-  }, [activeChat]);
-
   useEffect(() => {
     if (!currentUser) return;
     const currentUnsubs = subscribedPresenceRef.current;
+    
+    // Subscribe presence for all conversation participants
     conversations.forEach((conv) => {
       const otherId = conv.participantIds?.find((id) => id !== currentUser.uid);
       if (otherId && !currentUnsubs.has(otherId)) {
@@ -1983,7 +2190,19 @@ export default function Messages() {
         currentUnsubs.set(otherId, unsub);
       }
     });
-  }, [conversations, currentUser]);
+
+    // Also subscribe presence directly for activeChat user if single chat
+    if (activeChat && activeChat !== "jarvis" && activeChat !== "followers" && activeChat !== "activity" && activeChat !== "requests") {
+      const activeConv = conversations.find((c) => c.id === activeChat);
+      const targetUid = activeConv?.participantIds?.find((id) => id !== currentUser.uid) || activeChat;
+      if (targetUid && !currentUnsubs.has(targetUid)) {
+        const unsub = subscribePresence(targetUid, (data) => {
+          setPresenceData((prev) => ({ ...prev, [targetUid]: data }));
+        });
+        currentUnsubs.set(targetUid, unsub);
+      }
+    }
+  }, [conversations, currentUser, activeChat]);
 
   const handleLongPress = (e: React.UIEvent, msgId: string) => {
     e.preventDefault();
@@ -2188,6 +2407,7 @@ export default function Messages() {
     });
 
     shouldAutoScrollRef.current = true;
+    isSendingMsgRef.current = false;
 
     try {
       if (mediaItemsToSend.length === 1) {
@@ -2386,7 +2606,7 @@ export default function Messages() {
   const allUnifiedConversations = React.useMemo(() => {
     const list = [
       jarvisConvItem,
-      messageRequestsConvItem,
+      ...(pendingRequestsCount > 0 ? [messageRequestsConvItem] : []),
       ...conversations.filter((c: any) => {
         const isIncomingPending =
           c.isRequest &&
@@ -2687,27 +2907,27 @@ export default function Messages() {
 
   return (
     <div
-      className="h-full w-full flex bg-white overflow-hidden relative md:pl-24"
+      className="h-full w-full flex bg-white overflow-hidden relative md:pl-28 lg:pl-32"
       onClick={closeContextMenu}
     >
       {/* Left Sidebar (Contacts) */}
       <div
-        className={`w-full md:w-[350px] flex-shrink-0 border-r border-purple-100/50 flex-col h-full bg-transparent backdrop-blur-xl z-10 ${activeChat ? "hidden md:flex" : "flex"}`}
+        className={`w-full md:w-[350px] flex-shrink-0 border-r border-gray-100 flex-col h-full bg-white z-10 ${activeChat ? "hidden md:flex" : "flex"}`}
       >
-        {/* Header */}
-        <div className="px-4 pt-8 pb-3 flex items-center justify-between sticky top-0 bg-transparent z-10 w-full min-h-[88px] md:min-h-[72px]">
+        {/* Header - Pure 2D Bar with Glass Buttons */}
+        <div className="px-4 pt-[calc(env(safe-area-inset-top,0px)+22px)] pb-2.5 flex items-center justify-between sticky top-0 bg-white border-b border-gray-100 z-20 w-full min-h-[80px] md:min-h-[72px] transition-all">
           {isSearchExpanded ? (
             <div className="relative flex items-center flex-1 animate-in fade-in slide-in-from-right-2">
               <Search
-                className="w-5 h-5 absolute left-3 text-gray-400"
-                strokeWidth={2}
+                className="w-4 h-4 absolute left-3.5 text-gray-400 pointer-events-none"
+                strokeWidth={2.2}
               />
               <input
                 type="text"
                 placeholder="Search friends..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-gray-100 rounded-full pl-10 pr-8 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all font-normal text-gray-900"
+                className="w-full bg-white/80 backdrop-blur-lg rounded-full pl-10 pr-9 py-2 text-[14.5px] focus:outline-none focus:ring-2 focus:ring-purple-200/80 border border-gray-200/80 shadow-2xs transition-all font-normal text-gray-900 placeholder:text-gray-400"
                 autoFocus
               />
               <button
@@ -2715,46 +2935,49 @@ export default function Messages() {
                   setIsSearchExpanded(false);
                   setSearchQuery("");
                 }}
-                className="absolute right-3 p-1 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 p-1 text-gray-400 hover:text-gray-700 active:scale-90 transition-transform cursor-pointer"
               >
-                <X className="w-5 h-5" strokeWidth={2} />
+                <X className="w-4 h-4" strokeWidth={2.5} />
               </button>
             </div>
           ) : (
             <>
               <button
-                className="p-2 hover:bg-white/50 rounded-full transition-colors active:scale-95"
+                className="p-2 text-gray-700 hover:text-gray-900 active:scale-95 transition-all cursor-pointer rounded-full"
                 onClick={() => setShowCreateGroup(true)}
+                title="New Group"
               >
                 <UserPlus
-                  className="w-6 h-6 text-gray-800"
-                  strokeWidth={1.5}
+                  className="w-5.5 h-5.5"
+                  strokeWidth={2}
                 />
               </button>
               <div
-                className="flex items-center space-x-1.5 cursor-pointer relative select-none active:scale-95 transition-transform"
+                className="flex items-center space-x-1.5 cursor-pointer relative select-none active:scale-95 transition-transform px-3 py-1 rounded-full"
                 onClick={() => setShowPrivacySheet(true)}
               >
-                <h1 className="text-xl font-normal text-gray-900 tracking-tight">
-                  Inbox
+                <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? "bg-emerald-500" : "bg-gray-400"}`} />
+                <h1 className="text-[17px] font-bold text-gray-900 tracking-tight">
+                  {isOnline ? "Online" : "Offline"}
                 </h1>
                 <ChevronDown
-                  className="w-4 h-4 text-gray-900 mt-[2px]"
-                  strokeWidth={2}
+                  className="w-4 h-4 text-gray-700 mt-[1px]"
+                  strokeWidth={2.4}
                 />
                 {privacyMode === "private" && (
-                  <div className="absolute -right-3 top-[-2px]">
-                    <EyeOff className="w-3 h-3 text-gray-500" strokeWidth={2.5} />
+                  <div className="ml-1">
+                    <EyeOff className="w-3.5 h-3.5 text-purple-600" strokeWidth={2.5} />
                   </div>
                 )}
               </div>
               <button
-                className="p-2 hover:bg-white/50 rounded-full transition-colors active:scale-95"
+                className="p-2 text-gray-700 hover:text-gray-900 active:scale-95 transition-all cursor-pointer rounded-full"
                 onClick={() => setIsSearchExpanded(true)}
+                title="Search"
               >
                 <Search
-                  className="w-6 h-6 text-gray-800"
-                  strokeWidth={1.5}
+                  className="w-5.5 h-5.5"
+                  strokeWidth={2}
                 />
               </button>
             </>
@@ -2764,24 +2987,24 @@ export default function Messages() {
         {/* Scrollable Area (Stories + Contacts) */}
         <PullToRefresh onRefresh={async () => { await new Promise(r => setTimeout(r, 450)); }} className="flex-1 overflow-y-auto scrollbar-hide pb-[80px] [webkit-font-smoothing:antialiased]">
           <div className="w-full">
-          {/* Small Stories with Notes block */}
+          {/* Prominent Unique Circular Dual-Ring Stories Section */}
           {!searchQuery.trim() && (
-            <div className="pb-2.5 pt-1 border-b border-gray-100/60">
-              <div className="flex space-x-3.5 overflow-x-auto scrollbar-hide px-3.5">
-                <div className="flex flex-col items-center flex-shrink-0 cursor-pointer pt-6 pb-1">
+            <div className="w-full py-2 my-0 overflow-x-auto scrollbar-hide px-3 bg-white">
+              <div className="flex space-x-3.5 min-w-max items-center">
+                <div className="flex flex-col items-center flex-shrink-0 cursor-pointer pt-3 pb-0.5 relative">
                   <div className="relative">
-                    {/* Clean Note Bubble overlapping avatar top */}
+                    {/* Always Pure Glass Note Bubble overlapping avatar top */}
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowStatusInput(true);
                       }}
-                      className="absolute top-[-10px] left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-white/80 backdrop-blur-md border border-white/80 shadow-xs rounded-full z-20 w-auto max-w-[96px] cursor-pointer hover:bg-white/95 transition-all active:scale-95 flex items-center justify-center"
+                      className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-white/80 border border-white/90 shadow-2xs rounded-full z-20 w-auto max-w-[104px] cursor-pointer hover:bg-white/95 transition-all active:scale-95 flex items-center justify-center backdrop-blur-xl"
                     >
-                      <span className="text-[10px] font-medium text-purple-700 leading-tight block text-center truncate max-w-[80px]">
-                        {(currentUser as any)?.statusNote || "Note+"}
+                      <span className="text-[10.5px] font-bold text-purple-700 leading-tight block text-center truncate max-w-[88px]">
+                        {(currentUser as any)?.statusNote || "What's up?"}
                       </span>
-                      <div className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/80 border-b border-r border-white/80 rotate-45"></div>
+                      <div className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/80 border-b border-r border-white/90 rotate-45"></div>
                     </div>
                     <div
                       onClick={() => {
@@ -2789,23 +3012,23 @@ export default function Messages() {
                         setSelectedCreateMode('story');
                         pushPage('create');
                       }}
-                      className="cursor-pointer transition-transform active:scale-95 relative p-[2.5px] rounded-full bg-gradient-to-tr from-cyan-400 to-teal-400"
+                      className="cursor-pointer transition-transform active:scale-95 relative"
                     >
                       <img
                         src={
                           currentUser?.avatar ||
                           `https://ui-avatars.com/api/?name=${currentUser?.name || "Me"}&background=random`
                         }
-                        className="w-[84px] h-[84px] rounded-full object-cover border-2 border-white shadow-xs"
+                        className="w-[72px] h-[72px] rounded-full object-cover"
                         alt="Me"
                         referrerPolicy="no-referrer"
                       />
-                      <div className="absolute bottom-0.5 right-0.5 w-6 h-6 bg-[#20D5EC] rounded-full border-[2.5px] border-white flex items-center justify-center shadow-xs">
-                        <Plus className="w-4 h-4 text-white" strokeWidth={3} />
+                      <div className="absolute bottom-0 right-0 w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center text-white">
+                        <Plus className="w-3.5 h-3.5 text-white" strokeWidth={3} />
                       </div>
                     </div>
                   </div>
-                  <span className="text-[12px] font-normal [font-weight:400] text-gray-900 mt-1.5">
+                  <span className="text-[12px] font-semibold text-gray-900 mt-1 tracking-tight">
                     Create
                   </span>
                 </div>
@@ -2879,7 +3102,7 @@ export default function Messages() {
                     return (
                       <div
                         key={authorId}
-                        className="flex flex-col items-center flex-shrink-0 cursor-pointer pt-6 pb-1 relative"
+                        className="flex flex-col items-center flex-shrink-0 cursor-pointer pt-3 pb-0.5 relative"
                         onClick={() => {
                           if (hasStory) {
                             setViewingStory(firstStory);
@@ -2924,35 +3147,23 @@ export default function Messages() {
                         }}
                       >
                         <div className="relative">
-                          {/* Follower Note Bubble overlapping top */}
+                          {/* Follower Pure Glass Note Bubble overlapping top */}
                           {authorInfo.statusNote && (
-                            <div className="absolute top-[-10px] left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-white/80 backdrop-blur-md border border-white/80 shadow-xs rounded-full z-20 w-auto max-w-[96px]">
-                              <span className="text-[10px] font-medium text-gray-800 leading-tight block text-center truncate max-w-[80px]">
+                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-white/80 border border-white/90 shadow-2xs rounded-full z-20 w-auto max-w-[104px] backdrop-blur-xl">
+                              <span className="text-[10.5px] font-bold text-gray-800 leading-tight block text-center truncate max-w-[88px]">
                                 {authorInfo.statusNote}
                               </span>
-                              <div className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/80 border-b border-r border-white/80 rotate-45"></div>
+                              <div className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/80 border-b border-r border-white/90 rotate-45"></div>
                             </div>
                           )}
-                          <div
-                            className={`w-[88px] h-[88px] rounded-full p-[2.5px] transition-all duration-300 active:scale-95 ${
-                              hasStory
-                                ? isViewed
-                                  ? "bg-gray-300/80 opacity-60 border border-gray-200"
-                                  : "bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600 shadow-xs ring-2 ring-rose-500/20"
-                                : "bg-gray-200/60 border border-gray-100"
-                            }`}
-                          >
-                            <div className="w-full h-full rounded-full border-[2.5px] border-white overflow-hidden bg-gray-100 relative">
-                              <img
-                                src={authorInfo.avatar}
-                                alt={authorInfo.name}
-                                className="w-full h-full object-cover"
-                                referrerPolicy="no-referrer"
-                              />
-                            </div>
-                          </div>
+                          <img
+                            src={authorInfo.avatar}
+                            alt={authorInfo.name}
+                            className="w-[72px] h-[72px] rounded-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
                         </div>
-                        <span className="text-[12px] font-normal [font-weight:400] text-gray-900 mt-1.5 truncate w-[88px] text-center">
+                        <span className="text-[12px] font-semibold text-gray-900 mt-1 truncate w-[72px] text-center tracking-tight">
                           {authorInfo.name.split(" ")[0]}
                         </span>
                       </div>
@@ -2963,50 +3174,11 @@ export default function Messages() {
             </div>
           )}
 
-          {/* Contacts List */}
-          <div className="pt-0.5">
+          {/* Contacts & Friends List - Exact Match Style */}
+          <div className="pt-0 px-1 space-y-[1px]">
             {!searchQuery.trim() && (
               <>
-                {/* Followers Option Row - Friend List Item Style */}
-                <div
-                  onClick={() => {
-                    setLastCheckedFollowers(followers.length);
-                    setActiveChat("followers");
-                  }}
-                  className="flex items-center justify-between px-3.5 py-1.5 cursor-pointer hover:bg-white/50 active:bg-gray-100/60 transition-colors group"
-                >
-                  <div className="flex items-center space-x-3 min-w-0 flex-1">
-                    <div className="relative flex-shrink-0">
-                      <div className="w-[54px] h-[54px] rounded-full bg-gradient-to-tr from-[#0095F6] via-sky-500 to-cyan-400 flex items-center justify-center border-2 border-white shadow-xs group-hover:scale-105 transition-transform">
-                        <Users className="w-6 h-6 text-white" strokeWidth={2.2} />
-                      </div>
-                    </div>
-                    <div className="flex flex-col min-w-0 pr-2 space-y-0 -mt-0.5 flex-1">
-                      <h3 className="text-[14px] truncate tracking-tight leading-tight font-normal text-black group-hover:text-[#0095F6] transition-colors">
-                        Followers
-                      </h3>
-                      <div className="flex items-center text-[12px] leading-tight pt-0.5">
-                        <p className="truncate max-w-[200px] md:max-w-[260px] text-[12px] font-normal text-gray-400">
-                          {followers.length === 1 ? "1 follower" : `${followers.length} followers`}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex-shrink-0 ml-2">
-                    {followers.length > lastCheckedFollowers ? (
-                      <div className="bg-[#FF2C55] text-white text-[11px] font-bold rounded-full min-w-[20px] h-[20px] px-1.5 flex items-center justify-center shadow-xs">
-                        {followers.length - lastCheckedFollowers > 5 ? "5+" : followers.length - lastCheckedFollowers}
-                      </div>
-                    ) : (
-                      <span className="text-[12px] font-medium text-gray-400">
-                        {followers.length > 0 ? followers.length : ""}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Activity Option Row - Friend List Item Style */}
+                {/* Activity Option Row */}
                 {(() => {
                   const actUnread = notifications.filter((n) => {
                     if (n.type === "follow") return false;
@@ -3058,33 +3230,31 @@ export default function Messages() {
                         }
                         setActiveChat("activity");
                       }}
-                      className="flex items-center justify-between px-3.5 py-1.5 cursor-pointer hover:bg-white/50 active:bg-gray-100/60 transition-colors group"
+                      className="flex items-center justify-between px-3 py-2 my-[1px] rounded-[20px] cursor-pointer hover:bg-gray-100/70 active:bg-gray-200/60 transition-colors group md:hidden"
                     >
-                      <div className="flex items-center space-x-3 min-w-0 flex-1">
+                      <div className="flex items-center space-x-3.5 min-w-0 flex-1">
                         <div className="relative flex-shrink-0">
-                          <div className="w-[54px] h-[54px] rounded-full bg-gradient-to-tr from-[#FF2C55] via-pink-500 to-rose-400 flex items-center justify-center border-2 border-white shadow-xs group-hover:scale-105 transition-transform">
+                          <div className="w-[50px] h-[50px] rounded-full bg-rose-500 flex items-center justify-center">
                             <Sparkles className="w-6 h-6 fill-white stroke-white" strokeWidth={1.5} />
                           </div>
                         </div>
-                        <div className="flex flex-col min-w-0 pr-2 space-y-0 -mt-0.5 flex-1">
-                          <h3 className="text-[14px] truncate tracking-tight leading-tight font-normal text-black group-hover:text-[#FF2C55] transition-colors">
+                        <div className="flex flex-col min-w-0 pr-2 space-y-0.5 flex-1">
+                          <h3 className="text-[14.5px] font-bold truncate tracking-tight leading-tight text-gray-900 group-hover:text-rose-500 transition-colors">
                             Activity
                           </h3>
-                          <div className="flex items-center text-[12px] leading-tight pt-0.5">
-                            <p className={`truncate max-w-[190px] md:max-w-[240px] text-[12px] ${actUnread > 0 ? "font-medium text-black" : "font-normal text-gray-400"}`}>
-                              {latestText}
-                            </p>
-                          </div>
+                          <p className={`truncate max-w-[190px] md:max-w-[240px] text-[11.5px] ${actUnread > 0 ? "font-bold text-gray-900" : "font-normal text-gray-500"}`}>
+                            {latestText}
+                          </p>
                         </div>
                       </div>
 
                       <div className="flex-shrink-0 ml-2">
                         {actUnread > 0 ? (
-                          <div className="bg-[#FF2C55] text-white text-[11px] font-bold rounded-full min-w-[20px] h-[20px] px-1.5 flex items-center justify-center shadow-xs">
+                          <div className="bg-rose-500 text-white text-[11.5px] font-bold rounded-full min-w-[22px] h-[22px] px-1.5 flex items-center justify-center shadow-xs">
                             {actUnread > 5 ? "5+" : actUnread}
                           </div>
                         ) : (
-                          <span className="text-[12px] font-medium text-gray-400">
+                          <span className="text-[13px] font-medium text-gray-400">
                             {notifications.length > 0 ? notifications.length : ""}
                           </span>
                         )}
@@ -3127,28 +3297,28 @@ export default function Messages() {
                       onClick={() => {
                         setActiveChat("requests");
                       }}
-                      className="flex items-center justify-between px-3.5 py-1.5 cursor-pointer hover:bg-white/50 active:bg-gray-100/60 transition-colors group"
+                      className="flex items-center justify-between px-3.5 py-2.5 my-0.5 rounded-2xl cursor-pointer hover:bg-gray-100/70 active:bg-gray-200/60 transition-colors group"
                     >
                       <div className="flex items-center space-x-3 min-w-0 flex-1">
                         <div className="relative flex-shrink-0">
-                          <div className="w-[54px] h-[54px] rounded-full bg-gradient-to-tr from-purple-600 via-indigo-500 to-blue-500 flex items-center justify-center border-2 border-white shadow-xs">
+                          <div className="w-[50px] h-[50px] rounded-full bg-purple-600 flex items-center justify-center">
                             <MessageCircle className="w-6 h-6 text-white" strokeWidth={2.2} />
                           </div>
                         </div>
-                        <div className="flex flex-col min-w-0 pr-2 space-y-0 -mt-0.5 flex-1">
-                          <h3 className="text-[14px] truncate tracking-tight leading-tight font-normal text-black">
+                        <div className="flex flex-col min-w-0 pr-2 space-y-0.5 flex-1">
+                          <h3 className="text-[15.5px] font-bold truncate tracking-tight leading-tight text-gray-900">
                             Message Requests
                           </h3>
-                          <div className="flex items-center text-[12px] leading-tight pt-0.5">
-                            <p className={`truncate max-w-[170px] md:max-w-[220px] text-[12px] ${pendingRequestsCount > 0 ? "font-semibold text-purple-600" : "font-normal text-gray-400"}`}>
+                          <div className="flex items-center text-[13px] leading-tight">
+                            <p className={`truncate max-w-[170px] md:max-w-[220px] text-[13px] ${pendingRequestsCount > 0 ? "font-bold text-purple-600" : "font-normal text-gray-500"}`}>
                               {pendingRequestsCount > 0
                                 ? `${pendingRequestsCount} new message request${pendingRequestsCount > 1 ? 's' : ''}`
                                 : "0 pending requests"}
                             </p>
                             {reqTimeStr && (
                               <>
-                                <span className="mx-1 text-[11px] text-gray-400 font-normal">·</span>
-                                <span className="whitespace-nowrap text-[11px] font-normal text-gray-400">
+                                <span className="mx-1 text-[11.5px] text-gray-400 font-normal">·</span>
+                                <span className="whitespace-nowrap text-[11.5px] font-normal text-gray-400">
                                   {reqTimeStr}
                                 </span>
                               </>
@@ -3159,7 +3329,7 @@ export default function Messages() {
 
                       <div className="flex-shrink-0 ml-2">
                         {pendingRequestsCount > 0 && (
-                          <div className="bg-purple-600 text-white text-[11px] font-bold rounded-full min-w-[20px] h-[20px] px-1.5 flex items-center justify-center shadow-xs">
+                          <div className="bg-purple-600 text-white text-[11.5px] font-bold rounded-full min-w-[22px] h-[22px] px-1.5 flex items-center justify-center shadow-xs">
                             {pendingRequestsCount > 9 ? "9+" : pendingRequestsCount}
                           </div>
                         )}
@@ -3274,12 +3444,6 @@ export default function Messages() {
                           e.stopPropagation();
                           return;
                         }
-                        if (
-                          document.querySelector(
-                            ".fixed.bg-white.rounded-2xl.shadow-2xl.border.border-gray-100.py-2.w-48.z-50",
-                          )
-                        )
-                          return;
                         setActiveChat(conv.id);
                       }}
                       onContextMenu={(e) => {
@@ -3312,7 +3476,7 @@ export default function Messages() {
                       }
                       onMouseUp={handleChatTouchEnd}
                       onMouseMove={handleChatTouchEnd}
-                      className="flex items-center justify-between px-3.5 py-1.5 cursor-pointer hover:bg-white/50 active:bg-gray-100/60 transition-colors group"
+                      className="flex items-center justify-between px-3 py-1.5 my-[1px] rounded-[18px] cursor-pointer hover:bg-gray-100/70 active:bg-gray-200/60 transition-colors group"
                     >
                       <div className="flex items-center space-x-3 min-w-0 flex-1">
                         <div
@@ -3345,58 +3509,53 @@ export default function Messages() {
                                       (conv.participantAvatars || {})[id] ||
                                       `https://ui-avatars.com/api/?name=${encodeURIComponent(userDataCache[id]?.name || (conv.participantNames || {})[id] || "User")}&background=random`,
                                   )}
-                                sizeClass="w-[54px] h-[54px]"
+                                sizeClass="w-[50px] h-[50px]"
                               />
                             </div>
                           ) : (
-                            <div className={`rounded-full p-[2px] transition-all shrink-0 ${hasStory ? "bg-gradient-to-tr from-[#20D5EC] via-pink-500 to-yellow-400" : isJarvis ? "bg-gradient-to-tr from-purple-600 via-pink-500 to-cyan-400" : "bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500"}`}>
+                            <div className="relative shrink-0 w-[50px] h-[50px]">
                               <img
                                 src={avatar as string}
                                 alt={name}
                                 loading="lazy"
-                                className="w-[54px] h-[54px] rounded-full object-cover group-hover:opacity-90 transition-opacity border-2 border-white"
+                                className="w-[50px] h-[50px] rounded-full object-cover"
                                 referrerPolicy="no-referrer"
                               />
-                              {isJarvis && (
-                                <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-gradient-to-tr from-purple-600 to-pink-500 border-2 border-white rounded-full flex items-center justify-center shadow-xs">
-                                  <Sparkles className="w-2.5 h-2.5 text-white fill-white" />
-                                </div>
-                              )}
                               {!isJarvis && otherId && (presenceData[otherId]?.isOnline || (presenceData[otherId] as any)?.state === "online") && (
-                                <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-[#22c55e] border-2 border-white rounded-full"></div>
+                                <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full" />
                               )}
                             </div>
                           )}
                         </div>
-                        <div className="flex flex-col min-w-0 pr-2 space-y-0 -mt-0.5 flex-1">
-                          <h3 className="text-[14px] truncate tracking-tight leading-tight font-normal text-black">
+                        <div className="flex flex-col min-w-0 pr-2 space-y-0.5 flex-1">
+                          <h3 className={`truncate tracking-tight leading-tight ${isUnread ? "font-black text-black text-[15.5px]" : "font-semibold text-gray-800 text-[15px]"}`}>
                             {name}
                           </h3>
-                        <div className="flex items-center text-[12px] leading-tight pt-0.5">
+                        <div className="flex items-center text-[13px] leading-tight">
                           {isOlderThan5Days ? (
-                            <p className="truncate max-w-[170px] md:max-w-[220px] text-[12px] text-gray-400 font-normal">
+                            <p className="truncate max-w-[170px] md:max-w-[220px] text-[13px] text-gray-400 font-normal">
                               {timeStr}
                             </p>
                           ) : isUnread ? (
                             unreadMessages >= 2 ? (
                               <>
-                                <p className="truncate max-w-[150px] md:max-w-[200px] text-[12px] font-semibold text-black">
+                                <p className="truncate max-w-[150px] md:max-w-[200px] text-[13px] font-bold text-gray-900">
                                   {unreadMessages > 5
                                     ? "5+ new messages"
                                     : `${unreadMessages} new messages`}
                                 </p>
-                                <span className="mx-1 text-[11px] text-gray-400 font-normal">·</span>
-                                <span className="whitespace-nowrap text-[11px] font-normal text-gray-400">
+                                <span className="mx-1 text-[11.5px] text-gray-400 font-normal">·</span>
+                                <span className="whitespace-nowrap text-[11.5px] font-normal text-gray-400">
                                   {timeStr}
                                 </span>
                               </>
                             ) : (
                               <>
-                                <p className="truncate max-w-[150px] md:max-w-[200px] text-[12px] font-semibold text-black">
+                                <p className="truncate max-w-[150px] md:max-w-[200px] text-[13px] font-bold text-gray-900">
                                   {conv.lastMessage || "Sent a message"}
                                 </p>
-                                <span className="mx-1 text-[11px] text-gray-400 font-normal">·</span>
-                                <span className="whitespace-nowrap text-[11px] font-normal text-gray-400">
+                                <span className="mx-1 text-[11.5px] text-gray-400 font-normal">·</span>
+                                <span className="whitespace-nowrap text-[11.5px] font-normal text-gray-400">
                                   {timeStr}
                                 </span>
                               </>
@@ -3404,17 +3563,17 @@ export default function Messages() {
                           ) : (conv as any).lastSenderId === currentUser?.uid ? (() => {
                             const isSeenByOther = otherId && conv.unreadCount && conv.unreadCount[otherId] === 0;
                             return (
-                              <p className="truncate max-w-[170px] md:max-w-[220px] text-[12px] text-gray-400 font-normal">
+                              <p className="truncate max-w-[170px] md:max-w-[220px] text-[13px] text-gray-400 font-normal">
                                 {isSeenByOther ? `Seen · ${timeStr}` : `Sent ${timeStr}`}
                               </p>
                             );
                           })() : (
                             <>
-                              <p className="truncate max-w-[150px] md:max-w-[200px] text-[12px] text-gray-400 font-normal">
+                              <p className="truncate max-w-[150px] md:max-w-[200px] text-[13px] text-gray-500 font-normal">
                                 {conv.lastMessage || "Sent a message"}
                               </p>
-                              <span className="mx-1 text-[11px] text-gray-400 font-normal">·</span>
-                              <span className="whitespace-nowrap text-[11px] font-normal text-gray-400">
+                              <span className="mx-1 text-[11.5px] text-gray-400 font-normal">·</span>
+                              <span className="whitespace-nowrap text-[11.5px] font-normal text-gray-400">
                                 {timeStr}
                               </span>
                             </>
@@ -3426,7 +3585,7 @@ export default function Messages() {
                     <div className="flex-shrink-0 ml-2">
                       {typeof unreadMessages === "number" &&
                       unreadMessages > 0 ? (
-                        <div className="bg-[#FF3366] text-white text-[11px] font-bold rounded-full min-w-[20px] h-[20px] px-1.5 flex items-center justify-center shadow-xs">
+                        <div className="bg-[#FF2C55] text-white text-[11.5px] font-bold rounded-full min-w-[22px] h-[22px] px-1.5 flex items-center justify-center shadow-xs">
                           {unreadMessages > 5 ? "5+" : unreadMessages}
                         </div>
                       ) : null}
@@ -3453,23 +3612,51 @@ export default function Messages() {
               transition={{ duration: 0.2 }}
               className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-full bg-white will-change-opacity"
             >
-              <div className="min-h-[88px] md:min-h-[72px] px-4 pt-8 md:pt-0 pb-2 md:pb-0 border-b border-gray-100 flex items-center space-x-4 bg-white/90 backdrop-blur-md sticky top-0 z-20">
-                <button
-                  className="md:hidden p-2 -ml-2 hover:bg-black/5 rounded-full"
-                  onClick={() => setActiveChat(null)}
-                >
-                  <ArrowLeft className="w-6 h-6 text-gray-900" />
-                </button>
-                <h2 className="font-normal text-[16px] leading-tight text-gray-900">
-                  {activeChat === "followers"
-                    ? "New followers"
-                    : activeChat === "requests"
-                    ? "Message requests"
-                    : "Activity"}
-                </h2>
+              <div className="min-h-[88px] md:min-h-[72px] px-4 pt-8 md:pt-0 pb-2 md:pb-0 border-b border-gray-100 flex items-center justify-between bg-white/90 backdrop-blur-md sticky top-0 z-20">
+                <div className="flex items-center space-x-3">
+                  <button
+                    className="md:hidden p-2 -ml-2 hover:bg-black/5 rounded-full"
+                    onClick={() => setActiveChat(null)}
+                  >
+                    <ArrowLeft className="w-6 h-6 text-gray-900" />
+                  </button>
+                  <h2 className="font-bold text-[17px] leading-tight text-gray-900">
+                    {activeChat === "requests" ? "Message Requests" : "Activity"}
+                  </h2>
+                </div>
               </div>
+
+              {activeChat === "activity" && (
+                <div className="px-4 py-2 bg-white shrink-0">
+                  <div className="flex items-center p-1 bg-gray-100/80 rounded-2xl">
+                    <button
+                      type="button"
+                      onClick={() => setActivityTab("activity")}
+                      className={`flex-1 py-1.5 text-[13px] font-semibold rounded-xl transition-all cursor-pointer ${
+                        activityTab === "activity"
+                          ? "bg-white text-gray-900 shadow-2xs"
+                          : "text-gray-500 hover:text-gray-900"
+                      }`}
+                    >
+                      Activity
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActivityTab("followers")}
+                      className={`flex-1 py-1.5 text-[13px] font-semibold rounded-xl transition-all cursor-pointer ${
+                        activityTab === "followers"
+                          ? "bg-white text-gray-900 shadow-2xs"
+                          : "text-gray-500 hover:text-gray-900"
+                      }`}
+                    >
+                      New Followers {followers.length > 0 ? `(${followers.length})` : ""}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex-1 overflow-y-auto p-2 md:p-4">
-                {activeChat === "followers" ? (
+                {(activeChat === "followers" || (activeChat === "activity" && activityTab === "followers")) ? (
                   <div className="space-y-0">
                     {followers.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-4 py-20">
@@ -3623,34 +3810,26 @@ export default function Messages() {
                                 avatar: n.postAuthorAvatar || n.actorAvatar,
                               };
 
-                              if (isReel) {
-                                import("../services/postService").then(({ getPost }) => {
-                                  getPost(n.postId!).then((realPost) => {
-                                    if (realPost) {
-                                      setViewingReel({ ...realPost, single: true });
-                                    } else {
-                                      setViewingReel({
-                                        id: n.postId,
-                                        authorId: n.postAuthorId || "",
-                                        authorName: postAuthor.name,
-                                        authorAvatar: postAuthor.avatar,
-                                        media: [n.postMedia!],
-                                        text: "",
-                                        type: "reel",
-                                        likesCount: 0,
-                                        commentsCount: 0,
-                                        single: true,
-                                      });
-                                    }
-                                  });
+                              import("../services/postService").then(({ getPost }) => {
+                                getPost(n.postId!).then((realPost) => {
+                                  if (realPost) {
+                                    setViewingReel({ ...realPost, single: true });
+                                  } else {
+                                    setViewingReel({
+                                      id: n.postId,
+                                      authorId: n.postAuthorId || n.actorId || "",
+                                      authorName: postAuthor.name,
+                                      authorAvatar: postAuthor.avatar,
+                                      media: n.postMedia ? [n.postMedia] : [],
+                                      text: n.content || "",
+                                      type: isReel ? "reel" : "post",
+                                      likesCount: 0,
+                                      commentsCount: 0,
+                                      single: true,
+                                    });
+                                  }
                                 });
-                              } else {
-                                setViewingMedia({
-                                  url: n.postMedia,
-                                  type: "post",
-                                  user: postAuthor,
-                                });
-                              }
+                              });
                             } else {
                               setViewingUser({
                                 uid: n.actorId,
@@ -3678,7 +3857,7 @@ export default function Messages() {
                                 n.actorAvatar ||
                                 `https://ui-avatars.com/api/?name=${encodeURIComponent(n.actorName || "User")}&background=random`
                               }
-                              className="w-11 h-11 rounded-full object-cover border border-gray-100/80 shadow-2xs"
+                              className="w-10 h-10 rounded-full object-cover"
                               alt="actor"
                               referrerPolicy="no-referrer"
                             />
@@ -3775,14 +3954,14 @@ export default function Messages() {
             </motion.div>
           ) : (
             <motion.div
-              key="regular"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
+              key={`chat-${activeChat}`}
+              initial={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "-100%", opacity: 0.98 }}
+              transition={isDesktop ? { duration: 0 } : { duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
               className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-full overflow-hidden bg-white"
             >
-              {/* Chat Background Layer - Ultra-fast GPU hardware layer with original bright, clean aesthetic */}
+              {/* Chat Background Layer - Mobile Image Wallpaper & PC Clean Solid Color */}
               {(() => {
                 const isImage = 
                   activeConvTheme === 'bg-image' || 
@@ -3794,68 +3973,17 @@ export default function Messages() {
                   activeConvTheme.includes('.jpg') ||
                   activeConvTheme.includes('.webp');
 
-                const isDefaultWallpaper = 
-                  !activeConvTheme || 
-                  activeConvTheme === 'bg-image' || 
-                  activeConvTheme === '/chat-background.png' || 
-                  activeConvTheme === 'bg-white';
-
-                if (isDefaultWallpaper) {
-                  return (
-                    <>
-                      {/* Mobile: Original Crisp Clean Unzoomed Background Image (Pinned at top:0, never shifts on keyboard open) */}
-                      <img
-                        src="/chat-background.png"
-                        alt=""
-                        className="absolute top-0 left-0 right-0 w-full pointer-events-none z-0 select-none object-cover object-top md:hidden"
-                        style={{ 
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          width: '100%',
-                          height: `${unzoomedCssHeight}px`,
-                          minHeight: `${unzoomedCssHeight}px`,
-                          maxHeight: `${unzoomedCssHeight}px`,
-                          objectFit: 'cover',
-                          objectPosition: 'center top',
-                          transform: 'translate3d(0, 0, 0)',
-                          WebkitTransform: 'translate3d(0, 0, 0)',
-                          backfaceVisibility: 'hidden',
-                          pointerEvents: 'none'
-                        }}
-                      />
-
-                      {/* Desktop/PC: Original Aesthetic Ambient Pastel Glow Background */}
-                      <div 
-                        className="hidden md:block absolute inset-0 pointer-events-none z-0 select-none overflow-hidden"
-                        style={{
-                          background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 35%, #faf5ff 70%, #fdf4ff 100%)',
-                        }}
-                      >
-                        <div className="absolute -top-28 -right-28 w-[480px] h-[480px] rounded-full bg-gradient-to-br from-indigo-200/40 via-purple-200/30 to-pink-200/20 blur-3xl pointer-events-none" />
-                        <div className="absolute top-1/2 -left-32 w-[420px] h-[420px] rounded-full bg-gradient-to-tr from-blue-200/35 via-cyan-100/25 to-purple-200/20 blur-3xl pointer-events-none" />
-                        <div className="absolute -bottom-24 right-1/4 w-[440px] h-[440px] rounded-full bg-gradient-to-t from-purple-200/30 via-pink-100/30 to-amber-100/20 blur-3xl pointer-events-none" />
-                        <div 
-                          className="absolute inset-0 opacity-[0.04] pointer-events-none" 
-                          style={{
-                            backgroundImage: `radial-gradient(#4f46e5 1px, transparent 1px), radial-gradient(#9333ea 1px, #f8fafc 1px)`,
-                            backgroundSize: '28px 28px',
-                            backgroundPosition: '0 0, 14px 14px',
-                          }}
-                        />
-                      </div>
-                    </>
-                  );
-                }
-
-                if (isImage) {
-                  return (
+                return (
+                  <>
+                    {/* Mobile Background Image Layer */}
                     <img
-                      src={activeConvTheme}
-                      alt="Wallpaper"
-                      className="absolute top-0 left-0 right-0 w-full pointer-events-none z-0 select-none object-cover object-top"
-                      style={{
+                      src={isImage ? activeConvTheme : offlineWallpaperUrl}
+                      alt=""
+                      loading="eager"
+                      decoding="sync"
+                      fetchPriority="high"
+                      className="absolute top-0 left-0 right-0 w-full pointer-events-none z-0 select-none object-cover object-top md:hidden"
+                      style={{ 
                         position: 'absolute',
                         top: 0,
                         left: 0,
@@ -3872,150 +4000,133 @@ export default function Messages() {
                         pointerEvents: 'none'
                       }}
                     />
-                  );
-                }
 
-                return (
-                  <div
-                    className={`absolute top-0 left-0 right-0 w-full ${activeConvTheme} z-0 pointer-events-none`}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      width: '100%',
-                      height: `${unzoomedCssHeight}px`,
-                      minHeight: `${unzoomedCssHeight}px`,
-                      maxHeight: `${unzoomedCssHeight}px`,
-                      transform: 'translate3d(0, 0, 0)',
-                      WebkitTransform: 'translate3d(0, 0, 0)',
-                      pointerEvents: 'none'
-                    }}
-                  />
+                    {/* Desktop/PC Background - Pure Clean Soft Color, No Image Wallpaper */}
+                    <div 
+                      className="hidden md:block absolute inset-0 pointer-events-none z-0 select-none bg-slate-50/70 border-l border-gray-100"
+                    />
+                  </>
                 );
               })()}
 
-              {/* Chat Header (Floating iOS Liquid Glass Islands) */}
+              {/* Chat Header - Perfect Full-Width Desktop Bar on PC, Floating Island on Mobile */}
               <div
-                className="absolute top-0 inset-x-0 z-30 pointer-events-none px-3 md:px-5 pt-3.5 sm:pt-4 md:pt-3.5 pb-2 flex items-center justify-between gap-2"
+                className="absolute top-0 inset-x-0 z-30 pointer-events-none px-3 pt-[max(28px,calc(env(safe-area-inset-top,0px)+20px))] pb-2.5 flex items-center justify-between gap-2 md:relative md:top-auto md:inset-x-auto md:pointer-events-auto md:bg-white md:border-b md:border-gray-100 md:px-6 md:py-3.5 md:pt-3.5 md:shadow-none md:shrink-0"
               >
-                {/* Left: Friend Profile Island */}
-                <div
-                  className="pointer-events-auto flex items-center space-x-2 sm:space-x-2.5 cursor-pointer group min-w-0 ios-liquid-glass rounded-full pl-1.5 sm:pl-2 pr-3.5 sm:pr-4 py-1.5 transition-all hover:brightness-105 active:scale-[0.985] max-w-[calc(100%-145px)] sm:max-w-none"
-                  onClick={() => setShowChatSettings(true)}
-                >
+                {/* Left: Back button + Friend Profile Island */}
+                <div className="pointer-events-auto flex items-center space-x-2.5 min-w-0 flex-1 max-w-[calc(100%-145px)] sm:max-w-none">
                   <button
-                    className="md:hidden p-1.5 -ml-0.5 hover:bg-black/5 active:scale-90 rounded-full transition-all text-gray-800 shrink-0"
+                    className="md:hidden w-9.5 h-9.5 sm:w-10 sm:h-10 rounded-full bg-white/75 hover:bg-white/95 active:scale-90 transition-all text-gray-900 border border-white/90 shadow-[0_2px_10px_rgba(0,0,0,0.04)] shrink-0 flex items-center justify-center backdrop-blur-lg cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
                       setActiveChat(null);
                     }}
+                    title="Back to inbox"
                   >
                     <ArrowLeft
                       className="w-5 h-5 text-gray-800"
                       strokeWidth={2.4}
                     />
                   </button>
-                  <div className="relative shrink-0">
-                    {activeContact?.isGroup && !activeContact.avatar ? (
-                      <div className="cursor-pointer group-hover:opacity-90 transition-opacity">
-                        <GroupAvatar
-                          members={
-                            activeConversation?.participantIds
-                              ?.filter((id) => id !== currentUser?.uid)
-                              .slice(0, 3)
-                              .map(
-                                (id) =>
-                                  userDataCache[id]?.avatar ||
-                                  (activeConversation?.participantAvatars || {})[id] ||
-                                  `https://ui-avatars.com/api/?name=${encodeURIComponent(userDataCache[id]?.name || (activeConversation?.participantNames || {})[id] || "User")}&background=random`,
-                              ) || []
-                          }
-                          sizeClass="w-9 h-9 sm:w-10 sm:h-10"
-                        />
-                      </div>
-                    ) : (
-                      <img
-                        src={activeContact?.avatar as string}
-                        alt="Avatar"
-                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover group-hover:opacity-90 transition-opacity shadow-xs border border-white/90"
-                      />
-                    )}
-                    {activeContact?.online && (
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full shadow-xs" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h2
-                      className="font-semibold text-[14px] sm:text-[15px] text-gray-900 truncate leading-tight tracking-tight"
-                    >
-                      {activeContact?.name}
-                    </h2>
-                    <p
-                      className="text-[11.5px] font-medium text-emerald-600 truncate flex items-center gap-1 mt-0.5"
-                    >
-                      {activeContact?.online ? (
-                        <>
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                          <span>Active now</span>
-                        </>
-                      ) : activeContact?.lastSeen ? (
-                        <span className="text-gray-400 font-normal">Active {formatTime(activeContact.lastSeen)}</span>
+
+                  <div
+                    className="flex items-center space-x-3 cursor-pointer group bg-white/80 backdrop-blur-xl border border-white/90 shadow-[0_2px_12px_rgba(0,0,0,0.04)] md:shadow-none md:border-none md:bg-transparent md:backdrop-blur-none rounded-full md:rounded-none pl-1.5 sm:pl-2 md:pl-0 pr-4 md:pr-0 py-1.5 md:py-0 transition-all hover:bg-white/95 md:hover:bg-transparent active:scale-[0.985] md:active:scale-100 min-w-0 flex-1 justify-between md:justify-start"
+                    onClick={() => setShowChatSettings(true)}
+                  >
+                    <div className="relative shrink-0">
+                      {activeContact?.isGroup && !activeContact.avatar ? (
+                        <div className="cursor-pointer group-hover:opacity-90 transition-opacity">
+                          <GroupAvatar
+                            members={
+                              activeConversation?.participantIds
+                                ?.filter((id) => id !== currentUser?.uid)
+                                .slice(0, 3)
+                                .map(
+                                  (id) =>
+                                    userDataCache[id]?.avatar ||
+                                    (activeConversation?.participantAvatars || {})[id] ||
+                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(userDataCache[id]?.name || (activeConversation?.participantNames || {})[id] || "User")}&background=random`,
+                                ) || []
+                            }
+                            sizeClass="w-9 h-9 sm:w-10 sm:h-10"
+                          />
+                        </div>
                       ) : (
-                        <span className="text-gray-400 font-normal">Offline</span>
+                        <img
+                          src={activeContact?.avatar as string}
+                          alt="Avatar"
+                          className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover"
+                        />
                       )}
-                    </p>
+                    </div>
+
+                    {/* Friend name aligned left with online status indicator */}
+                    <div className="min-w-0 flex-1 flex flex-col justify-center pl-1 md:pl-0">
+                      <div className="flex items-center space-x-2">
+                        <h2
+                          className="font-bold text-[16px] sm:text-[17px] text-gray-900 truncate tracking-tight text-left"
+                        >
+                          {activeContact?.name}
+                        </h2>
+                        {activeContact?.online ? (
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" title="Online" />
+                        ) : (
+                          <span className="w-2.5 h-2.5 rounded-full bg-gray-300 shrink-0" title="Offline" />
+                        )}
+                      </div>
+                      <span className="text-[11.5px] font-normal text-gray-400 text-left hidden md:block">
+                        {activeContact?.online ? "Online" : "Offline"}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Right: Actions Island */}
-                <div className="pointer-events-auto flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+                {/* Right: Distinct Action Buttons */}
+                <div className="pointer-events-auto flex items-center space-x-1 sm:space-x-2 shrink-0">
                   {activeChat === "jarvis" ? (
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => {
-                          const welcome = [{
-                            id: "jarvis-welcome-1",
-                            senderId: "jarvis",
-                            type: "text",
-                            content: `কিরে বন্ধু ${currentUser?.name ? currentUser.name : ""}! কী খবর তোর? আমি তোর বেস্ট ফ্রেন্ড এনভো জার্ভিস! আজকে কী করতে চাস বল?`,
-                            createdAt: 0,
-                            status: "sent"
-                          }];
-                          setJarvisMessages(welcome);
-                          try { localStorage.setItem("jarvis_chat_history", JSON.stringify(welcome)); } catch(e){}
-                        }}
-                        className="px-3.5 py-1.5 ios-liquid-glass hover:brightness-105 text-purple-700 text-xs font-semibold rounded-full transition-all active:scale-95"
-                      >
-                        Reset Chat
-                      </button>
-                    </div>
-                  ) : activeContact && !activeContact.isGroup && (
+                    <button
+                      onClick={() => {
+                        const welcome = [{
+                          id: "jarvis-welcome-1",
+                          senderId: "jarvis",
+                          type: "text",
+                          content: `কিরে বন্ধু ${currentUser?.name ? currentUser.name : ""}! কী খবর তোর? আমি তোর বেস্ট ফ্রেন্ড এনভো জার্ভিস! আজকে কী করতে চাস বল?`,
+                          createdAt: 0,
+                          status: "sent"
+                        }];
+                        setJarvisMessages(welcome);
+                        try { localStorage.setItem("jarvis_chat_history", JSON.stringify(welcome)); } catch(e){}
+                      }}
+                      className="px-3.5 py-1.5 bg-white/75 hover:bg-white/95 active:scale-95 text-purple-700 text-xs font-semibold rounded-full border border-white/90 shadow-[0_2px_10px_rgba(0,0,0,0.04)] md:shadow-none md:border-none md:bg-gray-100 md:hover:bg-gray-200 transition-all backdrop-blur-lg cursor-pointer"
+                    >
+                      Reset Chat
+                    </button>
+                  ) : activeContact && !activeContact.isGroup ? (
                     <>
                       <button
                         onClick={() => handleStartCall('audio')}
                         title="Audio Call"
-                        className="w-9 h-9 sm:w-10 sm:h-10 ios-liquid-glass-button hover:brightness-105 active:scale-90 rounded-full transition-all text-[#007AFF] flex items-center justify-center"
+                        className="w-9.5 h-9.5 sm:w-10 sm:h-10 bg-white/75 hover:bg-white/95 active:scale-90 rounded-full transition-all text-[#007AFF] border border-white/90 shadow-[0_2px_10px_rgba(0,0,0,0.04)] md:shadow-none md:border-none md:bg-gray-100/80 md:hover:bg-gray-200/80 flex items-center justify-center shrink-0 backdrop-blur-lg cursor-pointer"
                       >
-                        <Phone className="w-4.5 h-4.5" strokeWidth={2.4} />
+                        <Phone className="w-5 h-5 text-[#007AFF]" strokeWidth={2.3} />
                       </button>
                       <button
                         onClick={() => handleStartCall('video')}
                         title="Video Call"
-                        className="w-9 h-9 sm:w-10 sm:h-10 ios-liquid-glass-button hover:brightness-105 active:scale-90 rounded-full transition-all text-[#007AFF] flex items-center justify-center"
+                        className="w-9.5 h-9.5 sm:w-10 sm:h-10 bg-white/75 hover:bg-white/95 active:scale-90 rounded-full transition-all text-[#007AFF] border border-white/90 shadow-[0_2px_10px_rgba(0,0,0,0.04)] md:shadow-none md:border-none md:bg-gray-100/80 md:hover:bg-gray-200/80 flex items-center justify-center shrink-0 backdrop-blur-lg cursor-pointer"
                       >
-                        <Video className="w-4.5 h-4.5" strokeWidth={2.4} />
+                        <Video className="w-5 h-5 text-[#007AFF]" strokeWidth={2.3} />
                       </button>
                     </>
-                  )}
+                  ) : null}
                   <button
                     onClick={() => setShowChatSettings(true)}
                     title="Chat Details"
-                    className="w-9 h-9 sm:w-10 sm:h-10 ios-liquid-glass-button hover:brightness-105 active:scale-90 rounded-full transition-all text-gray-700 flex items-center justify-center"
+                    className="w-9.5 h-9.5 sm:w-10 sm:h-10 bg-white/75 hover:bg-white/95 active:scale-90 rounded-full transition-all text-gray-800 border border-white/90 shadow-[0_2px_10px_rgba(0,0,0,0.04)] md:shadow-none md:border-none md:bg-gray-100/80 md:hover:bg-gray-200/80 flex items-center justify-center shrink-0 backdrop-blur-lg cursor-pointer"
                   >
                     <Info
-                      className="w-4.5 h-4.5 text-gray-700"
-                      strokeWidth={2.4}
+                      className="w-5 h-5 text-gray-700"
+                      strokeWidth={2.3}
                     />
                   </button>
                 </div>
@@ -4023,16 +4134,15 @@ export default function Messages() {
 
               {/* Messages & Floating Input Overlay Container */}
               <div className="flex-1 relative w-full h-full overflow-hidden">
-                {/* Messages Area - Full container height overlay so bubbles scroll underneath header islands and input box */}
+                {/* Messages Area */}
                 <div
                   ref={messagesContainerRef}
-                  className="absolute inset-0 overflow-y-auto px-4 pt-[68px] sm:pt-[72px] md:pt-[68px] space-y-0.5 scrollbar-hide flex flex-col justify-start z-10 overscroll-contain transform-gpu [webkit-overflow-scrolling:touch] transition-[padding-bottom] duration-150 ease-out"
+                  className="absolute inset-0 overflow-y-auto px-4 pt-[max(84px,calc(env(safe-area-inset-top,0px)+80px))] md:pt-4 space-y-0.5 scrollbar-hide flex flex-col justify-start z-10 overscroll-contain transform-gpu [webkit-overflow-scrolling:touch]"
                   style={{ paddingBottom: `${(showStickerModal ? 420 : 110) + (viewportBottomOffset > 0 ? viewportBottomOffset : 0)}px` }}
                   onScroll={(e) => {
                     if (e.currentTarget.scrollTop < 20) {
                       setMessageLimit((prev: number) => prev + 20);
                     }
-                    // Update auto-scroll ref based on regular scrolling
                     const { scrollTop, scrollHeight, clientHeight } =
                       e.currentTarget;
                     shouldAutoScrollRef.current =
@@ -4123,13 +4233,13 @@ export default function Messages() {
 
                 {/* Floating Input Area */}
                 <div
-                  className={`absolute inset-x-0 z-30 pb-3 md:pb-4 pt-2 px-3 md:px-6 w-full flex flex-col justify-end pointer-events-none bg-gradient-to-t from-black/[0.02] via-transparent to-transparent transform-gpu ${
-                    showStickerModal ? 'bottom-[340px] md:bottom-[360px]' : 'bottom-0'
+                  className={`absolute inset-x-0 z-30 pb-2.5 md:pb-3.5 pt-1 px-3 md:px-6 w-full flex flex-col justify-end pointer-events-none bg-gradient-to-t from-black/[0.02] via-transparent to-transparent transform-gpu ${
+                    showStickerModal ? 'bottom-[340px] md:bottom-[360px]' : 'bottom-2.5 md:bottom-3.5'
                   }`}
                   style={{
                     transform: viewportBottomOffset > 0 ? `translate3d(0, -${viewportBottomOffset}px, 0)` : 'translate3d(0, 0, 0)',
-                    transition: 'transform 0.26s cubic-bezier(0.33, 1, 0.68, 1), bottom 0.26s cubic-bezier(0.33, 1, 0.68, 1)',
-                    willChange: 'transform, bottom'
+                    transition: showStickerModal ? 'bottom 0.24s cubic-bezier(0.33, 1, 0.68, 1)' : 'none',
+                    willChange: 'transform'
                   }}
                 >
                 {/* Smart Sticker Suggestions (shown above input bar when typing keywords/emojis) */}
@@ -4375,16 +4485,64 @@ export default function Messages() {
 
                     <form
                       onSubmit={handleSend}
-                      className="pointer-events-auto flex items-end space-x-1.5 w-full max-w-3xl mx-auto ultra-glass-chat-container px-3 py-1.5 transform-gpu"
+                      className="pointer-events-auto flex items-end space-x-2 w-full max-w-2xl mx-auto bg-white/60 backdrop-blur-md border border-white/40 shadow-xs px-3 py-1.5 rounded-[28px] transform-gpu transition-all focus-within:border-white/70 focus-within:bg-white/70"
                     >
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="p-2 text-black bg-white/20 hover:bg-white/40 active:scale-90 rounded-2xl transition-all shrink-0 mb-0.5 border border-white/40 shadow-2xs flex items-center justify-center backdrop-blur-md"
-                        title="Attach Photo or Video"
-                      >
-                        <Plus className="w-5 h-5 stroke-[2.4] text-black" />
-                      </button>
+                      <div className="relative shrink-0 self-end mb-[1px]">
+                        <button
+                          type="button"
+                          onClick={() => setShowAttachMenu((prev) => !prev)}
+                          className={`w-9 h-9 text-gray-800 bg-white/70 hover:bg-white/90 active:scale-95 rounded-full transition-all shrink-0 border border-white/50 shadow-2xs flex items-center justify-center cursor-pointer ${showAttachMenu ? 'rotate-45 bg-white/90' : ''}`}
+                          title="Attach files"
+                        >
+                          <Plus className="w-5 h-5 stroke-[2.2] text-gray-800 transition-transform duration-200" />
+                        </button>
+
+                        <AnimatePresence>
+                          {showAttachMenu && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-[120]"
+                                onClick={() => setShowAttachMenu(false)}
+                              />
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.88, y: 10 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.88, y: 10 }}
+                                transition={{ type: 'spring', damping: 25, stiffness: 380 }}
+                                className="absolute bottom-12 left-0 z-[130] bg-white/98 backdrop-blur-2xl border border-gray-200/90 shadow-[0_12px_36px_rgba(0,0,0,0.18)] rounded-2xl p-1.5 min-w-[160px] flex flex-col space-y-1 select-none"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowAttachMenu(false);
+                                    fileInputRef.current?.click();
+                                  }}
+                                  className="flex items-center space-x-2.5 px-3 py-2 rounded-xl hover:bg-gray-100/90 active:scale-98 transition-all text-left group cursor-pointer"
+                                >
+                                  <div className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                    <ImageIcon className="w-3.5 h-3.5" />
+                                  </div>
+                                  <span className="text-xs font-bold text-gray-900">Photos</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowAttachMenu(false);
+                                    docInputRef.current?.click();
+                                  }}
+                                  className="flex items-center space-x-2.5 px-3 py-2 rounded-xl hover:bg-purple-50/80 active:scale-98 transition-all text-left group cursor-pointer"
+                                >
+                                  <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                    <FileText className="w-3.5 h-3.5" />
+                                  </div>
+                                  <span className="text-xs font-bold text-gray-900">Document</span>
+                                </button>
+                              </motion.div>
+                            </>
+                          )}
+                        </AnimatePresence>
+                      </div>
                       <input
                         type="file"
                         className="hidden"
@@ -4393,37 +4551,61 @@ export default function Messages() {
                         accept="image/*,video/*"
                         multiple
                       />
+                      <input
+                        type="file"
+                        className="hidden"
+                        ref={docInputRef}
+                        onChange={handleDocumentSelect}
+                        accept="*/*"
+                        multiple
+                      />
 
                       {isRecording ? (
-                        <div className="flex-1 flex items-center justify-between bg-red-50/80 backdrop-blur-md border border-red-200/90 rounded-2xl px-3 py-1.5 mr-1 my-0.5">
-                          <div className="flex items-center space-x-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-                            <span className="text-red-600 text-[13px] font-mono font-semibold tabular-nums">
+                        <div className="flex-1 flex items-center justify-between bg-red-500/10 backdrop-blur-xl border border-red-500/30 rounded-[22px] px-3.5 py-1.5 my-0.5 min-w-0">
+                          {/* Recording Dot & Time */}
+                          <div className="flex items-center space-x-2 shrink-0">
+                            <span className="relative flex h-3 w-3">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+                            </span>
+                            <span className="text-red-600 text-[13.5px] font-mono font-bold tabular-nums tracking-tight">
                               {Math.floor(recordingDuration / 60)}:
                               {(recordingDuration % 60).toString().padStart(2, "0")}
                             </span>
-                            <div className="flex items-center space-x-0.5 ml-1">
-                              <div className="w-1 h-3 bg-red-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                              <div className="w-1 h-4 bg-red-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                              <div className="w-1 h-2 bg-red-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                            </div>
                           </div>
-                          <div className="flex items-center space-x-2">
+
+                          {/* Android Multi-Bar Waveform Audio Visualizer */}
+                          <div className="flex items-center space-x-[3px] px-2 overflow-hidden flex-1 justify-center max-w-[210px]">
+                            {[35, 75, 45, 95, 60, 100, 50, 85, 40, 90, 65, 80, 55, 35, 75, 50, 85, 40, 90, 60].map((h, idx) => (
+                              <div
+                                key={idx}
+                                className="w-[3px] bg-gradient-to-t from-red-500 via-pink-500 to-rose-400 rounded-full animate-pulse"
+                                style={{
+                                  height: `${Math.max(6, Math.min(28, h * 0.28))}px`,
+                                  animationDuration: `${0.35 + (idx % 6) * 0.12}s`,
+                                  animationDelay: `${idx * 35}ms`
+                                }}
+                              />
+                            ))}
+                          </div>
+
+                          {/* Actions: Cancel (Trash) & Send Voice */}
+                          <div className="flex items-center space-x-2 shrink-0">
                             <button
                               type="button"
                               onClick={cancelRecording}
-                              className="flex items-center space-x-1 px-2.5 py-1 bg-white hover:bg-red-100 border border-red-200 text-red-600 rounded-full text-xs font-medium transition-colors active:scale-95 shadow-2xs"
+                              className="w-8.5 h-8.5 bg-white/90 hover:bg-red-100 text-red-600 border border-red-200/80 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-2xs cursor-pointer"
+                              title="Cancel Voice Message"
                             >
-                              <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                              <span>Cancel</span>
+                              <Trash2 className="w-4 h-4 text-red-500" />
                             </button>
                             <button
                               type="button"
                               onClick={stopRecording}
-                              className="p-2 bg-red-500 hover:bg-red-600 active:scale-90 text-white rounded-full transition-transform shadow-xs flex items-center justify-center"
+                              className="w-8.5 h-8.5 bg-gradient-to-tr from-[#FE2C55] to-pink-600 hover:from-[#E60045] hover:to-pink-700 active:scale-90 text-white rounded-full transition-transform shadow-[0_3px_10px_rgba(254,44,85,0.35)] flex items-center justify-center cursor-pointer border border-white/40"
                               title="Send Voice Message"
                             >
-                              <Send className="w-4 h-4" strokeWidth={2.2} />
+                              <Send className="w-4 h-4 ml-0.5" strokeWidth={2.4} />
                             </button>
                           </div>
                         </div>
@@ -4435,24 +4617,16 @@ export default function Messages() {
                           onChange={(e) => {
                             handleTyping(e);
                             e.target.style.height = 'auto';
-                            e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                            e.target.style.height = `${Math.min(e.target.scrollHeight, 80)}px`;
                           }}
                           onFocus={() => {
                             if (messagesContainerRef.current) {
-                              requestAnimationFrame(() => {
-                                if (messagesContainerRef.current) {
-                                  messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-                                }
-                              });
+                              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
                             }
                           }}
                           onTouchStart={() => {
                             if (messagesContainerRef.current) {
-                              requestAnimationFrame(() => {
-                                if (messagesContainerRef.current) {
-                                  messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-                                }
-                              });
+                              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
                             }
                           }}
                           onKeyDown={(e) => {
@@ -4463,13 +4637,13 @@ export default function Messages() {
                             }
                           }}
                           placeholder="Message..."
-                          className="flex-1 bg-transparent py-2 px-1.5 focus:outline-none focus:ring-0 focus:border-transparent text-[15px] font-normal text-black placeholder:text-black placeholder:font-normal min-w-0 resize-none max-h-[120px] overflow-y-auto no-scrollbar leading-snug"
+                          className="flex-1 bg-transparent py-1.5 px-2 focus:outline-none focus:ring-0 focus:border-transparent text-[15px] font-normal text-gray-900 placeholder:text-gray-400 placeholder:font-normal min-w-0 resize-none max-h-[80px] overflow-y-auto no-scrollbar leading-snug my-0.5"
                         />
                       )}
 
                       {!isRecording && (
-                        <div className="flex items-center space-x-1.5 shrink-0 mb-0.5">
-                          {/* STICKER BUTTON ON RIGHT SIDE (SOFT WATER GLASS) */}
+                        <div className="flex items-center space-x-1.5 shrink-0 self-end mb-[1px]">
+                          {/* STICKER BUTTON ON RIGHT SIDE */}
                           <button
                             type="button"
                             onClick={() => {
@@ -4478,30 +4652,30 @@ export default function Messages() {
                               }
                               setShowStickerModal((prev) => !prev);
                             }}
-                            className="p-2 bg-white/20 hover:bg-white/40 text-black active:scale-90 rounded-2xl transition-all shrink-0 border border-white/40 shadow-2xs flex items-center justify-center group backdrop-blur-md"
+                            className="w-9 h-9 bg-white/70 hover:bg-white/90 text-gray-700 active:scale-95 rounded-full transition-all shrink-0 border border-white/50 shadow-2xs flex items-center justify-center group cursor-pointer"
                             title="Stickers, Emojis & Creator"
                           >
-                            <StickerIcon className="w-5 h-5 text-black transform group-hover:rotate-12 transition-transform" strokeWidth={2.2} />
+                            <StickerIcon className="w-4.5 h-4.5 text-gray-700 transform group-hover:rotate-12 transition-transform" strokeWidth={2.2} />
                           </button>
 
                           <div className="w-9 h-9 flex items-center justify-center shrink-0">
                             {(inputText.trim() || selectedImagePreview) ? (
                               <motion.button
                                 type="submit"
-                                whileTap={{ scale: 0.82 }}
-                                whileHover={{ scale: 1.06 }}
-                                className="w-9 h-9 bg-[#FE2C55] hover:bg-[#E60045] text-white rounded-full transition-all duration-200 flex items-center justify-center shadow-[0_4px_14px_rgba(254,44,85,0.35)] border border-white/40 backdrop-blur-md"
+                                whileTap={{ scale: 0.88 }}
+                                whileHover={{ scale: 1.05 }}
+                                className="w-9 h-9 bg-gradient-to-tr from-[#FE2C55] via-rose-500 to-pink-500 hover:from-[#E60045] hover:to-pink-600 text-white rounded-full transition-all duration-150 flex items-center justify-center shadow-xs border border-white/50 cursor-pointer"
                               >
-                                <Send className="w-4 h-4" strokeWidth={2.5} />
+                                <SendHorizontal className="w-4 h-4 ml-0.5" strokeWidth={2.4} />
                               </motion.button>
                             ) : (
                               <button
                                 type="button"
                                 onClick={startRecording}
-                                className="p-2 text-black bg-white/20 hover:bg-white/40 active:scale-90 rounded-2xl transition-all shrink-0 border border-white/40 shadow-2xs flex items-center justify-center backdrop-blur-md"
+                                className="w-9 h-9 text-gray-700 bg-white/70 hover:bg-white/90 active:scale-95 rounded-full transition-all shrink-0 border border-white/50 shadow-2xs flex items-center justify-center cursor-pointer"
                                 title="Voice Message"
                               >
-                                <Mic className="w-5 h-5 stroke-[2.2] text-black" />
+                                <Mic className="w-4.5 h-4.5 stroke-[2.2] text-gray-700" />
                               </button>
                             )}
                           </div>
@@ -4513,12 +4687,12 @@ export default function Messages() {
               </div>
             </div>
 
-              {/* Context Menu */}
+              {/* Context Menu (Ultra Glass & Unique Emojis) */}
               <AnimatePresence>
                 {contextMenu && (
                   <>
                     <div
-                      className="fixed inset-0 z-[240] bg-black/20"
+                      className="fixed inset-0 z-[240] bg-black/25 backdrop-blur-xs transition-opacity"
                       onClick={closeContextMenu}
                       onContextMenu={(e) => {
                         e.preventDefault();
@@ -4527,19 +4701,19 @@ export default function Messages() {
                       }}
                     ></div>
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.1 }}
-                      className="fixed bg-white rounded-2xl shadow-xl border border-gray-200 p-2 w-64 z-[250] overflow-hidden"
+                      initial={{ opacity: 0, scale: 0.92, y: 4 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.92, y: 4 }}
+                      transition={{ duration: 0.12, ease: "easeOut" }}
+                      className="fixed ultra-glass-popup rounded-[26px] p-2.5 w-72 z-[250] overflow-hidden shadow-[0_20px_48px_-6px_rgba(0,0,0,0.18)]"
                       style={{
-                        top: Math.max(70, Math.min(contextMenu.y, (window.innerHeight || 800) - 260)),
-                        left: Math.max(16, Math.min(contextMenu.x, (window.innerWidth || 400) - 270)),
+                        top: Math.max(70, Math.min(contextMenu.y, (window.innerHeight || 800) - 270)),
+                        left: Math.max(16, Math.min(contextMenu.x, (window.innerWidth || 400) - 280)),
                       }}
                     >
-                      {/* Reaction Emojis Bar */}
-                      <div className="flex items-center justify-around px-2 py-1.5 bg-gray-50 rounded-xl mb-1.5 border border-gray-100">
-                        {["❤️", "😂", "😮", "😢", "🔥", "👏"].map((emoji) => (
+                      {/* Unique Expressive Reaction Emojis Bar */}
+                      <div className="flex items-center justify-between px-2 py-1.5 bg-white/70 backdrop-blur-xl rounded-2xl mb-2 border border-white/90 shadow-2xs overflow-x-auto no-scrollbar">
+                        {["💖", "🔥", "😮", "😭", "⚡", "🚀", "💯", "👍", "📌"].map((emoji) => (
                           <button
                             key={emoji}
                             onClick={async () => {
@@ -4565,7 +4739,7 @@ export default function Messages() {
                               }
                               closeContextMenu();
                             }}
-                            className="text-2xl hover:scale-110 active:scale-95 transition-transform p-0.5"
+                            className="text-[20px] hover:scale-125 active:scale-90 transition-transform p-1 shrink-0 drop-shadow-2xs cursor-pointer"
                           >
                             {emoji}
                           </button>
@@ -4594,10 +4768,10 @@ export default function Messages() {
                                     });
                                     closeContextMenu();
                                   }}
-                                  className="w-full text-left px-3 py-2 hover:bg-purple-50 active:bg-purple-100 rounded-xl flex items-center space-x-3 transition-colors text-purple-700"
+                                  className="w-full text-left px-3 py-2 hover:bg-purple-50/80 active:bg-purple-100/80 rounded-xl flex items-center space-x-3 transition-colors text-purple-700 cursor-pointer"
                                 >
                                   <Bookmark className={`w-4 h-4 ${isAlreadySaved ? "fill-purple-600" : ""}`} />
-                                  <span className="font-medium text-[14px]">
+                                  <span className="font-medium text-[13.5px]">
                                     {isAlreadySaved ? "Remove from Saved Stickers" : "Save to My Stickers"}
                                   </span>
                                 </button>
@@ -4613,10 +4787,10 @@ export default function Messages() {
                                   }
                                   closeContextMenu();
                                 }}
-                                className="w-full text-left px-3 py-2 hover:bg-gray-100 active:bg-gray-200 rounded-xl flex items-center space-x-3 transition-colors text-gray-800"
+                                className="w-full text-left px-3 py-2 hover:bg-gray-100/80 active:bg-gray-200/80 rounded-xl flex items-center space-x-3 transition-colors text-gray-800 cursor-pointer"
                               >
                                 <Reply className="w-4 h-4 text-purple-600" />
-                                <span className="font-medium text-[14px]">Reply to message</span>
+                                <span className="font-medium text-[13.5px]">Reply to message</span>
                               </button>
 
                               {isSticker && stkUrl && (
@@ -4625,10 +4799,10 @@ export default function Messages() {
                                     navigator.clipboard.writeText(stkUrl);
                                     closeContextMenu();
                                   }}
-                                  className="w-full text-left px-3 py-2 hover:bg-gray-100 active:bg-gray-200 rounded-xl flex items-center space-x-3 transition-colors text-gray-800"
+                                  className="w-full text-left px-3 py-2 hover:bg-gray-100/80 active:bg-gray-200/80 rounded-xl flex items-center space-x-3 transition-colors text-gray-800 cursor-pointer"
                                 >
                                   <Share2 className="w-4 h-4 text-gray-600" />
-                                  <span className="font-medium text-[14px]">Share / Copy Sticker Link</span>
+                                  <span className="font-medium text-[13.5px]">Share / Copy Link</span>
                                 </button>
                               )}
 
@@ -4640,17 +4814,17 @@ export default function Messages() {
                                     }
                                     closeContextMenu();
                                   }}
-                                  className="w-full text-left px-3 py-2 hover:bg-gray-100 active:bg-gray-200 rounded-xl flex items-center space-x-3 transition-colors text-gray-800"
+                                  className="w-full text-left px-3 py-2 hover:bg-gray-100/80 active:bg-gray-200/80 rounded-xl flex items-center space-x-3 transition-colors text-gray-800 cursor-pointer"
                                 >
                                   <Copy className="w-4 h-4 text-gray-600" />
-                                  <span className="font-medium text-[14px]">Copy text</span>
+                                  <span className="font-medium text-[13.5px]">Copy text</span>
                                 </button>
                               )}
                             </>
                           );
                         })()}
 
-                        <div className="h-px bg-gray-100 my-1"></div>
+                        <div className="h-px bg-gray-200/60 my-1"></div>
 
                         <button
                           onClick={async () => {
@@ -4688,10 +4862,10 @@ export default function Messages() {
                             }
                             closeContextMenu();
                           }}
-                          className="w-full text-left px-3 py-2 hover:bg-red-50 active:bg-red-100 rounded-xl flex items-center space-x-3 transition-colors text-red-600"
+                          className="w-full text-left px-3 py-2 hover:bg-red-50/90 active:bg-red-100/90 rounded-xl flex items-center space-x-3 transition-colors text-red-600 cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4 text-red-500" />
-                          <span className="font-medium text-[14px]">
+                          <span className="font-medium text-[13.5px]">
                             {messages.find((m) => m.id === contextMenu.msgId)
                               ?.senderId === currentUser?.uid
                               ? "Unsend message"
@@ -6059,16 +6233,14 @@ export default function Messages() {
                   autoFocus
                   onKeyDown={async (e) => {
                     if (e.key === "Enter" && currentUser) {
+                      const newNote = statusNoteText.trim();
+                      (currentUser as any).statusNote = newNote;
+                      useAppStore.getState().setCurrentUser({ ...currentUser, statusNote: newNote } as any);
+                      try { localStorage.setItem(`status_note_${currentUser.uid}`, newNote); } catch (err) {}
+                      setShowStatusInput(false);
                       try {
-                        const { updateDoc, doc } =
-                          await import("firebase/firestore");
-                        await updateDoc(doc(db, "users", currentUser.uid), {
-                          statusNote: statusNoteText,
-                        });
-                        if ((currentUser as any).statusNote !== undefined) {
-                          (currentUser as any).statusNote = statusNoteText;
-                        }
-                        setShowStatusInput(false);
+                        const { updateDoc, doc } = await import("firebase/firestore");
+                        updateDoc(doc(db, "users", currentUser.uid), { statusNote: newNote }).catch(() => {});
                       } catch (err) {}
                     }
                   }}
@@ -6089,7 +6261,7 @@ export default function Messages() {
                       <button
                         key={sug}
                         onClick={() => setStatusNoteText(sug)}
-                        className="px-3.5 py-1.5 bg-purple-50/80 hover:bg-purple-100 text-purple-700 rounded-full text-xs font-medium transition-all active:scale-95 border border-purple-100/30 shadow-sm"
+                        className="px-3.5 py-1.5 bg-purple-50/80 hover:bg-purple-100 text-purple-700 rounded-full text-xs font-medium transition-all active:scale-95 border border-purple-100/30 shadow-sm cursor-pointer"
                       >
                         {sug}
                       </button>
@@ -6102,42 +6274,37 @@ export default function Messages() {
             {/* Bottom Actions sticky to bottom */}
             <div className="sticky bottom-0 pt-4 pb-[max(env(safe-area-inset-bottom),24px)] w-full max-w-sm mx-auto flex flex-col space-y-3 shrink-0 z-20 bg-white/90 backdrop-blur-lg px-2">
               <button
-                onClick={async () => {
+                onClick={() => {
                   if (currentUser) {
-                    try {
-                      const { updateDoc, doc } =
-                        await import("firebase/firestore");
-                      await updateDoc(doc(db, "users", currentUser.uid), {
-                        statusNote: statusNoteText,
-                      });
-                      if ((currentUser as any).statusNote !== undefined) {
-                        (currentUser as any).statusNote = statusNoteText;
-                      }
-                      setShowStatusInput(false);
-                    } catch (err) {}
+                    const newNote = statusNoteText.trim();
+                    (currentUser as any).statusNote = newNote;
+                    useAppStore.getState().setCurrentUser({ ...currentUser, statusNote: newNote } as any);
+                    try { localStorage.setItem(`status_note_${currentUser.uid}`, newNote); } catch (err) {}
+                    setShowStatusInput(false);
+                    import("firebase/firestore").then(({ updateDoc, doc }) => {
+                      updateDoc(doc(db, "users", currentUser.uid), { statusNote: newNote }).catch(() => {});
+                    }).catch(() => {});
                   }
                 }}
-                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3.5 rounded-2xl transition-all shadow-lg shadow-purple-500/20 active:scale-98 text-center"
+                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3.5 rounded-2xl transition-all shadow-lg shadow-purple-500/20 active:scale-98 text-center cursor-pointer"
               >
                 Share Note
               </button>
               {(currentUser as any)?.statusNote && (
                 <button
-                  onClick={async () => {
+                  onClick={() => {
                     if (currentUser) {
-                      try {
-                        const { updateDoc, doc, deleteField } =
-                          await import("firebase/firestore");
-                        await updateDoc(doc(db, "users", currentUser.uid), {
-                          statusNote: deleteField(),
-                        });
-                        delete (currentUser as any).statusNote;
-                        setStatusNoteText("");
-                        setShowStatusInput(false);
-                      } catch (err) {}
+                      (currentUser as any).statusNote = "";
+                      useAppStore.getState().setCurrentUser({ ...currentUser, statusNote: "" } as any);
+                      try { localStorage.removeItem(`status_note_${currentUser.uid}`); } catch (err) {}
+                      setStatusNoteText("");
+                      setShowStatusInput(false);
+                      import("firebase/firestore").then(({ updateDoc, doc, deleteField }) => {
+                        updateDoc(doc(db, "users", currentUser.uid), { statusNote: deleteField() }).catch(() => {});
+                      }).catch(() => {});
                     }
                   }}
-                  className="w-full bg-red-50 hover:bg-red-100 text-red-500 font-medium py-3.5 rounded-2xl transition-all active:scale-98 text-center"
+                  className="w-full bg-red-50 hover:bg-red-100 text-red-500 font-medium py-3 rounded-2xl transition-all active:scale-98 text-center text-xs cursor-pointer"
                 >
                   Delete Status Note
                 </button>

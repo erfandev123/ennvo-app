@@ -166,34 +166,8 @@ export const playOutgoingRingtone = () => {
  */
 let messageSentAudioCtx: AudioContext | null = null;
 export const playMessageSentSound = () => {
-  try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    if (!messageSentAudioCtx || messageSentAudioCtx.state === 'closed') {
-      messageSentAudioCtx = new AudioCtx();
-    }
-    if (messageSentAudioCtx.state === 'suspended') {
-      messageSentAudioCtx.resume().catch(() => {});
-    }
-    const ctx = messageSentAudioCtx;
-    const now = ctx.currentTime;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(450, now);
-    osc.frequency.exponentialRampToValueAtTime(850, now + 0.08);
-
-    gain.gain.setValueAtTime(0.12, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.1);
-  } catch (e) {}
+  // Silent on user request - no sound effect when sending message
+  return;
 };
 
 /**

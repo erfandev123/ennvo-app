@@ -123,7 +123,10 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
     setShowViewsList, 
     setTargetViewsPostId,
     highlightedCommentId,
-    highlightedPostId
+    setHighlightedCommentId,
+    highlightedPostId,
+    setHighlightedPostId,
+    viewingReel
   } = useAppStore();
 
   const [liked, setLiked] = useState(false);
@@ -223,10 +226,14 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
   const [isCenteredInViewport, setIsCenteredInViewport] = useState(false);
 
   useEffect(() => {
-    if (highlightedPostId === post.id && highlightedCommentId && currentUser) {
+    if (!viewingReel && highlightedPostId === post.id && highlightedCommentId && currentUser) {
       setShowCommentsModal(true);
+      if (typeof setHighlightedPostId === 'function') {
+        setHighlightedPostId(null);
+        setHighlightedCommentId(null);
+      }
     }
-  }, [highlightedCommentId, highlightedPostId, post.id, currentUser]);
+  }, [viewingReel, highlightedCommentId, highlightedPostId, post.id, currentUser, setHighlightedPostId, setHighlightedCommentId]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(

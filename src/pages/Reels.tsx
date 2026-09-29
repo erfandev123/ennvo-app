@@ -9,10 +9,22 @@ import { ReelItem } from '../components/ReelItem';
 import { FacebookReelSkeleton } from '../components/Skeletons';
 
 const SEEN_REELS_STORAGE_KEY = 'ennvo_seen_reels_v2';
+const NOT_INTERESTED_STORAGE_KEY = 'ennvo_not_interested_reels';
 
 const getSeenReelIds = (): Set<string> => {
   try {
     const raw = localStorage.getItem(SEEN_REELS_STORAGE_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch (e) {
+    return new Set();
+  }
+};
+
+const getNotInterestedIds = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem(NOT_INTERESTED_STORAGE_KEY);
     if (!raw) return new Set();
     const arr = JSON.parse(raw);
     return new Set(Array.isArray(arr) ? arr : []);
@@ -72,21 +84,30 @@ export default function Reels() {
       }, 200);
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('refreshReels', handleRefresh);
-    
     const handlePrivacyUpdate = (e: any) => {
       const { id, privacy, isPrivate } = e.detail || {};
       if (id) {
         setReels(prev => prev.map(r => r.id === id ? { ...r, privacy, isPrivate } : r));
       }
     };
+
+    const handleNotInterested = (e: any) => {
+      const { id } = e.detail || {};
+      if (id) {
+        setReels(prev => prev.filter(r => r.id !== id));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('refreshReels', handleRefresh);
     window.addEventListener('reelPrivacyUpdated', handlePrivacyUpdate);
+    window.addEventListener('reelNotInterested', handleNotInterested);
     
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('refreshReels', handleRefresh);
       window.removeEventListener('reelPrivacyUpdated', handlePrivacyUpdate);
+      window.removeEventListener('reelNotInterested', handleNotInterested);
       if (activeReelTimerRef.current) clearTimeout(activeReelTimerRef.current);
     };
   }, []);
@@ -138,7 +159,8 @@ export default function Reels() {
   }, [currentUser, setCachedReels]);
 
   const filteredReels = useMemo(() => {
-    let list = reels.filter(r => r.privacy !== 'private' && !(r as any).isPrivate);
+    const notInterested = getNotInterestedIds();
+    let list = reels.filter(r => r.privacy !== 'private' && !(r as any).isPrivate && !notInterested.has(r.id));
 
     if (activeTab === 'following') {
       list = list.filter(r => followingIds.has(r.authorId));
@@ -202,21 +224,27 @@ export default function Reels() {
   return (
     <div className="h-full w-full bg-black md:bg-[#f8f9fa] overflow-hidden relative">
       {/* Feed Tabs Overlay */}
-      <div className={`absolute top-8 md:top-4 left-0 right-0 md:left-28 md:right-auto z-40 flex justify-center md:justify-start pointer-events-none transition-opacity duration-300 ${isReelsCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-        <div className="flex items-center space-x-5 px-5 py-1.5 pointer-events-auto">
-          <button 
-            onClick={() => setActiveTab('following')}
-            className={`text-[13px] font-medium tracking-wide drop-shadow-md transition-all ${activeTab === 'following' ? 'text-white md:text-black scale-105' : 'text-white/70 md:text-black/60 hover:text-white md:hover:text-black'}`}
-          >
-            Following
-            {activeTab === 'following' && <motion.div layoutId="reel-tab" className="h-0.5 bg-white md:bg-black rounded-full mt-0.5" />}
-          </button>
+      <div className={`absolute top-6 md:top-4 left-0 right-0 md:left-28 md:right-auto z-40 flex justify-center md:justify-start pointer-events-none transition-opacity duration-300 ${isReelsCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+        <div className="flex items-center bg-black/45 md:bg-white/85 backdrop-blur-xl border border-white/25 md:border-gray-200/80 rounded-full p-1 shadow-xl pointer-events-auto transition-all">
           <button 
             onClick={() => setActiveTab('forYou')}
-            className={`text-[13px] font-medium tracking-wide drop-shadow-md transition-all ${activeTab === 'forYou' ? 'text-white md:text-black scale-105' : 'text-white/70 md:text-black/60 hover:text-white md:hover:text-black'}`}
+            className={`relative px-4 py-1.5 text-[13px] font-semibold rounded-full transition-all duration-200 select-none ${
+              activeTab === 'forYou' 
+                ? 'text-black bg-white shadow-md scale-[1.02]' 
+                : 'text-white/80 md:text-gray-600 hover:text-white md:hover:text-black'
+            }`}
           >
             For You
-            {activeTab === 'forYou' && <motion.div layoutId="reel-tab" className="h-0.5 bg-white md:bg-black rounded-full mt-0.5" />}
+          </button>
+          <button 
+            onClick={() => setActiveTab('following')}
+            className={`relative px-4 py-1.5 text-[13px] font-semibold rounded-full transition-all duration-200 select-none ${
+              activeTab === 'following' 
+                ? 'text-black bg-white shadow-md scale-[1.02]' 
+                : 'text-white/80 md:text-gray-600 hover:text-white md:hover:text-black'
+            }`}
+          >
+            Following
           </button>
         </div>
       </div>

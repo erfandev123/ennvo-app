@@ -60,11 +60,29 @@ export const CallOverlay = () => {
         if (!activeCallState || activeCallState.callId !== call.id) {
           setIncomingCall(call);
           playRingtone(true);
+
+          // Android Native Bridge: Trigger native incoming call popup / full-screen intent
+          try {
+            const win = window as any;
+            if (typeof win.Android?.showIncomingCall === 'function') {
+              win.Android.showIncomingCall(call.callerName, call.callerAvatar || '', call.type || 'video', call.id);
+            } else if (typeof win.AndroidInterface?.showIncomingCall === 'function') {
+              win.AndroidInterface.showIncomingCall(call.callerName, call.callerAvatar || '', call.type || 'video', call.id);
+            }
+          } catch (e) {}
         }
       } else {
         setIncomingCall(prev => {
           if (prev) {
             stopRingtone();
+            try {
+              const win = window as any;
+              if (typeof win.Android?.dismissIncomingCall === 'function') {
+                win.Android.dismissIncomingCall();
+              } else if (typeof win.AndroidInterface?.dismissIncomingCall === 'function') {
+                win.AndroidInterface.dismissIncomingCall();
+              }
+            } catch (e) {}
           }
           return null;
         });

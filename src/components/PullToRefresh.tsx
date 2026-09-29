@@ -88,7 +88,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
             transition={{ type: 'spring', damping: 25, stiffness: 350 }}
             className="absolute top-1 left-0 right-0 z-[60] flex items-center justify-center pointer-events-none"
           >
-            <div className="bg-white/95 backdrop-blur-xl shadow-[0_8px_24px_-4px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.06)] rounded-full p-2.5 flex items-center justify-center text-[#FE2C55]">
+            <div className="bg-white/80 backdrop-blur-2xl shadow-[0_12px_32px_-4px_rgba(0,0,0,0.12),inset_0_1.5px_2px_rgba(255,255,255,0.95)] border border-white/90 rounded-full p-2.5 flex items-center justify-center text-[#FE2C55]">
               {isRefreshing ? (
                 <Loader2 className="w-5 h-5 animate-spin text-[#FE2C55]" />
               ) : (

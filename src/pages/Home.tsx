@@ -680,7 +680,7 @@ export default function Home() {
           </div>
 
           {/* Stories List */}
-          <div className="bg-white border-b border-gray-100 md:border md:border-gray-200/80 rounded-none sm:rounded-3xl p-3 sm:p-4 shadow-xs overflow-hidden">
+          <div className="bg-white rounded-none sm:rounded-3xl p-3 sm:p-4 shadow-xs overflow-hidden">
             {isStoriesLoading && stories.length === 0 ? (
               <FacebookStorySkeleton />
             ) : (

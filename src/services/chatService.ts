@@ -19,6 +19,50 @@ import {
 import { db, auth } from '../firebase';
 import { Conversation, Message } from '../types';
 
+/**
+ * Compress base64 image strings to ensure they stay well under Firestore's 1,048,487 byte document limit.
+ */
+export const compressChatImageBase64 = async (dataUrl: string, maxDim = 1000, quality = 0.75): Promise<string> => {
+  if (!dataUrl || typeof dataUrl !== 'string') return dataUrl;
+  if (!dataUrl.startsWith('data:image/')) return dataUrl;
+  if (dataUrl.length < 600000) return dataUrl; // Already small enough (< 600 KB)
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed.length < dataUrl.length ? compressed : dataUrl);
+      } catch (e) {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+};
+
 export const createGroupConversation = async (creatorId: string, participantIds: string[], groupName: string, groupAvatar?: string) => {
   try {
     const allIds = [creatorId, ...participantIds];
@@ -238,24 +282,46 @@ export const sendMessage = async (
       }
     }
 
+    let processedMediaUrl = mediaUrl || null;
+    if (processedMediaUrl && processedMediaUrl.startsWith('data:image/')) {
+      processedMediaUrl = await compressChatImageBase64(processedMediaUrl);
+    }
+
+    let processedMediaUrls = extra?.mediaUrls ? [...extra.mediaUrls] : undefined;
+    if (processedMediaUrls && processedMediaUrls.length > 0) {
+      processedMediaUrls = await Promise.all(
+        processedMediaUrls.map(async (u) => u.startsWith('data:image/') ? await compressChatImageBase64(u) : u)
+      );
+    }
+
+    let processedMediaItems = extra?.mediaItems ? [...extra.mediaItems] : undefined;
+    if (processedMediaItems && processedMediaItems.length > 0) {
+      processedMediaItems = await Promise.all(
+        processedMediaItems.map(async (m) => ({
+          ...m,
+          url: m.url?.startsWith('data:image/') ? await compressChatImageBase64(m.url) : m.url
+        }))
+      );
+    }
+
     const messageData: any = {
       senderId,
       type,
       content: content || '',
-      mediaUrl: mediaUrl || null,
+      mediaUrl: processedMediaUrl,
       createdAt: serverTimestamp(),
       status: 'sent'
     };
     
     if (postId) messageData.postId = postId;
     if (replyTo) messageData.replyTo = replyTo;
-    if (extra?.mediaUrls && extra.mediaUrls.length > 0) {
-      messageData.mediaUrls = extra.mediaUrls;
+    if (processedMediaUrls && processedMediaUrls.length > 0) {
+      messageData.mediaUrls = processedMediaUrls;
     }
-    if (extra?.mediaItems && extra.mediaItems.length > 0) {
-      messageData.mediaItems = extra.mediaItems;
+    if (processedMediaItems && processedMediaItems.length > 0) {
+      messageData.mediaItems = processedMediaItems;
       if (!messageData.mediaUrls) {
-        messageData.mediaUrls = extra.mediaItems.map(m => m.url);
+        messageData.mediaUrls = processedMediaItems.map(m => m.url);
       }
     }
 
@@ -380,6 +446,17 @@ export const markConversationRead = async (conversationId: string, userId: strin
 };
 
 export const subscribeMessages = (conversationId: string, callback: (messages: Message[]) => void, limitCount: number = 20) => {
+  // 1. Instant Offline Cache Load
+  try {
+    const cached = localStorage.getItem(`ennvo_offline_msgs_${conversationId}`);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        callback(parsed);
+      }
+    }
+  } catch (e) {}
+
   const q = query(
     collection(db, 'conversations', conversationId, 'messages'), 
     orderBy('createdAt', 'desc'),
@@ -387,11 +464,28 @@ export const subscribeMessages = (conversationId: string, callback: (messages: M
   );
   return onSnapshot(q, (snapshot) => {
     const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
-    callback(messages.reverse());
-  }, () => {});
+    const reversed = messages.reverse();
+    try {
+      localStorage.setItem(`ennvo_offline_msgs_${conversationId}`, JSON.stringify(reversed.slice(-50)));
+    } catch (e) {}
+    callback(reversed);
+  }, (err) => {
+    console.warn("Firestore messages snapshot notice:", err);
+  });
 };
 
 export const subscribeConversations = (userId: string, callback: (conversations: Conversation[]) => void) => {
+  // 1. Instant Offline Cache Load
+  try {
+    const cached = localStorage.getItem(`ennvo_offline_convs_${userId}`);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        callback(parsed);
+      }
+    }
+  } catch (e) {}
+
   const q = query(
     collection(db, 'conversations'), 
     where('participantIds', 'array-contains', userId)
@@ -410,8 +504,13 @@ export const subscribeConversations = (userId: string, callback: (conversations:
       };
       return getT(b) - getT(a);
     });
+    try {
+      localStorage.setItem(`ennvo_offline_convs_${userId}`, JSON.stringify(conversations));
+    } catch (e) {}
     callback(conversations);
-  }, () => {});
+  }, (err) => {
+    console.warn("Firestore conversations snapshot notice:", err);
+  });
 };
 
 export const logCallMessageInChat = async (
@@ -565,4 +664,51 @@ export const updateConversationTheme = async (conversationId: string, theme: str
     throw new Error(err.message);
   }
 };
+
+export const setTypingStatus = async (conversationId: string, userId: string, isTyping: boolean) => {
+  if (!conversationId || !userId) return;
+  try {
+    const convRef = doc(db, 'conversations', conversationId);
+    if (isTyping) {
+      await updateDoc(convRef, {
+        [`typing.${userId}`]: Date.now()
+      }).catch(() => {});
+    } else {
+      const { deleteField } = await import('firebase/firestore');
+      await updateDoc(convRef, {
+        [`typing.${userId}`]: deleteField()
+      }).catch(() => {});
+    }
+  } catch (e) {
+    // Ignore non-critical typing errors
+  }
+};
+
+export const subscribeTypingStatus = (conversationId: string, callback: (typingUserIds: string[]) => void) => {
+  if (!conversationId) return () => {};
+  const convRef = doc(db, 'conversations', conversationId);
+  
+  return onSnapshot(convRef, (snapshot) => {
+    if (!snapshot.exists()) {
+      callback([]);
+      return;
+    }
+    const data = snapshot.data();
+    const typingMap = data.typing || {};
+    const now = Date.now();
+    const activeTypingUids: string[] = [];
+
+    Object.keys(typingMap).forEach((uid) => {
+      const timestamp = typingMap[uid];
+      if (timestamp && (now - timestamp < 4000)) {
+        activeTypingUids.push(uid);
+      }
+    });
+
+    callback(activeTypingUids);
+  }, (err) => {
+    callback([]);
+  });
+};
+
 

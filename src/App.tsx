@@ -282,10 +282,77 @@ export default function App() {
     currentUser, setCurrentUser, 
     setNotificationCount,
     setMessageCount,
-    isBottomNavHidden
+    isBottomNavHidden,
+    popPage
   } = useAppStore();
 
-  const [showSplash, setShowSplash] = useState(true);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  // Network online/offline listener for TikTok/Facebook style offline browsing
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Android Native Hardware Back Button Handler & Capacitor Native Integration
+  useEffect(() => {
+    (window as any).handleAndroidBack = () => {
+      const state = useAppStore.getState();
+      if (state.viewingReel) {
+        state.setViewingReel(null);
+        state.setViewingReelList(null);
+        return true;
+      }
+      if (state.viewingMedia) {
+        state.setViewingMedia(null);
+        return true;
+      }
+      if (state.activeChat) {
+        state.setActiveChat(null);
+        return true;
+      }
+      if (state.navigationStack && state.navigationStack.length > 1) {
+        state.popPage();
+        return true;
+      }
+      return false; // Returns false to let native Android handle app minimization or exit
+    };
+
+    // Capacitor Native Hardware Back Button & Splash Screen integration
+    let unlistenBack: (() => void) | null = null;
+    import('@capacitor/app').then(({ App }) => {
+      App.addListener('backButton', () => {
+        const handled = (window as any).handleAndroidBack?.();
+        if (!handled) {
+          const now = Date.now();
+          if (now - lastBackPressRef.current < 2000) {
+            App.exitApp();
+          } else {
+            lastBackPressRef.current = now;
+            setShowExitToast(true);
+            setTimeout(() => setShowExitToast(false), 2000);
+          }
+        }
+      }).then(handle => {
+        unlistenBack = () => handle.remove();
+      });
+    }).catch(() => {});
+
+    import('@capacitor/splash-screen').then(({ SplashScreen }) => {
+      SplashScreen.hide();
+    }).catch(() => {});
+
+    return () => {
+      delete (window as any).handleAndroidBack;
+      if (unlistenBack) unlistenBack();
+    };
+  }, []);
 
   // Preload all tab page modules immediately on boot so lazy loading is instant
   useEffect(() => {
@@ -299,23 +366,6 @@ export default function App() {
     import('./pages/EditProfile');
     import('./pages/Settings');
   }, []);
-
-  useEffect(() => {
-    // Hard limit: Splash screen MUST hide after 2 seconds maximum
-    const maxTimer = setTimeout(() => {
-      setShowSplash(false);
-    }, 2000);
-
-    if (!isAuthLoading) {
-      if (isAuthenticated) {
-        const timer = setTimeout(() => setShowSplash(false), 1200);
-        return () => { clearTimeout(timer); clearTimeout(maxTimer); };
-      } else {
-        setShowSplash(false);
-      }
-    }
-    return () => clearTimeout(maxTimer);
-  }, [isAuthenticated, isAuthLoading]);
 
   const [showExitToast, setShowExitToast] = useState(false);
   const [showGoogleSetPasswordModal, setShowGoogleSetPasswordModal] = useState(false);
@@ -504,7 +554,7 @@ export default function App() {
   const isReelsPage = currentPage === 'home';
 
   const [visitedPages, setVisitedPages] = useState<Set<PageType>>(
-    () => new Set([currentPage])
+    () => new Set([currentPage, 'home', 'reels', 'messages', 'profile', 'search', 'notifications'])
   );
 
   useEffect(() => {
@@ -516,41 +566,19 @@ export default function App() {
     });
   }, [currentPage]);
 
-  // Splash screen removed as blocking mechanism, only displayed as overlay
-  if (!isAuthenticated && !showSplash && !isAuthLoading) {
+  if (!isAuthenticated && !isAuthLoading) {
     return <Auth />;
   }
 
   return (
     <div className={`flex h-[100dvh] w-full text-black overflow-hidden font-sans relative ${isReelsPage ? 'bg-black md:bg-[#f8f9fa]' : 'bg-[#faf5ff]'}`}>
-      <AnimatePresence>
-        {showSplash && (
-          <motion.div 
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0, scale: 1.02 }}
-            transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="absolute inset-0 z-[99999] flex flex-col items-center justify-center bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 text-white gpu-accelerated"
-          >
-            <motion.div 
-              initial={{ scale: 0.85, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.35, type: "spring", stiffness: 140, damping: 18 }}
-              className="flex flex-col items-center justify-center p-6 text-center"
-            >
-              <div className="w-24 h-24 rounded-3xl overflow-hidden mb-5 shadow-2xl border-2 border-white/30 p-0.5 bg-white/10 backdrop-blur-md">
-                <img src="/Ennvo.png" alt="Ennvo Logo" className="w-full h-full object-cover rounded-[22px]" />
-              </div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-white drop-shadow-lg mb-1">
-                Ennvo
-              </h1>
-              <p className="text-xs text-white/80 font-medium tracking-wide mb-5">
-                Connect • Share • Enjoy
-              </p>
-              <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Offline Status Pill - Informative TikTok/FB style banner */}
+      {!isOnline && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[9999] px-3 py-1 bg-amber-500/90 backdrop-blur-md text-white text-[11px] font-semibold rounded-full shadow-md flex items-center space-x-1.5 pointer-events-none animate-in fade-in slide-in-from-top-2 duration-300">
+          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+          <span>Offline Mode • Viewing Saved Content</span>
+        </div>
+      )}
 
       {!isSidebarHidden && (
         <Sidebar currentPage={currentPage} />
@@ -580,7 +608,7 @@ export default function App() {
               <div 
                 key={pageKey} 
                 style={{ display: isActive ? 'block' : 'none' }}
-                className={`w-full h-full absolute inset-0 ${isActive ? 'z-10 pointer-events-auto' : 'z-0 pointer-events-none'} transition-opacity duration-200 ease-out`}
+                className={`w-full h-full absolute inset-0 ${isActive ? 'z-10 pointer-events-auto' : 'z-0 pointer-events-none'} transform-gpu`}
               >
                 {pageKey === 'home' && <Reels />}
                 {pageKey === 'search' && <SearchPage />}

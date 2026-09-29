@@ -237,7 +237,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 350 }}
         onClick={(e) => e.stopPropagation()}
-        className="fixed bottom-0 inset-x-0 z-[220] bg-white/98 backdrop-blur-md rounded-t-[32px] shadow-[0_-12px_36px_rgba(0,0,0,0.18)] flex flex-col h-[340px] md:h-[360px] overflow-hidden transform-gpu border-t border-gray-200/80"
+        className="fixed bottom-0 inset-x-0 z-[220] bg-white/98 backdrop-blur-md rounded-t-[32px] shadow-[0_-12px_36px_rgba(0,0,0,0.18)] flex flex-col h-[340px] md:h-[360px] overflow-hidden transform-gpu border-t border-gray-200/80 select-none"
       >
         {/* Header Bar */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 shrink-0 bg-gray-50/60">
@@ -659,125 +659,123 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
           )}
         </AnimatePresence>
 
-        {/* Sticker Maker Modal */}
+        {/* Sticker Maker Full Screen Modal */}
         <AnimatePresence>
           {showCreateModal && (
             <div 
-              className="fixed inset-0 z-[280] bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs"
-              onClick={() => setShowCreateModal(false)}
+              className="fixed inset-0 z-[280] bg-white flex flex-col h-full w-full overflow-y-auto p-4 md:p-6"
             >
               <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                transition={{ duration: 0.18 }}
-                onClick={(e) => e.stopPropagation()}
-                className="bg-white rounded-3xl p-4 w-full max-w-xs shadow-2xl border border-gray-100 flex flex-col"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 30 }}
+                transition={{ duration: 0.2 }}
+                className="w-full max-w-lg mx-auto flex flex-col h-full justify-between"
               >
-                <div className="flex items-center justify-between pb-2 border-b border-gray-100 mb-3">
-                  <div className="flex items-center space-x-2">
-                    <Sparkles className="w-4 h-4 text-purple-600" />
-                    <h3 className="font-semibold text-gray-900 text-xs">Create Live Sticker</h3>
+                <div>
+                  <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-5">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 rounded-xl bg-purple-100 text-purple-600">
+                        <Sparkles className="w-5 h-5" />
+                      </div>
+                      <h3 className="font-bold text-gray-900 text-base">Create Sticker</h3>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowCreateModal(false)}
+                      className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full transition-all active:scale-90"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
-                  <button 
-                    type="button" 
-                    onClick={() => setShowCreateModal(false)}
-                    className="p-1 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-full"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+
+                  <form id="sticker-creator-form" onSubmit={handleCreateStickerSubmit} className="flex flex-col space-y-4">
+                    <input
+                      type="file"
+                      ref={creatorFileInputRef}
+                      accept="image/*,video/*,.gif,.mp4,.webm,.mov,.heic"
+                      className="hidden"
+                      onChange={handleCreatorFileChange}
+                    />
+
+                    {creatorPreviewUrl ? (
+                      <div className="relative w-full h-64 rounded-3xl bg-gray-50 border-2 border-purple-200 flex items-center justify-center overflow-hidden p-3 shadow-inner group">
+                        {creatorFileType === 'video' ? (
+                          <video 
+                            ref={videoPreviewRef}
+                            src={creatorPreviewUrl} 
+                            autoPlay 
+                            loop 
+                            muted 
+                            playsInline 
+                            onTimeUpdate={handleVideoTimeUpdate}
+                            className="w-full h-full object-contain rounded-2xl" 
+                          />
+                        ) : (
+                          <img 
+                            src={creatorPreviewUrl} 
+                            alt="Preview" 
+                            className="w-full h-full object-contain mix-blend-multiply drop-shadow-md" 
+                          />
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCreatorFile(null);
+                            setCreatorPreviewUrl(null);
+                          }}
+                          className="absolute top-3 right-3 p-2 bg-black/70 hover:bg-black text-white rounded-full text-xs shadow-lg transition-transform active:scale-90"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => creatorFileInputRef.current?.click()}
+                        className="w-full h-56 rounded-3xl border-2 border-dashed border-gray-300 hover:border-purple-500 bg-gray-50/70 hover:bg-purple-50/20 flex flex-col items-center justify-center cursor-pointer transition-all p-6 group"
+                      >
+                        <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform shadow-xs">
+                          <Upload className="w-5 h-5" />
+                        </div>
+                        <p className="text-sm font-bold text-gray-900">Upload Media</p>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Tag</label>
+                      <input
+                        type="text"
+                        placeholder="Tag name..."
+                        value={creatorTitle}
+                        onChange={(e) => setCreatorTitle(e.target.value)}
+                        required
+                        className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-900 focus:outline-none focus:border-purple-600 focus:bg-white transition-all"
+                      />
+                    </div>
+                  </form>
                 </div>
 
-                <form onSubmit={handleCreateStickerSubmit} className="flex flex-col space-y-2.5">
-                  <input
-                    type="file"
-                    ref={creatorFileInputRef}
-                    accept="image/*,video/*,.gif,.mp4,.webm,.mov"
-                    className="hidden"
-                    onChange={handleCreatorFileChange}
-                  />
-
-                  {creatorPreviewUrl ? (
-                    <div className="relative w-full h-32 rounded-2xl bg-gray-50 border border-purple-200 flex items-center justify-center overflow-hidden p-1.5 group">
-                      {creatorFileType === 'video' ? (
-                        <video 
-                          ref={videoPreviewRef}
-                          src={creatorPreviewUrl} 
-                          autoPlay 
-                          loop 
-                          muted 
-                          playsInline 
-                          onTimeUpdate={handleVideoTimeUpdate}
-                          className="w-full h-full object-cover rounded-xl" 
-                        />
-                      ) : (
-                        <img 
-                          src={creatorPreviewUrl} 
-                          alt="Preview" 
-                          className="w-full h-full object-contain mix-blend-multiply" 
-                        />
-                      )}
-                      
-                      {videoDuration > 5 && (
-                        <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/75 text-white text-[9px] rounded-full backdrop-blur-xs">
-                          Trimmed to 5s clip
-                        </div>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCreatorFile(null);
-                          setCreatorPreviewUrl(null);
-                        }}
-                        className="absolute top-2 right-2 p-1 bg-black/60 hover:bg-black text-white rounded-full text-xs shadow-md"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      onClick={() => creatorFileInputRef.current?.click()}
-                      className="w-full h-32 rounded-2xl border-2 border-dashed border-gray-200 hover:border-purple-400 bg-gray-50/50 hover:bg-purple-50/20 flex flex-col items-center justify-center cursor-pointer transition-all p-3"
-                    >
-                      <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center mb-1.5">
-                        <Upload className="w-4 h-4" />
-                      </div>
-                      <p className="text-xs font-semibold text-gray-800">Photo, GIF or Video Clip</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">Supports MP4, WebM, GIF, PNG (Max 5s)</p>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Sticker Name</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Cute Reaction"
-                      value={creatorTitle}
-                      onChange={(e) => setCreatorTitle(e.target.value)}
-                      required
-                      className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-
+                <div className="pt-4 pb-6">
                   <button
                     type="submit"
+                    form="sticker-creator-form"
                     disabled={!creatorFile || isUploadingSticker}
-                    className="w-full flex items-center justify-center space-x-2 py-2 bg-gray-900 hover:bg-black disabled:opacity-50 text-white font-medium text-xs rounded-xl shadow-xs active:scale-95 transition-all mt-1"
+                    className="w-full flex items-center justify-center space-x-2 py-3.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:opacity-95 disabled:opacity-50 text-white font-bold text-sm rounded-2xl shadow-lg shadow-purple-500/20 active:scale-98 transition-all"
                   >
                     {isUploadingSticker ? (
                       <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Publishing...</span>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Publishing Live Sticker...</span>
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-3.5 h-3.5" />
+                        <Sparkles className="w-4 h-4" />
                         <span>Publish Live Sticker</span>
                       </>
                     )}
                   </button>
-                </form>
+                </div>
               </motion.div>
             </div>
           )}

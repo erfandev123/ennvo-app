@@ -17,8 +17,17 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+
+// Enable robust memory cache so Firestore target view assertions don't fail during hot-reloads or multi-tab preview sessions
+let localCacheSetting;
+try {
+  localCacheSetting = memoryLocalCache();
+} catch (e) {
+  console.warn('Memory cache fallback:', e);
+}
+
 export const db = initializeFirestore(app, {
-  localCache: memoryLocalCache(),
+  localCache: localCacheSetting,
   experimentalAutoDetectLongPolling: true,
   ignoreUndefinedProperties: true,
 });

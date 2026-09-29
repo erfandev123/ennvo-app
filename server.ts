@@ -12,6 +12,17 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// Enable CORS for all incoming requests (crucial for Android WebView, Capacitor, and remote web views)
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 
@@ -96,7 +107,7 @@ IMPORTANT INSTRUCTIONS FOR YOUR PERSONA:
         const fullPrompt = `${systemPrompt}\n\nRecent Conversation History:\n${historyText}\n\nJarvis:`;
 
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.6-flash',
           contents: fullPrompt,
           config: {
             temperature: 0.7,

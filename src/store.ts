@@ -127,6 +127,12 @@ type AppState = {
   setActiveCallState: (state: any) => void;
   navStyle: 'classic' | 'glass';
   setNavStyle: (style: 'classic' | 'glass') => void;
+  profileStyle: 'design1' | 'design2';
+  setProfileStyle: (style: 'design1' | 'design2') => void;
+  reelsStyle: 'design1' | 'design2';
+  setReelsStyle: (style: 'design1' | 'design2') => void;
+  reelsUiStyle: 'tiktok' | 'instagram';
+  setReelsUiStyle: (style: 'tiktok' | 'instagram') => void;
   showAccountSwitcherModal: boolean;
   setShowAccountSwitcherModal: (show: boolean) => void;
 };
@@ -404,6 +410,21 @@ export const useAppStore = create<AppState>((set) => ({
   setNavStyle: (style) => {
     try { localStorage.setItem('ennvo_nav_style', style); } catch (e) {}
     set({ navStyle: style });
+  },
+  profileStyle: (typeof window !== 'undefined' && (localStorage.getItem('ennvo_profile_style') as 'design1' | 'design2')) || 'design1',
+  setProfileStyle: (style) => {
+    try { localStorage.setItem('ennvo_profile_style', style); } catch (e) {}
+    set({ profileStyle: style });
+  },
+  reelsStyle: (typeof window !== 'undefined' && (localStorage.getItem('ennvo_reels_style') as 'design1' | 'design2')) || 'design1',
+  setReelsStyle: (style) => {
+    try { localStorage.setItem('ennvo_reels_style', style); } catch (e) {}
+    set({ reelsStyle: style });
+  },
+  reelsUiStyle: (typeof window !== 'undefined' && (localStorage.getItem('ennvo_reels_ui_style') as 'tiktok' | 'instagram')) || 'tiktok',
+  setReelsUiStyle: (style) => {
+    try { localStorage.setItem('ennvo_reels_ui_style', style); } catch (e) {}
+    set({ reelsUiStyle: style });
   },
   showAccountSwitcherModal: false,
   setShowAccountSwitcherModal: (show) => set({ showAccountSwitcherModal: show }),
