@@ -83,6 +83,15 @@ const InAppToaster = memo(() => {
           if (data.createdAt && Date.now() - data.createdAt.toMillis() < 10000) {
              setToast({ id: change.doc.id, ...data });
              playNotifChime();
+             try {
+               deviceNotification.show({
+                 title: data.actorName || 'Ennvo',
+                 body: data.type === 'like' ? 'liked your post.' : data.type === 'comment' ? `commented: ${data.content}` : data.type === 'follow' ? 'started following you.' : (data.content || 'New activity'),
+                 icon: data.actorAvatar || '/Ennvo.png',
+                 type: 'activity',
+                 tag: `notif-${change.doc.id}`
+               });
+             } catch (e) {}
              if (timeoutRef.current) clearTimeout(timeoutRef.current);
              timeoutRef.current = setTimeout(() => setToast(null), 4500);
           }
@@ -97,12 +106,32 @@ const InAppToaster = memo(() => {
       }
       const changes = snap.docChanges();
       changes.forEach(change => {
-        if (change.type === 'modified') {
+        if (change.type === 'modified' || change.type === 'added') {
           const data = change.doc.data();
+          const otherId = data.participantIds?.find((id: string) => id !== currentUser.uid);
+          const name = data.participantNames?.[otherId] || 'User';
+          const avatar = data.participantAvatars?.[otherId] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
+
+          // 1. Friend typing in-app notification when user is in another page/chat
+          if (otherId && data.typing?.[otherId] && activeChat !== change.doc.id) {
+            const typingTime = data.typing[otherId];
+            if (Date.now() - typingTime < 4000) {
+              setToast({
+                id: `${change.doc.id}-typing`,
+                type: 'typing',
+                actorName: name,
+                actorAvatar: avatar,
+                content: 'is typing a message...',
+                conversationId: change.doc.id
+              });
+              if (timeoutRef.current) clearTimeout(timeoutRef.current);
+              timeoutRef.current = setTimeout(() => setToast(null), 3200);
+              return;
+            }
+          }
+
+          // 2. Incoming message alert
           if (data.unreadCount?.[currentUser.uid] > 0 && data.updatedAt && Date.now() - data.updatedAt.toMillis() < 10000 && activeChat !== change.doc.id) {
-             const otherId = data.participantIds.find((id: string) => id !== currentUser.uid);
-             const name = data.participantNames?.[otherId] || 'User';
-             const avatar = data.participantAvatars?.[otherId] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
              setToast({ 
                id: change.doc.id, 
                type: 'message', 
@@ -112,6 +141,15 @@ const InAppToaster = memo(() => {
                conversationId: change.doc.id
              });
              playNotifChime();
+             try {
+               deviceNotification.show({
+                 title: name,
+                 body: data.lastMessage || 'Sent a new message',
+                 icon: avatar || '/Ennvo.png',
+                 type: 'message',
+                 tag: `msg-${change.doc.id}`
+               });
+             } catch (e) {}
              if (timeoutRef.current) clearTimeout(timeoutRef.current);
              timeoutRef.current = setTimeout(() => setToast(null), 4500);
           }
@@ -140,7 +178,7 @@ const InAppToaster = memo(() => {
           className="bg-white/85 backdrop-blur-xl shadow-[0_12px_32px_-8px_rgba(0,0,0,0.16),0_0_1px_1px_rgba(255,255,255,0.9)_inset] border border-white/70 rounded-[22px] flex items-center px-3.5 py-2.5 pointer-events-auto cursor-pointer max-w-sm w-full transition-transform active:scale-[0.98] relative overflow-hidden group backdrop-saturate-150 transform-gpu"
           onClick={async () => {
              setToast(null);
-             if (toast.type === 'message') {
+             if (toast.type === 'message' || toast.type === 'typing') {
                setActiveChat(toast.conversationId);
                pushPage('messages');
              } else if (toast.postId) {
@@ -178,7 +216,9 @@ const InAppToaster = memo(() => {
               referrerPolicy="no-referrer"
             />
             <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-2xs border border-gray-100 scale-90">
-              {toast.type === 'message' ? (
+              {toast.type === 'typing' ? (
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-600 animate-ping" />
+              ) : toast.type === 'message' ? (
                 <MessageCircle className="w-2.5 h-2.5 text-blue-500 fill-blue-500" />
               ) : toast.type === 'like' ? (
                 <Heart className="w-2.5 h-2.5 text-red-500 fill-red-500" />
@@ -188,7 +228,41 @@ const InAppToaster = memo(() => {
             </div>
           </div>
           
-          {toast.type === 'message' ? (
+          {toast.type === 'typing' ? (
+            <>
+              <div className="ml-3 flex-1 min-w-0 pr-1 flex flex-col justify-center">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[13px] font-bold text-gray-900 leading-tight truncate">
+                    {toast.actorName || 'Friend'}
+                  </h4>
+                  <span className="text-[10px] font-semibold text-purple-600 ml-2 animate-pulse">typing...</span>
+                </div>
+                <div className="flex items-center space-x-1.5 mt-0.5">
+                  <span className="text-[11.5px] font-medium text-gray-600 truncate">
+                    is typing a message
+                  </span>
+                  <div className="flex items-center space-x-1 bg-purple-50 px-1.5 py-0.5 rounded-full">
+                    <span className="w-1 h-1 rounded-full bg-purple-600 animate-bounce [animation-delay:0ms]" />
+                    <span className="w-1 h-1 rounded-full bg-purple-600 animate-bounce [animation-delay:150ms]" />
+                    <span className="w-1 h-1 rounded-full bg-purple-600 animate-bounce [animation-delay:300ms]" />
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setToast(null);
+                  setActiveChat(toast.conversationId);
+                  pushPage('messages');
+                }}
+                className="text-white bg-purple-600 hover:bg-purple-700 font-semibold text-[11px] px-3 py-1 rounded-full shrink-0 ml-2 transition-transform active:scale-95 shadow-2xs"
+              >
+                Chat
+              </button>
+            </>
+          ) : toast.type === 'message' ? (
             <>
               <div className="ml-3 flex-1 min-w-0 pr-1 flex flex-col justify-center">
                 <div className="flex items-center justify-between">

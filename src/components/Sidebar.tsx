@@ -10,6 +10,7 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
   const setViewingUser = useAppStore(state => state.setViewingUser);
   const setShowCreatePost = useAppStore(state => state.setShowCreatePost);
   const setSelectedCreateMode = useAppStore(state => state.setSelectedCreateMode);
+  const appTheme = useAppStore(state => state.appTheme);
 
   const dockRef = useRef<HTMLDivElement>(null);
   const lastClickRef = useRef<{ [key: string]: number }>({});
@@ -168,7 +169,7 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
-      className="ultra-glass-pc-dock hidden md:flex flex-col items-center justify-between"
+      className={`ultra-glass-pc-dock hidden md:flex flex-col items-center justify-between ${appTheme === 'dark' || currentPage === 'home' ? 'dark-mode' : ''}`}
       style={{
         cursor: isDragging ? 'grabbing' : 'default',
       }}

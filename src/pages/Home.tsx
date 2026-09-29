@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { Image as ImageIcon, Video, Smile, MoreHorizontal, Heart, MessageCircle, Send, Bookmark, Plus, Search, X, ChevronDown, ChevronRight, Type, Play, UserPlus, Globe, Share2, Music, Settings2, MoreVertical, ArrowLeft, Bell } from 'lucide-react';
+import { Image as ImageIcon, Video, Smile, MoreHorizontal, Heart, MessageCircle, Send, Bookmark, Plus, Search, X, ChevronDown, ChevronRight, Type, Play, UserPlus, Globe, Share2, Music, Settings2, MoreVertical, ArrowLeft, Bell, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import { useAppStore } from '../store';
@@ -604,83 +604,122 @@ export default function Home() {
           <span>📡 No Internet Connection — Showing loaded posts & reels</span>
         </div>
       )}
-      <div ref={scrollContainerRef} id="home-scroll-container" className="h-full w-full overflow-y-auto bg-white flex flex-col items-center px-0 md:px-4 md:pl-24" onScroll={handleScroll}>
-      {/* Mobile Top Header - Smooth Slide Hide on Scroll */}
+      <div ref={scrollContainerRef} id="home-scroll-container" className="h-full w-full overflow-y-auto overflow-x-hidden bg-white dark:bg-[#0b0f19] flex flex-col items-center px-0 md:px-4 md:pl-24" onScroll={handleScroll}>
+      {/* Mobile Top Header - Separate Floating Liquid Glass Islands (Lowered safely below notification/status bar) */}
       <div 
-        className={`sm:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b border-gray-100 z-[60] px-5 pt-8 pb-3 flex items-center justify-between transition-transform duration-300 ease-in-out ${
-          showHeader && !showCreatePost ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'
+        className={`sm:hidden fixed top-0 left-0 right-0 z-[60] px-4 pt-[max(calc(env(safe-area-inset-top,0px)+18px),26px)] pb-2 flex items-center justify-between pointer-events-none transition-all duration-300 ease-in-out ${
+          showHeader && !showCreatePost ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
         }`}
       >
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-[10px] overflow-hidden shadow-sm border border-gray-100 flex-shrink-0">
-            <img src="/Ennvo.png" alt="Ennvo Logo" className="w-full h-full object-cover" />
+        {/* Left Floating Glass Island: Branding */}
+        <div 
+          onClick={() => {
+            if (scrollContainerRef.current) {
+              scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }}
+          className="pointer-events-auto flex items-center space-x-2 bg-white/85 dark:bg-[#131927]/90 backdrop-blur-2xl border border-white/80 dark:border-white/15 shadow-[0_8px_25px_rgba(0,0,0,0.08)] px-3.5 py-1.5 rounded-full transition-transform active:scale-95 cursor-pointer"
+        >
+          <div className="w-6.5 h-6.5 rounded-full overflow-hidden flex-shrink-0">
+            <img src="/Ennvo.png" alt="Ennvo" className="w-full h-full object-cover" />
           </div>
-          <h1 className="text-[24px] font-bold tracking-tight text-gray-900 drop-shadow-sm font-sans">Ennvo</h1>
+          <span className="text-[17px] font-bold tracking-tight text-gray-900 dark:text-white font-sans pr-1">Ennvo</span>
         </div>
-        <div className="flex items-center space-x-3">
-          <button onClick={() => pushPage('search')} className="p-2 transition-transform active:scale-95">
-            <Search className="w-5.5 h-5.5 text-gray-800" strokeWidth={2.5} />
+
+        {/* Right Separate Floating Glass Island Buttons (Alada Alada Glass Buttons) */}
+        <div className="pointer-events-auto flex items-center space-x-2">
+          {/* 1. Search Glass Button */}
+          <button 
+            onClick={() => pushPage('search')} 
+            className="w-9 h-9 rounded-full bg-white/85 dark:bg-[#131927]/90 backdrop-blur-2xl border border-white/80 dark:border-white/15 shadow-[0_4px_16px_rgba(0,0,0,0.07)] flex items-center justify-center text-gray-800 dark:text-gray-100 hover:scale-105 active:scale-90 transition-transform cursor-pointer"
+            title="Search"
+          >
+            <Search className="w-4.5 h-4.5" strokeWidth={2.2} />
           </button>
-          <button onClick={() => pushPage('notifications')} className="p-2 hover:bg-gray-100 rounded-full transition-transform active:scale-95 relative">
-            <Bell className="w-5.5 h-5.5 text-gray-800" strokeWidth={2.5} />
-            {notificationCount > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-600 rounded-full border-2 border-white"></span>}
+
+          {/* 2. Notifications Glass Button */}
+          <button 
+            onClick={() => pushPage('notifications')} 
+            className="w-9 h-9 rounded-full bg-white/85 dark:bg-[#131927]/90 backdrop-blur-2xl border border-white/80 dark:border-white/15 shadow-[0_4px_16px_rgba(0,0,0,0.07)] flex items-center justify-center text-gray-800 dark:text-gray-100 hover:scale-105 active:scale-90 transition-transform relative cursor-pointer"
+            title="Notifications"
+          >
+            <Bell className="w-4.5 h-4.5" strokeWidth={2.2} />
+            {notificationCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-600 rounded-full ring-2 ring-white dark:ring-gray-900"></span>
+            )}
           </button>
-          <button onClick={() => setShowCreatePost(true)} className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-full transition-colors active:scale-95 border border-gray-200/50 flex items-center justify-center"><Plus className="w-5 h-5" strokeWidth={2.5} /></button>
+
+          {/* 3. Create Post Glass Button */}
+          <button 
+            onClick={() => setShowCreatePost(true)} 
+            className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-indigo-600 text-white shadow-[0_4px_16px_rgba(124,58,237,0.35)] flex items-center justify-center hover:scale-105 active:scale-90 transition-transform cursor-pointer"
+            title="Create Post"
+          >
+            <Plus className="w-4.5 h-4.5" strokeWidth={2.5} />
+          </button>
         </div>
       </div>
 
-      <div className="w-full max-w-[1020px] flex justify-between space-x-0 md:space-x-8 pt-[76px] sm:pt-6 pb-24 px-0 sm:px-3">
-        <div className="flex-1 w-full max-w-[620px] mx-auto lg:mx-0 flex flex-col space-y-3 sm:space-y-4">
-          {/* Create Post Box */}
-          <div className="bg-white border-b border-gray-100 md:border md:border-gray-200/80 rounded-none sm:rounded-3xl px-4 py-3.5 shadow-xs transition-all">
-            <div className="flex items-center space-x-3">
-              <div className="relative group/avatar cursor-pointer shrink-0" onClick={() => { setViewingUser({ uid: currentUser?.uid, name: currentUser?.name, avatar: currentUser?.avatar }); pushPage('profile'); }}>
+      <div className="w-full max-w-[1020px] flex justify-between space-x-0 md:space-x-8 pt-[max(calc(env(safe-area-inset-top,0px)+86px),92px)] sm:pt-6 pb-24 px-0 sm:px-3 box-border">
+        <div className="flex-1 w-full max-w-[620px] mx-auto lg:mx-0 flex flex-col space-y-2.5 sm:space-y-4">
+          {/* Create Post Box - Clean 2D Minimal Modern Card */}
+          <div className="w-full bg-white dark:bg-[#131927] border-b sm:border border-gray-100 dark:border-white/10 sm:border-gray-200/70 rounded-none sm:rounded-3xl p-3 sm:p-4 shadow-xs transition-all box-border overflow-hidden">
+            <div className="flex items-center space-x-3 sm:space-x-3.5 w-full">
+              <div 
+                className="relative cursor-pointer shrink-0 active:scale-95 transition-transform" 
+                onClick={() => { setViewingUser({ uid: currentUser?.uid, name: currentUser?.name, avatar: currentUser?.avatar }); pushPage('profile'); }}
+                title="View Profile"
+              >
                 <img 
                   src={currentUser?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || 'User')}&background=random`} 
                   alt="Profile" 
                   loading="lazy" 
                   referrerPolicy="no-referrer"
-                  className="w-10 h-10 rounded-full object-cover shadow-xs border border-gray-200/60 ring-2 ring-transparent group-hover/avatar:ring-blue-100 transition-all" 
+                  className="w-10 h-10 rounded-full object-cover border border-gray-200/80 dark:border-white/10" 
                 />
               </div>
               <div 
-                className="flex-1 bg-gray-50 hover:bg-gray-100/80 transition-all rounded-full px-5 py-2.5 text-[14.5px] font-normal text-gray-500 cursor-pointer border border-gray-200/50 shadow-2xs" 
+                className="flex-1 min-w-0 bg-gray-50/90 dark:bg-[#1a2233] hover:bg-gray-100 dark:hover:bg-[#222c42] transition-all rounded-full pl-4 pr-3 py-2.5 text-[14px] font-normal text-gray-500 dark:text-gray-300 cursor-pointer border border-gray-100 dark:border-white/5 shadow-2xs flex items-center justify-between" 
                 onClick={() => setShowCreatePost(true)}
               >
-                What's on your mind, {currentUser?.name?.split(' ')[0] || 'User'}?
+                <span className="truncate mr-2">What's on your mind, {currentUser?.name?.split(' ')[0] || 'User'}?</span>
+                <div className="flex items-center space-x-1.5 shrink-0 text-gray-400 dark:text-gray-500">
+                  <ImageIcon className="w-4.5 h-4.5 text-emerald-500 hover:scale-110 transition-transform" />
+                  <Camera className="w-4.5 h-4.5 text-purple-500 hover:scale-110 transition-transform sm:hidden" />
+                </div>
               </div>
             </div>
 
-            {/* Quick Action Badges Bar */}
-            <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-100 text-xs font-semibold text-gray-600">
-              <button 
-                onClick={() => setShowCreatePost(true)}
-                className="flex-1 flex items-center justify-center space-x-1.5 py-1.5 px-2 hover:bg-gray-50 rounded-xl transition-colors text-emerald-600"
-              >
-                <ImageIcon className="w-4 h-4 text-emerald-500" />
-                <span>Photo/Video</span>
-              </button>
-
-              <button 
-                onClick={() => setShowCreatePost(true)}
-                className="flex-1 flex items-center justify-center space-x-1.5 py-1.5 px-2 hover:bg-gray-50 rounded-xl transition-colors text-blue-600"
-              >
-                <UserPlus className="w-4 h-4 text-blue-500" />
-                <span>Tag Friends</span>
-              </button>
-
-              <button 
-                onClick={() => setShowCreatePost(true)}
-                className="flex-1 flex items-center justify-center space-x-1.5 py-1.5 px-2 hover:bg-gray-50 rounded-xl transition-colors text-amber-600"
-              >
-                <Smile className="w-4 h-4 text-amber-500" />
-                <span>Feeling</span>
-              </button>
+            {/* PC Desktop Clean 2D Action Buttons */}
+            <div className="hidden sm:block border-t border-gray-100 dark:border-white/10 mt-3 pt-2">
+              <div className="grid grid-cols-3 gap-2">
+                <button 
+                  onClick={() => setShowCreatePost(true)}
+                  className="flex items-center justify-center space-x-2 py-1.5 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl text-gray-600 dark:text-gray-300 font-medium text-[13px] transition-colors cursor-pointer"
+                >
+                  <ImageIcon className="w-5 h-5 text-emerald-500 shrink-0" />
+                  <span className="truncate">Photo/video</span>
+                </button>
+                <button 
+                  onClick={() => setShowCreatePost(true)}
+                  className="flex items-center justify-center space-x-2 py-1.5 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl text-gray-600 dark:text-gray-300 font-medium text-[13px] transition-colors cursor-pointer"
+                >
+                  <UserPlus className="w-5 h-5 text-blue-500 shrink-0" />
+                  <span className="truncate">Tag friends</span>
+                </button>
+                <button 
+                  onClick={() => setShowCreatePost(true)}
+                  className="flex items-center justify-center space-x-2 py-1.5 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl text-gray-600 dark:text-gray-300 font-medium text-[13px] transition-colors cursor-pointer"
+                >
+                  <Smile className="w-5 h-5 text-amber-500 shrink-0" />
+                  <span className="truncate">Feeling/activity</span>
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Stories List */}
-          <div className="bg-white rounded-none sm:rounded-3xl p-3 sm:p-4 shadow-xs overflow-hidden">
+          <div className="bg-white border-b border-gray-100 md:border md:border-gray-200/80 rounded-none sm:rounded-3xl p-3 sm:p-4 shadow-xs overflow-hidden">
             {isStoriesLoading && stories.length === 0 ? (
               <FacebookStorySkeleton />
             ) : (

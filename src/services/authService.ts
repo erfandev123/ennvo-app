@@ -122,10 +122,119 @@ export const signIn = async (usernameOrEmail: string, password: string) => {
   }
 };
 
+export const checkRedirectResult = async (): Promise<User | null> => {
+  try {
+    const { getRedirectResult } = await import('firebase/auth');
+    const result = await getRedirectResult(auth);
+    if (result && result.user) {
+      const firebaseUser = result.user;
+      const docRef = doc(db, 'users', firebaseUser.uid);
+      const docSnap = await getDoc(docRef);
+
+      const hasPasswordProvider = firebaseUser.providerData.some(p => p.providerId === 'password');
+
+      if (docSnap.exists()) {
+        const existing = docSnap.data() as User;
+        const isBoth = existing.hasPassword || hasPasswordProvider;
+        await updateDoc(docRef, { 
+          hasPassword: isBoth,
+          authProvider: isBoth ? 'both' : 'google'
+        });
+        existing.hasPassword = isBoth;
+        existing.authProvider = isBoth ? 'both' : 'google';
+        try {
+          localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(existing));
+        } catch (e) {}
+        return existing;
+      }
+
+      if (firebaseUser.email) {
+        const emailQ = query(collection(db, 'users'), where('email', '==', firebaseUser.email.toLowerCase()));
+        const emailSnap = await getDocs(emailQ);
+        if (!emailSnap.empty) {
+          const existingDoc = emailSnap.docs[0];
+          const existingUser = existingDoc.data() as User;
+          const updatedData: Partial<User> = {
+            hasPassword: true,
+            authProvider: 'both',
+            avatar: existingUser.avatar || firebaseUser.photoURL || undefined
+          };
+          await updateDoc(doc(db, 'users', existingDoc.id), updatedData);
+          const merged = { ...existingUser, ...updatedData };
+          try {
+            localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(merged));
+          } catch (e) {}
+          return merged;
+        }
+      }
+
+      const username = firebaseUser.email?.split('@')[0] || `user_${firebaseUser.uid.substring(0, 5)}`;
+      const userData: User = {
+        uid: firebaseUser.uid,
+        name: firebaseUser.displayName || 'User',
+        username: username.toLowerCase(),
+        email: firebaseUser.email || '',
+        avatar: firebaseUser.photoURL || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(firebaseUser.displayName || 'User')}&backgroundColor=f1f5f9`,
+        bio: '',
+        followersCount: 0,
+        followingCount: 0,
+        postsCount: 0,
+        hasPassword: hasPasswordProvider,
+        authProvider: hasPasswordProvider ? 'both' : 'google',
+        createdAt: serverTimestamp(),
+      };
+      await setDoc(docRef, userData);
+      try {
+        localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(userData));
+      } catch (e) {}
+      return userData;
+    }
+  } catch (error: any) {
+    console.warn('checkRedirectResult notice:', error);
+  }
+  return null;
+};
+
 export const signInWithGoogle = async () => {
   try {
-    const result = await signInWithPopup(auth, googleProvider);
-    const firebaseUser = result.user;
+    let firebaseUser: FirebaseUser | null = null;
+    
+    // Check if in Capacitor / WebView where popup is often unsupported
+    const isCapacitorOrWebView = typeof (window as any).Capacitor !== 'undefined' || 
+      /wv|WebView|Android.*Version\/[\d.]+/i.test(navigator.userAgent);
+
+    if (isCapacitorOrWebView) {
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        firebaseUser = result.user;
+      } catch (popupErr: any) {
+        console.warn("Mobile WebView popup notice, launching redirect:", popupErr);
+        const { signInWithRedirect } = await import('firebase/auth');
+        await signInWithRedirect(auth, googleProvider);
+        return null;
+      }
+    } else {
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        firebaseUser = result.user;
+      } catch (popupErr: any) {
+        console.warn("Google signInWithPopup error, trying redirect fallback:", popupErr);
+        if (
+          popupErr.code === 'auth/popup-blocked' ||
+          popupErr.code === 'auth/popup-closed-by-user' ||
+          popupErr.code === 'auth/operation-not-supported-in-this-environment' ||
+          popupErr.code === 'auth/cancelled-popup-request' ||
+          popupErr.code === 'auth/internal-error'
+        ) {
+          const { signInWithRedirect } = await import('firebase/auth');
+          await signInWithRedirect(auth, googleProvider);
+          return null;
+        }
+        throw popupErr;
+      }
+    }
+
+    if (!firebaseUser) return null;
     
     const docRef = doc(db, 'users', firebaseUser.uid);
     const docSnap = await getDoc(docRef);

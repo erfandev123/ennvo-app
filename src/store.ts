@@ -129,12 +129,12 @@ type AppState = {
   setNavStyle: (style: 'classic' | 'glass') => void;
   profileStyle: 'design1' | 'design2';
   setProfileStyle: (style: 'design1' | 'design2') => void;
-  reelsStyle: 'design1' | 'design2';
-  setReelsStyle: (style: 'design1' | 'design2') => void;
-  reelsUiStyle: 'tiktok' | 'instagram';
-  setReelsUiStyle: (style: 'tiktok' | 'instagram') => void;
+  reelsStyle: 'design1' | 'design2' | 'tiktok';
+  setReelsStyle: (style: 'design1' | 'design2' | 'tiktok') => void;
   showAccountSwitcherModal: boolean;
   setShowAccountSwitcherModal: (show: boolean) => void;
+  appTheme: 'light' | 'dark';
+  setAppTheme: (theme: 'light' | 'dark') => void;
 };
 
 const getInitialPage = (): PageType => {
@@ -416,17 +416,22 @@ export const useAppStore = create<AppState>((set) => ({
     try { localStorage.setItem('ennvo_profile_style', style); } catch (e) {}
     set({ profileStyle: style });
   },
-  reelsStyle: (typeof window !== 'undefined' && (localStorage.getItem('ennvo_reels_style') as 'design1' | 'design2')) || 'design1',
+  reelsStyle: (typeof window !== 'undefined' && (localStorage.getItem('ennvo_reels_style') as 'design1' | 'design2' | 'tiktok')) || 'design1',
   setReelsStyle: (style) => {
     try { localStorage.setItem('ennvo_reels_style', style); } catch (e) {}
     set({ reelsStyle: style });
   },
-  reelsUiStyle: (typeof window !== 'undefined' && (localStorage.getItem('ennvo_reels_ui_style') as 'tiktok' | 'instagram')) || 'tiktok',
-  setReelsUiStyle: (style) => {
-    try { localStorage.setItem('ennvo_reels_ui_style', style); } catch (e) {}
-    set({ reelsUiStyle: style });
-  },
   showAccountSwitcherModal: false,
   setShowAccountSwitcherModal: (show) => set({ showAccountSwitcherModal: show }),
+  appTheme: (typeof window !== 'undefined' && localStorage.getItem('ennvo_theme_mode') === 'dark') ? 'dark' : 'light',
+  setAppTheme: (theme) => {
+    try {
+      localStorage.setItem('ennvo_theme_mode', theme);
+      if (typeof document !== 'undefined') {
+        document.documentElement.classList.toggle('dark', theme === 'dark');
+      }
+    } catch (e) {}
+    set({ appTheme: theme });
+  },
 }));
 

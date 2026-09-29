@@ -11,6 +11,7 @@ const BottomNav = memo(() => {
   const setViewingUser = useAppStore(state => state.setViewingUser);
   const viewingUser = useAppStore(state => state.viewingUser);
   const navStyle = useAppStore(state => state.navStyle);
+  const appTheme = useAppStore(state => state.appTheme);
   const setShowAccountSwitcherModal = useAppStore(state => state.setShowAccountSwitcherModal);
 
   const navItems = [
@@ -68,6 +69,7 @@ const BottomNav = memo(() => {
   }, [currentPage, pushPage, setViewingUser]);
 
   const isReels = currentPage === 'home';
+  const isDarkNav = appTheme === 'dark' || isReels;
 
   // Render New Ultra Liquid Glass Navigation Bar
   if (navStyle === 'glass') {
@@ -182,7 +184,7 @@ const BottomNav = memo(() => {
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          className={`ultra-glass-nav pointer-events-auto select-none ${currentPage === 'home' ? 'dark-mode' : 'light-mode'} ${isHolding || isDragging ? 'is-holding' : ''}`}
+          className={`ultra-glass-nav pointer-events-auto select-none ${isDarkNav ? 'dark-mode' : 'light-mode'} ${isHolding || isDragging ? 'is-holding' : ''}`}
         >
           {/* Dynamic Percentage / Continuous Draggable Indicator Slot */}
           <div 
@@ -287,7 +289,7 @@ const BottomNav = memo(() => {
 
   // Render Classic Standard Android Navigation Bar
   return (
-    <div className={`md:hidden fixed bottom-0 left-0 right-0 ${isReels ? 'bg-black/95 border-white/10 text-white' : 'bg-[#F9FAFB] border-gray-200/80 shadow-md text-gray-900'} backdrop-blur-xl border-t flex items-center justify-around h-[calc(54px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] z-[60] px-3 select-none gpu-accelerated`}>
+    <div className={`md:hidden fixed bottom-0 left-0 right-0 bottom-nav-classic ${isDarkNav ? 'bg-[#131927]/95 border-white/10 text-white' : 'bg-white border-gray-100 shadow-md text-gray-900'} backdrop-blur-xl border-t flex items-center justify-around h-[calc(54px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] z-[60] px-3 select-none gpu-accelerated`}>
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = currentPage === item.id && (item.id !== 'profile' || viewingUser === null);
@@ -300,13 +302,13 @@ const BottomNav = memo(() => {
           >
             <div className="relative flex flex-col items-center justify-center pointer-events-none">
               {item.id === 'profile' ? (
-                <div className={`rounded-full transition-all duration-150 ${isActive ? (isReels ? 'ring-2 ring-white p-[1px]' : 'ring-2 ring-purple-600 p-[1px]') : ''}`}>
+                <div className={`rounded-full transition-all duration-150 ${isActive ? (isDarkNav ? 'ring-2 ring-purple-400 p-[1px]' : 'ring-2 ring-purple-600 p-[1px]') : ''}`}>
                   <img 
                     src={currentUser?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || '')}&background=random`} 
                     className={`w-[22px] h-[22px] rounded-full object-cover shadow-2xs`} 
                     alt="Profile" 
-                    loading="lazy"
-                    decoding="async"
+                    loading="lazy" 
+                    decoding="async" 
                     referrerPolicy="no-referrer"
                   />
                 </div>
@@ -319,7 +321,7 @@ const BottomNav = memo(() => {
                 </div>
               ) : (
                 <Icon 
-                  className={`w-[22px] h-[22px] transition-all duration-150 ${isActive ? (isReels ? 'text-white' : 'text-purple-600') : (isReels ? 'text-gray-400' : 'text-gray-400 hover:text-gray-600')}`} 
+                  className={`w-[22px] h-[22px] transition-all duration-150 ${isActive ? (isDarkNav ? 'text-white' : 'text-purple-600') : (isDarkNav ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600')}`} 
                   strokeWidth={isActive ? 2.3 : 1.7}
                 />
               )}

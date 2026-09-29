@@ -218,7 +218,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
     setIsBottomNavHidden,
     setSelectedCreateSong,
     navStyle,
-    reelsUiStyle
+    reelsStyle: reelsUiStyle
   } = useAppStore();
 
   const reelBottomSpacing = isModal ? 'bottom-[78px]' : navStyle === 'glass' ? 'bottom-[calc(98px+env(safe-area-inset-bottom))]' : 'bottom-[calc(72px+env(safe-area-inset-bottom))]';

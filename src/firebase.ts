@@ -34,4 +34,5 @@ export const db = initializeFirestore(app, {
 export const rtdb = getDatabase(app);
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 

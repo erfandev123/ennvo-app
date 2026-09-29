@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User as UserIcon, Lock, Eye, EyeOff, Camera, ArrowLeft, CheckCircle2, Mail, X, MapPin, Sparkles, ArrowRight, Loader2, Compass, UserPlus, ShieldCheck, HeartHandshake, Zap, KeyRound } from 'lucide-react';
 import { useAppStore } from '../store';
-import { signUp, signIn, signInWithGoogle, isUsernameUnique, sendPasswordReset } from '../services/authService';
+import { signUp, signIn, signInWithGoogle, isUsernameUnique, sendPasswordReset, checkRedirectResult } from '../services/authService';
 import { uploadMedia } from '../services/githubStorage';
 import { compressAvatarImage } from '../services/mediaCompressor';
 import { DEFAULT_MALE_AVATAR, DEFAULT_FEMALE_AVATAR } from '../utils/defaultAvatars';
@@ -80,6 +80,16 @@ export default function Auth() {
       detectLocation();
     }
   }, [signupStep, viewMode]);
+
+  // Check if returning from Google OAuth redirect (especially for mobile APK/WebView)
+  useEffect(() => {
+    checkRedirectResult().then((user) => {
+      if (user) {
+        setCreatedUser(user);
+        setCurrentUser(user);
+      }
+    }).catch(() => {});
+  }, [setCurrentUser]);
 
   const detectLocation = async () => {
     setIsDetectingLoc(true);

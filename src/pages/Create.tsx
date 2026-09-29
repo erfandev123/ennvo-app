@@ -64,6 +64,7 @@ export default function Create() {
   const activeStreamRef = useRef<MediaStream | null>(null);
   const [isMirrored, setIsMirrored] = useState(true);
   const [wasRecordedMirrored, setWasRecordedMirrored] = useState(false);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
   // New Interactive Feature States
   const [taggedUsers, setTaggedUsers] = useState<{ uid: string; name: string; username: string; avatar: string }[]>([]);
@@ -569,11 +570,12 @@ export default function Create() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault();
     if (e.target.files && e.target.files.length > 0) {
       const selected = Array.from(e.target.files) as File[];
       selectFiles(selected);
-      e.target.value = "";
+      try {
+        e.target.value = "";
+      } catch (err) {}
     }
   };
 
@@ -804,18 +806,21 @@ export default function Create() {
               {/* Bottom Capture Bar */}
               <div className="flex items-center justify-between px-8 pb-12 w-full max-w-lg mx-auto">
                 <div className="flex flex-col items-center">
-                  <label 
-                    htmlFor="mobile-gallery-upload-input"
+                  <input
+                    ref={galleryInputRef}
+                    id="mobile-gallery-upload-input"
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleChange}
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
                     className="w-14 h-14 rounded-2xl bg-gray-900 border-2 border-white/40 overflow-hidden relative shadow-2xl active:scale-90 transition-transform cursor-pointer group flex items-center justify-center"
+                    aria-label="Upload photo or video from gallery"
                   >
-                    <input
-                      id="mobile-gallery-upload-input"
-                      type="file"
-                      accept="image/*,video/*"
-                      multiple
-                      className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full"
-                      onChange={handleChange}
-                    />
                     <img
                       src="https://picsum.photos/seed/gallery/100/100"
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform"
@@ -824,7 +829,7 @@ export default function Create() {
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center pointer-events-none">
                       <Upload className="w-6 h-6 text-white" />
                     </div>
-                  </label>
+                  </button>
                 </div>
 
                 <button

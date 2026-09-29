@@ -44,7 +44,7 @@ type SettingsScreen =
 
 export default function Settings() {
   const [currentScreen, setCurrentScreen] = useState<SettingsScreen>('main');
-  const { setIsAuthenticated, currentUser, setCurrentUser, popPage, setShowAccountSwitcherModal, navStyle, setNavStyle, profileStyle, setProfileStyle, reelsStyle, setReelsStyle } = useAppStore();
+  const { setIsAuthenticated, currentUser, setCurrentUser, popPage, setShowAccountSwitcherModal, navStyle, setNavStyle, profileStyle, setProfileStyle, reelsStyle, setReelsStyle, appTheme, setAppTheme } = useAppStore();
 
   const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
 
@@ -925,6 +925,36 @@ export default function Settings() {
               <div>
                 <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Content & display</p>
                 <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                  {/* Direct Dark Mode Switch */}
+                  <div className="w-full flex items-center justify-between px-4 py-3.5">
+                    <div className="flex items-center space-x-3">
+                      {appTheme === 'dark' ? (
+                        <Moon className="w-5 h-5 text-purple-500 shrink-0" />
+                      ) : (
+                        <Sun className="w-5 h-5 text-amber-500 shrink-0" />
+                      )}
+                      <div>
+                        <span className="text-[15px] font-medium text-gray-900 block">Dark mode</span>
+                        <span className="text-[12px] text-gray-500 block">Switch app appearance to dark</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = appTheme === 'dark' ? 'light' : 'dark';
+                        setAppTheme(next);
+                        updateSettingValue('appTheme', next);
+                      }}
+                      className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer ${
+                        appTheme === 'dark' ? 'bg-purple-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-xs ${
+                        appTheme === 'dark' ? 'right-0.5' : 'left-0.5'
+                      }`} />
+                    </button>
+                  </div>
+
                   <button 
                     onClick={() => setCurrentScreen('ui_customize')}
                     className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-purple-50/60 transition-colors text-left bg-purple-50/30"
@@ -1966,17 +1996,18 @@ export default function Settings() {
                     <button
                       key={t.id}
                       onClick={() => {
+                        setAppTheme(t.id as 'light' | 'dark');
                         updateSettingValue('appTheme', t.id);
                         localStorage.setItem('ennvo_theme_mode', t.id);
                       }}
-                      className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 text-left"
+                      className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 text-left cursor-pointer"
                     >
                       <div className="flex items-center space-x-3">
                         <Icon className="w-5 h-5 text-gray-700" />
                         <span className="text-[15px] font-medium text-gray-900">{t.label}</span>
                       </div>
-                      {(userSettings.appTheme || 'light') === t.id && (
-                        <Check className="w-5 h-5 text-gray-900" />
+                      {appTheme === t.id && (
+                        <Check className="w-5 h-5 text-purple-600" />
                       )}
                     </button>
                   );

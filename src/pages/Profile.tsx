@@ -82,7 +82,7 @@ const UserRowWithFollow = React.memo(({ user, currentUser, onSelectUser }: { use
 });
 
 export default function Profile() {
-  const [activeTab, setActiveTab] = useState<'posts' | 'reels' | 'saved' | 'reposts' | 'private'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'reels' | 'saved' | 'reposts' | 'private'>('reels');
   const { viewingUser, setViewingUser, setViewingMedia, setViewingPost, setViewingReel, setViewingReelList, setViewingReelContext, currentUser, pushPage, popPage, setActiveChat, cachedProfilePosts, setCachedProfilePosts, cachedSavedPosts, setCachedSavedPosts, setIsBottomNavHidden, setSelectedCreateSong, setShowAccountSwitcherModal } = useAppStore();
   const isCurrentUser = !viewingUser || viewingUser.uid === currentUser?.uid;
   const targetUserId = isCurrentUser ? currentUser?.uid : viewingUser.uid;
@@ -532,7 +532,7 @@ export default function Profile() {
 
   return (
     <PullToRefresh onRefresh={handleRefreshProfile} className="h-full w-full">
-      <div className="h-full w-full overflow-y-auto bg-gradient-to-b from-[#e9d5ff] via-[#f3e8ff] to-[#faf5ff] flex flex-col items-center relative md:pl-24" onScroll={handleScroll}>
+      <div className="h-full w-full overflow-y-auto bg-gradient-to-b from-[#e9d5ff] via-[#f3e8ff] to-[#faf5ff] flex flex-col items-center relative md:pl-24 profile-page-root" onScroll={handleScroll}>
       <AnimatePresence>
         {/* Profile Views List */}
         {showProfileViews && (
@@ -705,170 +705,165 @@ export default function Profile() {
               </div>
             </div>
 
-            {/* Profile Content Container - Sleek, High-end, No Awkward Gaps */}
-            <div className="w-full px-3 sm:px-6 z-20 max-w-4xl mx-auto">
-              <div className="bg-white/60 md:bg-white/80 backdrop-blur-2xl rounded-3xl border border-white/80 shadow-[0_8px_30px_rgba(139,92,246,0.08)] p-3.5 sm:p-5 transition-all">
-                
-                {/* Main Profile Info Row: Avatar Left, Name & Stats Right */}
-                <div className="flex items-center gap-3.5 sm:gap-5">
-                  {/* Left: Large Profile Picture */}
-                  <div className="relative shrink-0">
-                    <div className="w-[84px] h-[84px] sm:w-[98px] sm:h-[98px] md:w-[108px] md:h-[108px] rounded-3xl p-[3px] bg-gradient-to-tr from-violet-600 via-fuchsia-500 to-amber-400 shadow-lg shadow-purple-500/25">
-                      <div className="w-full h-full rounded-[21px] sm:rounded-[22px] md:rounded-[25px] overflow-hidden bg-white border-2 border-white">
-                        <img 
-                          src={userData?.avatar || profileAvatar} 
-                          alt="Profile" 
-                          className="w-full h-full object-cover" 
-                          referrerPolicy="no-referrer" 
-                        />
-                      </div>
-                    </div>
-                    {isCurrentUser && (
-                      <button 
-                        type="button"
-                        onClick={() => pushPage('edit-profile')}
-                        className="absolute -bottom-1 -right-1 p-2 bg-gradient-to-tr from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white rounded-2xl shadow-md border-2 border-white cursor-pointer active:scale-90 hover:scale-105 transition-all"
-                        title="Change Avatar"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Right: Display Name, Username, and Stats Counter */}
-                  <div className="flex-1 min-w-0 flex flex-col justify-center">
-                    <div className="flex items-center space-x-1.5 flex-wrap">
-                      <h1 className="text-lg sm:text-xl md:text-2xl font-black text-gray-900 tracking-tight leading-tight truncate">
-                        {userData?.name || profileName || 'User'}
-                      </h1>
-                      {user?.isVerified && <VerifiedBadge />}
-                    </div>
-
-                    <p className="text-purple-600/95 font-semibold text-[13px] sm:text-sm mt-0.5 truncate">
-                      @{userData?.username || profileHandle.replace('@', '')}
-                    </p>
-
-                    {/* Stats Counters: Bold numbers aligned directly alongside */}
-                    <div className="flex items-center gap-3 sm:gap-6 mt-2 pt-1.5 border-t border-purple-200/50">
-                      <div 
-                        className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform"
-                        onClick={() => setShowFollowersList('following')}
-                      >
-                        {!userData && (user?.followingCount === undefined || user?.followingCount === null) ? (
-                          <div className="w-8 h-4 bg-purple-200/60 rounded animate-pulse my-0.5" />
-                        ) : (
-                          <span className="text-base sm:text-lg font-black text-gray-900 leading-tight tracking-tight">
-                            {formatCount(userData?.followingCount ?? user?.followingCount ?? 0)}
-                          </span>
-                        )}
-                        <span className="text-gray-500 text-[10.5px] sm:text-[11px] font-bold uppercase tracking-wider mt-0.5">Following</span>
-                      </div>
-
-                      <div className="w-px h-4 bg-purple-200/70 shrink-0" />
-
-                      <div 
-                        className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform"
-                        onClick={() => setShowFollowersList('followers')}
-                      >
-                        {!userData && (user?.followersCount === undefined || user?.followersCount === null) ? (
-                          <div className="w-8 h-4 bg-purple-200/60 rounded animate-pulse my-0.5" />
-                        ) : (
-                          <span className="text-base sm:text-lg font-black text-gray-900 leading-tight tracking-tight">
-                            {formatCount(userData?.followersCount ?? user?.followersCount ?? 0)}
-                          </span>
-                        )}
-                        <span className="text-gray-500 text-[10.5px] sm:text-[11px] font-bold uppercase tracking-wider mt-0.5">Followers</span>
-                      </div>
-
-                      <div className="w-px h-4 bg-purple-200/70 shrink-0" />
-
-                      <div className="flex flex-col items-center">
-                        {!userData && totalLikes === 0 && profilePosts.length === 0 ? (
-                          <div className="w-8 h-4 bg-purple-200/60 rounded animate-pulse my-0.5" />
-                        ) : (
-                          <span className="text-base sm:text-lg font-black text-gray-900 leading-tight tracking-tight">
-                            {formatCount(userData?.totalLikes ?? (totalLikes || profilePosts.reduce((sum, p) => sum + (p.likesCount || 0), 0)))}
-                          </span>
-                        )}
-                        <span className="text-gray-500 text-[10.5px] sm:text-[11px] font-bold uppercase tracking-wider mt-0.5">Likes</span>
-                      </div>
-                    </div>
-                  </div>
+            {/* Profile Picture with soft iridescent border */}
+            <div className="relative mt-2 mb-2 z-20">
+              <div className="w-[102px] h-[102px] rounded-full p-[3px] bg-gradient-to-tr from-purple-400 via-pink-400 to-indigo-400 shadow-md shadow-purple-200/50">
+                <div className="w-full h-full rounded-full border-[2.5px] border-white overflow-hidden bg-white">
+                  <img src={userData?.avatar || profileAvatar} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 </div>
-
-                {/* Action Buttons: Snug & polished right below header with no dead space */}
-                <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-purple-100/60">
-                  {isCurrentUser ? (
-                    <>
-                      <button 
-                        onClick={() => pushPage('edit-profile')}
-                        className="flex-1 bg-white hover:bg-purple-50 active:scale-98 text-gray-900 font-bold text-xs sm:text-[13px] py-2 px-3 rounded-xl border border-purple-200/70 shadow-2xs flex items-center justify-center transition-all"
-                      >
-                        <span>Edit profile</span>
-                      </button>
-                      <button 
-                        onClick={handleShare}
-                        className="flex-1 bg-white hover:bg-purple-50 active:scale-98 text-gray-900 font-bold text-xs sm:text-[13px] py-2 px-3 rounded-xl border border-purple-200/70 shadow-2xs flex items-center justify-center transition-all"
-                      >
-                        <span>Share profile</span>
-                      </button>
-                      <button 
-                        onClick={() => setShowAccountSwitcherModal(true)}
-                        className="w-9 h-9 bg-white hover:bg-purple-50 active:scale-95 text-purple-600 rounded-xl border border-purple-200/70 shadow-2xs flex items-center justify-center transition-all shrink-0"
-                        title="Switch or Add Account"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button 
-                        onClick={handleFollow}
-                        disabled={loading}
-                        className={`flex-1 font-bold text-xs sm:text-[13px] px-3 py-2 rounded-xl flex items-center justify-center disabled:opacity-50 transition-all active:scale-98 shadow-2xs ${
-                          friendship.following 
-                            ? 'bg-white hover:bg-purple-50 text-purple-700 border border-purple-200' 
-                            : 'bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 shadow-purple-300'
-                        }`}
-                      >
-                        {friendship.isFriend ? 'Friends' : friendship.following ? 'Following' : friendship.followedBy ? 'Follow Back' : 'Follow'}
-                      </button>
-                      <button 
-                        onClick={handleMessage}
-                        className="flex-1 bg-white hover:bg-purple-50 text-gray-900 font-bold text-xs sm:text-[13px] px-3 py-2 rounded-xl border border-purple-200/70 shadow-2xs flex items-center justify-center transition-all active:scale-98"
-                      >
-                        <span>Message</span>
-                      </button>
-                    </>
-                  )}
+              </div>
+              {isCurrentUser && (
+                <div 
+                  className="absolute bottom-0 right-0 p-2 bg-white rounded-full border border-purple-100 shadow-md cursor-pointer text-gray-700 hover:bg-purple-50 active:scale-90 transition-all"
+                  onClick={() => pushPage('edit-profile')}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
                 </div>
+              )}
+            </div>
 
-                {/* Compact Modern Bio Card - Snug & clean */}
-                {(userData?.bio || user?.bio || userData?.link || user?.link) && (
-                  <div className="mt-2.5 p-3 rounded-2xl bg-purple-50/60 border border-purple-100/80 text-[13px] text-gray-800">
-                    {userData?.bio || user?.bio ? (
-                      <p className="font-normal text-gray-800 leading-relaxed whitespace-pre-line">
-                        {userData?.bio || user?.bio}
-                      </p>
-                    ) : null}
-                    
-                    {(userData?.link || user?.link) && (
-                      <div className="flex items-center space-x-2 text-purple-600 font-medium text-xs mt-2 pt-1.5 border-t border-purple-200/40">
-                        <LinkIcon className="w-3.5 h-3.5 shrink-0" />
-                        <a 
-                          href={(userData?.link || user?.link)?.startsWith('http') ? (userData?.link || user?.link) : `https://${userData?.link || user?.link}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="hover:underline truncate"
-                        >
-                          {(userData?.link || user?.link)?.replace(/^https?:\/\//, '')}
-                        </a>
-                      </div>
-                    )}
-                  </div>
+            {/* Name & Username */}
+            <div className="text-center mb-2.5 z-20">
+              <h1 className="text-[18px] font-bold text-gray-900 tracking-tight flex items-center justify-center space-x-1">
+                <span>{userData?.name || profileName || 'User'}</span>
+                {user?.isVerified && <VerifiedBadge />}
+              </h1>
+              <p className="text-purple-600/90 font-normal text-[13px] mt-0.5">@{userData?.username || profileHandle.replace('@', '')}</p>
+            </div>
+
+            {/* Unboxed Stats Counters - Compact & Closer Together */}
+            <div className="w-full max-w-[240px] mx-auto py-0.5 px-1 flex items-center justify-around mb-2.5 z-20">
+              <div 
+                className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform px-1.5 py-0.5"
+                onClick={() => setShowFollowersList('following')}
+              >
+                {!userData && (user?.followingCount === undefined || user?.followingCount === null) ? (
+                  <div className="w-8 h-3.5 bg-purple-200/60 rounded animate-pulse my-0.5" />
+                ) : (
+                  <span className="text-[15px] font-bold text-gray-900 leading-tight tracking-tight">
+                    {formatCount(userData?.followingCount ?? user?.followingCount ?? 0)}
+                  </span>
                 )}
+                <span className="text-gray-500 text-[11px] font-medium mt-0.5">Following</span>
+              </div>
+              <div className="w-[1px] h-4 bg-purple-200/80 shrink-0" />
+              <div 
+                className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform px-1.5 py-0.5"
+                onClick={() => setShowFollowersList('followers')}
+              >
+                {!userData && (user?.followersCount === undefined || user?.followersCount === null) ? (
+                  <div className="w-8 h-3.5 bg-purple-200/60 rounded animate-pulse my-0.5" />
+                ) : (
+                  <span className="text-[15px] font-bold text-gray-900 leading-tight tracking-tight">
+                    {formatCount(userData?.followersCount ?? user?.followersCount ?? 0)}
+                  </span>
+                )}
+                <span className="text-gray-500 text-[11px] font-medium mt-0.5">Followers</span>
+              </div>
+              <div className="w-[1px] h-4 bg-purple-200/80 shrink-0" />
+              <div className="flex flex-col items-center px-1.5 py-0.5">
+                {!userData && totalLikes === 0 && profilePosts.length === 0 ? (
+                  <div className="w-8 h-3.5 bg-purple-200/60 rounded animate-pulse my-0.5" />
+                ) : (
+                  <span className="text-[15px] font-bold text-gray-900 leading-tight tracking-tight">
+                    {formatCount(userData?.totalLikes ?? (totalLikes || profilePosts.reduce((sum, p) => sum + (p.likesCount || 0), 0)))}
+                  </span>
+                )}
+                <span className="text-gray-500 text-[11px] font-medium mt-0.5">Likes</span>
               </div>
             </div>
+
+            {/* Light Glass Action Buttons */}
+            <div className="flex items-center justify-center space-x-2.5 w-full px-6 mb-3 z-20 max-w-[340px]">
+              {isCurrentUser ? (
+                <>
+                  <button 
+                    onClick={() => pushPage('edit-profile')}
+                    className="flex-1 bg-white/70 hover:bg-white active:scale-95 text-gray-900 font-bold text-[13px] py-2 px-3 rounded-xl backdrop-blur-xl border border-white/90 shadow-2xs flex items-center justify-center transition-all"
+                  >
+                    <span>Edit profile</span>
+                  </button>
+                  <button 
+                    onClick={handleShare}
+                    className="flex-1 bg-white/70 hover:bg-white active:scale-95 text-gray-900 font-bold text-[13px] py-2 px-3 rounded-xl backdrop-blur-xl border border-white/90 shadow-2xs flex items-center justify-center transition-all"
+                  >
+                    <span>Share profile</span>
+                  </button>
+                  <button 
+                    onClick={() => setShowAccountSwitcherModal(true)}
+                    className="w-9 h-9 bg-white/70 hover:bg-white active:scale-95 text-purple-600 rounded-xl backdrop-blur-xl border border-white/90 shadow-2xs flex items-center justify-center transition-all shrink-0"
+                    title="Switch or Add Account"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button 
+                    onClick={handleFollow}
+                    disabled={loading}
+                    className={`flex-1 font-bold text-[13px] px-3 py-2 rounded-xl flex items-center justify-center disabled:opacity-50 transition-all active:scale-95 shadow-2xs ${
+                      friendship.following 
+                        ? 'bg-white/70 hover:bg-white text-purple-700 border border-purple-200 backdrop-blur-xl' 
+                        : 'bg-purple-600 text-white hover:bg-purple-700 shadow-purple-200'
+                    }`}
+                  >
+                    {friendship.isFriend ? 'Friends' : friendship.following ? 'Following' : friendship.followedBy ? 'Follow Back' : 'Follow'}
+                  </button>
+                  <button 
+                    onClick={handleMessage}
+                    className="flex-1 bg-white/70 hover:bg-white text-gray-900 font-bold text-[13px] px-3 py-2 rounded-xl border border-white/90 backdrop-blur-xl shadow-2xs flex items-center justify-center transition-all active:scale-95"
+                  >
+                    <span>Message</span>
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Glass Bio Card */}
+            {(userData?.bio || user?.bio || userData?.link || user?.link) && (
+              <div className="w-full px-5 md:px-8 z-20 max-w-[500px]">
+                <div className="bg-white/30 backdrop-blur-xl border border-white/60  rounded-2xl p-4 relative overflow-hidden">
+                  <div className="absolute top-1 left-3 text-purple-400 font-serif text-3xl leading-none">“</div>
+                  <div className="absolute bottom-4 right-4 text-purple-400 font-serif text-3xl leading-none rotate-180">“</div>
+                  
+                  <p className="text-center text-[14px] font-normal text-gray-800 leading-relaxed px-6 py-2 z-10 relative whitespace-pre-line">
+                    {userData?.bio || user?.bio}
+                  </p>
+                  
+                  {(userData?.link || user?.link) && (
+                    <>
+                      <div className="flex items-center justify-center my-3 relative z-10">
+                        <div className="h-[1px] bg-purple-200 w-12"></div>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-purple-400 mx-2"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <div className="h-[1px] bg-purple-200 w-12"></div>
+                      </div>
+                      
+                      <div className="flex items-center justify-center space-x-2 text-purple-500 pb-1 relative z-10">
+                        <LinkIcon className="w-3.5 h-3.5" />
+                        <a href={(userData?.link || user?.link)?.startsWith('http') ? (userData?.link || user?.link) : `https://${userData?.link || user?.link}`} target="_blank" rel="noopener noreferrer" className="text-[13px] font-normal hover:underline">
+                          {(userData?.link || user?.link)?.replace(/^https?:\/\//, '')}
+                        </a>
+                        {isCurrentUser && (
+                          <div className="bg-purple-500 rounded-full p-1 ml-4  text-white cursor-pointer active:scale-95" onClick={() => pushPage('edit-profile')}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  
+                  {/* Floral Corner Deco */}
+                  <div className="absolute -bottom-2 -right-4 w-28 h-28 opacity-60 pointer-events-none mix-blend-multiply">
+                     <svg viewBox="0 0 100 100" className="w-full h-full fill-purple-300">
+                        <path d="M 50 100 Q 40 80 10 70 Q 40 60 50 20 Q 60 60 90 70 Q 60 80 50 100 Z" />
+                        <path d="M 80 100 Q 70 90 50 85 Q 70 80 75 60 Q 80 80 95 85 Q 80 90 80 100 Z" fill="#d8b4fe"/>
+                        <path d="M 20 100 Q 30 90 50 85 Q 30 80 25 60 Q 20 80 5 85 Q 20 90 20 100 Z" fill="#e9d5ff" opacity="0.6"/>
+                     </svg>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Highlights Row */}
             {((userData?.highlights || user?.highlights || []).length > 0) && (

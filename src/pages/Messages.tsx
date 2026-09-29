@@ -1965,7 +1965,7 @@ export default function Messages() {
             fileName: file.name,
             fileSize: sizeStr,
             fileExt: ext
-          }
+          } as any
         );
       }
     }
@@ -3959,7 +3959,7 @@ export default function Messages() {
               animate={{ x: 0, opacity: 1 }}
               exit={isDesktop ? { x: 0, opacity: 1 } : { x: "-100%", opacity: 0.98 }}
               transition={isDesktop ? { duration: 0 } : { duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
-              className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-full overflow-hidden bg-white"
+              className="chat-view-container fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-full overflow-hidden bg-white"
             >
               {/* Chat Background Layer - Mobile Image Wallpaper & PC Clean Solid Color */}
               {(() => {

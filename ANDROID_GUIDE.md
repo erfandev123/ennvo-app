@@ -100,11 +100,14 @@ This code enables hardware acceleration, hardware back button navigation, fast r
 package com.ennvo.app;
 
 import android.os.Bundle;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -112,7 +115,7 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 1. Hardware Accelerated full-screen Edge-to-Edge
+        // 1. Hardware Accelerated full-screen Edge-to-Edge & immediate Header Fill
         Window window = getWindow();
         WindowCompat.setDecorFitsSystemWindows(window, false);
         window.setFlags(
@@ -124,7 +127,16 @@ public class MainActivity extends BridgeActivity {
         window.setStatusBarColor(android.graphics.Color.TRANSPARENT);
         window.setNavigationBarColor(android.graphics.Color.TRANSPARENT);
 
-        // 3. Ultra-Fast WebView caching & smooth rendering
+        // 3. Auto-Hide Navigation Bar (Back, Home, Minimize buttons hide smoothly)
+        WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(window, window.getDecorView());
+        if (insetsController != null) {
+            insetsController.setSystemBarsBehavior(
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            );
+            insetsController.hide(WindowInsetsCompat.Type.navigationBars());
+        }
+
+        // 4. Ultra-Fast WebView caching, DOM storage, and Photo/Video Upload Support
         if (bridge != null && bridge.getWebView() != null) {
             WebView webView = bridge.getWebView();
             WebSettings settings = webView.getSettings();
@@ -132,8 +144,22 @@ public class MainActivity extends BridgeActivity {
             settings.setCacheMode(WebSettings.LOAD_DEFAULT);
             settings.setDomStorageEnabled(true);
             settings.setDatabaseEnabled(true);
+            settings.setAllowFileAccess(true);
+            settings.setAllowContentAccess(true);
             settings.setMediaPlaybackRequiresUserGesture(false);
             webView.setScrollBarStyle(WebView.SCROLLBARS_INSIDE_OVERLAY);
+        }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            // Keep bottom navigation bar hidden on resume
+            WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+            if (insetsController != null) {
+                insetsController.hide(WindowInsetsCompat.Type.navigationBars());
+            }
         }
     }
 }

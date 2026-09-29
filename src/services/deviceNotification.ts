@@ -3,6 +3,8 @@
  * Supports Web Notification API + Android WebView Bridges
  */
 
+import { playNotificationSound, playIncomingRingtone } from './soundService';
+
 export interface DeviceNotificationOptions {
   title: string;
   body: string;
@@ -52,6 +54,17 @@ class DeviceNotificationService {
     const tag = options.tag || `ennvo-${Date.now()}`;
     const type = options.type || 'activity';
 
+    const isCall = tag.startsWith('call-') || type === ('call' as any);
+
+    // Play sound on notification / call
+    try {
+      if (isCall) {
+        playIncomingRingtone();
+      } else {
+        playNotificationSound();
+      }
+    } catch (e) {}
+
     // 1. Comprehensive Android WebView Native Java Bridge Support
     try {
       const win = window as any;
@@ -93,6 +106,15 @@ class DeviceNotificationService {
       console.warn('Android bridge notification dispatch warning:', e);
     }
 
+    // Trigger device vibration if available
+    try {
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        if (type === 'activity' || type === 'message') {
+          navigator.vibrate([120, 80, 120]);
+        }
+      }
+    } catch (e) {}
+
     // 2. Standard Web Notification API
     if ('Notification' in window && (Notification.permission as string) === 'granted') {
       try {
@@ -103,6 +125,8 @@ class DeviceNotificationService {
           tag,
           renotify: true,
           silent: false,
+          requireInteraction: isCall,
+          vibrate: isCall ? [300, 150, 300, 150, 450] : [100, 50, 100],
           data: options.data,
         };
         const notif = new Notification(title, notifOptions);
@@ -110,6 +134,9 @@ class DeviceNotificationService {
         notif.onclick = () => {
           try {
             window.focus();
+            if (options.data?.url) {
+              window.location.href = options.data.url;
+            }
             notif.close();
           } catch (e) {}
         };
@@ -117,16 +144,23 @@ class DeviceNotificationService {
         // Fallback for Service Worker push if standalone new Notification() throws
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
           navigator.serviceWorker.ready.then((reg) => {
-            reg.showNotification(title, {
+            const isCall = tag.startsWith('call-') || type === ('call' as any);
+            const swOptions: any = {
               body,
               icon,
               badge: '/Ennvo.png',
               tag,
+              requireInteraction: isCall,
+              vibrate: isCall ? [300, 150, 300, 150, 450] : [100, 50, 100],
               data: options.data,
-            });
+            };
+            reg.showNotification(title, swOptions);
           });
         }
       }
+    } else if ('Notification' in window && (Notification.permission as string) === 'default') {
+      // Prompt user politely for future notifications
+      this.requestPermission();
     }
   }
 }

@@ -29,6 +29,10 @@ export const setTyping = (conversationId: string, userId: string, isTyping: bool
   if (isTyping) {
     onDisconnect(typingRef).remove().catch(() => {});
   }
+  // Sync to Firestore conversation doc for real-time background and in-app toasts
+  import('./chatService').then(({ setTypingStatus }) => {
+    setTypingStatus(conversationId, userId, isTyping).catch(() => {});
+  }).catch(() => {});
 };
 
 export const subscribeTyping = (conversationId: string, callback: (typingUsers: string[]) => void) => {

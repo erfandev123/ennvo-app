@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   
@@ -21,6 +23,15 @@
   scrollbar-width: none;  /* Firefox */
 }
 
+html {
+  background-color: #ffffff;
+}
+
+html.dark {
+  background-color: #0b0914;
+  color-scheme: dark;
+}
+
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -30,12 +41,18 @@ body {
   font-weight: 400;
   -ms-overflow-style: none;
   scrollbar-width: none;
-  background-color: #000;
+  background-color: #ffffff;
+  color: #111827;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
+}
+
+html.dark body {
+  background-color: #0b0914;
+  color: #f3f4f6;
 }
 
 button, a, input, select, textarea {
@@ -719,6 +736,251 @@ video::-webkit-media-controls-enclosure {
 .ios-typing-dot-3 {
   animation: ios-typing-wave 1.25s cubic-bezier(0.4, 0, 0.2, 1) infinite 0.32s;
 }
+
+/* ==========================================================================
+   GLOBAL DARK MODE STYLING (Except Profile Page)
+   User Rule: "profile page bade sob page dark hobe sonen feed page,search,
+   massage,create,setting mane ja ja ace sob akdom parfect babe drak hobe"
+   ========================================================================== */
+
+html.dark {
+  background-color: #0b0914;
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #0b0914;
+  color: #f8fafc;
+}
+
+/* Base surface overrides in dark mode (excluding profile page & chat view) */
+html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white,
+html.dark nav:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white,
+html.dark header:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white,
+html.dark footer:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white,
+html.dark aside:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white,
+html.dark section:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white,
+html.dark form:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white {
+  background-color: #131927 !important;
+}
+
+html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white\/95,
+html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white\/90,
+html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white\/85,
+html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white\/80 {
+  background-color: rgba(19, 25, 39, 0.94) !important;
+}
+
+html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white\/70,
+html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white\/60 {
+  background-color: rgba(19, 25, 39, 0.75) !important;
+}
+
+html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-slate-50,
+html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-gray-50,
+html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-\[\#faf5ff\],
+html.dark main:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-\[\#faf5ff\] {
+  background-color: #0b0914 !important;
+}
+
+html.dark #home-scroll-container {
+  background-color: #0b0914 !important;
+}
+
+/* Borders in dark mode */
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).border-gray-100,
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).border-gray-200,
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).border-gray-100\/90,
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).border-gray-100\/80,
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).border-white\/40,
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).border-white\/60,
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).border-white\/70,
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).border-white\/80,
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).border-white\/90 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Divide borders */
+html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Text colors in dark mode */
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).text-gray-900,
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).text-black {
+  color: #f8fafc !important;
+}
+
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).text-gray-800,
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).text-gray-700 {
+  color: #e2e8f0 !important;
+}
+
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).text-gray-600,
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).text-gray-400 {
+  color: #64748b !important;
+}
+
+/* Inputs and textareas outside chat */
+html.dark input:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *),
+html.dark textarea:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *) {
+  color: #f8fafc !important;
+}
+
+html.dark input:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *)::placeholder,
+html.dark textarea:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *)::placeholder {
+  color: #64748b !important;
+}
+
+/* Hover and active states in dark mode */
+html.dark button:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *):hover.hover\:bg-gray-50,
+html.dark button:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *):hover.hover\:bg-gray-50\/70,
+html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *):hover.hover\:bg-gray-100\/70 {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Navigation Dock & Bottom Bar in dark mode */
+html.dark .ultra-glass-pc-dock {
+  background: rgba(19, 25, 39, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4) !important;
+}
+
+html.dark .bottom-nav-classic {
+  background: rgba(19, 25, 39, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Chat text input container inside chat stays light glass */
+html.dark form.bg-white\/60:not(.chat-view-container *) {
+  background-color: rgba(19, 25, 39, 0.8) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* ==========================================================================
+   STRICT EXCEPTION: CHAT PAGE REMAINS IN LIGHT THEME AS BEFORE
+   User Request: "dark mode chat page ager moto takbe mane chat page dark hobe na oky"
+   ========================================================================== */
+
+html.dark .chat-view-container {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+html.dark .chat-view-container * {
+  color-scheme: light;
+}
+
+html.dark .chat-view-container .text-gray-900,
+html.dark .chat-view-container .text-gray-800,
+html.dark .chat-view-container .text-black,
+html.dark .chat-view-container h1,
+html.dark .chat-view-container h2,
+html.dark .chat-view-container h3,
+html.dark .chat-view-container h4 {
+  color: #111827 !important;
+}
+
+html.dark .chat-view-container .text-gray-600,
+html.dark .chat-view-container .text-gray-500 {
+  color: #6b7280 !important;
+}
+
+html.dark .chat-view-container .text-gray-400 {
+  color: #9ca3af !important;
+}
+
+html.dark .chat-view-container .bg-white {
+  background-color: #ffffff !important;
+}
+
+html.dark .chat-view-container .bg-white\/95,
+html.dark .chat-view-container .bg-white\/90,
+html.dark .chat-view-container .bg-white\/85,
+html.dark .chat-view-container .bg-white\/75 {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+}
+
+html.dark .chat-view-container .bg-white\/60 {
+  background-color: rgba(255, 255, 255, 0.6) !important;
+}
+
+html.dark .chat-view-container .border-gray-100 {
+  border-color: #f3f4f6 !important;
+}
+
+html.dark .chat-view-container .border-gray-200,
+html.dark .chat-view-container .border-white\/40,
+html.dark .chat-view-container .border-white\/90 {
+  border-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+html.dark .chat-view-container .bg-slate-50\/70 {
+  background-color: rgba(248, 250, 252, 0.7) !important;
+}
+
+html.dark .chat-view-container input,
+html.dark .chat-view-container textarea {
+  color: #111827 !important;
+  background-color: transparent !important;
+}
+
+html.dark .chat-view-container input::placeholder,
+html.dark .chat-view-container textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+/* ==========================================================================
+   STRICT EXCEPTION: PROFILE PAGE REMAINS IN LIGHT THEME
+   User Request: "profile page bade sob page dark hobe"
+   ========================================================================== */
+
+html.dark .profile-page-root {
+  background: linear-gradient(to bottom, #e9d5ff, #f3e8ff, #faf5ff) !important;
+  color: #111827 !important;
+}
+
+html.dark .profile-page-root * {
+  color-scheme: light;
+}
+
+html.dark .profile-page-root .text-gray-900,
+html.dark .profile-page-root h1,
+html.dark .profile-page-root h2,
+html.dark .profile-page-root h3,
+html.dark .profile-page-root p.text-gray-900 {
+  color: #111827 !important;
+}
+
+html.dark .profile-page-root .text-gray-500 {
+  color: #6b7280 !important;
+}
+
+html.dark .profile-page-root .text-gray-600 {
+  color: #4b5563 !important;
+}
+
+html.dark .profile-page-root .bg-white\/70 {
+  background-color: rgba(255, 255, 255, 0.7) !important;
+}
+
+html.dark .profile-page-root .bg-white {
+  background-color: #ffffff !important;
+}
+
+html.dark .profile-page-root .border-white\/90 {
+  border-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+html.dark .profile-page-root .border-purple-200,
+html.dark .profile-page-root .border-purple-200\/80 {
+  border-color: rgba(233, 213, 255, 0.8) !important;
+}
+
 
 
 

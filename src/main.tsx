@@ -37,20 +37,18 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// Gracefully fade out and remove the instant native-style initial loading screen
+// Gracefully and immediately remove initial loader on mount without lagging
 if (typeof window !== 'undefined') {
   const removeLoader = () => {
     const loader = document.getElementById('ennvo-initial-loader');
     if (loader) {
       loader.style.opacity = '0';
       loader.style.pointerEvents = 'none';
-      setTimeout(() => loader.remove(), 400);
+      setTimeout(() => loader.remove(), 250);
     }
   };
 
-  if (document.readyState === 'complete') {
-    setTimeout(removeLoader, 100);
-  } else {
-    window.addEventListener('load', () => setTimeout(removeLoader, 100));
-  }
+  requestAnimationFrame(() => {
+    setTimeout(removeLoader, 50);
+  });
 }

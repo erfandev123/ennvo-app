@@ -17,6 +17,7 @@ import {
   switchCamera
 } from '../services/callService';
 import { logCallMessageInChat } from '../services/chatService';
+import { deviceNotification } from '../services/deviceNotification';
 
 export const CallOverlay = () => {
   const currentUser = useAppStore(state => state.currentUser);
@@ -61,6 +62,20 @@ export const CallOverlay = () => {
           setIncomingCall(call);
           playRingtone(true);
 
+          // Dispatch browser/device notification & vibration for incoming call
+          try {
+            deviceNotification.show({
+              title: `Incoming ${call.type === 'video' ? 'Video' : 'Audio'} Call 📞`,
+              body: `${call.callerName} is calling you on Ennvo...`,
+              icon: call.callerAvatar || '/Ennvo.png',
+              tag: `call-${call.id}`,
+              type: 'activity',
+            });
+            if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+              navigator.vibrate([300, 150, 300, 150, 450]);
+            }
+          } catch (e) {}
+
           // Android Native Bridge: Trigger native incoming call popup / full-screen intent
           try {
             const win = window as any;
@@ -92,6 +107,24 @@ export const CallOverlay = () => {
       unsub();
     };
   }, [currentUser?.uid, activeCallState?.callId]);
+
+  // Flash PC browser document title when incoming call arrives
+  useEffect(() => {
+    if (!incomingCall) return;
+    const originalTitle = document.title;
+    let toggle = false;
+    const interval = setInterval(() => {
+      document.title = toggle 
+        ? `📞 (1) Incoming Call from ${incomingCall.callerName}...` 
+        : `⚡ Ennvo - Ringing...`;
+      toggle = !toggle;
+    }, 900);
+
+    return () => {
+      clearInterval(interval);
+      document.title = originalTitle;
+    };
+  }, [incomingCall]);
 
   // Handle active call duration timer
   useEffect(() => {
@@ -244,17 +277,23 @@ export const CallOverlay = () => {
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: -80, opacity: 0, scale: 0.95 }}
             transition={{ type: 'spring', damping: 30, stiffness: 350 }}
-            className="fixed top-[calc(1.5rem+env(safe-area-inset-top))] left-4 right-4 md:left-auto md:right-6 md:w-[360px] z-[300] bg-white/98 border border-purple-100 p-4 rounded-3xl shadow-2xl flex flex-col space-y-3 transform-gpu will-change-transform"
+            className="fixed top-4 sm:top-6 left-4 right-4 md:left-auto md:right-8 md:w-[380px] z-[350] bg-white/95 dark:bg-[#131927]/95 backdrop-blur-2xl border border-purple-100 dark:border-white/15 p-4.5 rounded-3xl shadow-[0_16px_40px_rgba(0,0,0,0.18)] flex flex-col space-y-3.5 transform-gpu will-change-transform"
           >
             <div className="flex items-center space-x-3.5">
-              <img 
-                src={incomingCall.callerAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(incomingCall.callerName)}&background=random`} 
-                className="w-13 h-13 rounded-full object-cover border-2 border-purple-200/80 shadow-sm shrink-0"
-                alt="Caller Avatar"
-              />
+              <div className="relative shrink-0">
+                <img 
+                  src={incomingCall.callerAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(incomingCall.callerName)}&background=random`} 
+                  className="w-13 h-13 rounded-full object-cover border-2 border-purple-400 shadow-sm"
+                  alt="Caller Avatar"
+                />
+                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-white dark:border-[#131927]"></span>
+                </span>
+              </div>
               <div className="flex-1 min-w-0">
-                <h4 className="font-medium text-gray-900 text-sm truncate">{incomingCall.callerName}</h4>
-                <p className="text-xs text-purple-600 font-normal flex items-center space-x-1.5 mt-0.5">
+                <h4 className="font-bold text-gray-900 dark:text-white text-base truncate">{incomingCall.callerName}</h4>
+                <p className="text-xs text-purple-600 dark:text-purple-400 font-medium flex items-center space-x-1.5 mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-purple-500 inline-block animate-pulse" />
                   <span>Incoming {incomingCall.type === 'video' ? 'Video' : 'Audio'} Call...</span>
                 </p>
@@ -264,14 +303,14 @@ export const CallOverlay = () => {
             <div className="flex items-center space-x-2.5 pt-1">
               <button 
                 onClick={handleRejectIncoming}
-                className="flex-1 py-2.5 bg-rose-50 hover:bg-rose-100 active:scale-98 text-rose-600 font-medium text-xs rounded-2xl flex items-center justify-center space-x-1.5 transition-all border border-rose-100 cursor-pointer"
+                className="flex-1 py-2.5 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 active:scale-95 text-rose-600 dark:text-rose-400 font-semibold text-xs rounded-2xl flex items-center justify-center space-x-1.5 transition-all border border-rose-100 dark:border-rose-900/40 cursor-pointer"
               >
                 <PhoneOff className="w-4 h-4" />
                 <span>Decline</span>
               </button>
               <button 
                 onClick={handleAcceptIncoming}
-                className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-98 text-white font-medium text-xs rounded-2xl flex items-center justify-center space-x-1.5 transition-all shadow-md shadow-purple-600/20 cursor-pointer"
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold text-xs rounded-2xl flex items-center justify-center space-x-1.5 transition-all shadow-md shadow-emerald-600/30 cursor-pointer"
               >
                 <Phone className="w-4 h-4" />
                 <span>Accept</span>
