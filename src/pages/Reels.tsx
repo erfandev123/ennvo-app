@@ -223,28 +223,30 @@ export default function Reels() {
 
   return (
     <div className="h-full w-full bg-black md:bg-[#f8f9fa] overflow-hidden relative">
-      {/* Feed Tabs Overlay */}
-      <div className={`absolute top-6 md:top-4 left-0 right-0 md:left-28 md:right-auto z-40 flex justify-center md:justify-start pointer-events-none transition-opacity duration-300 ${isReelsCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-        <div className="flex items-center bg-black/45 md:bg-white/85 backdrop-blur-xl border border-white/25 md:border-gray-200/80 rounded-full p-1 shadow-xl pointer-events-auto transition-all">
+      {/* Feed Tabs Overlay - Ultra-Light Sleek Glass Buttons (Following on LEFT, For You on RIGHT) */}
+      <div className={`absolute top-5 md:top-4 left-0 right-0 md:left-24 md:right-auto z-40 flex justify-center md:justify-start pointer-events-none transition-opacity duration-200 ${isReelsCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+        <div className="flex items-center space-x-1.5 pointer-events-auto select-none bg-black/25 md:bg-white/40 backdrop-blur-md px-2 py-1 rounded-full border border-white/15 md:border-black/5 shadow-xs">
           <button 
-            onClick={() => setActiveTab('forYou')}
-            className={`relative px-4 py-1.5 text-[13px] font-semibold rounded-full transition-all duration-200 select-none ${
-              activeTab === 'forYou' 
-                ? 'text-black bg-white shadow-md scale-[1.02]' 
-                : 'text-white/80 md:text-gray-600 hover:text-white md:hover:text-black'
-            }`}
-          >
-            For You
-          </button>
-          <button 
+            type="button"
             onClick={() => setActiveTab('following')}
-            className={`relative px-4 py-1.5 text-[13px] font-semibold rounded-full transition-all duration-200 select-none ${
+            className={`relative px-3 py-1 rounded-full text-[14px] tracking-tight transition-all duration-150 select-none cursor-pointer active:scale-95 ${
               activeTab === 'following' 
-                ? 'text-black bg-white shadow-md scale-[1.02]' 
-                : 'text-white/80 md:text-gray-600 hover:text-white md:hover:text-black'
+                ? 'text-white md:text-gray-900 bg-white/20 md:bg-white font-bold shadow-xs' 
+                : 'text-white/70 md:text-gray-600 hover:text-white md:hover:text-gray-900 font-medium'
             }`}
           >
             Following
+          </button>
+          <button 
+            type="button"
+            onClick={() => setActiveTab('forYou')}
+            className={`relative px-3 py-1 rounded-full text-[14px] tracking-tight transition-all duration-150 select-none cursor-pointer active:scale-95 ${
+              activeTab === 'forYou' 
+                ? 'text-white md:text-gray-900 bg-white/20 md:bg-white font-bold shadow-xs' 
+                : 'text-white/70 md:text-gray-600 hover:text-white md:hover:text-gray-900 font-medium'
+            }`}
+          >
+            For You
           </button>
         </div>
       </div>

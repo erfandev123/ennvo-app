@@ -2907,7 +2907,7 @@ export default function Messages() {
 
   return (
     <div
-      className="h-full w-full flex bg-white overflow-hidden relative md:pl-28 lg:pl-32"
+      className="h-full w-full flex bg-white overflow-hidden relative md:pl-[88px] lg:pl-[96px]"
       onClick={closeContextMenu}
     >
       {/* Left Sidebar (Contacts) */}

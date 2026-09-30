@@ -559,16 +559,69 @@ export default function App() {
       }
     }, (err) => console.warn('User sync error:', err));
 
+    let initialConvsLoaded = false;
+    const prevConvsMap = new Map<string, { lastMessage: string, unread: number }>();
+    let initialNotifsLoaded = false;
+
     const unsubscribeNotifs = onSnapshot(query(collection(db, 'notifications', currentUser.uid, 'items'), where('isRead', '==', false)), (snap) => {
       setNotificationCount(snap.size);
+      if (!initialNotifsLoaded) {
+        initialNotifsLoaded = true;
+        return;
+      }
+      snap.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const nData = change.doc.data();
+          deviceNotification.show({
+            title: nData.senderName || 'Ennvo Notification',
+            body: nData.message || nData.text || 'You have a new notification',
+            icon: nData.senderAvatar || '/Ennvo.png',
+            type: 'activity',
+          });
+        }
+      });
     }, (err) => console.warn('Notif count error:', err));
 
     const unsubscribeMessages = onSnapshot(query(collection(db, 'conversations'), where('participantIds', 'array-contains', currentUser.uid)), (snap) => {
       let total = 0;
       snap.docs.forEach(doc => {
         const data = doc.data();
-        total += (data.unreadCount?.[currentUser.uid] || 0);
+        const unread = data.unreadCount?.[currentUser.uid] || 0;
+        total += unread;
+
+        if (initialConvsLoaded) {
+          const prev = prevConvsMap.get(doc.id);
+          const hasNewMsg = prev ? (unread > prev.unread || (data.lastMessage && data.lastMessage !== prev.lastMessage)) : (unread > 0);
+          const isFromOther = data.lastSenderId ? data.lastSenderId !== currentUser.uid : true;
+
+          // Only trigger desktop system notification if it's a new message sent by someone else
+          if (hasNewMsg && isFromOther && data.lastMessage) {
+            const otherId = (data.participantIds || []).find((id: string) => id !== currentUser.uid);
+            const otherName = data.isGroup 
+              ? (data.groupName || 'Group Chat') 
+              : (data.participantNames?.[otherId] || 'Friend');
+            const otherAvatar = data.isGroup 
+              ? (data.groupAvatar || '/Ennvo.png') 
+              : (data.participantAvatars?.[otherId] || '/Ennvo.png');
+
+            deviceNotification.show({
+              title: `${otherName} 💬`,
+              body: data.lastMessage,
+              icon: otherAvatar,
+              tag: `chat-${doc.id}`,
+              type: 'message',
+              data: { conversationId: doc.id }
+            });
+          }
+        }
+
+        prevConvsMap.set(doc.id, {
+          lastMessage: data.lastMessage || '',
+          unread
+        });
       });
+
+      initialConvsLoaded = true;
       setMessageCount(total);
     }, (err) => console.warn('Msg count error:', err));
 

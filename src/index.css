@@ -514,7 +514,7 @@ video:not([controls]) {
   width: 22px;
   height: 22px;
   fill: none;
-  stroke: #64748b;
+  stroke: #475569 !important;
   stroke-width: 1.85;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -522,28 +522,14 @@ video:not([controls]) {
 }
 
 .ultra-glass-pc-item:hover .ultra-glass-pc-icon {
-  stroke: #1e293b;
+  stroke: #0f172a !important;
 }
 
 .ultra-glass-pc-item.active .ultra-glass-pc-icon {
-  stroke: #0f172a;
-  stroke-width: 2.35;
+  stroke: #020617 !important;
+  stroke-width: 2.4 !important;
   transform: scale(1.08);
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.12));
-}
-
-.ultra-glass-pc-dock.dark-mode .ultra-glass-pc-icon {
-  stroke: rgba(255, 255, 255, 0.7);
-}
-
-.ultra-glass-pc-dock.dark-mode .ultra-glass-pc-item:hover .ultra-glass-pc-icon {
-  stroke: #ffffff;
-}
-
-.ultra-glass-pc-dock.dark-mode .ultra-glass-pc-item.active .ultra-glass-pc-icon {
-  stroke: #ffffff;
-  stroke-width: 2.35;
-  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8));
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
 }
 
 /* =========================================================

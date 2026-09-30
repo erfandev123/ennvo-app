@@ -224,7 +224,8 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
   const reelBottomSpacing = isModal ? 'bottom-[78px]' : navStyle === 'glass' ? 'bottom-[calc(98px+env(safe-area-inset-bottom))]' : 'bottom-[calc(72px+env(safe-area-inset-bottom))]';
 
   const cachedAuthor = userCache[reel.authorId];
-  const authorName = cachedAuthor?.name || reel.authorName;
+  const rawAuthorName = cachedAuthor?.name || reel.authorName || 'User';
+  const authorName = rawAuthorName.trim() ? (rawAuthorName.trim().charAt(0).toUpperCase() + rawAuthorName.trim().slice(1)) : 'User';
   const authorAvatar = cachedAuthor?.avatar || reel.authorAvatar;
 
   const [mediaSrc, setMediaSrc] = useState<string>(reel.media?.[0] || '');
@@ -877,10 +878,10 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
       className="w-full h-full min-h-full snap-start flex items-center justify-center relative bg-black md:bg-[#f8f9fa] transform-gpu overflow-hidden shrink-0 select-none"
     >
       {isNearScreen && (
-        <div className="flex flex-col md:flex-row items-center md:items-end justify-center w-full h-full max-w-[1200px] mx-auto relative group py-0 md:py-8 md:space-x-4 lg:space-x-8 animate-in fade-in duration-200 md:pl-28 lg:pl-32">
+        <div className="flex flex-col md:flex-row items-center md:items-end justify-center w-full h-full max-w-[1100px] mx-auto relative group py-0 md:py-8 md:space-x-4 lg:space-x-6 animate-in fade-in duration-200 md:pl-16 lg:pl-16 md:pr-2">
           
           {/* Desktop Left Info Column */}
-        <div className={`hidden md:flex flex-col justify-end w-[260px] lg:w-[320px] pb-4 shrink-0 transition-all duration-300 ${isCleanZoom || is2XSpeed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+        <div className={`hidden md:flex flex-col justify-end w-[220px] lg:w-[260px] pb-4 shrink-0 transition-all duration-300 ${isCleanZoom || is2XSpeed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           {renderActivityGroup(false)}
           <div className="flex items-center space-x-3 mb-3">
               <img 
@@ -900,7 +901,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                      if (onClose) onClose();
                      pushPage('profile'); 
                   }}>
-                    {(authorName || 'User').toLowerCase().replace(/\s+/g, '_')}
+                    {authorName}
                   </span>
                   {(reel as any).authorIsVerified && <VerifiedBadge />}
                 </div>
@@ -1084,7 +1085,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                   pushPage('profile');
                 }}>
                   <span className="text-[15px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] hover:underline">
-                    @{authorName.toLowerCase().replace(/\s+/g, '')}
+                    @{authorName.replace(/\s+/g, '')}
                   </span>
                   {(reel as any).authorIsVerified && <VerifiedBadge />}
                 </div>
@@ -1142,7 +1143,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                        if (onClose) onClose();
                        pushPage('profile'); 
                     }}>
-                      {(authorName || 'User').toLowerCase().replace(/\s+/g, '_')}
+                      {authorName}
                     </span>
                     {(reel as any).authorIsVerified && <VerifiedBadge />}
                   </div>

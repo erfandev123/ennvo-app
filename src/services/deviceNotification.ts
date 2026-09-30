@@ -18,6 +18,23 @@ export interface DeviceNotificationOptions {
 class DeviceNotificationService {
   private hasPrompted = false;
 
+  constructor() {
+    // Auto-request permission on first user gesture anywhere in the browser
+    if (typeof window !== 'undefined') {
+      const handleFirstInteraction = () => {
+        if ('Notification' in window && (Notification.permission as string) === 'default') {
+          this.requestPermission().catch(() => {});
+        }
+        window.removeEventListener('click', handleFirstInteraction);
+        window.removeEventListener('touchstart', handleFirstInteraction);
+        window.removeEventListener('keydown', handleFirstInteraction);
+      };
+      window.addEventListener('click', handleFirstInteraction, { once: true, passive: true });
+      window.addEventListener('touchstart', handleFirstInteraction, { once: true, passive: true });
+      window.addEventListener('keydown', handleFirstInteraction, { once: true, passive: true });
+    }
+  }
+
   public async requestPermission(): Promise<boolean> {
     if (typeof window === 'undefined') return false;
 

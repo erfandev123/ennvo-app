@@ -128,10 +128,16 @@ const playPreloadedAudio = (
   });
 };
 
+let lastNotifSoundTime = 0;
+let lastRingtoneSoundTime = 0;
+
 /**
  * Play Notification Sound Effect
  */
 export const playNotificationSound = () => {
+  const now = Date.now();
+  if (now - lastNotifSoundTime < 1200) return;
+  lastNotifSoundTime = now;
   playPreloadedAudio('notification', false, 0.85).catch(() => {
     playSynthesizedNotification();
   });
@@ -141,6 +147,9 @@ export const playNotificationSound = () => {
  * Play Incoming Call Ringtone
  */
 export const playIncomingRingtone = () => {
+  const now = Date.now();
+  if (now - lastRingtoneSoundTime < 2000 && activeAudio) return;
+  lastRingtoneSoundTime = now;
   const currentToken = currentSoundToken + 1;
   playPreloadedAudio('ringtone', true, 0.95).catch(() => {
     if (currentToken === currentSoundToken) {

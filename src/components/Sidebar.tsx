@@ -169,7 +169,7 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
-      className={`ultra-glass-pc-dock hidden md:flex flex-col items-center justify-between ${appTheme === 'dark' || currentPage === 'home' ? 'dark-mode' : ''}`}
+      className="ultra-glass-pc-dock hidden md:flex flex-col items-center justify-between"
       style={{
         cursor: isDragging ? 'grabbing' : 'default',
       }}
@@ -228,7 +228,9 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
                       loading="lazy"
                       decoding="async"
                       className={`w-[25px] h-[25px] rounded-full object-cover border-2 transition-all duration-200 ${
-                        isActive ? 'border-slate-900 scale-110 shadow-xs ring-2 ring-slate-900/10' : 'border-transparent group-hover:scale-110'
+                        isActive 
+                          ? (appTheme === 'dark' || currentPage === 'home' ? 'border-white scale-110 ring-2 ring-white/30' : 'border-slate-900 scale-110 shadow-xs ring-2 ring-slate-900/10')
+                          : 'border-transparent group-hover:scale-110'
                       }`}
                     />
                   </div>
@@ -236,8 +238,8 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
                   <Icon
                     className={`ultra-glass-pc-icon ${
                       isActive || (item.id === 'create' && showCreateMenu)
-                        ? 'stroke-slate-950 stroke-[2.4] scale-110'
-                        : 'stroke-slate-500 group-hover:stroke-slate-900 group-hover:scale-105'
+                        ? (appTheme === 'dark' || currentPage === 'home' ? 'stroke-white stroke-[2.5] scale-110' : 'stroke-slate-950 stroke-[2.4] scale-110')
+                        : (appTheme === 'dark' || currentPage === 'home' ? 'stroke-white/80 group-hover:stroke-white group-hover:scale-105' : 'stroke-slate-500 group-hover:stroke-slate-900 group-hover:scale-105')
                     }`}
                   />
                 )}
