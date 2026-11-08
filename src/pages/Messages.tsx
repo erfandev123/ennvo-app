@@ -103,6 +103,11 @@ import { subscribeStories, Story } from "../services/storyService";
 import { Conversation, Message as AppMessage, Notification } from "../types";
 import { FacebookMessageListSkeleton } from "../components/Skeletons";
 
+// Stable id for optimistic messages. The same id is used as the Firestore
+// document id, so retries on a slow network can never create duplicates.
+const makeTempMessageId = (uid: string) =>
+  `temp_${uid}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
 const GroupAvatar = ({
   members,
   sizeClass = "w-14 h-14",
@@ -2092,7 +2097,7 @@ export default function Messages() {
     }
 
     // Optimistic message in UI
-    const tempId = 'temp_' + Date.now();
+    const tempId = makeTempMessageId(currentUser.uid);
     const optMsg: any = {
       id: tempId,
       tempId: tempId,
@@ -2104,6 +2109,7 @@ export default function Messages() {
       stickerType: stickerType || 'image',
       createdAt: { toMillis: () => Date.now() },
       status: 'sent',
+      pending: true,
       replyTo: replyData
     };
 
@@ -2132,7 +2138,8 @@ export default function Messages() {
         cleanStickerUrl,
         cleanStickerUrl,
         undefined,
-        replyData
+        replyData,
+        { clientMessageId: tempId }
       );
     } catch (err) {
       console.error("Failed to send sticker:", err);
@@ -2273,7 +2280,7 @@ export default function Messages() {
             activeChat !== "activity" &&
             currentUser
           ) {
-            const tempVoiceId = "opt_voice_" + Date.now();
+            const tempVoiceId = makeTempMessageId(currentUser.uid);
             const optVoiceMsg = {
               id: tempVoiceId,
               tempId: tempVoiceId,
@@ -2283,7 +2290,8 @@ export default function Messages() {
               mediaUrl: dataUrl,
               duration: Math.max(1, recordingDuration),
               createdAt: { toMillis: () => Date.now() },
-              status: "sent"
+              status: "sent",
+              pending: true
             };
             setMessagesCache((prev) => ({
               ...prev,
@@ -2296,7 +2304,8 @@ export default function Messages() {
               "Sent a voice message",
               dataUrl,
               undefined,
-              { duration: Math.max(1, recordingDuration) }
+              undefined,
+              { duration: Math.max(1, recordingDuration), clientMessageId: tempVoiceId }
             ).catch(console.error);
           }
         };
@@ -2323,7 +2332,7 @@ export default function Messages() {
       } else if (!isCanceledRef.current) {
         const synthUrl = "https://actions.google.com/sounds/v1/ambiences/outdoor_park.ogg";
         if (activeChat && currentUser) {
-          const tempVoiceId = "opt_voice_" + Date.now();
+          const tempVoiceId = makeTempMessageId(currentUser.uid);
           const optVoiceMsg = {
             id: tempVoiceId,
             tempId: tempVoiceId,
@@ -2333,7 +2342,8 @@ export default function Messages() {
             mediaUrl: synthUrl,
             duration: Math.max(1, recordingDuration),
             createdAt: { toMillis: () => Date.now() },
-            status: "sent"
+            status: "sent",
+            pending: true
           };
           setMessagesCache((prev) => ({
             ...prev,
@@ -2346,7 +2356,8 @@ export default function Messages() {
             "Sent a voice message",
             synthUrl,
             undefined,
-            { duration: Math.max(1, recordingDuration) }
+            undefined,
+            { duration: Math.max(1, recordingDuration), clientMessageId: tempVoiceId }
           ).catch(console.error);
         }
       }
@@ -2528,7 +2539,7 @@ export default function Messages() {
       }
 
       if (docUrl) {
-        const tempId = 'temp_doc_' + Date.now();
+        const tempId = makeTempMessageId(currentUser.uid);
         const replyData = replyingTo ? {
           messageId: replyingTo.id,
           senderName: userDataCache[replyingTo.senderId]?.name || 'User',
@@ -2548,6 +2559,7 @@ export default function Messages() {
           fileExt: ext,
           createdAt: { toMillis: () => Date.now() },
           status: 'sent',
+          pending: true,
           replyTo: replyData
         };
 
@@ -2567,8 +2579,9 @@ export default function Messages() {
           {
             fileName: file.name,
             fileSize: sizeStr,
-            fileExt: ext
-          } as any
+            fileExt: ext,
+            clientMessageId: tempId
+          }
         );
       }
     }
@@ -2642,19 +2655,40 @@ export default function Messages() {
     };
   }, [currentUser]);
 
-  // Listen in REAL-TIME to user profile changes for conversation participants
+  // Only watch profiles that are actually visible: the other person in each
+  // direct chat, plus the members of the currently open group. Watching every
+  // member of every group made slow networks open dozens of live listeners.
+  const watchedProfileIds = React.useMemo(() => {
+    if (!currentUser) return [] as string[];
+    const ids = new Set<string>();
+
+    conversations.forEach((conv: any) => {
+      const isGroup = Boolean(conv.isGroup || conv.participantIds?.length > 2);
+      if (!isGroup || conv.id === activeChat) {
+        conv.participantIds?.forEach((id: string) => {
+          if (id && id !== currentUser.uid) ids.add(id);
+        });
+      }
+    });
+
+    if (activeChat && activeChat !== "jarvis" && activeChat !== "followers" && activeChat !== "activity" && activeChat !== "requests") {
+      const activeConv: any = conversations.find((c: any) => c.id === activeChat);
+      const directUid = activeConv?.participantIds?.find((id: string) => id !== currentUser.uid);
+      if (directUid) ids.add(directUid);
+      else if (!activeConv && activeChat.length > 10) ids.add(activeChat);
+    }
+
+    return Array.from(ids).sort();
+  }, [conversations, currentUser, activeChat]);
+
+  const watchedProfileKey = watchedProfileIds.join("|");
+
+  // Listen in REAL-TIME to user profile changes for visible participants
   useEffect(() => {
     if (!currentUser) return;
     const unsubs: (() => void)[] = [];
-    const allParticipantIds = new Set<string>();
 
-    conversations.forEach((conv) => {
-      conv.participantIds?.forEach((id: string) => {
-        if (id && id !== currentUser.uid) allParticipantIds.add(id);
-      });
-    });
-
-    allParticipantIds.forEach((uid) => {
+    watchedProfileIds.forEach((uid) => {
       const userRef = doc(db, "users", uid);
       const unsub = onSnapshot(userRef, (userDoc) => {
         if (userDoc.exists()) {
@@ -2677,7 +2711,8 @@ export default function Messages() {
     return () => {
       unsubs.forEach((unsub) => unsub());
     };
-  }, [conversations, currentUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedProfileKey, currentUser?.uid]);
 
   const [messageLimit, setMessageLimit] = useState(20);
   const [activityLimit, setActivityLimit] = useState(15);
@@ -2702,8 +2737,12 @@ export default function Messages() {
           // Filter out temp messages that have already synced to Firestore
           const pendingTempMsgs = currentCached.filter((m: any) => {
             if (!m.id || typeof m.id !== 'string') return false;
-            if (!m.id.startsWith('temp_')) return false;
-            // Check if synced
+            const isOptimistic = Boolean(m.pending) || m.id.startsWith('temp_');
+            if (!isOptimistic) return false;
+            // Exact id match: the Firestore document uses the optimistic id,
+            // so the real message has already replaced this one.
+            if (newMsgIds.has(m.id) || (m.tempId && newMsgIds.has(m.tempId))) return false;
+            // Legacy heuristic for messages sent by older builds
             const isSynced = newMsgs.some(nm =>
               nm.senderId === m.senderId &&
               (nm.type === m.type || (nm.type === 'image' && m.type === 'image')) &&
@@ -2946,7 +2985,7 @@ export default function Messages() {
     }
 
     // Optimistically show message in UI
-    const tempId = 'temp_' + Date.now();
+    const tempId = makeTempMessageId(currentUser.uid);
     let optMsg: any;
     if (mediaItemsToSend.length === 1) {
       const single = mediaItemsToSend[0];
@@ -2959,6 +2998,7 @@ export default function Messages() {
         mediaUrl: single.url,
         createdAt: { toMillis: () => Date.now() },
         status: 'sent',
+        pending: true,
         replyTo: replyData
       };
     } else if (mediaItemsToSend.length > 1) {
@@ -2973,6 +3013,7 @@ export default function Messages() {
         mediaItems: mediaItemsToSend.map(m => ({ type: m.type, url: m.url })),
         createdAt: { toMillis: () => Date.now() },
         status: 'sent',
+        pending: true,
         replyTo: replyData
       };
     } else {
@@ -2984,6 +3025,7 @@ export default function Messages() {
         content: textToSend,
         createdAt: { toMillis: () => Date.now() },
         status: 'sent',
+        pending: true,
         replyTo: replyData
       };
     }
@@ -3014,7 +3056,6 @@ export default function Messages() {
     });
 
     shouldAutoScrollRef.current = true;
-    isSendingMsgRef.current = false;
 
     try {
       if (mediaItemsToSend.length > 0) {
@@ -3056,7 +3097,8 @@ export default function Messages() {
             textToSend || (single.type === "video" ? "Sent a video" : "Sent a photo"),
             single.url,
             undefined,
-            replyData
+            replyData,
+            { clientMessageId: tempId }
           );
         } else if (!hasBase64) {
           // All are remote CDN URLs (tiny strings) -> safe for album
@@ -3071,10 +3113,17 @@ export default function Messages() {
             {
               mediaUrls: resolvedItems.map((m) => m.url),
               mediaItems: resolvedItems,
+              clientMessageId: tempId,
             }
           );
         } else {
-          // Send sequentially so each photo gets stored cleanly without hitting size limit
+          // Each base64 item becomes its own document. Remove the single
+          // album placeholder first so the UI does not show a phantom extra.
+          setMessagesCache((prev) => ({
+            ...prev,
+            [activeChat]: (prev[activeChat] || []).filter((m: any) => m.id !== tempId),
+          }));
+
           let isFirst = true;
           for (const item of resolvedItems) {
             await sendMessage(
@@ -3097,7 +3146,8 @@ export default function Messages() {
           textToSend,
           undefined,
           undefined,
-          replyData
+          replyData,
+          { clientMessageId: tempId }
         );
       }
     } catch (error) {
@@ -3567,9 +3617,7 @@ export default function Messages() {
             borderRadius = "rounded-3xl rounded-bl-md";
         }
 
-        const messageKey = msg.id && !msg.id.startsWith("temp_")
-          ? msg.id
-          : `${msg.id || msg.tempId || 'msg'}_${idx}`;
+        const messageKey = msg.id || msg.tempId || `msg_${idx}`;
 
         const isLastMsg = idx === messages.length - 1;
         let seenStr: string | null = null;
@@ -3595,7 +3643,9 @@ export default function Messages() {
         }
 
         const msgId = msg.id || msg.tempId;
-        const isTemp = Boolean(msg.id?.startsWith("temp_"));
+        // Only truly optimistic messages are "pending"; once Firestore echoes
+        // the same document id the flag is gone and animations stop replaying.
+        const isTemp = Boolean((msg as any).pending);
         const isNew = isTemp || (Boolean(msgId) && !animatedMsgIdsRef.current.has(msgId) && isChatInitialLoadedRef.current);
         if (msgId) {
           animatedMsgIdsRef.current.add(msgId);

@@ -4,6 +4,7 @@ import {
   setDoc, 
   doc, 
   getDoc,
+  getDocFromCache,
   deleteDoc,
   query, 
   where, 
@@ -18,6 +19,10 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Conversation, Message } from '../types';
+
+/** Idempotent message id used as the Firestore document id. */
+export const createClientMessageId = (uid: string) =>
+  `msg_${uid}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 /**
  * Compress base64 image strings to ensure they stay well under Firestore's 1,048,487 byte document limit.
@@ -153,11 +158,22 @@ export const createConversation = async (
       where('participantIds', 'array-contains', currentUid)
     );
     const querySnapshot = await getDocs(q);
-    const existing = querySnapshot.docs.find(doc => {
-      const data = doc.data();
-      return (data.participantIds?.length === participantIds.length) && 
-             participantIds.every(id => data.participantIds?.includes(id));
-    });
+    // If bad networks already produced duplicate threads, always reuse the
+    // one that actually has messages (and then the most recent one).
+    const existing = querySnapshot.docs
+      .filter((doc) => {
+        const data = doc.data();
+        return (data.participantIds?.length === participantIds.length) &&
+               participantIds.every(id => data.participantIds?.includes(id));
+      })
+      .sort((a, b) => {
+        const aData = a.data();
+        const bData = b.data();
+        const aHas = aData.lastMessage ? 1 : 0;
+        const bHas = bData.lastMessage ? 1 : 0;
+        if (aHas !== bHas) return bHas - aHas;
+        return getConversationTime(bData) - getConversationTime(aData);
+      })[0];
 
     if (existing) {
       // Update names/avatars in case they changed
@@ -223,6 +239,28 @@ export const createConversation = async (
       convPayload.requestMessageCount = 0;
     }
 
+    // Direct chats get a deterministic id derived from both participant uids.
+    // Retries, double taps and flaky networks can no longer create a second
+    // conversation between the same two friends.
+    if (participantIds.length === 2) {
+      const directId = `dm_${[...participantIds].sort().join('_')}`;
+      const directRef = doc(db, 'conversations', directId);
+      // Never overwrite live counters such as unreadCount / lastMessage when
+      // the other device created the conversation a moment earlier.
+      const {
+        unreadCount: _unreadCount,
+        lastMessage: _lastMessage,
+        requestMessageCount: _requestMessageCount,
+        ...safePayload
+      } = convPayload;
+      try {
+        await setDoc(directRef, safePayload, { merge: true });
+        return directId;
+      } catch (e) {
+        console.warn('Deterministic conversation create failed, falling back:', e);
+      }
+    }
+
     const docRef = await addDoc(collection(db, 'conversations'), convPayload);
 
     return docRef.id;
@@ -242,13 +280,25 @@ export const sendMessage = async (
   extra?: {
     mediaUrls?: string[];
     mediaItems?: { type: 'image' | 'video'; url: string }[];
+    clientMessageId?: string;
+    duration?: number;
+    fileName?: string;
+    fileSize?: string;
+    fileExt?: string;
   }
 ) => {
   try {
     const convRef = doc(db, 'conversations', conversationId);
     let convData: any = null;
     try {
-      const convSnap = await getDoc(convRef);
+      // Read the cached copy first: on a slow network the server round-trip
+      // used to delay every single outgoing message by several seconds.
+      let convSnap;
+      try {
+        convSnap = await getDocFromCache(convRef);
+      } catch {
+        convSnap = await getDoc(convRef);
+      }
       if (convSnap.exists()) {
         convData = convSnap.data();
 
@@ -256,12 +306,18 @@ export const sendMessage = async (
         if (convData.participantIds?.length === 2) {
           const otherParticipantId = convData.participantIds.find((id: string) => id !== senderId);
           if (otherParticipantId) {
-            const blockedCheck = await getDoc(doc(db, 'users', otherParticipantId, 'blockedUsers', senderId));
-            if (blockedCheck.exists()) {
+            // Cache-first block checks: never let two extra server reads delay
+            // an outgoing message on a weak connection.
+            const blockedCheck = await getDocFromCache(
+              doc(db, 'users', otherParticipantId, 'blockedUsers', senderId)
+            ).catch(() => null);
+            if (blockedCheck?.exists()) {
               throw new Error("You cannot send messages to this account.");
             }
-            const myBlockedCheck = await getDoc(doc(db, 'users', senderId, 'blockedUsers', otherParticipantId));
-            if (myBlockedCheck.exists()) {
+            const myBlockedCheck = await getDocFromCache(
+              doc(db, 'users', senderId, 'blockedUsers', otherParticipantId)
+            ).catch(() => null);
+            if (myBlockedCheck?.exists()) {
               throw new Error("You have blocked this user. Unblock them first to send a message.");
             }
           }
@@ -319,6 +375,10 @@ export const sendMessage = async (
     
     if (postId) messageData.postId = postId;
     if (replyTo) messageData.replyTo = replyTo;
+    if (typeof extra?.duration === 'number') messageData.duration = extra.duration;
+    if (extra?.fileName) messageData.fileName = extra.fileName;
+    if (extra?.fileSize) messageData.fileSize = extra.fileSize;
+    if (extra?.fileExt) messageData.fileExt = extra.fileExt;
     if (processedMediaUrls && processedMediaUrls.length > 0) {
       messageData.mediaUrls = processedMediaUrls;
     }
@@ -329,7 +389,20 @@ export const sendMessage = async (
       }
     }
 
-    await addDoc(collection(db, 'conversations', conversationId, 'messages'), messageData);
+    const clientMessageId = extra?.clientMessageId;
+    if (clientMessageId) {
+      // Idempotent write: the optimistic UI already uses this id, and a retry
+      // after a network timeout rewrites the same document instead of adding
+      // a duplicate message for both sides.
+      messageData.clientMessageId = clientMessageId;
+      await setDoc(
+        doc(db, 'conversations', conversationId, 'messages', clientMessageId),
+        messageData,
+        { merge: true }
+      );
+    } else {
+      await addDoc(collection(db, 'conversations', conversationId, 'messages'), messageData);
+    }
 
     // Update conversation and increment unread count for others
     try {
@@ -488,7 +561,23 @@ export const subscribeMessages = (conversationId: string, callback: (messages: M
   );
   return onSnapshot(q, (snapshot) => {
     const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
-    const reversed = messages.reverse();
+
+    // Hide duplicate documents created by older app versions on bad networks.
+    // New messages carry a clientMessageId and are idempotent, so they are
+    // never touched by this legacy fallback.
+    const lastLegacyTime = new Map<string, number>();
+    const deduped = messages.filter((m: any) => {
+      if (m.clientMessageId) return true;
+      const time = m.createdAt?.toMillis?.() || 0;
+      if (time <= 0) return true;
+      const key = `${m.senderId}|${m.type}|${m.content}|${m.mediaUrl || ''}`;
+      const previous = lastLegacyTime.get(key);
+      if (previous !== undefined && Math.abs(previous - time) < 4000) return false;
+      lastLegacyTime.set(key, time);
+      return true;
+    });
+
+    const reversed = deduped.reverse();
     try {
       localStorage.setItem(`ennvo_offline_msgs_${conversationId}`, JSON.stringify(reversed.slice(-50)));
     } catch (e) {}
@@ -498,6 +587,42 @@ export const subscribeMessages = (conversationId: string, callback: (messages: M
   });
 };
 
+// Collapse empty duplicate direct chats left behind by older builds.
+// Threads that actually contain messages are never hidden.
+const dedupeConversations = (list: any[]) => {
+  const groups = new Map<string, any[]>();
+  const deduped: any[] = [];
+  list.forEach((c: any) => {
+    if (c.isGroup || c.participantIds?.length !== 2) {
+      deduped.push(c);
+      return;
+    }
+    const requestKey = c.isRequest && c.requestStatus === 'pending' ? '|request' : '|chat';
+    const key = `${[...c.participantIds].sort().join('|')}${requestKey}`;
+    const group = groups.get(key) || [];
+    group.push(c);
+    groups.set(key, group);
+  });
+  groups.forEach((group) => {
+    const withMessages = group.filter((c) => c.lastMessage);
+    if (withMessages.length === 0) {
+      deduped.push([...group].sort((a, b) => getConversationTime(b) - getConversationTime(a))[0]);
+    } else {
+      deduped.push(...withMessages);
+    }
+  });
+  return deduped;
+};
+
+const getConversationTime = (item: any) => {
+  if (typeof item.updatedAt?.toMillis === 'function') return item.updatedAt.toMillis();
+  if (typeof item.lastMessageTime === 'number') return item.lastMessageTime;
+  if (typeof item.lastMessageTime?.toMillis === 'function') return item.lastMessageTime.toMillis();
+  if (typeof item.createdAt?.toMillis === 'function') return item.createdAt.toMillis();
+  if (typeof item.createdAt === 'number') return item.createdAt;
+  return 0;
+};
+
 export const subscribeConversations = (userId: string, callback: (conversations: Conversation[]) => void) => {
   // 1. Instant Offline Cache Load
   try {
@@ -505,7 +630,7 @@ export const subscribeConversations = (userId: string, callback: (conversations:
     if (cached) {
       const parsed = JSON.parse(cached);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        callback(parsed);
+        callback(dedupeConversations(parsed).sort((a: any, b: any) => getConversationTime(b) - getConversationTime(a)));
       }
     }
   } catch (e) {}
@@ -514,24 +639,15 @@ export const subscribeConversations = (userId: string, callback: (conversations:
     collection(db, 'conversations'), 
     where('participantIds', 'array-contains', userId)
   );
+
   return onSnapshot(q, (snapshot) => {
     const conversations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Conversation));
-    // Sort client-side to avoid index requirement
-    conversations.sort((a: any, b: any) => {
-      const getT = (item: any) => {
-        if (typeof item.updatedAt?.toMillis === 'function') return item.updatedAt.toMillis();
-        if (typeof item.lastMessageTime === 'number') return item.lastMessageTime;
-        if (typeof item.lastMessageTime?.toMillis === 'function') return item.lastMessageTime.toMillis();
-        if (typeof item.createdAt?.toMillis === 'function') return item.createdAt.toMillis();
-        if (typeof item.createdAt === 'number') return item.createdAt;
-        return 0;
-      };
-      return getT(b) - getT(a);
-    });
+    const deduped = dedupeConversations(conversations);
+    deduped.sort((a: any, b: any) => getConversationTime(b) - getConversationTime(a));
     try {
-      localStorage.setItem(`ennvo_offline_convs_${userId}`, JSON.stringify(conversations));
+      localStorage.setItem(`ennvo_offline_convs_${userId}`, JSON.stringify(deduped));
     } catch (e) {}
-    callback(conversations);
+    callback(deduped);
   }, (err) => {
     console.warn("Firestore conversations snapshot notice:", err);
   });

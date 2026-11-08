@@ -6,28 +6,20 @@ import BottomNav from './components/BottomNav';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
 
-import Home from './pages/Home';
-import Search from './pages/Search';
-import Reels from './pages/Reels';
-import Messages from './pages/Messages';
-import Notifications from './pages/Notifications';
+// Heavy pages are split into their own chunks so a new user on a slow network
+// never has to download the entire app before seeing anything.
+const Home = lazy(() => import('./pages/Home'));
+const Reels = lazy(() => import('./pages/Reels'));
+const Messages = lazy(() => import('./pages/Messages'));
+const Notifications = lazy(() => import('./pages/Notifications'));
 const Profile = lazy(() => import('./pages/Profile'));
 const EditProfile = lazy(() => import('./pages/EditProfile'));
-import Create from './pages/Create';
-import SearchPage from './pages/SearchPage';
-import Settings from './pages/Settings';
+const Create = lazy(() => import('./pages/Create'));
+const SearchPage = lazy(() => import('./pages/SearchPage'));
+const Settings = lazy(() => import('./pages/Settings'));
 import Auth from './pages/Auth';
 const AdminApp = lazy(() => import('../admin/src/AdminApp'));
 
-// Background prefetch for Profile & EditProfile chunks for ultra-smooth instant feel
-if (typeof window !== 'undefined') {
-  setTimeout(() => {
-    import('./pages/Profile');
-    import('./pages/EditProfile');
-  }, 1200);
-}
-
-import MiniChat from './components/MiniChat';
 import { CallOverlay } from './components/CallOverlay';
 import { AccountSwitcherModal } from './components/AccountSwitcherModal';
 import { SetPasswordModal } from './components/SetPasswordModal';
@@ -49,13 +41,14 @@ import { deviceNotification } from './services/deviceNotification';
 import { formatTime, downloadMediaFile } from './utils';
 import { doc, onSnapshot, collection, query, where, limit } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import { ReelItem, SharePortal } from './components/ReelItem';
-import { LikesList } from './components/LikesList';
-import { AnalyticsModal } from './components/AnalyticsModal';
+const ReelItem = lazy(() => import('./components/ReelItem').then(m => ({ default: m.ReelItem })));
+const LikesList = lazy(() => import('./components/LikesList').then(m => ({ default: m.LikesList })));
+const AnalyticsModal = lazy(() => import('./components/AnalyticsModal').then(m => ({ default: m.AnalyticsModal })));
+const ReelCameraModal = lazy(() => import('./components/ReelCameraModal').then(m => ({ default: m.ReelCameraModal })));
+const MediaViewerModal = lazy(() => import('./components/MediaViewerModal').then(m => ({ default: m.MediaViewerModal })));
+const MiniChat = lazy(() => import('./components/MiniChat'));
 import { UploadProgressBar } from './components/UploadProgressBar';
-import { ReelCameraModal } from './components/ReelCameraModal';
 import { getPost } from './services/postService';
-import { MediaViewerModal } from './components/MediaViewerModal';
 import { bridge, PendingSharePayload } from './native/bridge';
 import { 
   startNotificationCenter, 
@@ -312,6 +305,7 @@ export default function App() {
     viewingReelList, setViewingReelList,
     viewingReelContext, setViewingReelContext,
     activeChat, showCreatePost, showReelCamera,
+    showLikesList, showAnalytics, miniChatUser,
     isAuthenticated, isAuthLoading, 
     currentUser, setCurrentUser, 
     setNotificationCount,
@@ -360,21 +354,19 @@ export default function App() {
     };
   }, []);
 
-  // Preload secondary tab page modules during idle time after initial mount
+  // Prefetch the next likely tab only on a healthy connection. On 2G/3G or
+  // data-saver we skip this entirely so it never competes with real requests.
   useEffect(() => {
+    if (!isAuthenticated) return;
+    const conn = (navigator as any).connection;
+    if (conn && (conn.saveData || /(^|-)2g$/.test(conn.effectiveType || ''))) return;
+
     const timer = setTimeout(() => {
-      import('./pages/Home');
-      import('./pages/Reels');
-      import('./pages/Messages');
-      import('./pages/Profile');
-      import('./pages/Create');
-      import('./pages/SearchPage');
-      import('./pages/Notifications');
-      import('./pages/EditProfile');
-      import('./pages/Settings');
-    }, 2000);
+      if (currentPage === 'home') import('./pages/Messages');
+      else if (currentPage === 'messages') import('./pages/Notifications');
+    }, 4000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isAuthenticated, currentPage]);
 
   const [showExitToast, setShowExitToast] = useState(false);
   const [showGoogleSetPasswordModal, setShowGoogleSetPasswordModal] = useState(false);
@@ -960,10 +952,12 @@ export default function App() {
 
       {/* Global Media Viewer */}
       {viewingMedia && (
-        <MediaViewerModal
-          media={viewingMedia}
-          onClose={() => setViewingMedia(null)}
-        />
+        <Suspense fallback={null}>
+          <MediaViewerModal
+            media={viewingMedia}
+            onClose={() => setViewingMedia(null)}
+          />
+        </Suspense>
       )}
 
       {/* Global Story Viewer */}
@@ -973,11 +967,13 @@ export default function App() {
 
       <InAppToaster />
       <UploadProgressBar />
-      <ReelCameraModal />
-      <LikesList />
+      <Suspense fallback={null}>
+        {showReelCamera && <ReelCameraModal />}
+        {showLikesList && <LikesList />}
+        {showAnalytics && <AnalyticsModal />}
+        {miniChatUser && <MiniChat />}
+      </Suspense>
       <ViewsList />
-      <AnalyticsModal />
-      <MiniChat />
       <CallOverlay />
       <SetPasswordModal 
         isOpen={showGoogleSetPasswordModal} 
@@ -986,6 +982,7 @@ export default function App() {
 
       {/* Global Reel Viewer (Modal) */}
       {viewingReel && (
+        <Suspense fallback={<div className="fixed inset-0 z-[100] bg-black" />}>
         <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center animate-in fade-in duration-200">
           {/* Always visible prominent close button for PC & Mobile in top-left */}
           <button 
@@ -1035,6 +1032,7 @@ export default function App() {
             )}
           </div>
         </div>
+        </Suspense>
       )}
       </div>
     </ErrorBoundary>

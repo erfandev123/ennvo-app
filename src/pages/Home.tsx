@@ -45,7 +45,8 @@ import {
   subscribeMessages, 
   createConversation, 
   markConversationRead, 
-  compressChatImageBase64 
+  compressChatImageBase64,
+  createClientMessageId
 } from '../services/chatService';
 import { subscribePresence, setTyping, subscribeTyping } from '../services/presenceService';
 import { initiateCall } from '../services/callService';
@@ -572,7 +573,8 @@ const RightPanelInlineChat: React.FC<{
       `Voice message (${dur}s)`,
       undefined,
       undefined,
-      { duration: dur }
+      undefined,
+      { duration: dur, clientMessageId: createClientMessageId(currentUser.uid) }
     );
   };
 
@@ -585,7 +587,9 @@ const RightPanelInlineChat: React.FC<{
         const rawBase64 = reader.result as string;
         const compressed = await compressChatImageBase64(rawBase64);
         playMessageSentSound();
-        await sendMessage(conversationId, currentUser.uid, 'image', 'Photo', compressed);
+        await sendMessage(conversationId, currentUser.uid, 'image', 'Photo', compressed, undefined, undefined, {
+          clientMessageId: createClientMessageId(currentUser.uid),
+        });
       };
       reader.readAsDataURL(file);
     } catch (err) {
@@ -605,7 +609,9 @@ const RightPanelInlineChat: React.FC<{
     setTyping(conversationId, currentUser.uid, false);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     try {
-      await sendMessage(conversationId, currentUser.uid, 'text', text);
+      await sendMessage(conversationId, currentUser.uid, 'text', text, undefined, undefined, undefined, {
+        clientMessageId: createClientMessageId(currentUser.uid),
+      });
     } catch (err) {
       console.error('Failed to send message:', err);
     } finally {

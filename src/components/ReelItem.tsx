@@ -3701,10 +3701,12 @@ export const SharePortal = ({
     onClose();
 
     // Async background send
-    import('../services/chatService').then(async ({ sendMessage }) => {
+    import('../services/chatService').then(async ({ sendMessage, createClientMessageId }) => {
       for (const targetId of selectedTargets) {
         try {
-          await sendMessage(targetId, currentUser.uid, shareType === 'post' ? 'reel' : shareType, 'Shared a post', postMedia, reel.id);
+          await sendMessage(targetId, currentUser.uid, shareType === 'post' ? 'reel' : shareType, 'Shared a post', postMedia, reel.id, undefined, {
+            clientMessageId: createClientMessageId(currentUser.uid),
+          });
         } catch (err) {
           console.error("Error sending share message:", err);
         }
