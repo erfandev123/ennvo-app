@@ -20,11 +20,11 @@ const DEFAULT_OG_IMAGE = 'https://ennvo.vercel.app/og-image.jpg';
 
 export const OFFICIAL_BRAND_SEO: PageSEOConfig = {
   title: 'Ennvo Official App – Social Media, Reels, Chat & Video Calls',
-  description: 'Ennvo is the official social media app by Erfan Sarker. Share reels, chat with friends, post stories, and make HD video calls — fast and free.',
+  description: 'Ennvo is the official social media app by Erfan Sarker and co-developer Rita Akter. Share reels, chat, post stories, and make HD video calls — fast and free.',
   canonical: DEFAULT_CANONICAL,
   robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
   ogTitle: 'Ennvo Official App – Social Media, Reels, Chat & Video Calls',
-  ogDescription: 'Ennvo is the official social media app by Erfan Sarker. Share reels, chat with friends, post stories, and make HD video calls — fast and free.',
+  ogDescription: 'Ennvo is the official social media app by Erfan Sarker and co-developer Rita Akter. Share reels, chat, post stories, and make HD video calls — fast and free.',
   ogUrl: DEFAULT_CANONICAL,
   ogImage: DEFAULT_OG_IMAGE,
 };

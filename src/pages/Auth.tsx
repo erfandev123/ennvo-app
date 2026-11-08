@@ -577,7 +577,7 @@ export default function Auth() {
 
               {/* Public SEO / brand page link */}
               <div className="text-center mt-3 text-[10px] font-medium text-slate-400">
-                <a href="/about" className="hover:text-slate-600 hover:underline">About Ennvo &amp; founder Erfan Sarker</a>
+                <a href="/about" className="hover:text-slate-600 hover:underline">About Ennvo, Erfan Sarker &amp; Rita Akter</a>
               </div>
             </div>
 
