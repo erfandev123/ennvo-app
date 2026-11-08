@@ -1,14 +1,20 @@
 # Robots.txt for Ennvo Official Platform
 # Website: https://ennvo.vercel.app/
+# Founder: Erfan Sarker
 
 User-agent: *
 Allow: /
+Allow: /about
+Allow: /feed
+Allow: /search
+Allow: /signup
 Disallow: /api/
-Disallow: /admin/
-Disallow: /messages/
-Disallow: /settings/
-Disallow: /notifications/
-Disallow: /create/
+Disallow: /admin
+Disallow: /messages
+Disallow: /settings
+Disallow: /notifications
+Disallow: /create
+Disallow: /edit-profile
 
 # Search Engine & Discovery Crawlers
 User-agent: Googlebot

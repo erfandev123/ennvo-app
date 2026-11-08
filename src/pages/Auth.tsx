@@ -574,6 +574,11 @@ export default function Auth() {
                   Sign Up
                 </button>
               </div>
+
+              {/* Public SEO / brand page link */}
+              <div className="text-center mt-3 text-[10px] font-medium text-slate-400">
+                <a href="/about" className="hover:text-slate-600 hover:underline">About Ennvo &amp; founder Erfan Sarker</a>
+              </div>
             </div>
 
             {/* Bottom Safe Area Padding */}

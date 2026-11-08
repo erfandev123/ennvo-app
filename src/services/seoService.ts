@@ -19,12 +19,12 @@ const DEFAULT_CANONICAL = 'https://ennvo.vercel.app/';
 const DEFAULT_OG_IMAGE = 'https://ennvo.vercel.app/og-image.jpg';
 
 export const OFFICIAL_BRAND_SEO: PageSEOConfig = {
-  title: 'Ennvo - Official Social Media, Video Calling & Reels Platform',
-  description: 'Discover Ennvo, the official ultra-fast social media platform. Connect with friends, watch and share short reels, post stories, and enjoy real-time HD audio/video calls.',
+  title: 'Ennvo Official App – Social Media, Reels, Chat & Video Calls',
+  description: 'Ennvo is the official social media app by Erfan Sarker. Share reels, chat with friends, post stories, and make HD video calls — fast and free.',
   canonical: DEFAULT_CANONICAL,
   robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
-  ogTitle: 'Ennvo - Official Social Media, Video Calling & Reels Platform',
-  ogDescription: 'Discover Ennvo, the official ultra-fast social media platform. Connect with friends, watch and share short reels, post stories, and enjoy real-time HD audio/video calls.',
+  ogTitle: 'Ennvo Official App – Social Media, Reels, Chat & Video Calls',
+  ogDescription: 'Ennvo is the official social media app by Erfan Sarker. Share reels, chat with friends, post stories, and make HD video calls — fast and free.',
   ogUrl: DEFAULT_CANONICAL,
   ogImage: DEFAULT_OG_IMAGE,
 };
@@ -97,8 +97,8 @@ export function applyRouteSEO(page: string, params?: { userName?: string; isAuth
     case 'search':
       updatePageSEO({
         title: 'Discover & Search Creators • Ennvo Social',
-        description: 'Explore trending creators, viral reels, and lively communities on Ennvo — the official ultra-fast social media platform.',
-        canonical: 'https://ennvo.vercel.app/',
+        description: 'Explore trending creators, viral reels, and lively communities on Ennvo — the official social media app by Erfan Sarker.',
+        canonical: 'https://ennvo.vercel.app/search',
         robots: 'index, follow',
       });
       break;
@@ -107,7 +107,7 @@ export function applyRouteSEO(page: string, params?: { userName?: string; isAuth
       updatePageSEO({
         title: 'Short Video Reels • Ennvo',
         description: 'Watch, create, and share trending short video reels with HD music and creative effects on Ennvo.',
-        canonical: 'https://ennvo.vercel.app/',
+        canonical: 'https://ennvo.vercel.app/feed',
         robots: 'index, follow',
       });
       break;
