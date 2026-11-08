@@ -46,6 +46,12 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://ennvo.vercel.app/landing</loc>
+    <lastmod>2026-11-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
     <loc>https://ennvo.vercel.app/feed</loc>
     <lastmod>2026-11-08</lastmod>
     <changefreq>daily</changefreq>

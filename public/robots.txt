@@ -8,6 +8,7 @@ Allow: /about
 Allow: /blog
 Allow: /blog/
 Allow: /help
+Allow: /landing
 Allow: /feed
 Allow: /search
 Allow: /signup

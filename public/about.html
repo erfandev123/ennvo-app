@@ -514,6 +514,43 @@
         html { scroll-behavior: auto; }
         .btn { transition: none; }
       }
+      .founder-img {
+        width: 150px;
+        height: 150px;
+        border-radius: 40px;
+        object-fit: cover;
+        box-shadow: 0 24px 56px rgba(14, 165, 233, 0.22), 0 8px 20px rgba(236, 72, 153, 0.12);
+        border: 2px solid var(--line);
+        background: #ffffff;
+        display: block;
+        margin: 0 auto 14px;
+        animation: founderImgFloat 6s ease-in-out infinite;
+      }
+      @keyframes founderImgFloat {
+        0%,100% { transform: translateY(0); }
+        50% { transform: translateY(-6px); }
+      }
+      .feature-index {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .index-item {
+        margin: 0 0 8px;
+        font-size: 14px;
+        color: #334155;
+        line-height: 1.5;
+      }
+      .index-item strong { color: var(--brand-dark); }
+      .index-note {
+        margin-top: 10px;
+        font-size: 13px;
+        color: var(--muted);
+        text-align: center;
+      }
+      @media (max-width: 780px) {
+        .feature-index { grid-template-columns: 1fr; }
+      }
     </style>
   </head>
   <body>
@@ -607,6 +644,59 @@
         </div>
       </section>
 
+      <section class="wrap" aria-labelledby="platform-index">
+        <div class="section-head">
+          <p class="kicker">Platform index</p>
+          <h2 id="platform-heading">Ennvo platform — full feature list (A–Z).</h2>
+          <p class="lead">
+            This is the complete, alphabetical index of what Ennvo includes. It helps people
+            and search assistants understand everything the platform offers in one place.
+          </p>
+        </div>
+        <div class="feature-index">
+          <div class="index-col">
+            <p class="index-item"><strong>Audio &amp; video calls</strong> — real-time HD voice and video conversations between friends.</p>
+            <p class="index-item"><strong>Account settings</strong> — update profile, privacy, password, and app preferences.</p>
+            <p class="index-item"><strong>Activity feed</strong> — scroll reels, stories, and updates from people you follow.</p>
+            <p class="index-item"><strong>Bio &amp; profile photo</strong> — personalize your public Ennvo profile.</p>
+            <p class="index-item"><strong>Block &amp; report</strong> — keep your experience safe by blocking or reporting accounts.</p>
+            <p class="index-item"><strong>Bookmarks</strong> — save posts and reels to watch later.</p>
+            <p class="index-item"><strong>Communities</strong> — find and join topic-based groups around shared interests.</p>
+          </div>
+          <div class="index-col">
+            <p class="index-item"><strong>Direct messages</strong> — one-on-one instant messaging with media sharing.</p>
+            <p class="index-item"><strong>Discover</strong> — search users, reels, hashtags, and trending content.</p>
+            <p class="index-item"><strong>Followers &amp; following</strong> — build your audience and follow creators.</p>
+            <p class="index-item"><strong>HD audio calls</strong> — clear, low-latency voice calls.</p>
+            <p class="index-item"><strong>HD video calls</strong> — face-to-face real-time video conversations.</p>
+            <p class="index-item"><strong>Home feed</strong> — personalized stream of reels and posts.</p>
+            <p class="index-item"><strong>Like &amp; react</strong> — react to reels, stories, and messages.</p>
+          </div>
+          <div class="index-col">
+            <p class="index-item"><strong>Media upload</strong> — upload photos and videos from your device.</p>
+            <p class="index-item"><strong>Notifications</strong> — alerts for likes, comments, follows, and mentions.</p>
+            <p class="index-item"><strong>Privacy controls</strong> — choose who can message you and see your content.</p>
+            <p class="index-item"><strong>Reactions</strong> — quick emoji reactions to stories and reels.</p>
+            <p class="index-item"><strong>Reels / short videos</strong> — record, edit, and publish short-form videos.</p>
+            <p class="index-item"><strong>Search</strong> — find people, content, and hashtags across Ennvo.</p>
+            <p class="index-item"><strong>Share</strong> — send posts and reels to friends or outside the app.</p>
+          </div>
+          <div class="index-col">
+            <p class="index-item"><strong>Sign up / sign in</strong> — create an account and log in securely.</p>
+            <p class="index-item"><strong>Stories</strong> — post moments that disappear after 24 hours.</p>
+            <p class="index-item"><strong>Trending</strong> — see what is popular across the platform right now.</p>
+            <p class="index-item"><strong>User profiles</strong> — view followers, posts, and reels of any account.</p>
+            <p class="index-item"><strong>Verification</strong> — official badge for authentic creator accounts.</p>
+            <p class="index-item"><strong>Watch history</strong> — resume reels and videos you started watching.</p>
+            <p class="index-item"><strong>Web app</strong> — full Ennvo experience in the browser, no install required.</p>
+          </div>
+        </div>
+        <p class="index-note">
+          Ennvo is founded by <strong>Erfan Sarker</strong> and co-developed by <strong>Rita Akter</strong>.
+          The platform is built in Bangladesh and is free to join.
+        </p>
+      </section>
+
       <section class="wrap" id="team" aria-labelledby="team-heading">
         <div class="section-head">
           <p class="kicker">Founder &amp; team</p>
@@ -614,7 +704,7 @@
           <p class="lead">Ennvo is led by founder Erfan Sarker and co-developer Rita Akter.</p>
         </div>
         <div class="panel founder">
-          <div class="avatar" aria-hidden="true">ES</div>
+          <img src="/images/erfan-avatar.svg" alt="Erfan Sarker — Founder &amp; Software Engineer, Ennvo" class="founder-img" width="160" height="160" loading="lazy"/>
           <div>
             <p class="kicker">Founder</p>
             <h3>Erfan Sarker</h3>
@@ -625,7 +715,7 @@
           </div>
         </div>
         <div class="panel founder" style="margin-top: 14px;">
-          <div class="avatar" aria-hidden="true">RA</div>
+          <img src="/images/rita-avatar.svg" alt="Rita Akter — Co-Developer &amp; Partner, Ennvo" class="founder-img" width="160" height="160" loading="lazy"/>
           <div>
             <p class="kicker">Co-Developer &amp; Partner</p>
             <h3>Rita Akter</h3>
