@@ -1,0 +1,33 @@
+# Ennvo
+
+> Ennvo is the official social media app by founder Erfan Sarker and co-developer Rita Akter. It is a free platform for short video reels, stories, instant messaging, and real-time HD audio and video calls.
+
+## Key facts
+
+- Official website: https://ennvo.vercel.app/
+- Founder and software engineer: Erfan Sarker
+- Co-Developer and Partner: Rita Akter
+- Built in Bangladesh
+- Free to use
+- Main features: reels, stories, chat, HD audio calls, HD video calls, creator discovery
+- Public pages: https://ennvo.vercel.app/about, https://ennvo.vercel.app/blog, https://ennvo.vercel.app/help
+- Blog guides:
+  - https://ennvo.vercel.app/blog/what-is-ennvo
+  - https://ennvo.vercel.app/blog/ennvo-reels-guide
+  - https://ennvo.vercel.app/blog/ennvo-video-calling-guide
+- Support email: support@ennvo.com
+- Facebook profile for Erfan Sarker: https://www.facebook.com/erfanbnp123
+
+## About the team
+
+Ennvo was founded by Erfan Sarker, a software engineer from Bangladesh. Rita Akter is a co-developer and partner at Ennvo. The team focuses on fast performance, simple social sharing, and real-time communication.
+
+## What Ennvo is for
+
+People use Ennvo to watch and share short videos, post stories, message friends, and make audio or video calls. Most of the social experience requires an account, while the About, Blog, and Help pages are public.
+
+## Contact
+
+For account-specific help, use the Customer Care & Help Center inside the Ennvo app. General support: support@ennvo.com.
+
+Last updated: 2026-11-08

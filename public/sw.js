@@ -1,7 +1,7 @@
 // Ennvo Background Service Worker for Real-Time Push & Desktop Notifications
 // Also caches the app shell so repeat opens are instant on slow networks.
-const STATIC_CACHE = 'ennvo-static-v7';
-const RUNTIME_CACHE = 'ennvo-runtime-v7';
+const STATIC_CACHE = 'ennvo-static-v8';
+const RUNTIME_CACHE = 'ennvo-runtime-v8';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -40,7 +40,15 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname === '/sw.js') return;
 
   // Static SEO pages must be served by the network, not replaced by the app shell.
-  if (url.pathname === '/about' || url.pathname === '/about.html') return;
+  const isStaticSeoPage =
+    url.pathname === '/about' ||
+    url.pathname === '/about.html' ||
+    url.pathname === '/help' ||
+    url.pathname === '/help.html' ||
+    url.pathname === '/blog' ||
+    url.pathname === '/blog/' ||
+    url.pathname.startsWith('/blog/');
+  if (isStaticSeoPage) return;
 
   // App navigation: serve the cached shell instantly, refresh it in background.
   if (request.mode === 'navigate') {

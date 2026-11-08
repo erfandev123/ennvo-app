@@ -5,6 +5,9 @@
 User-agent: *
 Allow: /
 Allow: /about
+Allow: /blog
+Allow: /blog/
+Allow: /help
 Allow: /feed
 Allow: /search
 Allow: /signup
@@ -30,6 +33,19 @@ User-agent: Applebot
 Allow: /
 
 User-agent: DuckDuckBot
+Allow: /
+
+# AI search and assistant crawlers
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
 Allow: /
 
 # Canonical Sitemap Location
