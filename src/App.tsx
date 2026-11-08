@@ -42,6 +42,7 @@ import { formatTime, downloadMediaFile } from './utils';
 import { doc, onSnapshot, collection, query, where, limit } from 'firebase/firestore';
 import { db, auth } from './firebase';
 const ReelItem = lazy(() => import('./components/ReelItem').then(m => ({ default: m.ReelItem })));
+const SharePortal = lazy(() => import('./components/ReelItem').then(m => ({ default: m.SharePortal })));
 const LikesList = lazy(() => import('./components/LikesList').then(m => ({ default: m.LikesList })));
 const AnalyticsModal = lazy(() => import('./components/AnalyticsModal').then(m => ({ default: m.AnalyticsModal })));
 const ReelCameraModal = lazy(() => import('./components/ReelCameraModal').then(m => ({ default: m.ReelCameraModal })));
@@ -1545,7 +1546,9 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
         </div>
 
         {showShareModal && (
-          <SharePortal reel={currentStory} onClose={() => setShowShareModal(false)} />
+          <Suspense fallback={null}>
+            <SharePortal reel={currentStory} onClose={() => setShowShareModal(false)} />
+          </Suspense>
         )}
       </div>
     </div>
@@ -1813,7 +1816,9 @@ const GlobalReelItem = memo(({ reel }: { reel: any }) => {
             </div>
           )}
           {showShare && (
-            <SharePortal reel={reel} onClose={() => setShowShare(false)} />
+            <Suspense fallback={null}>
+              <SharePortal reel={reel} onClose={() => setShowShare(false)} />
+            </Suspense>
           )}
         </div>
       </div>

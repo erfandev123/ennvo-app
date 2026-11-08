@@ -70,7 +70,7 @@ export const CallOverlay = () => {
             deviceNotification.show({
               title: `Incoming ${call.type === 'video' ? 'Video' : 'Audio'} Call 📞`,
               body: `${call.callerName} is calling you on Ennvo...`,
-              icon: call.callerAvatar || '/Ennvo.png',
+              icon: call.callerAvatar || '/icon-192.png',
               tag: `call-${call.id}`,
               type: 'activity',
             });

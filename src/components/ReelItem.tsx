@@ -95,8 +95,7 @@ const IonHeartIcon: React.FC<{ filled?: boolean; className?: string }> = ({ fill
 };
 
 const IonChatIcon: React.FC<{ className?: string }> = ({ className = "w-[1.85rem] h-[1.85rem]" }) => (
-  // @ts-ignore
-  <ion-icon name="chatbubble-ellipses-outline" class={className} style={{ fontSize: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}></ion-icon>
+  <MessageCircle className={className} strokeWidth={1.9} />
 );
 
 const IonBookmarkIcon: React.FC<{ filled?: boolean; className?: string }> = ({ filled, className = "w-[1.85rem] h-[1.85rem]" }) => {
@@ -1459,8 +1458,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                 className="flex flex-col items-center cursor-pointer select-none active:scale-90 transition-transform"
               >
                 <div className="text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] flex items-center justify-center">
-                  {/* @ts-ignore */}
-                  <ion-icon name="chatbubble-ellipses-outline" style={{ fontSize: '32px' }}></ion-icon>
+                  <MessageCircle style={{ width: 32, height: 32 }} strokeWidth={1.8} />
                 </div>
                 <span className="text-white text-[12px] font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                   {demoCounts.comments}

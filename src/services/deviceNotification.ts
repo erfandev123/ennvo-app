@@ -67,7 +67,7 @@ class DeviceNotificationService {
 
     const title = options.title || 'Ennvo';
     const body = options.body || '';
-    const icon = options.icon || '/Ennvo.png';
+    const icon = options.icon || '/icon-192.png';
     const tag = options.tag || `ennvo-${Date.now()}`;
     const type = options.type || 'activity';
 
@@ -138,7 +138,7 @@ class DeviceNotificationService {
         const notifOptions: any = {
           body,
           icon,
-          badge: '/Ennvo.png',
+          badge: '/icon-192.png',
           tag,
           renotify: true,
           silent: false,
@@ -165,7 +165,7 @@ class DeviceNotificationService {
             const swOptions: any = {
               body,
               icon,
-              badge: '/Ennvo.png',
+              badge: '/icon-192.png',
               tag,
               requireInteraction: isCall,
               vibrate: isCall ? [300, 150, 300, 150, 450] : [100, 50, 100],

@@ -144,9 +144,40 @@ type AppState = {
 };
 
 const getInitialPage = (): PageType => {
-  const last = sessionStorage.getItem('lastVisitedPage');
-  if (last === 'home' || last === 'reels') return last as PageType;
-  return Math.random() > 0.5 ? 'home' : 'reels';
+  // A direct URL (e.g. /feed, /notifications, /messages/xyz) must open the
+  // matching tab immediately instead of flashing a random page first.
+  if (typeof window !== 'undefined') {
+    const first = window.location.pathname
+      .replace(/^\/+/, '')
+      .split('/')[0]
+      .toLowerCase();
+    const urlPages: Record<string, PageType> = {
+      home: 'home',
+      feed: 'reels',
+      reels: 'reels',
+      search: 'search',
+      explore: 'search',
+      messages: 'messages',
+      chat: 'messages',
+      massage: 'messages',
+      m: 'messages',
+      notifications: 'notifications',
+      create: 'create',
+      profile: 'profile',
+      user: 'profile',
+      u: 'profile',
+      settings: 'settings',
+      'edit-profile': 'edit-profile',
+      admin: 'admin',
+    };
+    if (urlPages[first]) return urlPages[first];
+    if (first) return 'home';
+  }
+  try {
+    const last = sessionStorage.getItem('lastVisitedPage');
+    if (last === 'home' || last === 'reels') return last as PageType;
+  } catch (e) {}
+  return 'home';
 };
 
 const getInitialUserCache = (): Record<string, CachedUser> => {
