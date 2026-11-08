@@ -10,7 +10,7 @@
     />
     <meta
       name="keywords"
-      content="Ennvo, Ennvo app, Ennvo social media, Ennvo official platform, Ennvo reels, Ennvo video calls, Erfan Sarker, Rita Akter, Ennvo Bangladesh, social media platform"
+      content="Ennvo, Ennvo app, Ennvo social media, Ennvo official platform, Ennvo reels, Ennvo video calls, Erfan Sarker, Rita Akter, Ennvo Bangladesh, social media platform, Ennvo founder, Ennvo co-developer"
     />
     <link rel="canonical" href="https://ennvo.vercel.app/landing" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
@@ -50,6 +50,7 @@
           "@type": "Organization",
           "@id": "https://ennvo.vercel.app/#organization",
           "name": "Ennvo",
+          "alternateName": ["Ennvo App", "Ennvoapp", "Ennvo Social"],
           "url": "https://ennvo.vercel.app/",
           "logo": {
             "@type": "ImageObject",
@@ -93,7 +94,7 @@
           "url": "https://ennvo.vercel.app/",
           "name": "Ennvo",
           "publisher": { "@id": "https://ennvo.vercel.app/#organization" },
-          "inLanguage": "en",
+          "inLanguage": ["en", "bn"],
           "potentialAction": {
             "@type": "SearchAction",
             "target": "https://ennvo.vercel.app/search?q={search_term_string}",
@@ -106,7 +107,7 @@
           "name": "Erfan Sarker",
           "jobTitle": "Founder &amp; Software Engineer",
           "description": "Erfan Sarker is the founder and software engineer behind Ennvo, a social media platform for reels, messaging, and real-time video calls.",
-          "image": "https://ennvo.vercel.app/images/erfan-avatar.svg",
+          "image": "https://ennvo.vercel.app/images/erfan.avif",
           "url": "https://ennvo.vercel.app/about",
           "sameAs": ["https://www.facebook.com/erfanbnp123"],
           "worksFor": { "@id": "https://ennvo.vercel.app/#organization" },
@@ -124,7 +125,7 @@
           "name": "Rita Akter",
           "jobTitle": "Co-Developer &amp; Partner",
           "description": "Rita Akter is a co-developer and partner at Ennvo, contributing to the platform's development alongside founder Erfan Sarker.",
-          "image": "https://ennvo.vercel.app/images/rita-avatar.svg",
+          "image": "https://ennvo.vercel.app/images/rita.jpg",
           "url": "https://ennvo.vercel.app/about#team",
           "worksFor": { "@id": "https://ennvo.vercel.app/#organization" },
           "knowsAbout": ["Software development", "Web applications", "Real-time messaging"]
@@ -155,8 +156,7 @@
           "description": "Ennvo is a free social media platform for sharing short video reels, posting stories, chatting, and making HD audio and video calls.",
           "screenshot": "https://ennvo.vercel.app/og-image.jpg",
           "isPartOf": { "@id": "https://ennvo.vercel.app/#organization" },
-          "inLanguage": "en",
-          "audio": "https://ennvo.vercel.app/og-image.jpg"
+          "inLanguage": "en"
         },
         {
           "@type": "WebPage",
@@ -167,6 +167,9 @@
           "isPartOf": { "@id": "https://ennvo.vercel.app/#website" },
           "about": { "@id": "https://ennvo.vercel.app/#organization" },
           "mainEntity": { "@id": "https://ennvo.vercel.app/#app" },
+          "primaryImageOfPage": {
+            "@id": "https://ennvo.vercel.app/#logo"
+          },
           "inLanguage": "en"
         },
         {
@@ -220,9 +223,6 @@
           radial-gradient(circle at 85% 20%, rgba(236, 72, 153, 0.12), transparent 35%),
           #f8fafc;
       }
-      .landing-hero .eyebrow { margin: 0 auto 12px; }
-      .landing-hero h1 { max-width: 900px; margin: 0 auto 18px; }
-      .landing-hero p.lead { max-width: 720px; margin: 0 auto 30px; font-size: clamp(16px, 2vw, 20px); color: #334155; }
       .brand-stamp {
         display: inline-flex;
         align-items: center;
@@ -238,6 +238,8 @@
         text-transform: uppercase;
         box-shadow: 0 10px 24px rgba(14, 165, 233, 0.16);
       }
+      .landing-hero h1 { max-width: 900px; margin: 0 auto 18px; }
+      .landing-hero p.lead { max-width: 720px; margin: 0 auto 30px; font-size: clamp(16px, 2vw, 20px); color: #334155; }
       .stat-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -259,7 +261,7 @@
         align-items: center;
         justify-content: space-between;
         gap: 20px;
-        padding: 30px 0;
+        padding: 40px 0;
         border-bottom: 1px solid var(--line);
       }
       .company-text h3 { margin: 0 0 8px; font-size: 22px; }
@@ -288,6 +290,24 @@
       }
       .feature-card h3 { margin: 12px 0 6px; font-size: 17px; }
       .feature-card p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+      .team-grid {
+        display: flex;
+        align-items: flex-start;
+        gap: 34px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .team-card {
+        text-align: center;
+        max-width: 320px;
+      }
+      .team-photo {
+        width: 160px; height: 160px; border-radius: 42px; object-fit: cover;
+        box-shadow: 0 24px 56px rgba(14, 165, 233, 0.2), 0 8px 24px rgba(236, 72, 153, 0.12);
+        border: 3px solid #ffffff; background: #ffffff;
+        margin: 0 auto 12px;
+        display: block;
+      }
       .cta {
         margin: 50px auto 0;
         padding: 44px 28px;
@@ -362,7 +382,7 @@
             <div class="lbl">To join and use</div>
           </div>
           <div class="stat-card">
-            <div class="label">BD</div>
+            <div class="num">BD</div>
             <div class="lbl">Built in Bangladesh</div>
           </div>
         </div>
@@ -380,7 +400,7 @@
             </p>
           </div>
           <img
-            src="/images/erfan-avatar.svg"
+            src="/images/erfan.avif"
             alt="Erfan Sarker — Founder &amp; Software Engineer, Ennvo"
             class="company-photo"
             width="170"
@@ -445,19 +465,19 @@
           <h2 id="team-heading">The people behind Ennvo.</h2>
           <p class="lead">Ennvo is led by founder Erfan Sarker and co-developer Rita Akter.</p>
         </div>
-        <div style="display:flex; align-items:center; gap:34px; flex-wrap:wrap; justify-content:center;">
-          <div style="text-align:center; max-width:320px;">
-            <img src="/images/erfan-avatar.svg" alt="Erfan Sarker — Founder &amp; Software Engineer" class="founder-img" width="160" height="160" loading="lazy"/>
-            <div style="margin-top:10px;">
+        <div class="team-grid">
+          <div class="team-card">
+            <img src="/images/erfan.avif" alt="Erfan Sarker — Founder &amp; Software Engineer" class="team-photo" width="160" height="160" loading="lazy"/>
+            <div>
               <p style="margin:0 0 4px; font-size:11px; font-weight:900; letter-spacing:0.14em; text-transform:uppercase; color:var(--brand-dark);">Founder</p>
               <h3 style="margin:4px 0 6px; font-size:20px;">Erfan Sarker</h3>
               <p style="margin:0; color:var(--muted); font-size:13px;">Founder &amp; Software Engineer, Ennvo. Building fast, simple social connection.</p>
               <p style="margin-top:8px; font-size:12px; color:#0369a1; font-weight:700;"><a href="https://www.facebook.com/erfanbnp123" rel="me noopener" target="_blank" style="color:#0369a1; text-decoration:underline;">Facebook profile</a></p>
             </div>
           </div>
-          <div style="text-align:center; max-width:320px;">
-            <img src="/images/rita-avatar.svg" alt="Rita Akter — Co-Developer &amp; Partner" class="founder-img" width="160" height="160" loading="lazy"/>
-            <div style="margin-top:10px;">
+          <div class="team-card">
+            <img src="/images/rita.jpg" alt="Rita Akter — Co-Developer &amp; Partner" class="team-photo" width="160" height="160" loading="lazy"/>
+            <div>
               <p style="margin:0 0 4px; font-size:11px; font-weight:900; letter-spacing:0.14em; text-transform:uppercase; color:#be185d;">Co-Developer &amp; Partner</p>
               <h3 style="margin:4px 0 6px; font-size:20px;">Rita Akter</h3>
               <p style="margin:0; color:var(--muted); font-size:13px;">Co-developer and partner at Ennvo, working on the platform's development.</p>
@@ -488,7 +508,7 @@
           <a href="/blog">Blog</a> &nbsp;·&nbsp;
           <a href="/help">Help</a> &nbsp;·&nbsp;
           <a href="/about">About</a> &nbsp;·&nbsp;
-          <a href="/landing">Home</a>
+          <a href="/landing">Landing</a>
         </nav>
       </div>
     </footer>
