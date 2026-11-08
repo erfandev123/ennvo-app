@@ -1,11 +1,17 @@
 import React, { useState, useRef } from 'react';
-import { ArrowLeft, Camera, Check, X, Loader2, Globe, Lock, Link as LinkIcon, AtSign, User, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Camera, Check, X, Loader2, Link as LinkIcon, Plus, Trash2 } from 'lucide-react';
 import { useAppStore } from '../store';
 import { updateUserProfile } from '../services/authService';
 import { uploadMedia } from '../services/githubStorage';
 import { compressAvatarImage } from '../services/mediaCompressor';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../firebase';
+import { MediaCropModal } from '../components/MediaCropModal';
+
+const isVideoMedia = (url?: string | null): boolean => {
+  if (!url) return false;
+  return /\.(mp4|webm|mov|m4v|ogg)($|\?)/i.test(url) || url.startsWith('data:video');
+};
 
 export default function EditProfile() {
   const { currentUser, setCurrentUser, setCurrentPage } = useAppStore();
@@ -15,11 +21,20 @@ export default function EditProfile() {
   const [bio, setBio] = useState(currentUser?.bio || '');
   const [link, setLink] = useState(currentUser?.link || '');
   const [avatar, setAvatar] = useState(currentUser?.avatar || '');
+  const [bannerUrl, setBannerUrl] = useState(currentUser?.bannerUrl || '');
   const [highlights, setHighlights] = useState<string[]>(currentUser?.highlights || []);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [isUploadingHighlight, setIsUploadingHighlight] = useState(false);
   const [deleteHighlightUrl, setDeleteHighlightUrl] = useState<string | null>(null);
+
+  // Cropper states
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropTargetFile, setCropTargetFile] = useState<File | null>(null);
+  const [cropType, setCropType] = useState<'avatar' | 'banner'>('avatar');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
   const highlightInputRef = useRef<HTMLInputElement>(null);
 
   const handleUploadHighlight = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -30,8 +45,6 @@ export default function EditProfile() {
       const url = await uploadMedia(file, 'highlights');
       setHighlights(prev => [...prev, url]);
       
-      // Update directly to keep it safe, or wait for save. We'll wait for save to batch it, or directly update DB.
-      // Let's directly update DB so it's consistent with Profile.tsx
       await updateDoc(doc(db, 'users', currentUser.uid), {
         highlights: arrayUnion(url)
       });
@@ -47,254 +60,299 @@ export default function EditProfile() {
     setDeleteHighlightUrl(url);
   };
 
+  // Ultra-Fast image selection with instant optimistic preview
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Instant local preview
+      const preview = URL.createObjectURL(file);
+      setAvatar(preview);
       setAvatarFile(file);
-      setAvatar(URL.createObjectURL(file));
+    }
+    e.target.value = '';
+  };
+
+  const handleBannerSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Instant local preview
+      const preview = URL.createObjectURL(file);
+      setBannerUrl(preview);
+      setBannerFile(file);
+    }
+    e.target.value = '';
+  };
+
+  const handleCropApply = (croppedFile: File, previewUrl: string) => {
+    if (cropType === 'avatar') {
+      setAvatarFile(croppedFile);
+      setAvatar(previewUrl);
+    } else {
+      setBannerFile(croppedFile);
+      setBannerUrl(previewUrl);
     }
   };
 
+  // Ultra Super Fast Optimistic Save
   const handleSave = async () => {
     if (!currentUser) return;
     setLoading(true);
-    try {
-      let finalAvatar = avatar;
-      if (avatarFile) {
-        try {
-          const compressed = await compressAvatarImage(avatarFile);
-          finalAvatar = await uploadMedia(compressed, 'avatars');
-        } catch (uploadErr) {
-          console.warn('Avatar upload fallback to data URL:', uploadErr);
-          finalAvatar = await new Promise<string>((res) => {
-            const reader = new FileReader();
-            reader.onload = () => res(reader.result as string);
-            reader.onerror = () => res(avatar);
-            reader.readAsDataURL(avatarFile);
-          });
+
+    const snapshotAvatar = avatar;
+    const snapshotBanner = bannerUrl;
+    const snapshotName = name.trim();
+    const snapshotUsername = username.toLowerCase().trim();
+    const snapshotBio = bio.trim();
+    const snapshotLink = link.trim();
+
+    // 1. Immediately update UI state so user experiences zero delay
+    const optimisticUser = {
+      ...currentUser,
+      name: snapshotName,
+      username: snapshotUsername,
+      bio: snapshotBio,
+      link: snapshotLink,
+      avatar: snapshotAvatar,
+      bannerUrl: snapshotBanner,
+    };
+    setCurrentUser(optimisticUser);
+    setCurrentPage('profile');
+
+    // 2. Perform background upload and database sync asynchronously
+    (async () => {
+      try {
+        let finalAvatar = snapshotAvatar;
+        if (avatarFile) {
+          try {
+            if (avatarFile.type.startsWith('video/') || avatarFile.name?.toLowerCase().endsWith('.gif')) {
+              finalAvatar = await uploadMedia(avatarFile, 'avatars');
+            } else {
+              const compressed = await compressAvatarImage(avatarFile);
+              finalAvatar = await uploadMedia(compressed, 'avatars');
+            }
+          } catch (uploadErr) {
+            console.warn('Avatar upload fallback:', uploadErr);
+          }
         }
+
+        let finalBanner = snapshotBanner;
+        if (bannerFile) {
+          try {
+            finalBanner = await uploadMedia(bannerFile, 'banners');
+          } catch (bannerErr) {
+            console.warn('Banner upload fallback:', bannerErr);
+          }
+        }
+
+        const updated = await updateUserProfile(currentUser.uid, {
+          name: snapshotName,
+          username: snapshotUsername,
+          bio: snapshotBio,
+          link: snapshotLink,
+          avatar: finalAvatar,
+          bannerUrl: finalBanner
+        });
+
+        setCurrentUser(updated);
+      } catch (error: any) {
+        console.error('Background profile update error:', error);
       }
-
-      const updatedUser = await updateUserProfile(currentUser.uid, {
-        name,
-        username: username.toLowerCase(),
-        bio,
-        link,
-        avatar: finalAvatar
-      });
-
-      setCurrentUser(updatedUser);
-      setCurrentPage('profile');
-    } catch (error: any) {
-      console.error(error);
-      alert(error.message || 'Failed to update profile');
-    } finally {
-      setLoading(false);
-    }
+    })();
   };
 
   return (
-    <div className="h-full w-full bg-gradient-to-b from-[#e9d5ff] via-[#f3e8ff] to-[#faf5ff] flex flex-col overflow-y-auto overflow-x-hidden">
-      {/* Header with safe top padding on mobile */}
-      <div className="sticky top-0 z-30 bg-white/30 backdrop-blur-xl border-b border-white/60 px-4 pt-8 pb-3 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <button onClick={() => setCurrentPage('profile')} className="p-2 hover:bg-white/50 text-gray-800 rounded-full transition-colors active:scale-90">
-            <X className="w-6 h-6" />
-          </button>
-          <h1 className="text-[18px] font-bold text-gray-900 tracking-tight">Edit Profile</h1>
-        </div>
+    <div className="h-full w-full bg-white dark:bg-black text-neutral-900 dark:text-white flex flex-col overflow-y-auto overflow-x-hidden relative select-none">
+      
+      {/* Ambient Soft Blue Glow Fixed at Top extending to very top edge */}
+      <div 
+        className="pointer-events-none fixed top-0 left-0 right-0 h-[280px] sm:h-[320px] bg-gradient-to-b from-sky-400/[0.22] via-blue-500/[0.08] to-transparent dark:from-blue-600/[0.28] dark:via-blue-800/[0.08] dark:to-transparent z-0" 
+        aria-hidden="true" 
+      />
+
+      {/* Floating Top Action Controls - No Header Bar so blue gradient flows to the very top */}
+      <div className="sticky top-0 z-30 pointer-events-none bg-transparent border-0 px-4 pt-[max(calc(env(safe-area-inset-top,0px)+8px),14px)] pb-2 flex items-center justify-between select-none [&>*]:pointer-events-auto">
+        <button 
+          onClick={() => setCurrentPage('profile')} 
+          className="w-10 h-10 rounded-full bg-white/75 dark:bg-black/60 hover:bg-white dark:hover:bg-black/80 backdrop-blur-md active:scale-95 flex items-center justify-center transition-all text-neutral-900 dark:text-white cursor-pointer border border-black/5 dark:border-white/15 shadow-sm"
+          title="Back"
+        >
+          <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
+        </button>
+
         <button 
           onClick={handleSave}
           disabled={loading}
-          className="bg-gradient-to-r from-purple-500 to-purple-400 hover:from-purple-600 hover:to-purple-500 disabled:opacity-50 text-white px-5 py-2 rounded-2xl font-medium text-[14px] shadow-[0_4px_14px_rgba(168,85,247,0.3)] transition-all active:scale-95 flex items-center space-x-2"
+          className="px-5 py-2 rounded-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs flex items-center space-x-1.5 transition-all active:scale-95 shadow-md shadow-blue-500/30 cursor-pointer border-0"
+          title="Save changes"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-          <span>{loading ? 'Saving...' : 'Done'}</span>
+          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span>Save</span>}
         </button>
       </div>
 
-      {/* Overflow-hidden container to prevent swiping/scrolling shift on mobile */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-50px] left-[-50px] w-64 h-64 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-        <div className="absolute top-40 right-[-20px] w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob" style={{animationDelay: '2s'}}></div>
-      </div>
-
-      <div className="max-w-2xl mx-auto w-full p-6 space-y-8 relative z-10">
-
-        {/* Avatar Section */}
-        <div className="flex flex-col items-center relative z-20">
-          <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-            <div className="w-[115px] h-[115px] rounded-full p-1 bg-gradient-to-br from-purple-200 to-purple-400 shadow-[0_0_25px_rgba(168,85,247,0.3)]">
-              <div className="w-full h-full rounded-full border-[3px] border-white overflow-hidden bg-white">
-                <img src={avatar} alt="Avatar" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+      <div className="max-w-xl mx-auto w-full px-4 pt-1 pb-16 space-y-4 relative z-10">
+        
+        {/* Banner & Avatar Combined Section */}
+        <div className="relative w-full">
+          {/* Banner Box */}
+          <div 
+            onClick={() => bannerInputRef.current?.click()}
+            className="w-full h-36 sm:h-44 rounded-[28px] overflow-hidden bg-neutral-100 dark:bg-white/[0.05] relative cursor-pointer group shadow-xs"
+          >
+            {bannerUrl ? (
+              isVideoMedia(bannerUrl) ? (
+                <video src={bannerUrl} className="w-full h-full object-cover" autoPlay loop muted playsInline />
+              ) : (
+                <img src={bannerUrl} alt="Banner" className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300" />
+              )
+            ) : (
+              <div className="w-full h-full bg-gradient-to-r from-blue-600/30 via-indigo-600/20 to-sky-500/20 flex items-center justify-center">
+                <span className="text-xs text-neutral-400 font-medium">Tap to add cover photo</span>
+              </div>
+            )}
+            <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+              <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md text-white text-xs font-semibold flex items-center space-x-1.5">
+                <Camera className="w-3.5 h-3.5" />
+                <span>Change Cover</span>
               </div>
             </div>
-            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ml-1 mt-1 w-[107px] h-[107px]">
-              <Camera className="w-8 h-8 text-white" />
-            </div>
-            <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" />
           </div>
-          <button onClick={() => fileInputRef.current?.click()} className="mt-4 text-purple-600 font-medium text-[14px] hover:underline">Change Profile Photo</button>
+
+          {/* Avatar Box overlapping Banner */}
+          <div className="relative -mt-12 ml-4 w-22 h-22 sm:w-24 sm:h-24">
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full h-full rounded-full ring-4 ring-white dark:ring-black overflow-hidden bg-neutral-200 dark:bg-neutral-800 relative cursor-pointer group shadow-md"
+            >
+              {avatar ? (
+                isVideoMedia(avatar) ? (
+                  <video src={avatar} className="w-full h-full object-cover" autoPlay loop muted playsInline />
+                ) : (
+                  <img src={avatar} alt="Avatar" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                )
+              ) : (
+                <div className="w-full h-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center text-neutral-400">
+                  <Camera className="w-6 h-6" />
+                </div>
+              )}
+              <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                <Camera className="w-5 h-5 text-white" />
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Form Fields */}
-        <div className="space-y-5 relative z-20">
-          <div className="space-y-2">
-            <label className="text-[13px] font-medium text-purple-700 uppercase tracking-wider flex items-center space-x-2">
-              <User className="w-4 h-4" />
-              <span>Name</span>
+        {/* Hidden File Inputs */}
+        <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
+        <input ref={bannerInputRef} type="file" accept="image/*,video/*" onChange={handleBannerSelect} className="hidden" />
+        <input ref={highlightInputRef} type="file" accept="image/*,video/*" onChange={handleUploadHighlight} className="hidden" />
+
+        {/* Edit Form Fields */}
+        <div className="bg-neutral-100/70 dark:bg-white/[0.04] backdrop-blur-md rounded-[28px] p-4 space-y-3.5 border-0 shadow-xs">
+          <div>
+            <label className="text-[11.5px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-1">
+              Full Name
             </label>
-            <input 
-              type="text" 
-              value={name} 
+            <input
+              type="text"
+              value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-white/50 backdrop-blur-md border border-white/80 rounded-2xl px-4 py-3.5 text-[15px] text-gray-800 font-medium focus:ring-2 focus:ring-purple-400 focus:bg-white focus:border-transparent outline-none transition-all shadow-sm"
-              placeholder="Your full name"
+              placeholder="Your name"
+              className="w-full mt-1 px-4 py-2.5 rounded-[18px] bg-white/80 dark:bg-white/[0.06] text-neutral-900 dark:text-white border-0 text-[14.5px] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[13px] font-medium text-purple-700 uppercase tracking-wider flex items-center space-x-2">
-              <AtSign className="w-4 h-4" />
-              <span>Username</span>
+          <div>
+            <label className="text-[11.5px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-1">
+              Username
             </label>
-            <div className="relative">
-              <input 
-                type="text" 
-                value={username} 
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-white/50 backdrop-blur-md border border-white/80 rounded-2xl px-4 py-3.5 text-[15px] text-gray-800 font-medium focus:ring-2 focus:ring-purple-400 focus:bg-white focus:border-transparent outline-none transition-all shadow-sm"
-                placeholder="username"
-              />
-            </div>
-            <p className="text-[11px] text-purple-500/70 font-medium px-2">You can change your username once every 30 days.</p>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, ''))}
+              placeholder="@username"
+              className="w-full mt-1 px-4 py-2.5 rounded-[18px] bg-white/80 dark:bg-white/[0.06] text-neutral-900 dark:text-white border-0 text-[14.5px] focus:outline-none focus:ring-2 focus:ring-blue-500/50 font-mono"
+            />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[13px] font-medium text-purple-700 uppercase tracking-wider flex items-center space-x-2">
-              <Globe className="w-4 h-4" />
-              <span>Bio</span>
+          <div>
+            <label className="text-[11.5px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-1">
+              Bio
             </label>
-            <textarea 
-              value={bio} 
+            <textarea
+              rows={3}
+              value={bio}
               onChange={(e) => setBio(e.target.value)}
-              className="w-full bg-white/50 backdrop-blur-md border border-white/80 rounded-2xl px-4 py-3.5 text-[15px] text-gray-800 font-medium focus:ring-2 focus:ring-purple-400 focus:bg-white focus:border-transparent outline-none transition-all min-h-[120px] resize-none shadow-sm"
-              placeholder="Tell us about yourself..."
+              placeholder="Tell the world about yourself..."
+              className="w-full mt-1 px-4 py-2.5 rounded-[18px] bg-white/80 dark:bg-white/[0.06] text-neutral-900 dark:text-white border-0 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none leading-relaxed"
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[13px] font-medium text-purple-700 uppercase tracking-wider flex items-center space-x-2">
-              <LinkIcon className="w-4 h-4" />
-              <span>Link</span>
+          <div>
+            <label className="text-[11.5px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-1">
+              Link
             </label>
-            <input 
-              type="text" 
-              value={link} 
-              onChange={(e) => setLink(e.target.value)}
-              className="w-full bg-white/50 backdrop-blur-md border border-white/80 rounded-2xl px-4 py-3.5 text-[15px] text-gray-800 font-medium focus:ring-2 focus:ring-purple-400 focus:bg-white focus:border-transparent outline-none transition-all shadow-sm"
-              placeholder="https://yourlink.com"
-            />
+            <div className="relative mt-1">
+              <input
+                type="url"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                placeholder="https://yourwebsite.com"
+                className="w-full pl-9.5 pr-4 py-2.5 rounded-[18px] bg-white/80 dark:bg-white/[0.06] text-neutral-900 dark:text-white border-0 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              />
+              <LinkIcon className="w-4 h-4 text-neutral-400 absolute left-3.5 top-3" />
+            </div>
           </div>
         </div>
 
         {/* Highlights Section */}
-        <div className="pt-8 relative z-20">
-          <h3 className="text-[15px] font-medium text-purple-800 mb-4 flex items-center space-x-2 px-2">
-            <Camera className="w-4 h-4" />
-            <span>Highlights</span>
-          </h3>
-          <div className="bg-white/40 backdrop-blur-md rounded-2xl border border-white/60 shadow-sm p-4">
-            <div className="flex flex-wrap gap-4 items-center">
-              {/* New Highlight Button */}
-              <div className="flex flex-col items-center">
-                <div 
-                  className="w-[60px] h-[60px] rounded-full border border-dashed border-purple-400 flex items-center justify-center mb-1 text-purple-600 cursor-pointer hover:bg-white/50 transition-colors bg-white/30"
-                  onClick={() => highlightInputRef.current?.click()}
-                >
-                  {isUploadingHighlight ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Plus className="w-6 h-6" />
-                  )}
-                </div>
-                <span className="text-[12px] text-gray-800 font-medium">New</span>
-                <input type="file" ref={highlightInputRef} className="hidden" accept="image/*" onChange={handleUploadHighlight} />
-              </div>
+        <div className="bg-neutral-100/70 dark:bg-white/[0.04] backdrop-blur-md rounded-[28px] p-4 space-y-3 border-0 shadow-xs">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[11.5px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
+              Story Highlights
+            </span>
+            <button
+              type="button"
+              onClick={() => highlightInputRef.current?.click()}
+              disabled={isUploadingHighlight}
+              className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center space-x-1 cursor-pointer border-0 bg-transparent"
+            >
+              {isUploadingHighlight ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+              <span>Add</span>
+            </button>
+          </div>
 
-              {/* Existing Highlights */}
-              {highlights.map((highlight: string, i: number) => (
-                <div key={i} className="flex flex-col items-center relative group">
-                  <div className="w-[60px] h-[60px] rounded-full p-[2px] bg-gradient-to-br from-pink-400 to-purple-500 shadow-sm mb-1">
-                    <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-white">
-                      <img src={highlight} alt="Highlight" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => handleDeleteHighlight(highlight)}
-                    className="absolute -top-1 -right-1 bg-white rounded-full p-1 shadow-md text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors border border-gray-100 opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+          <div className="flex items-center space-x-3 overflow-x-auto no-scrollbar py-1">
+            {highlights.map((hUrl, i) => (
+              <div key={i} className="relative shrink-0 group">
+                <div className="w-14 h-14 rounded-full overflow-hidden ring-2 ring-blue-500/40 p-0.5">
+                  <img src={hUrl} alt="Highlight" className="w-full h-full object-cover rounded-full" />
                 </div>
-              ))}
-            </div>
-            <p className="text-[11px] text-purple-500/70 font-medium mt-3 px-1">Add photos to your profile highlights.</p>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteHighlight(hUrl)}
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center cursor-pointer border-0 shadow-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            ))}
+            {highlights.length === 0 && (
+              <span className="text-xs text-neutral-400 py-2">No highlights added yet</span>
+            )}
           </div>
         </div>
 
-        {/* Private Info Section */}
-        <div className="pt-8 relative z-20">
-          <h3 className="text-[15px] font-medium text-purple-800 mb-4 flex items-center space-x-2 px-2">
-            <Lock className="w-4 h-4" />
-            <span>Private Information</span>
-          </h3>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center p-4 bg-white/40 backdrop-blur-md rounded-2xl border border-white/60 shadow-sm">
-              <span className="text-sm text-purple-600 font-medium">Email</span>
-              <span className="text-sm text-gray-800 font-medium">{currentUser?.email}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Custom Delete Highlight Dialog */}
-        {deleteHighlightUrl && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl w-full max-w-xs p-6 text-center shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-              <Trash2 className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <h3 className="text-lg font-normal text-gray-900 mb-2">Delete Highlight?</h3>
-              <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete this highlight?</p>
-              <div className="flex flex-col space-y-2">
-                <button 
-                  onClick={async () => {
-                    if (currentUser?.uid && deleteHighlightUrl) {
-                      setHighlights(prev => prev.filter(h => h !== deleteHighlightUrl));
-                      try {
-                        await updateDoc(doc(db, 'users', currentUser.uid), {
-                          highlights: arrayRemove(deleteHighlightUrl)
-                        });
-                        setCurrentUser({ ...currentUser, highlights: currentUser.highlights?.filter(h => h !== deleteHighlightUrl) || [] });
-                      } catch (err) {
-                        console.error(err);
-                      }
-                    }
-                    setDeleteHighlightUrl(null);
-                  }}
-                  className="w-full bg-red-500 hover:bg-red-600 text-white font-normal py-2.5 rounded-xl transition-all active:scale-95"
-                >
-                  Delete
-                </button>
-                <button 
-                  onClick={() => setDeleteHighlightUrl(null)}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-900 font-normal py-2.5 rounded-xl transition-all active:scale-95"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+
+      {cropModalOpen && cropTargetFile && (
+        <MediaCropModal
+          file={cropTargetFile}
+          aspectRatio={cropType === 'avatar' ? 1 : 16 / 9}
+          onApply={handleCropApply}
+          onClose={() => setCropModalOpen(false)}
+        />
+      )}
+
     </div>
   );
 }

@@ -17,11 +17,12 @@ import {
   runTransaction,
   onSnapshot
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { Post, Comment, Notification, User, Song } from '../types';
 import { uploadMedia, deleteMedia } from './githubStorage';
 import { compressMediaFile } from './mediaCompressor';
 import { sendNotification } from './notificationService';
+import { ensureFirebaseAuth } from './authService';
 import { formatFileSize, generateVideoThumbnail } from '../utils';
 import { collection as usersCol, getDocs as getUsers, where as whereUser } from 'firebase/firestore';
 
@@ -192,9 +193,19 @@ export const createPost = async (
 ) => {
   try {
     if (extra?.onProgress) extra.onProgress(15);
+    const authUid = await ensureFirebaseAuth();
+    const effectiveAuthorId = auth.currentUser?.uid || userId || authUid;
 
     const mediaDetailsList: any[] = [];
     let generatedThumbnailUrl: string | null = null;
+
+    if ((type === 'reel' || files[0]?.type.startsWith('video')) && files[0] && !extra?.thumbnailUrl) {
+      try {
+        generatedThumbnailUrl = await generateVideoThumbnail(files[0]);
+      } catch (e) {
+        generatedThumbnailUrl = null;
+      }
+    }
 
     const mediaUrls = await Promise.all(
       files.map(async (file, idx) => {
@@ -213,6 +224,10 @@ export const createPost = async (
           }
         );
 
+        if (!url || (url.startsWith('data:video') && url.length > 500000)) {
+          throw new Error('Video upload failed. Please check your network connection.');
+        }
+
         mediaDetailsList.push({
           originalSize: origSizeStr,
           compressedSize: origSizeStr,
@@ -225,9 +240,9 @@ export const createPost = async (
     );
 
     const postData: any = {
-      authorId: userId,
-      authorName: user.name,
-      authorAvatar: user.avatar,
+      authorId: effectiveAuthorId,
+      authorName: user?.name || 'User',
+      authorAvatar: user?.avatar || '',
       text,
       media: mediaUrls,
       type,
@@ -237,11 +252,11 @@ export const createPost = async (
       mediaDetails: mediaDetailsList,
     };
 
-    if (generatedThumbnailUrl) {
+    if (generatedThumbnailUrl && generatedThumbnailUrl.length < 300000) {
       postData.thumbnailUrl = generatedThumbnailUrl;
       postData.thumbnail = generatedThumbnailUrl;
     }
-    if (extra?.thumbnailUrl) {
+    if (extra?.thumbnailUrl && extra.thumbnailUrl.length < 300000) {
       postData.thumbnailUrl = extra.thumbnailUrl;
       postData.thumbnail = extra.thumbnailUrl;
     }
@@ -448,10 +463,42 @@ export const getFeed = async (pageSize: number = 10, lastDoc: any = null, userId
   };
 };
 
+export const promotePost = async (postId: string, isPromoted: boolean = true) => {
+  try {
+    const postRef = doc(db, 'posts', postId);
+    await updateDoc(postRef, {
+      isPromoted,
+      promotedAt: isPromoted ? serverTimestamp() : null
+    });
+    return true;
+  } catch (error) {
+    console.error("Promote post error:", error);
+    throw error;
+  }
+};
+
 export const subscribeFeed = (callback: (posts: Post[]) => void, pageSize: number = 30) => {
-  const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(pageSize));
+  const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(pageSize * 2));
   return onSnapshot(q, (snapshot) => {
-    const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
+    const raw = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
+    // Deduplicate content by ID so no post repeats
+    const map = new Map<string, Post>();
+    raw.forEach(p => {
+      if (!map.has(p.id)) {
+        map.set(p.id, p);
+      }
+    });
+    const posts = Array.from(map.values());
+    // Prioritize promoted content right at index 0 (#1 position)
+    posts.sort((a, b) => {
+      const aProm = !!(a.isPromoted || (a as any).promoted);
+      const bProm = !!(b.isPromoted || (b as any).promoted);
+      if (aProm && !bProm) return -1;
+      if (!aProm && bProm) return 1;
+      const tA = a.createdAt?.seconds || (typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() / 1000 : 0);
+      const tB = b.createdAt?.seconds || (typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() / 1000 : 0);
+      return tB - tA;
+    });
     callback(posts);
   }, (error) => {
     console.error("Feed subscription error:", error);
@@ -687,19 +734,21 @@ export const getSavedPosts = async (userId: string) => {
 const viewedReelsCache = new Set<string>();
 
 export const incrementViewCount = async (postId: string, userId: string) => {
-  if (!userId || viewedReelsCache.has(`${postId}_${userId}`)) return;
+  if (!postId || !userId || viewedReelsCache.has(`${postId}_${userId}`)) return;
+  const key = `${postId}_${userId}`;
+  viewedReelsCache.add(key);
+
   const viewRef = doc(db, 'posts', postId, 'views', userId);
   const postRef = doc(db, 'posts', postId);
 
   try {
     const viewDoc = await getDoc(viewRef);
     if (!viewDoc.exists()) {
-      await setDoc(viewRef, { createdAt: serverTimestamp() });
+      await setDoc(viewRef, { createdAt: serverTimestamp(), userId });
       await updateDoc(postRef, { viewsCount: increment(1) });
     }
-    viewedReelsCache.add(`${postId}_${userId}`);
   } catch (error: any) {
-    console.error("Error incrementing view count:", error);
+    console.warn("Notice incrementing view count:", error?.message || error);
   }
 };
 
@@ -720,13 +769,26 @@ export const subscribeUserPosts = (userId: string, callback: (posts: Post[]) => 
   });
 };
 
-export const subscribeReels = (callback: (reels: Post[]) => void, pageSize: number = 50) => {
-  const q = query(collection(db, 'posts'), where('type', '==', 'reel'), limit(pageSize));
+export const subscribeReels = (callback: (reels: Post[]) => void, pageSize: number = 25) => {
+  const q = query(collection(db, 'posts'), where('type', '==', 'reel'), limit(pageSize * 2));
   return onSnapshot(q, (snapshot) => {
-    let reels = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
+    const raw = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
+    // Deduplicate by ID so no video ever repeats
+    const map = new Map<string, Post>();
+    raw.forEach(r => {
+      if (!map.has(r.id)) {
+        map.set(r.id, r);
+      }
+    });
+    const reels = Array.from(map.values());
+    // Prioritize promoted reels at position 0 across all users
     reels.sort((a, b) => {
-      const timeA = a.createdAt?.seconds || 0;
-      const timeB = b.createdAt?.seconds || 0;
+      const aProm = !!(a.isPromoted || (a as any).promoted);
+      const bProm = !!(b.isPromoted || (b as any).promoted);
+      if (aProm && !bProm) return -1;
+      if (!aProm && bProm) return 1;
+      const timeA = a.createdAt?.seconds || (typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() / 1000 : 0);
+      const timeB = b.createdAt?.seconds || (typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() / 1000 : 0);
       return timeB - timeA;
     });
     callback(reels);

@@ -32,23 +32,14 @@ if (typeof window !== 'undefined') {
 }
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+  <App />
 );
 
-// Gracefully and immediately remove initial loader on mount without lagging
-if (typeof window !== 'undefined') {
-  const removeLoader = () => {
-    const loader = document.getElementById('ennvo-initial-loader');
-    if (loader) {
-      loader.style.opacity = '0';
-      loader.style.pointerEvents = 'none';
-      setTimeout(() => loader.remove(), 250);
-    }
-  };
-
-  requestAnimationFrame(() => {
-    setTimeout(removeLoader, 50);
+// Register background service worker for desktop notifications
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('Service Worker registration notice:', err);
+    });
   });
 }

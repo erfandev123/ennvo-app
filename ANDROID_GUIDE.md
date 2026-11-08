@@ -99,23 +99,38 @@ This code enables hardware acceleration, hardware back button navigation, fast r
 ```java
 package com.ennvo.app;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Color;
+import android.media.RingtoneManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import androidx.core.app.NotificationCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private static final String CHANNEL_ID = "ennvo_notifications";
+    private WebView webView;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 1. Hardware Accelerated full-screen Edge-to-Edge & immediate Header Fill
+        // 1. Hardware Accelerated full-screen Edge-to-Edge
         Window window = getWindow();
         WindowCompat.setDecorFitsSystemWindows(window, false);
         window.setFlags(
@@ -123,22 +138,16 @@ public class MainActivity extends BridgeActivity {
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
         );
 
-        // 2. Transparent modern Status Bar & Navigation
+        // 2. Transparent modern Status Bar & Navigation Bar
         window.setStatusBarColor(android.graphics.Color.TRANSPARENT);
         window.setNavigationBarColor(android.graphics.Color.TRANSPARENT);
 
-        // 3. Auto-Hide Navigation Bar (Back, Home, Minimize buttons hide smoothly)
-        WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(window, window.getDecorView());
-        if (insetsController != null) {
-            insetsController.setSystemBarsBehavior(
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            );
-            insetsController.hide(WindowInsetsCompat.Type.navigationBars());
-        }
+        // 3. Create Notification Channel for Android 8.0+
+        createNotificationChannel();
 
-        // 4. Ultra-Fast WebView caching, DOM storage, and Photo/Video Upload Support
+        // 4. Ultra-Fast WebView caching, DOM storage, and Java Notification Bridge
         if (bridge != null && bridge.getWebView() != null) {
-            WebView webView = bridge.getWebView();
+            webView = bridge.getWebView();
             WebSettings settings = webView.getSettings();
             settings.setRenderPriority(WebSettings.RenderPriority.HIGH);
             settings.setCacheMode(WebSettings.LOAD_DEFAULT);
@@ -148,18 +157,105 @@ public class MainActivity extends BridgeActivity {
             settings.setAllowContentAccess(true);
             settings.setMediaPlaybackRequiresUserGesture(false);
             webView.setScrollBarStyle(WebView.SCROLLBARS_INSIDE_OVERLAY);
+
+            // Add JavaScript Interface for Native Android Notifications & Back Handling
+            webView.addJavascriptInterface(new AndroidBridge(this), "AndroidInterface");
+            webView.addJavascriptInterface(new AndroidBridge(this), "Android");
         }
     }
 
+    // Hardware Back Button: Delegate to web app first, never exit prematurely
     @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) {
-            // Keep bottom navigation bar hidden on resume
-            WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-            if (insetsController != null) {
-                insetsController.hide(WindowInsetsCompat.Type.navigationBars());
+    public void onBackPressed() {
+        if (webView != null) {
+            webView.evaluateJavascript("if (typeof window.handleAndroidBack === 'function') { window.handleAndroidBack(); } else { window.history.back(); }", null);
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CharSequence name = "Ennvo Notifications";
+            String description = "Social updates, calls and messages";
+            int importance = NotificationManager.IMPORTANCE_HIGH;
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
+            channel.setDescription(description);
+            channel.enableVibration(true);
+            channel.setVibrationPattern(new long[]{100, 200, 100, 200});
+
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            if (notificationManager != null) {
+                notificationManager.createNotificationChannel(channel);
             }
+        }
+    }
+
+    // Java Bridge class accessed from web Javascript
+    public class AndroidBridge {
+        Context mContext;
+
+        AndroidBridge(Context c) {
+            mContext = c;
+        }
+
+        @JavascriptInterface
+        public void showNotification(String title, String body, String icon, String type) {
+            sendNotification(title, body, type);
+        }
+
+        @JavascriptInterface
+        public void showNotification(String title, String body, String type) {
+            sendNotification(title, body, type);
+        }
+
+        @JavascriptInterface
+        public void sendNotification(String title, String body) {
+            sendNotification(title, body, "general");
+        }
+
+        private void sendNotification(String title, String body, String type) {
+            Intent intent = new Intent(mContext, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            PendingIntent pendingIntent = PendingIntent.getActivity(mContext, 0, intent,
+                PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
+
+            Uri defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            NotificationCompat.Builder notificationBuilder =
+                new NotificationCompat.Builder(mContext, CHANNEL_ID)
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setAutoCancel(true)
+                    .setSound(defaultSoundUri)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setVibrate(new long[]{100, 200, 100, 200})
+                    .setContentIntent(pendingIntent);
+
+            NotificationManager notificationManager =
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+            if (notificationManager != null) {
+                notificationManager.notify((int) System.currentTimeMillis(), notificationBuilder.build());
+            }
+        }
+
+        @JavascriptInterface
+        public void setStatusBarColor(String hexColor, boolean isDark) {
+            runOnUiThread(() -> {
+                try {
+                    Window window = getWindow();
+                    WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(window, window.getDecorView());
+                    if (insetsController != null) {
+                        insetsController.setAppearanceLightStatusBars(!isDark);
+                    }
+                } catch (Exception e) {}
+            });
+        }
+
+        @JavascriptInterface
+        public void exitApp() {
+            finishAffinity();
         }
     }
 }

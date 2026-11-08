@@ -6,3 +6,14 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local runtime data
+.aistudio/
+uploads/
+
+# Native build output & signing material
+android/
+ios/
+*.jks
+*.keystore
+secret-values.txt

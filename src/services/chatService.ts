@@ -22,10 +22,10 @@ import { Conversation, Message } from '../types';
 /**
  * Compress base64 image strings to ensure they stay well under Firestore's 1,048,487 byte document limit.
  */
-export const compressChatImageBase64 = async (dataUrl: string, maxDim = 1000, quality = 0.75): Promise<string> => {
+export const compressChatImageBase64 = async (dataUrl: string, maxDim = 900, quality = 0.7): Promise<string> => {
   if (!dataUrl || typeof dataUrl !== 'string') return dataUrl;
   if (!dataUrl.startsWith('data:image/')) return dataUrl;
-  if (dataUrl.length < 600000) return dataUrl; // Already small enough (< 600 KB)
+  if (dataUrl.length < 120000) return dataUrl; // Already tiny (< 120 KB)
 
   return new Promise((resolve) => {
     const img = new Image();
@@ -313,6 +313,10 @@ export const sendMessage = async (
       status: 'sent'
     };
     
+    if (type === 'sticker') {
+      messageData.stickerUrl = processedMediaUrl;
+    }
+    
     if (postId) messageData.postId = postId;
     if (replyTo) messageData.replyTo = replyTo;
     if (processedMediaUrls && processedMediaUrls.length > 0) {
@@ -357,6 +361,26 @@ export const sendMessage = async (
         }
 
         await updateDoc(convRef, updatePayload);
+
+        // Dispatch High-Priority DATA-ONLY Push Notification to all other participants
+        const senderName = convData.participantNames?.[senderId] || 'Friend';
+        const senderAvatar = convData.participantAvatars?.[senderId] || '';
+        const otherParticipants = (convData.participantIds || []).filter((id: string) => id !== senderId);
+
+        otherParticipants.forEach((otherId: string) => {
+          fetch('/api/native/send-push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              targetUserId: otherId,
+              type: 'message',
+              title: senderName,
+              body: lastMsgLabel,
+              avatar: senderAvatar,
+              convId: conversationId
+            })
+          }).catch((err) => console.warn('[Chat] Failed triggering push:', err));
+        });
       }
     } catch (updateErr) {
       console.warn("Failed updating conversation lastMessage:", updateErr);
@@ -529,7 +553,6 @@ export const logCallMessageInChat = async (
       }
     );
 
-    const icon = callType === 'video' ? '📹' : '📞';
     const typeLabel = callType === 'video' ? 'Video call' : 'Audio call';
     let text = '';
 
@@ -537,19 +560,19 @@ export const logCallMessageInChat = async (
     const secs = durationSecs % 60;
     let durationFormatted = '';
     if (mins > 0 && secs > 0) {
-      durationFormatted = `${mins} min ${secs} sec`;
+      durationFormatted = `${mins}m ${secs}s`;
     } else if (mins > 0) {
-      durationFormatted = `${mins} min`;
+      durationFormatted = `${mins}m`;
     } else {
-      durationFormatted = `${secs} sec`;
+      durationFormatted = `${secs}s`;
     }
 
     if (status === 'missed') {
-      text = `📵 Missed ${typeLabel.toLowerCase()} • 0 sec`;
+      text = `Missed ${typeLabel.toLowerCase()}`;
     } else if (status === 'rejected') {
-      text = `🚫 Declined ${typeLabel.toLowerCase()} • 0 sec`;
+      text = `Declined ${typeLabel.toLowerCase()}`;
     } else {
-      text = `${icon} ${typeLabel} • ${durationFormatted}`;
+      text = `${typeLabel} • ${durationFormatted}`;
     }
 
     await sendMessage(convId, caller.uid, 'text', text);
@@ -608,6 +631,27 @@ export const deleteConversation = async (conversationId: string) => {
   }
 };
 
+export const clearConversationMessages = async (conversationId: string) => {
+  try {
+    const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+    const snap = await getDocs(messagesRef);
+    if (!snap.empty) {
+      const batch = writeBatch(db);
+      snap.docs.forEach((d) => {
+        batch.delete(d.ref);
+      });
+      await batch.commit();
+    }
+    await updateDoc(doc(db, 'conversations', conversationId), {
+      lastMessage: '',
+      updatedAt: serverTimestamp(),
+    });
+  } catch (err: any) {
+    console.error('Failed to clear conversation messages:', err);
+    throw new Error(err.message);
+  }
+};
+
 export const addParticipantsToGroup = async (conversationId: string, newParticipantIds: string[]) => {
   try {
     const convRef = doc(db, 'conversations', conversationId);
@@ -648,13 +692,27 @@ export const addParticipantsToGroup = async (conversationId: string, newParticip
   }
 };
 
-export const updateConversationTheme = async (conversationId: string, theme: string, userName?: string, userId?: string) => {
+export const updateConversationTheme = async (
+  conversationId: string,
+  theme: string,
+  userName?: string,
+  userId?: string,
+  themeBlur?: boolean,
+  themeBrightness?: number
+) => {
   try {
     const convRef = doc(db, 'conversations', conversationId);
-    await updateDoc(convRef, {
+    const updatePayload: any = {
       theme,
       updatedAt: serverTimestamp()
-    });
+    };
+    if (typeof themeBlur === 'boolean') {
+      updatePayload.themeBlur = themeBlur;
+    }
+    if (typeof themeBrightness === 'number') {
+      updatePayload.themeBrightness = themeBrightness;
+    }
+    await updateDoc(convRef, updatePayload);
 
     if (userId) {
       await sendMessage(conversationId, userId, 'system', `Wallpaper changed by ${userName || 'User'}`);

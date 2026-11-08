@@ -13,7 +13,7 @@ import {
   User as FirebaseUser
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, limit, onSnapshot } from 'firebase/firestore';
-import { auth, db, googleProvider } from '../firebase';
+import { auth, db, googleProvider, facebookProvider } from '../firebase';
 import { User } from '../types';
 import { getDefaultAvatar } from '../utils/defaultAvatars';
 
@@ -31,7 +31,8 @@ export const signUp = async (
   mobileNumber?: string,
   avatar?: string,
   gender?: 'male' | 'female' | 'other',
-  location?: string
+  location?: string,
+  dob?: string
 ) => {
   try {
     const cleanUsername = username.trim().toLowerCase();
@@ -52,6 +53,7 @@ export const signUp = async (
       username: cleanUsername,
       email,
       mobileNumber: mobileNumber || '',
+      dob: dob || '',
       avatar: avatar || getDefaultAvatar(gender),
       bio: '',
       gender: gender || 'male',
@@ -195,7 +197,18 @@ export const checkRedirectResult = async (): Promise<User | null> => {
   return null;
 };
 
-export const signInWithGoogle = async () => {
+export interface GoogleSignInResult {
+  user: User | null;
+  isNewUser?: boolean;
+  firebaseUser?: {
+    uid: string;
+    email: string | null;
+    displayName: string | null;
+    photoURL: string | null;
+  };
+}
+
+export const signInWithGoogle = async (options?: { allowNewUserOnboarding?: boolean }): Promise<any> => {
   try {
     let firebaseUser: FirebaseUser | null = null;
     
@@ -250,6 +263,13 @@ export const signInWithGoogle = async () => {
       });
       existing.hasPassword = isBoth;
       existing.authProvider = isBoth ? 'both' : 'google';
+      try {
+        localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(existing));
+      } catch (e) {}
+
+      if (options?.allowNewUserOnboarding) {
+        return { user: existing, isNewUser: false };
+      }
       return existing;
     }
 
@@ -266,17 +286,40 @@ export const signInWithGoogle = async () => {
           avatar: existingUser.avatar || firebaseUser.photoURL || undefined
         };
         await updateDoc(doc(db, 'users', existingDoc.id), updatedData);
-        return { ...existingUser, ...updatedData };
+        const merged = { ...existingUser, ...updatedData };
+        try {
+          localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(merged));
+        } catch (e) {}
+
+        if (options?.allowNewUserOnboarding) {
+          return { user: merged, isNewUser: false };
+        }
+        return merged;
       }
     }
 
+    // New Google User
+    if (options?.allowNewUserOnboarding) {
+      return {
+        user: null,
+        isNewUser: true,
+        firebaseUser: {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          photoURL: firebaseUser.photoURL
+        }
+      };
+    }
+
+    // Default fallback if allowNewUserOnboarding is false (e.g. AccountSwitcherModal)
     const username = firebaseUser.email?.split('@')[0] || `user_${firebaseUser.uid.substring(0, 5)}`;
     const userData: User = {
       uid: firebaseUser.uid,
       name: firebaseUser.displayName || 'User',
       username: username.toLowerCase(),
       email: firebaseUser.email || '',
-      avatar: firebaseUser.photoURL || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(firebaseUser.displayName || 'User')}&backgroundColor=f1f5f9`,
+      avatar: firebaseUser.photoURL || getDefaultAvatar('male'),
       bio: '',
       followersCount: 0,
       followingCount: 0,
@@ -286,10 +329,157 @@ export const signInWithGoogle = async () => {
       createdAt: serverTimestamp(),
     };
     await setDoc(docRef, userData);
+    try {
+      localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(userData));
+    } catch (e) {}
     return userData;
   } catch (error: any) {
-    throw new Error(error.message);
+    if (
+      error.code === 'auth/popup-closed-by-user' ||
+      error.code === 'auth/cancelled-popup-request'
+    ) {
+      return null;
+    }
+    throw new Error(error.message || 'Google sign in failed');
   }
+};
+
+export const signInWithFacebook = async (): Promise<User | null> => {
+  try {
+    let firebaseUser: FirebaseUser | null = null;
+    const isCapacitorOrWebView = typeof (window as any).Capacitor !== 'undefined' || 
+      /wv|WebView|Android.*Version\/[\d.]+/i.test(navigator.userAgent);
+
+    if (isCapacitorOrWebView) {
+      try {
+        const result = await signInWithPopup(auth, facebookProvider);
+        firebaseUser = result.user;
+      } catch (popupErr: any) {
+        console.warn("Mobile WebView Facebook popup notice, launching redirect:", popupErr);
+        const { signInWithRedirect } = await import('firebase/auth');
+        await signInWithRedirect(auth, facebookProvider);
+        return null;
+      }
+    } else {
+      try {
+        const result = await signInWithPopup(auth, facebookProvider);
+        firebaseUser = result.user;
+      } catch (popupErr: any) {
+        if (
+          popupErr.code === 'auth/popup-blocked' ||
+          popupErr.code === 'auth/popup-closed-by-user' ||
+          popupErr.code === 'auth/operation-not-supported-in-this-environment'
+        ) {
+          const { signInWithRedirect } = await import('firebase/auth');
+          await signInWithRedirect(auth, facebookProvider);
+          return null;
+        }
+        throw popupErr;
+      }
+    }
+
+    if (!firebaseUser) return null;
+
+    const docRef = doc(db, 'users', firebaseUser.uid);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const existing = docSnap.data() as User;
+      try {
+        localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(existing));
+      } catch (e) {}
+      return existing;
+    }
+
+    const username = firebaseUser.email?.split('@')[0] || `user_${firebaseUser.uid.substring(0, 5)}`;
+    const userData: User = {
+      uid: firebaseUser.uid,
+      name: firebaseUser.displayName || 'Facebook User',
+      username: username.toLowerCase(),
+      email: firebaseUser.email || '',
+      avatar: firebaseUser.photoURL || getDefaultAvatar('male'),
+      bio: '',
+      followersCount: 0,
+      followingCount: 0,
+      postsCount: 0,
+      hasPassword: false,
+      authProvider: 'both',
+      createdAt: serverTimestamp(),
+    };
+    await setDoc(docRef, userData);
+    try {
+      localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(userData));
+    } catch (e) {}
+    return userData;
+  } catch (error: any) {
+    if (
+      error.code === 'auth/popup-closed-by-user' ||
+      error.code === 'auth/cancelled-popup-request'
+    ) {
+      return null;
+    }
+    throw new Error(error.message || 'Facebook sign in failed. You can also sign in with Google or Email.');
+  }
+};
+
+
+/**
+ * Complete Google user onboarding with display name, username, DOB, avatar, gender, password
+ */
+export const completeGoogleSignUp = async (params: {
+  uid: string;
+  name: string;
+  username: string;
+  email: string;
+  dob?: string;
+  gender?: 'male' | 'female';
+  avatar?: string;
+  password?: string;
+  location?: string;
+}): Promise<User> => {
+  const cleanUsername = params.username.trim().toLowerCase();
+  const unique = await isUsernameUnique(cleanUsername);
+  if (!unique) throw new Error('Username already taken. Please choose another.');
+
+  let hasPassword = false;
+  if (params.password && params.password.length >= 6) {
+    try {
+      await setUserPassword(params.password, params.email);
+      hasPassword = true;
+    } catch (pwErr: any) {
+      console.warn('Google set password notice:', pwErr);
+      hasPassword = true;
+    }
+  }
+
+  const finalAvatar = params.avatar || getDefaultAvatar(params.gender);
+
+  const userData: User = {
+    uid: params.uid,
+    name: params.name.trim() || params.username.trim(),
+    username: cleanUsername,
+    email: params.email.trim(),
+    dob: params.dob || '',
+    avatar: finalAvatar,
+    bio: '',
+    gender: params.gender || 'male',
+    location: params.location || 'Dhaka, Bangladesh',
+    followersCount: 0,
+    followingCount: 0,
+    postsCount: 0,
+    hasPassword,
+    authProvider: hasPassword ? 'both' : 'google',
+    createdAt: serverTimestamp(),
+  };
+
+  const userRef = doc(db, 'users', params.uid);
+  await setDoc(userRef, userData, { merge: true });
+
+  try {
+    localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(userData));
+  } catch (e) {}
+
+  return userData;
 };
 
 /**
@@ -542,7 +732,18 @@ export const onAuthChange = (callback: (user: User | null) => void) => {
       userUnsub = null;
     }
     if (firebaseUser && !firebaseUser.isAnonymous) {
-      const docRef = doc(db, 'users', firebaseUser.uid);
+      let activeUid = firebaseUser.uid;
+      try {
+        const raw = localStorage.getItem('ennvo_last_active_user_v1');
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (saved?.uid && saved.name && saved.name !== 'User') {
+            activeUid = saved.uid;
+          }
+        }
+      } catch (e) {}
+
+      const docRef = doc(db, 'users', activeUid);
       userUnsub = onSnapshot(docRef, async (docSnap) => {
         if (docSnap.exists()) {
           const uData = docSnap.data() as User;
@@ -550,6 +751,15 @@ export const onAuthChange = (callback: (user: User | null) => void) => {
             localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(uData));
           } catch (e) {}
           callback(uData);
+        } else if (activeUid !== firebaseUser.uid) {
+          // If switched account doc doesn't exist, fallback to firebaseUser
+          const fallbackRef = doc(db, 'users', firebaseUser.uid);
+          const fbSnap = await getDoc(fallbackRef);
+          if (fbSnap.exists()) {
+            const fbData = fbSnap.data() as User;
+            localStorage.setItem('ennvo_last_active_user_v1', JSON.stringify(fbData));
+            callback(fbData);
+          }
         } else {
           // Real authenticated user without doc (e.g. fresh Google signin)
           const fallbackUser: User = {
@@ -623,4 +833,17 @@ export const searchUsers = async (searchTerm: string): Promise<User[]> => {
   const q = query(usersRef, where('username', '>=', qStr), where('username', '<=', qStr + '\uf8ff'), limit(10));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => doc.data() as User);
+};
+
+export const ensureFirebaseAuth = async (): Promise<string> => {
+  if (auth.currentUser?.uid) {
+    return auth.currentUser.uid;
+  }
+  try {
+    const anon = await signInAnonymously(auth);
+    return anon.user.uid;
+  } catch (e) {
+    console.warn('Anonymous auth fallback notice:', e);
+    return auth.currentUser?.uid || 'guest_user';
+  }
 };

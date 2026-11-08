@@ -1,6 +1,16 @@
 import React, { memo, useRef, useState, useCallback, useEffect } from 'react';
-import { Home, Search, Inbox, PlusSquare, User, Bell, LayoutList, Settings, Film, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Film, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { useAppStore } from '../store';
+import { 
+  NavHomeIcon, 
+  NavFeedIcon, 
+  NavSearchIcon, 
+  NavMessageIcon, 
+  NavNotificationIcon, 
+  NavCreateIcon, 
+  NavProfileIcon, 
+  NavSettingsIcon 
+} from './NavIcons';
 
 const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
   const currentUser = useAppStore(state => state.currentUser);
@@ -9,6 +19,7 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
   const messageCount = useAppStore(state => state.messageCount);
   const setViewingUser = useAppStore(state => state.setViewingUser);
   const setShowCreatePost = useAppStore(state => state.setShowCreatePost);
+  const setShowReelCamera = useAppStore(state => state.setShowReelCamera);
   const setSelectedCreateMode = useAppStore(state => state.setSelectedCreateMode);
   const appTheme = useAppStore(state => state.appTheme);
 
@@ -48,13 +59,13 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
   const hasDraggedRef = useRef(false);
 
   const navItems = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'reels', label: 'Feed', icon: LayoutList },
-    { id: 'search', label: 'Search', icon: Search },
-    { id: 'messages', label: 'Inbox', icon: Inbox, badge: messageCount },
-    { id: 'notifications', label: 'Notifications', icon: Bell, badge: notificationCount },
-    { id: 'create', label: 'Create', icon: PlusSquare },
-    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'home', label: 'Home', icon: NavHomeIcon },
+    { id: 'reels', label: 'Feed', icon: NavFeedIcon },
+    { id: 'search', label: 'Search', icon: NavSearchIcon },
+    { id: 'messages', label: 'Inbox', icon: NavMessageIcon, badge: messageCount },
+    { id: 'notifications', label: 'Notifications', icon: NavNotificationIcon, badge: notificationCount },
+    { id: 'create', label: 'Create', icon: NavCreateIcon },
+    { id: 'profile', label: 'Profile', icon: NavProfileIcon },
   ];
 
   const handleNavigate = useCallback((pageId: string) => {
@@ -162,6 +173,8 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
 
   if (!isDesktop) return null;
 
+  const isDarkDock = appTheme === 'dark';
+
   return (
     <aside
       ref={dockRef}
@@ -169,7 +182,7 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
-      className="ultra-glass-pc-dock hidden md:flex flex-col items-center justify-between"
+      className={`ultra-glass-pc-dock hidden md:flex flex-col items-center justify-between ${isDarkDock ? 'dark-mode' : ''}`}
       style={{
         cursor: isDragging ? 'grabbing' : 'default',
       }}
@@ -229,17 +242,19 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
                       decoding="async"
                       className={`w-[25px] h-[25px] rounded-full object-cover border-2 transition-all duration-200 ${
                         isActive 
-                          ? (appTheme === 'dark' || currentPage === 'home' ? 'border-white scale-110 ring-2 ring-white/30' : 'border-slate-900 scale-110 shadow-xs ring-2 ring-slate-900/10')
+                          ? (isDarkDock ? 'border-white scale-110 ring-2 ring-white/30' : 'border-slate-900 scale-110 shadow-xs ring-2 ring-slate-900/10')
                           : 'border-transparent group-hover:scale-110'
                       }`}
                     />
                   </div>
                 ) : (
                   <Icon
+                    size={22}
+                    filled={isActive || (item.id === 'create' && showCreateMenu)}
                     className={`ultra-glass-pc-icon ${
                       isActive || (item.id === 'create' && showCreateMenu)
-                        ? (appTheme === 'dark' || currentPage === 'home' ? 'stroke-white stroke-[2.5] scale-110' : 'stroke-slate-950 stroke-[2.4] scale-110')
-                        : (appTheme === 'dark' || currentPage === 'home' ? 'stroke-white/80 group-hover:stroke-white group-hover:scale-105' : 'stroke-slate-500 group-hover:stroke-slate-900 group-hover:scale-105')
+                        ? (isDarkDock ? 'text-white stroke-white scale-110' : 'text-slate-950 stroke-slate-950 scale-110')
+                        : (isDarkDock ? 'text-white/60 stroke-white/60 group-hover:text-neutral-200 group-hover:scale-105' : 'text-slate-500 stroke-slate-500 group-hover:text-slate-900 group-hover:scale-105')
                     }`}
                   />
                 )}
@@ -276,7 +291,7 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
                     onClick={() => {
                       setShowCreateMenu(false);
                       setSelectedCreateMode('reel');
-                      pushPage('create');
+                      setShowReelCamera(true);
                     }}
                     className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl hover:bg-purple-50 text-gray-700 hover:text-purple-600 transition-all text-xs font-semibold group/item cursor-pointer text-left"
                   >
@@ -306,7 +321,7 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
                     onClick={() => {
                       setShowCreateMenu(false);
                       setSelectedCreateMode('story');
-                      pushPage('create');
+                      setShowReelCamera(true);
                     }}
                     className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl hover:bg-amber-50 text-gray-700 hover:text-amber-600 transition-all text-xs font-semibold group/item cursor-pointer text-left"
                   >
@@ -323,7 +338,7 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
       </div>
 
       {/* Bottom Settings Button */}
-      <div className="pt-1 mt-1 border-t border-white/60 w-full flex justify-center">
+      <div className="pt-1 mt-1 border-t border-black/5 dark:border-white/10 w-full flex justify-center">
         <button
           type="button"
           onClick={() => handleNavigate('settings')}
@@ -331,11 +346,12 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
           aria-label="Settings"
           style={{ backgroundColor: 'transparent', border: 'none' }}
         >
-          <Settings 
+          <NavSettingsIcon 
+            size={22}
             className={`ultra-glass-pc-icon ${
-              currentPage === 'settings'
-                ? 'stroke-slate-950 stroke-[2.4] scale-110'
-                : 'stroke-slate-500 group-hover:stroke-slate-900 group-hover:scale-105'
+              isDarkDock
+                ? (currentPage === 'settings' ? 'text-white stroke-white scale-110' : 'text-white/60 stroke-white/60 group-hover:text-neutral-200 group-hover:scale-105')
+                : (currentPage === 'settings' ? 'text-slate-950 stroke-slate-950 scale-110' : 'text-slate-500 stroke-slate-500 group-hover:text-slate-900 group-hover:scale-105')
             }`} 
           />
           <span className="absolute left-full ml-3 px-2.5 py-1 bg-slate-900/90 text-white text-[12px] font-medium rounded-xl pointer-events-none opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-200 shadow-md backdrop-blur-md whitespace-nowrap z-50">

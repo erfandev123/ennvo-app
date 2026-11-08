@@ -98,6 +98,8 @@ export const EMOJI_CATEGORIES = [
 const getSavedStickersStorageKey = (userId: string) => `ennvo_stickers_saved_${userId}`;
 const getCreatedStickersStorageKey = (userId: string) => `ennvo_stickers_created_${userId}`;
 
+import { onSnapshot } from 'firebase/firestore';
+
 /**
  * Fetch user-created stickers from Firestore (no external APIs)
  */
@@ -129,6 +131,50 @@ export const fetchCommunityStickers = async (): Promise<CustomSticker[]> => {
   } catch (err) {
     console.warn('Failed to fetch stickers from Firestore:', err);
     return [];
+  }
+};
+
+/**
+ * Real-Time listener for Community Stickers so any sticker created or deleted updates live for all users
+ */
+export const subscribeCommunityStickers = (
+  callback: (stickers: CustomSticker[]) => void
+) => {
+  try {
+    const q = query(
+      collection(db, 'stickers'),
+      orderBy('createdAt', 'desc'),
+      limit(100)
+    );
+    return onSnapshot(
+      q,
+      (snap) => {
+        const list: CustomSticker[] = [];
+        snap.forEach((docSnap) => {
+          const data = docSnap.data();
+          list.push({
+            id: docSnap.id,
+            url: data.url,
+            title: data.title || 'User Sticker',
+            type: data.type || 'image',
+            authorId: data.authorId || 'community',
+            authorName: data.authorName || 'Creator',
+            authorAvatar: data.authorAvatar,
+            tags: data.tags || [],
+            isPublic: true,
+            createdAt: data.createdAt
+          });
+        });
+        callback(list);
+      },
+      (err) => {
+        console.warn('Stickers onSnapshot notice:', err);
+        fetchCommunityStickers().then(callback).catch(() => {});
+      }
+    );
+  } catch (err) {
+    fetchCommunityStickers().then(callback).catch(() => {});
+    return () => {};
   }
 };
 
@@ -280,16 +326,52 @@ export const toggleSaveSticker = (
 /**
  * Delete a user created sticker
  */
-export const deleteCustomSticker = async (userId: string, stickerId: string): Promise<boolean> => {
+export const deleteCustomSticker = async (userId: string, stickerIdOrUrl: string): Promise<boolean> => {
+  if (!userId || !stickerIdOrUrl) return false;
+  
+  let cleanUrl = stickerIdOrUrl;
+  if (cleanUrl.includes('/uploads/')) {
+    cleanUrl = `/uploads/${cleanUrl.split('/uploads/')[1]}`;
+  }
+
   try {
-    await deleteDoc(doc(db, 'stickers', stickerId));
+    // If it's a Firestore document ID directly
+    if (!stickerIdOrUrl.startsWith('http') && !stickerIdOrUrl.startsWith('/') && !stickerIdOrUrl.startsWith('data:')) {
+      await deleteDoc(doc(db, 'stickers', stickerIdOrUrl)).catch(() => {});
+    }
+    
+    // Find sticker by original URL or clean URL in collection and remove
+    const q1 = query(collection(db, 'stickers'), where('url', '==', stickerIdOrUrl));
+    const snap1 = await getDocs(q1).catch(() => null);
+    if (snap1) {
+      snap1.forEach(async (d) => {
+        await deleteDoc(d.ref).catch(() => {});
+      });
+    }
+
+    if (cleanUrl !== stickerIdOrUrl) {
+      const q2 = query(collection(db, 'stickers'), where('url', '==', cleanUrl));
+      const snap2 = await getDocs(q2).catch(() => null);
+      if (snap2) {
+        snap2.forEach(async (d) => {
+          await deleteDoc(d.ref).catch(() => {});
+        });
+      }
+    }
   } catch (e) {}
 
   try {
-    const localKey = getCreatedStickersStorageKey(userId);
-    const existing: CustomSticker[] = JSON.parse(localStorage.getItem(localKey) || '[]');
-    const updated = existing.filter(s => s.id !== stickerId);
-    localStorage.setItem(localKey, JSON.stringify(updated));
+    const createdKey = getCreatedStickersStorageKey(userId);
+    const existing: CustomSticker[] = JSON.parse(localStorage.getItem(createdKey) || '[]');
+    const updated = existing.filter(s => s.id !== stickerIdOrUrl && s.url !== stickerIdOrUrl && s.url !== cleanUrl);
+    localStorage.setItem(createdKey, JSON.stringify(updated));
+  } catch (e) {}
+
+  try {
+    const savedKey = getSavedStickersStorageKey(userId);
+    const existingSaved = JSON.parse(localStorage.getItem(savedKey) || '[]');
+    const updatedSaved = existingSaved.filter((s: any) => s.id !== stickerIdOrUrl && s.url !== stickerIdOrUrl && s.url !== cleanUrl);
+    localStorage.setItem(savedKey, JSON.stringify(updatedSaved));
   } catch (e) {}
 
   return true;

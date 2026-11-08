@@ -1,7 +1,19 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageSquareOff, EyeOff, Lock, Repeat, Sparkles, ArrowLeft, Shield, Sliders, HardDrive, Zap, Music, X } from 'lucide-react';
-import { formatFileSize } from '../utils';
+import { 
+  Globe, 
+  Users, 
+  Lock, 
+  MessageSquare, 
+  Heart, 
+  Share2, 
+  Sparkles, 
+  X, 
+  Check, 
+  DownloadCloud,
+  Maximize2,
+  Minimize2
+} from 'lucide-react';
 
 export interface AdvancedSettings {
   commentsDisabled: boolean;
@@ -34,10 +46,30 @@ export const AdvancedSettingsModal: React.FC<AdvancedSettingsModalProps> = ({
   onClose,
   settings,
   onChangeSettings,
-  selectedFiles = [],
-  user,
-  defaultSongTitle = '',
 }) => {
+  const [isDesktop, setIsDesktop] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth >= 640;
+  });
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 640);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleBack = (e: Event) => {
+      e.preventDefault();
+      onClose();
+    };
+    window.addEventListener('appBackPress', handleBack);
+    return () => window.removeEventListener('appBackPress', handleBack);
+  }, [isOpen, onClose]);
+
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
   if (!isOpen) return null;
 
   const toggle = (key: keyof AdvancedSettings) => {
@@ -57,363 +89,344 @@ export const AdvancedSettingsModal: React.FC<AdvancedSettingsModalProps> = ({
 
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 30 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="fixed inset-0 z-[200] bg-gray-950 md:bg-black/40 md:backdrop-blur-xl text-white flex flex-col items-center justify-center font-sans overflow-hidden md:p-6 md:pl-28"
-      >
-        {/* Full Screen Android on mobile, Soft Liquid Water Glass Container on PC */}
-        <div 
-          className="w-full h-full md:max-w-[760px] md:h-[720px] bg-gray-950 md:bg-zinc-950/85 md:backdrop-blur-2xl md:rounded-[32px] md:border md:border-white/15 flex flex-col overflow-hidden relative shadow-2xl"
-          style={{
-            boxShadow: '0 25px 60px -15px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.12) inset',
+      <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6">
+        {/* Soft frosted glass backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="fixed inset-0 bg-black/50 backdrop-blur-md"
+        />
+
+        {/* Modal Sheet - Perfectly Centered on PC, Smooth Slide Up on Mobile */}
+        <motion.div
+          initial={isDesktop ? { opacity: 0, scale: 0.95, y: 15 } : { y: '100%' }}
+          animate={isDesktop ? { opacity: 1, scale: 1, y: 0 } : { y: 0 }}
+          exit={isDesktop ? { opacity: 0, scale: 0.95, y: 15 } : { y: '100%' }}
+          transition={{ type: 'spring', damping: 28, stiffness: 350, mass: 0.7 }}
+          drag={isDesktop ? false : "y"}
+          dragConstraints={{ top: 0, bottom: 0 }}
+          dragElastic={{ top: 0.15, bottom: 0.4 }}
+          onDragEnd={(_, info) => {
+            if (isDesktop) return;
+            if (info.offset.y < -50 || info.velocity.y < -300) {
+              setIsFullScreen(true);
+            } else if (info.offset.y > 90 || info.velocity.y > 350) {
+              if (isFullScreen) {
+                setIsFullScreen(false);
+              } else {
+                onClose();
+              }
+            }
           }}
+          className={`w-full max-w-[540px] bg-white/95 dark:bg-neutral-950/95 backdrop-blur-2xl flex flex-col overflow-hidden relative shadow-2xl border-0 sm:border sm:border-black/10 sm:dark:border-white/10 z-10 sm:my-auto transition-[height,border-radius] duration-300 ease-out ${
+            isFullScreen
+              ? 'h-[100dvh] max-h-[100dvh] rounded-none sm:rounded-[32px] sm:h-[90vh]'
+              : 'h-[86vh] sm:h-[640px] max-h-[90vh] sm:max-h-[85vh] rounded-t-[34px] sm:rounded-[32px]'
+          }`}
         >
-          {/* Top App Bar */}
-          <div className="pt-10 sm:pt-4 px-4 md:px-6 pb-3 bg-gray-950 md:bg-zinc-900/40 border-b border-gray-800/80 flex items-center justify-between sticky top-0 z-30">
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={onClose}
-                className="p-2 -ml-2 text-white hover:bg-white/10 rounded-full transition-all active:scale-90"
-              >
-                <ArrowLeft className="w-6 h-6" />
-              </button>
-              <div>
-                <h2 className="text-lg md:text-xl font-bold text-white tracking-tight">Advanced Settings</h2>
-                <p className="text-xs text-gray-400 font-normal hidden md:block">Configure distribution, interactions, and media quality</p>
-              </div>
+          {/* Ambient Blue Glow at Top */}
+          <div 
+            className="pointer-events-none absolute top-0 left-0 right-0 h-44 bg-gradient-to-b from-sky-400/[0.16] via-blue-500/[0.06] to-transparent dark:from-blue-600/[0.22] dark:via-blue-800/[0.06] dark:to-transparent z-0" 
+            aria-hidden="true" 
+          />
+
+          {/* Top Drag Handle Bar (Mobile Only) */}
+          <div 
+            onClick={() => setIsFullScreen(prev => !prev)}
+            className="w-full pt-3 pb-1 flex sm:hidden items-center justify-center cursor-pointer select-none group"
+            title={isFullScreen ? "Tap or drag down to shrink" : "Tap or drag up for full screen"}
+          >
+            <div className="w-12 h-1.5 rounded-full bg-neutral-300 dark:bg-neutral-700 group-hover:bg-neutral-400 dark:group-hover:bg-neutral-600 transition-colors" />
+          </div>
+
+          {/* Header */}
+          <div className="relative z-10 px-5 pt-2 pb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-[18px] font-bold text-neutral-900 dark:text-white tracking-tight">
+                Content Settings
+              </h2>
+              <p className="text-[12px] text-neutral-500 dark:text-neutral-400">
+                Control audience privacy, comments, and visibility
+              </p>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1.5">
+              {/* Fullscreen Expand/Collapse Button */}
               <button
-                onClick={onClose}
-                className="text-xs font-bold text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 px-4 py-2 rounded-full border border-purple-500/20"
+                type="button"
+                onClick={() => setIsFullScreen(prev => !prev)}
+                className="w-9 h-9 rounded-full bg-neutral-100 dark:bg-white/10 hover:bg-neutral-200 dark:hover:bg-white/15 flex items-center justify-center text-neutral-700 dark:text-neutral-200 cursor-pointer transition-all border-0 shadow-none"
+                title={isFullScreen ? "Exit Full Screen" : "Full Screen"}
               >
-                Done
+                {isFullScreen ? (
+                  <Minimize2 className="w-4 h-4 stroke-[2.2]" />
+                ) : (
+                  <Maximize2 className="w-4 h-4 stroke-[2.2]" />
+                )}
               </button>
+
+              {/* Close Button */}
               <button
                 onClick={onClose}
-                className="hidden md:flex p-1.5 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+                className="w-9 h-9 rounded-full bg-neutral-100 dark:bg-white/10 hover:bg-neutral-200 dark:hover:bg-white/15 flex items-center justify-center text-neutral-700 dark:text-neutral-200 cursor-pointer transition-all border-0 shadow-none"
+                aria-label="Close"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 stroke-[2.2]" />
               </button>
             </div>
           </div>
 
-          {/* Content Body - Android Material Design Settings on mobile, Glass cards on PC */}
-          <div className="flex-1 overflow-y-auto p-4 md:px-6 space-y-6 no-scrollbar">
-            {/* Privacy Section */}
+          {/* Scrollable Settings Content */}
+          <div className="relative z-10 flex-1 overflow-y-auto px-5 py-2 space-y-5 no-scrollbar pb-6">
+            
+            {/* Section 1: Audience & Privacy */}
             <div className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-400 px-1 flex items-center space-x-1.5">
-                <Shield className="w-3.5 h-3.5" />
-                <span>Audience & Privacy</span>
-              </h3>
-              <div className="bg-gray-900 md:bg-white/5 border border-gray-800 md:border-white/10 rounded-2xl p-1.5 flex justify-between gap-1 shadow-sm">
-                <button
-                  onClick={() => setPrivacy('public')}
-                  className={`flex-1 py-3 text-xs font-semibold rounded-xl transition-all ${
-                    settings.privacy === 'public'
-                      ? 'bg-purple-600 text-white shadow-md'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Everyone
-                </button>
-                <button
-                  onClick={() => setPrivacy('followers')}
-                  className={`flex-1 py-3 text-xs font-semibold rounded-xl transition-all ${
-                    settings.privacy === 'followers'
-                      ? 'bg-purple-600 text-white shadow-md'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Friends Only
-                </button>
-                <button
-                  onClick={() => setPrivacy('private')}
-                  className={`flex-1 py-3 text-xs font-semibold rounded-xl transition-all ${
-                    settings.privacy === 'private'
-                      ? 'bg-purple-600 text-white shadow-md'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Only Me
-                </button>
-              </div>
-            </div>
-
-            {/* Interaction Toggles */}
-            <div className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-400 px-1">
-                Comments & Interaction
-              </h3>
-
-              <div className="bg-gray-900 md:bg-white/5 border border-gray-800 md:border-white/10 rounded-2xl divide-y divide-gray-800/60 md:divide-white/10 overflow-hidden shadow-sm">
-              {/* Turn off comments */}
-              <div
-                onClick={() => toggle('commentsDisabled')}
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-850/60 transition-colors"
-              >
-                <div className="flex items-center space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center shrink-0">
-                    <MessageSquareOff className="w-5 h-5" />
-                  </div>
-                  <div className="text-left">
-                    <h4 className="text-sm font-semibold text-white">
-                      Turn off commenting
-                    </h4>
-                    <p className="text-xs text-gray-400">
-                      Prevent others from leaving comments on this post
-                    </p>
-                  </div>
-                </div>
-                {/* Android Material Switch */}
-                <div
-                  className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${
-                    settings.commentsDisabled ? 'bg-purple-600' : 'bg-gray-700'
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform ${
-                      settings.commentsDisabled ? 'translate-x-6' : 'translate-x-0.5'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              {/* Hide likes */}
-              <div
-                onClick={() => toggle('hideLikes')}
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-850/60 transition-colors"
-              >
-                <div className="flex items-center space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center shrink-0">
-                    <EyeOff className="w-5 h-5" />
-                  </div>
-                  <div className="text-left">
-                    <h4 className="text-sm font-semibold text-white">
-                      Hide like & view counts
-                    </h4>
-                    <p className="text-xs text-gray-400">
-                      Only you will see total likes and view numbers
-                    </p>
-                  </div>
-                </div>
-                <div
-                  className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${
-                    settings.hideLikes ? 'bg-purple-600' : 'bg-gray-700'
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform ${
-                      settings.hideLikes ? 'translate-x-6' : 'translate-x-0.5'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              {/* Allow Remixing */}
-              <div
-                onClick={() => toggle('allowRemix')}
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-850/60 transition-colors"
-              >
-                <div className="flex items-center space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
-                    <Repeat className="w-5 h-5" />
-                  </div>
-                  <div className="text-left">
-                    <h4 className="text-sm font-semibold text-white">
-                      Allow audio remixing
-                    </h4>
-                    <p className="text-xs text-gray-400">
-                      Let creators use your video sound in their reels
-                    </p>
-                  </div>
-                </div>
-                <div
-                  className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${
-                    settings.allowRemix ? 'bg-purple-600' : 'bg-gray-700'
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform ${
-                      settings.allowRemix ? 'translate-x-6' : 'translate-x-0.5'
-                    }`}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Song Publish Section (Original Audio to Music Library) */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-purple-400 px-1 flex items-center space-x-1.5">
-              <Music className="w-3.5 h-3.5" />
-              <span>Publish Original Song / Audio</span>
-            </h3>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl divide-y divide-gray-800/60 overflow-hidden shadow-sm">
-              <div
-                onClick={() => toggle('publishSong')}
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-850/60 transition-colors"
-              >
-                <div className="flex items-center space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center shrink-0">
-                    <Music className="w-5 h-5" />
-                  </div>
-                  <div className="text-left">
-                    <h4 className="text-sm font-semibold text-white">
-                      Publish as Original Audio
-                    </h4>
-                    <p className="text-xs text-gray-400">
-                      Add to app audio library with your profile cover
-                    </p>
-                  </div>
-                </div>
-                <div
-                  className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${
-                    settings.publishSong ? 'bg-purple-600' : 'bg-gray-700'
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform ${
-                      settings.publishSong ? 'translate-x-6' : 'translate-x-0.5'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              {settings.publishSong && (
-                <div className="p-4 space-y-4 bg-gray-900/90 animate-in fade-in duration-200">
-                  <div className="flex items-center space-x-3 bg-gray-950 p-3 rounded-xl border border-gray-800">
-                    <img 
-                      src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'Artist')}`} 
-                      alt="Song Cover" 
-                      className="w-12 h-12 rounded-xl object-cover border border-purple-500/40"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <span className="text-[11px] font-semibold text-purple-400 uppercase tracking-wider block">Auto Album Cover</span>
-                      <p className="text-xs text-gray-400 truncate">Defaulted to your profile picture</p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-gray-300 block mb-1.5">Song Title</label>
-                    <input 
-                      type="text" 
-                      value={settings.songTitle || ''} 
-                      onChange={(e) => onChangeSettings({ ...settings, songTitle: e.target.value })}
-                      placeholder={defaultSongTitle || `Original Audio - ${user?.name || 'Artist'}`}
-                      className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-gray-300 block mb-1.5">Artist Name</label>
-                    <input 
-                      type="text" 
-                      value={settings.songArtist || ''} 
-                      onChange={(e) => onChangeSettings({ ...settings, songArtist: e.target.value })}
-                      placeholder={user?.name || 'Artist Name'}
-                      className="w-full bg-gray-950 border border-gray-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Media Size & Ultra Compressor Info */}
-          {selectedFiles && selectedFiles.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-400 px-1 flex items-center space-x-1.5">
-                <HardDrive className="w-3.5 h-3.5" />
-                <span>Media & Compression Info</span>
-              </h3>
-              <div className="bg-gradient-to-br from-purple-900/40 via-gray-900 to-indigo-900/40 border border-purple-500/30 rounded-2xl p-4 space-y-3 shadow-md">
-                {selectedFiles.map((f, idx) => {
-                  const origSize = f.size;
-                  // Estimated compressed size for heavy video/image
-                  let estCompSize = origSize;
-                  if (f.type.startsWith('video/') && origSize > 3 * 1024 * 1024) {
-                    estCompSize = Math.max(1.5 * 1024 * 1024, origSize * 0.12);
-                  } else if (f.type.startsWith('image/') && origSize > 600 * 1024) {
-                    estCompSize = Math.min(700 * 1024, origSize * 0.2);
-                  }
-                  const saved = origSize > estCompSize ? Math.round(((origSize - estCompSize) / origSize) * 100) : 0;
-
+              <span className="text-[11.5px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-1">
+                Audience Privacy
+              </span>
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  {
+                    id: 'public' as const,
+                    title: 'Public',
+                    desc: 'Anyone on or off Ennvo can see this post',
+                    icon: Globe,
+                  },
+                  {
+                    id: 'followers' as const,
+                    title: 'Friends / Followers',
+                    desc: 'Only users following you can see this post',
+                    icon: Users,
+                  },
+                  {
+                    id: 'private' as const,
+                    title: 'Only Me (Private)',
+                    desc: 'Only you can view this post',
+                    icon: Lock,
+                  },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isSelected = settings.privacy === item.id;
                   return (
-                    <div key={idx} className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
-                      <div className="flex items-center space-x-3 min-w-0">
-                        <div className="w-9 h-9 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center shrink-0">
-                          <Zap className="w-4 h-4 fill-purple-400" />
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setPrivacy(item.id)}
+                      className={`w-full p-3.5 rounded-[22px] flex items-center justify-between text-left transition-all cursor-pointer border-0 ${
+                        isSelected 
+                          ? 'bg-blue-500/10 dark:bg-blue-500/15 ring-2 ring-blue-500 text-neutral-900 dark:text-white' 
+                          : 'bg-neutral-100/70 dark:bg-white/[0.04] hover:bg-neutral-100 dark:hover:bg-white/[0.07] text-neutral-700 dark:text-neutral-300'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3 min-w-0 pr-2">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                          isSelected ? 'bg-blue-600 text-white' : 'bg-neutral-200 dark:bg-white/10 text-neutral-600 dark:text-neutral-300'
+                        }`}>
+                          <Icon className="w-4 h-4" />
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-white truncate max-w-[180px]">{f.name}</p>
-                          <p className="text-[11px] text-gray-400">
-                            Original: <span className="text-gray-200 font-medium">{formatFileSize(origSize)}</span>
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-xs font-bold text-emerald-400 block">
-                          ~{formatFileSize(estCompSize)}
-                        </span>
-                        {saved > 0 && (
-                          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold">
-                            -{saved}% Smaller
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[13.5px] font-bold truncate">
+                            {item.title}
                           </span>
-                        )}
+                          <span className="text-[11.5px] text-neutral-500 dark:text-neutral-400 leading-tight">
+                            {item.desc}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                        isSelected ? 'bg-blue-600 text-white' : 'border-2 border-neutral-300 dark:border-white/20'
+                      }`}>
+                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                    </button>
                   );
                 })}
               </div>
             </div>
-          )}
 
-          {/* Media Quality */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-purple-400 px-1">
-              Media Quality
-            </h3>
-
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-sm">
-              <div
-                onClick={() => toggle('highQuality')}
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-850/60 transition-colors"
-              >
-                <div className="flex items-center space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
-                    <Sparkles className="w-5 h-5" />
+            {/* Section 2: Engagement & Comments */}
+            <div className="space-y-2">
+              <span className="text-[11.5px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-1">
+                Engagement & Comments
+              </span>
+              <div className="bg-neutral-100/70 dark:bg-white/[0.04] rounded-[24px] p-2 space-y-1">
+                
+                {/* Toggle: Turn Comments On/Off */}
+                <div className="p-3 rounded-[18px] flex items-center justify-between">
+                  <div className="flex items-center space-x-3 pr-2">
+                    <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                      <MessageSquare className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[13px] font-bold text-neutral-900 dark:text-white">
+                        Turn Off Comments
+                      </span>
+                      <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        {settings.commentsDisabled ? 'Comments are disabled for everyone' : 'Allow followers to comment'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-left">
-                    <h4 className="text-sm font-semibold text-white">
-                      Upload at highest quality (HD)
-                    </h4>
-                    <p className="text-xs text-gray-400">
-                      Upload crisp high definition videos & photos
-                    </p>
-                  </div>
-                </div>
-                <div
-                  className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${
-                    settings.highQuality ? 'bg-purple-600' : 'bg-gray-700'
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform ${
-                      settings.highQuality ? 'translate-x-6' : 'translate-x-0.5'
+                  <button
+                    type="button"
+                    onClick={() => toggle('commentsDisabled')}
+                    className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer border-0 shrink-0 ${
+                      settings.commentsDisabled ? 'bg-blue-600' : 'bg-neutral-300 dark:bg-white/20'
                     }`}
-                  />
+                  >
+                    <motion.div
+                      animate={{ x: settings.commentsDisabled ? 22 : 2 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      className="w-5 h-5 rounded-full bg-white shadow-xs"
+                    />
+                  </button>
+                </div>
+
+                {/* Toggle: Hide Likes & View Counts */}
+                <div className="p-3 rounded-[18px] flex items-center justify-between">
+                  <div className="flex items-center space-x-3 pr-2">
+                    <div className="w-8 h-8 rounded-full bg-pink-500/10 text-pink-600 dark:text-pink-400 flex items-center justify-center shrink-0">
+                      <Heart className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[13px] font-bold text-neutral-900 dark:text-white">
+                        Hide Like & View Counts
+                      </span>
+                      <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        Only you will be able to see the total counts
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggle('hideLikes')}
+                    className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer border-0 shrink-0 ${
+                      settings.hideLikes ? 'bg-blue-600' : 'bg-neutral-300 dark:bg-white/20'
+                    }`}
+                  >
+                    <motion.div
+                      animate={{ x: settings.hideLikes ? 22 : 2 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      className="w-5 h-5 rounded-full bg-white shadow-xs"
+                    />
+                  </button>
+                </div>
+
+                {/* Toggle: Allow Sharing / Remix */}
+                <div className="p-3 rounded-[18px] flex items-center justify-between">
+                  <div className="flex items-center space-x-3 pr-2">
+                    <div className="w-8 h-8 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                      <Share2 className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[13px] font-bold text-neutral-900 dark:text-white">
+                        Allow Reposts & Remix
+                      </span>
+                      <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        Others can repost or duet this post to their feed
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggle('allowRemix')}
+                    className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer border-0 shrink-0 ${
+                      settings.allowRemix ? 'bg-blue-600' : 'bg-neutral-300 dark:bg-white/20'
+                    }`}
+                  >
+                    <motion.div
+                      animate={{ x: settings.allowRemix ? 22 : 2 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      className="w-5 h-5 rounded-full bg-white shadow-xs"
+                    />
+                  </button>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Section 3: Media & Quality */}
+            <div className="space-y-2">
+              <span className="text-[11.5px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-1">
+                Upload Quality
+              </span>
+              <div className="bg-neutral-100/70 dark:bg-white/[0.04] rounded-[24px] p-2 space-y-1">
+                <div className="p-3 rounded-[18px] flex items-center justify-between">
+                  <div className="flex items-center space-x-3 pr-2">
+                    <div className="w-8 h-8 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[13px] font-bold text-neutral-900 dark:text-white">
+                        Upload in High Quality (HD)
+                      </span>
+                      <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        Upload without heavy compression for crisp details
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggle('highQuality')}
+                    className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer border-0 shrink-0 ${
+                      settings.highQuality ? 'bg-blue-600' : 'bg-neutral-300 dark:bg-white/20'
+                    }`}
+                  >
+                    <motion.div
+                      animate={{ x: settings.highQuality ? 22 : 2 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      className="w-5 h-5 rounded-full bg-white shadow-xs"
+                    />
+                  </button>
+                </div>
+
+                <div className="p-3 rounded-[18px] flex items-center justify-between">
+                  <div className="flex items-center space-x-3 pr-2">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                      <DownloadCloud className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[13px] font-bold text-neutral-900 dark:text-white">
+                        Save to Camera Roll
+                      </span>
+                      <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        Automatically keep a copy on your local storage
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggle('saveToDevice')}
+                    className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer border-0 shrink-0 ${
+                      settings.saveToDevice ? 'bg-blue-600' : 'bg-neutral-300 dark:bg-white/20'
+                    }`}
+                  >
+                    <motion.div
+                      animate={{ x: settings.saveToDevice ? 22 : 2 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      className="w-5 h-5 rounded-full bg-white shadow-xs"
+                    />
+                  </button>
                 </div>
               </div>
             </div>
+
           </div>
-        </div>
+
+          {/* Footer Done button */}
+          <div className="relative z-10 px-5 pt-2 pb-5 bg-white/50 dark:bg-neutral-950/50 backdrop-blur-md">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-3.5 rounded-full font-bold text-[14px] bg-blue-600 hover:bg-blue-500 active:scale-98 text-white shadow-sm shadow-blue-500/25 transition-all cursor-pointer border-0 text-center"
+            >
+              Done
+            </button>
+          </div>
+
+        </motion.div>
       </div>
-    </motion.div>
-  </AnimatePresence>
-);
+    </AnimatePresence>
+  );
 };

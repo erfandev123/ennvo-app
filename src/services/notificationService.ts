@@ -1,9 +1,9 @@
-import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, updateDoc, doc, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, getDoc, doc, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Notification, User } from '../types';
 
 export const sendNotification = async (
-  userId: string, 
+  userId: string | undefined | null, 
   type: Notification['type'], 
   actor: User, 
   targetId: string,
@@ -13,34 +13,31 @@ export const sendNotification = async (
   postAuthorName: string | null = null,
   postAuthorAvatar: string | null = null
 ) => {
-  if (!userId || userId === actor.uid) return;
+  let targetUid = userId;
+
+  // If userId is missing, automatically resolve from postId
+  if ((!targetUid || targetUid === 'undefined') && postId) {
+    try {
+      const postSnap = await getDoc(doc(db, 'posts', postId));
+      if (postSnap.exists()) {
+        const pData = postSnap.data();
+        targetUid = pData.authorId || pData.authorUID || pData.userId;
+      }
+    } catch (e) {
+      // Ignore lookup error
+    }
+  }
+
+  // Never notify oneself or empty target
+  if (!targetUid || targetUid === actor.uid) return;
 
   try {
-    // Prevent duplicate notifications
-    const q = query(
-      collection(db, 'notifications', userId, 'items'),
-      where('actorId', '==', actor.uid),
-      where('type', '==', type)
-    );
-    const existingSnap = await getDocs(q);
-    
-    // Check if there's an exact match
-    let isDuplicate = false;
-    existingSnap.docs.forEach(doc => {
-      const data = doc.data();
-      if (type === 'like' && data.postId === postId) isDuplicate = true;
-      if (type === 'follow' && data.targetId === targetId) isDuplicate = true;
-      if (type === 'comment' && data.postId === postId && data.content === content) isDuplicate = true;
-    });
-
-    if (isDuplicate) return;
-
-    await addDoc(collection(db, 'notifications', userId, 'items'), {
+    await addDoc(collection(db, 'notifications', targetUid, 'items'), {
       type,
       actorId: actor.uid,
-      actorName: actor.name,
-      actorAvatar: actor.avatar,
-      targetId,
+      actorName: actor.name || 'Ennvo User',
+      actorAvatar: actor.avatar || '',
+      targetId: targetId || postId || '',
       postId: postId ?? null,
       postMedia: postMedia ?? null,
       postAuthorName: postAuthorName ?? null,
@@ -49,30 +46,8 @@ export const sendNotification = async (
       isRead: false,
       createdAt: serverTimestamp(),
     });
-
-    // Trigger Android Java / Device Native Notification
-    try {
-      const { deviceNotification } = await import('./deviceNotification');
-      let notifTitle = `${actor.name}`;
-      let notifBody = 'Interaction on Ennvo';
-      if (type === 'like') {
-        notifBody = `${actor.name} liked your post.`;
-      } else if (type === 'comment') {
-        notifBody = `${actor.name}: ${content || 'commented on your post.'}`;
-      } else if (type === 'follow') {
-        notifBody = `${actor.name} started following you.`;
-      } else if ((type as string) === 'repost') {
-        notifBody = `${actor.name} reposted your reel.`;
-      }
-      deviceNotification.show({
-        title: notifTitle,
-        body: notifBody,
-        icon: actor.avatar || '/Ennvo.png',
-        type: type === 'comment' ? 'comment' : type === 'like' ? 'like' : 'activity'
-      });
-    } catch (e) {}
   } catch (error: any) {
-    console.error('Notification Error:', error);
+    console.warn('[NotificationService] sendNotification error:', error);
   }
 };
 
@@ -84,33 +59,22 @@ export const subscribeNotifications = (userId: string, callback: (notifications:
   return onSnapshot(q, (snapshot) => {
     const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
     callback(notifications);
-  }, () => {});
-};
-
-export const findUserByUsername = async (username: string) => {
-  try {
-    const q = query(collection(db, 'users'), where('username', '==', username.toLowerCase()));
-    const snapshot = await getDocs(q);
-    if (!snapshot.empty) {
-      return { uid: snapshot.docs[0].id, ...snapshot.docs[0].data() } as User;
-    }
-  } catch (error) {
-    console.error('Find User Error:', error);
-  }
-  return null;
+  }, (err) => console.warn('[NotificationService] subscribe error:', err));
 };
 
 export const markAllRead = async (userId: string) => {
   try {
-    const q = query(collection(db, 'notifications', userId, 'items'), where('isRead', '==', false));
+    const q = query(collection(db, 'notifications', userId, 'items'), orderBy('createdAt', 'desc'));
     const querySnapshot = await getDocs(q);
     
     const batch = writeBatch(db);
     querySnapshot.docs.forEach((doc) => {
-      batch.update(doc.ref, { isRead: true });
+      if (!doc.data().isRead) {
+        batch.update(doc.ref, { isRead: true });
+      }
     });
     await batch.commit();
   } catch (error: any) {
-    console.error('Mark Read Error:', error);
+    console.warn('[NotificationService] markAllRead error:', error);
   }
 };

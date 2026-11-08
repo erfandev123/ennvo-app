@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   ArrowLeft, CheckCircle2, AlertTriangle, Loader2, Camera, 
-  MapPin, Compass, Phone, User as UserIcon, Mail, Check, Sparkles 
+  MapPin, Compass, Phone, User as UserIcon, Mail, Check, Sparkles,
+  Calendar, Cake
 } from 'lucide-react';
 import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAppStore } from '../../store';
+import { BirthdayPickerModal } from '../BirthdayPickerModal';
 
 interface AccountInfoScreenProps {
   onBack: () => void;
@@ -20,6 +22,8 @@ export const AccountInfoScreen: React.FC<AccountInfoScreenProps> = ({ onBack }) 
   const [mobileNumber, setMobileNumber] = useState(currentUser?.mobileNumber || currentUser?.phoneNumber || '');
   const [location, setLocation] = useState(currentUser?.location || 'Dhaka, Bangladesh');
   const [gender, setGender] = useState(currentUser?.gender || 'male');
+  const [dob, setDob] = useState(currentUser?.dob || '');
+  const [showDobPicker, setShowDobPicker] = useState(false);
   const [bio, setBio] = useState(currentUser?.bio || 'Hey there! I am using Ennvo.');
 
   // Username validation state
@@ -193,6 +197,7 @@ export const AccountInfoScreen: React.FC<AccountInfoScreenProps> = ({ onBack }) 
         phoneNumber: mobileNumber.trim(),
         location: location.trim(),
         gender: gender,
+        dob: dob.trim(),
         bio: bio.trim()
       });
 
@@ -204,6 +209,7 @@ export const AccountInfoScreen: React.FC<AccountInfoScreenProps> = ({ onBack }) 
         phoneNumber: mobileNumber.trim(),
         location: location.trim(),
         gender: gender as any,
+        dob: dob.trim(),
         bio: bio.trim()
       });
 
@@ -403,6 +409,34 @@ export const AccountInfoScreen: React.FC<AccountInfoScreenProps> = ({ onBack }) 
               </div>
             </div>
 
+            {/* Date of Birth Selection */}
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-gray-500">Date of Birth</label>
+                <button
+                  type="button"
+                  onClick={() => setShowDobPicker(true)}
+                  className="text-xs text-[#00a8b5] hover:text-[#008f9a] font-semibold flex items-center space-x-1 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>{dob ? 'Change Date' : 'Set Birthday'}</span>
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDobPicker(true)}
+                className="w-full flex items-center justify-between py-1 text-left group cursor-pointer"
+              >
+                <div className="flex items-center space-x-2">
+                  <Cake className="w-4 h-4 text-gray-400 group-hover:text-[#00a8b5] transition-colors" />
+                  <span className={`text-[15px] font-medium ${dob ? 'text-gray-900' : 'text-gray-400'}`}>
+                    {dob || 'Not set yet (tap to choose)'}
+                  </span>
+                </div>
+                <span className="text-xs text-gray-400 font-medium">🎂 Birthday</span>
+              </button>
+            </div>
+
             {/* Gender Selection */}
             <div className="p-4">
               <label className="block text-xs font-semibold text-gray-500 mb-1.5">Gender</label>
@@ -453,6 +487,17 @@ export const AccountInfoScreen: React.FC<AccountInfoScreenProps> = ({ onBack }) 
           </div>
         </form>
       </div>
+
+      {/* Birthday Picker Modal */}
+      <BirthdayPickerModal
+        isOpen={showDobPicker}
+        value={dob}
+        onConfirm={(val) => {
+          setDob(val);
+          setShowDobPicker(false);
+        }}
+        onClose={() => setShowDobPicker(false)}
+      />
     </div>
   );
 };

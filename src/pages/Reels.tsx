@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Play, UserPlus, Search } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Play, UserPlus, Search, ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../store';
 import { subscribeReels } from '../services/postService';
 import { Post } from '../types';
@@ -44,8 +44,15 @@ const markReelAsSeen = (reelId: string) => {
 };
 
 export default function Reels() {
-  const { pushPage, currentUser, cachedReels, setCachedReels, isReelsCleanZoom } = useAppStore();
-  const [reels, setReels] = useState<Post[]>(cachedReels && cachedReels.length > 0 ? cachedReels : []);
+  const { pushPage, currentUser, cachedReels, setCachedReels, isReelsCleanZoom, newUserWelcomeName, setNewUserWelcomeName } = useAppStore();
+  const [reels, setReels] = useState<Post[]>(() => {
+    if (cachedReels && cachedReels.length > 0) return cachedReels;
+    try {
+      const local = localStorage.getItem('cached_reels');
+      if (local) return JSON.parse(local);
+    } catch (e) {}
+    return [];
+  });
   const [loading, setLoading] = useState(reels.length === 0);
   const [activeTab, setActiveTab] = useState<'forYou' | 'following'>('forYou');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -55,18 +62,62 @@ export default function Reels() {
   const reelsContainerRef = useRef<HTMLDivElement>(null);
   const initialLoadDone = useRef(false);
   const activeReelTimerRef = useRef<any>(null);
+  const scrollTickingRef = useRef(false);
+
+  // New user welcome overlay state
+  const [welcomeName, setWelcomeName] = useState<string | null>(() => {
+    return newUserWelcomeName || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('ennvo_new_user_welcome') : null);
+  });
+  const [showWelcomeGreeting, setShowWelcomeGreeting] = useState<boolean>(() => !!welcomeName);
+
+  useEffect(() => {
+    if (newUserWelcomeName && !welcomeName) {
+      setWelcomeName(newUserWelcomeName);
+      setShowWelcomeGreeting(true);
+    }
+  }, [newUserWelcomeName, welcomeName]);
+
+  const handleDismissWelcome = useCallback(() => {
+    setShowWelcomeGreeting(false);
+    setNewUserWelcomeName(null);
+    try {
+      sessionStorage.removeItem('ennvo_new_user_welcome');
+    } catch (e) {}
+  }, [setNewUserWelcomeName]);
+
+  // Smooth auto-dismiss after 4.2 seconds
+  useEffect(() => {
+    if (showWelcomeGreeting) {
+      const timer = setTimeout(() => {
+        handleDismissWelcome();
+      }, 4200);
+      return () => clearTimeout(timer);
+    }
+  }, [showWelcomeGreeting, handleDismissWelcome]);
+
+  const handlePrevReel = useCallback(() => {
+    const c = reelsContainerRef.current;
+    if (!c) return;
+    const h = c.clientHeight || window.innerHeight;
+    c.scrollBy({ top: -h, behavior: 'smooth' });
+  }, []);
+
+  const handleNextReel = useCallback(() => {
+    const c = reelsContainerRef.current;
+    if (!c) return;
+    const h = c.clientHeight || window.innerHeight;
+    c.scrollBy({ top: h, behavior: 'smooth' });
+  }, []);
 
   useEffect(() => {
     // Keyboard listener for desktop arrow keys
     const handleKeyDown = (e: KeyboardEvent) => {
-      const c = reelsContainerRef.current;
-      if (!c) return;
       if (e.key === 'ArrowUp') {
         e.preventDefault();
-        c.scrollBy({ top: -window.innerHeight, behavior: 'smooth' });
+        handlePrevReel();
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        c.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+        handleNextReel();
       }
     };
     
@@ -110,24 +161,31 @@ export default function Reels() {
       window.removeEventListener('reelNotInterested', handleNotInterested);
       if (activeReelTimerRef.current) clearTimeout(activeReelTimerRef.current);
     };
-  }, []);
+  }, [handlePrevReel, handleNextReel]);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    if (scrollTop + clientHeight >= scrollHeight - 1200) {
-      setVisibleCount(prev => prev + 5);
-    }
-
-    // Determine current index to mark reel as seen after 2.5 seconds of viewing
-    if (clientHeight > 0) {
-      const activeIdx = Math.round(scrollTop / clientHeight);
-      if (activeReelTimerRef.current) clearTimeout(activeReelTimerRef.current);
-      activeReelTimerRef.current = setTimeout(() => {
-        const activeReel = reels[activeIdx];
-        if (activeReel?.id) {
-          markReelAsSeen(activeReel.id);
+    const currentTarget = e.currentTarget;
+    if (!scrollTickingRef.current) {
+      scrollTickingRef.current = true;
+      requestAnimationFrame(() => {
+        scrollTickingRef.current = false;
+        const { scrollTop, scrollHeight, clientHeight } = currentTarget;
+        if (scrollTop + clientHeight >= scrollHeight - 1200) {
+          setVisibleCount(prev => prev + 5);
         }
-      }, 2500);
+
+        // Determine current index to mark reel as seen after 2.5 seconds of viewing
+        if (clientHeight > 0) {
+          const activeIdx = Math.round(scrollTop / clientHeight);
+          if (activeReelTimerRef.current) clearTimeout(activeReelTimerRef.current);
+          activeReelTimerRef.current = setTimeout(() => {
+            const activeReel = reels[activeIdx];
+            if (activeReel?.id) {
+              markReelAsSeen(activeReel.id);
+            }
+          }, 2500);
+        }
+      });
     }
   }, [reels]);
 
@@ -158,29 +216,53 @@ export default function Reels() {
     return () => unsubscribe();
   }, [currentUser, setCachedReels]);
 
+  // Re-fetch following creator IDs when active tab changes to 'following'
+  useEffect(() => {
+    if (activeTab === 'following' && currentUser?.uid) {
+      getFollowing(currentUser.uid).then(following => {
+        setFollowingIds(new Set(following.map(f => f.uid)));
+      });
+    }
+  }, [activeTab, currentUser?.uid]);
+
   const filteredReels = useMemo(() => {
     const notInterested = getNotInterestedIds();
-    let list = reels.filter(r => r.privacy !== 'private' && !(r as any).isPrivate && !notInterested.has(r.id));
+    // 1. Filter out private and not-interested items
+    let rawList = reels.filter(r => r.privacy !== 'private' && !(r as any).isPrivate && !notInterested.has(r.id));
+
+    // 2. Strict ID Deduplication: Never allow duplicate reel videos in the feed
+    const dedupeMap = new Map<string, typeof reels[0]>();
+    rawList.forEach(item => {
+      if (!dedupeMap.has(item.id)) {
+        dedupeMap.set(item.id, item);
+      }
+    });
+    let list = Array.from(dedupeMap.values());
 
     if (activeTab === 'following') {
       list = list.filter(r => followingIds.has(r.authorId));
-    } else {
-      // Smart Random + Viral Recommendation Algorithm with Seen-Deduplication
-      const currentSeen = seenIds;
-      list.sort((a, b) => {
-        const isSeenA = currentSeen.has(a.id);
-        const isSeenB = currentSeen.has(b.id);
-
-        const viralA = ((a.likesCount || 0) * 1.5) + ((a.commentsCount || 0) * 3) + ((a.viewsCount || 0) * 0.1);
-        const viralB = ((b.likesCount || 0) * 1.5) + ((b.commentsCount || 0) * 3) + ((b.viewsCount || 0) * 0.1);
-
-        // Heavy penalty if already seen so the user always sees fresh viral videos
-        const scoreA = (isSeenA ? 0 : 500) + viralA + ((a.id.charCodeAt(0) % 30));
-        const scoreB = (isSeenB ? 0 : 500) + viralB + ((b.id.charCodeAt(0) % 30));
-
-        return scoreB - scoreA;
-      });
     }
+
+    // 3. Smart Algorithm: Promoted items at Top (#1), followed by Fresh & Viral
+    const currentSeen = seenIds;
+    list.sort((a, b) => {
+      const isPromotedA = !!(a.isPromoted || (a as any).promoted);
+      const isPromotedB = !!(b.isPromoted || (b as any).promoted);
+      if (isPromotedA && !isPromotedB) return -1;
+      if (!isPromotedA && isPromotedB) return 1;
+
+      const isSeenA = currentSeen.has(a.id);
+      const isSeenB = currentSeen.has(b.id);
+
+      const viralA = ((a.likesCount || 0) * 1.5) + ((a.commentsCount || 0) * 3) + ((a.viewsCount || 0) * 0.1);
+      const viralB = ((b.likesCount || 0) * 1.5) + ((b.commentsCount || 0) * 3) + ((b.viewsCount || 0) * 0.1);
+
+      // Heavy penalty if already seen so the user always sees fresh viral videos
+      const scoreA = (isSeenA ? 0 : 500) + viralA + ((a.id.charCodeAt(0) % 30));
+      const scoreB = (isSeenB ? 0 : 500) + viralB + ((b.id.charCodeAt(0) % 30));
+
+      return scoreB - scoreA;
+    });
 
     if (selectedCategory !== 'All') {
       list = list.filter(r => {
@@ -193,17 +275,6 @@ export default function Reels() {
     return list;
   }, [reels, activeTab, followingIds, selectedCategory, seenIds]);
 
-  // Preload top 2 adjacent videos
-  const preloadVideoUrls = useMemo(() => {
-    return filteredReels
-      .slice(1, 4)
-      .map(r => r.media?.[0])
-      .filter((url): url is string => !!url && (url.includes('.mp4') || url.includes('video') || url.includes('github') || url.includes('blob')));
-  }, [filteredReels]);
-
-  if (reels.length === 0 && loading) {
-    return <FacebookReelSkeleton />;
-  }
 
   if (reels.length === 0 && !loading) {
     return (
@@ -222,43 +293,168 @@ export default function Reels() {
   }
 
   return (
-    <div className="h-full w-full bg-black md:bg-[#f8f9fa] overflow-hidden relative">
-      {/* Feed Tabs Overlay - Ultra-Light Sleek Glass Buttons (Following on LEFT, For You on RIGHT) */}
-      <div className={`absolute top-5 md:top-4 left-0 right-0 md:left-24 md:right-auto z-40 flex justify-center md:justify-start pointer-events-none transition-opacity duration-200 ${isReelsCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-        <div className="flex items-center space-x-1.5 pointer-events-auto select-none bg-black/25 md:bg-white/40 backdrop-blur-md px-2 py-1 rounded-full border border-white/15 md:border-black/5 shadow-xs">
-          <button 
+    <div className="h-full w-full bg-black md:bg-white dark:md:bg-[#08080a] overflow-hidden relative antialiased">
+      {/* New User Welcome Message on Reels (Sleek, Non-Bold, Smooth, No Lag) */}
+      <AnimatePresence>
+        {showWelcomeGreeting && welcomeName && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="absolute inset-0 z-[60] flex flex-col items-center justify-center p-5 text-center bg-black/85 backdrop-blur-sm transform-gpu select-none"
+          >
+            {/* Soft Ambient Light (Static GPU layer, 0 lag) */}
+            <div 
+              className="absolute inset-0 pointer-events-none opacity-40 transform-gpu"
+              style={{
+                background: 'radial-gradient(circle at 50% 40%, rgba(56, 189, 248, 0.25) 0%, rgba(139, 92, 246, 0.15) 45%, transparent 70%)'
+              }}
+            />
+
+            {/* Fresh, Rounded Soft Card */}
+            <motion.div
+              initial={{ scale: 0.92, y: 12, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 340 }}
+              className="relative z-10 max-w-[340px] sm:max-w-[380px] w-full p-6 sm:p-7 rounded-[32px] bg-[#0b101e]/90 border border-white/15 shadow-[0_25px_60px_rgba(0,0,0,0.6)] flex flex-col items-center text-center space-y-4.5 transform-gpu"
+            >
+              {/* App Icon Container */}
+              <div className="relative">
+                <div className="w-19 h-19 rounded-[24px] bg-gradient-to-tr from-sky-400 via-indigo-500 to-pink-500 p-[1.5px] shadow-[0_8px_25px_rgba(56,189,248,0.35)]">
+                  <div className="w-full h-full bg-[#0a0f1d] rounded-[22px] flex items-center justify-center overflow-hidden">
+                    <img src="/Ennvo.png" alt="Ennvo" className="w-13 h-13 object-contain" />
+                  </div>
+                </div>
+                <div className="absolute -top-1 -right-1 text-amber-300">
+                  <Sparkles className="w-5 h-5 fill-amber-300" />
+                </div>
+              </div>
+
+              {/* Text Greeting */}
+              <div className="space-y-1.5 w-full">
+                <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-400/25 text-sky-300 text-xs font-normal">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-ping" />
+                  <span>Welcome to Ennvo Community</span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-normal text-white tracking-tight">
+                  Hi, <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-teal-300 to-pink-400 font-medium">{welcomeName}!</span>
+                </h2>
+                <p className="text-xs sm:text-[13px] text-gray-300 font-normal leading-relaxed max-w-xs mx-auto">
+                  Your account is live! Swipe up anytime to explore viral reels, share your thoughts, and connect with friends.
+                </p>
+              </div>
+
+              {/* Fresh Feature Badges */}
+              <div className="flex items-center justify-center gap-2 pt-1 pb-1 flex-wrap">
+                <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-300 font-normal">
+                  🎬 HD Reels
+                </span>
+                <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-300 font-normal">
+                  ⚡ Instant Chat
+                </span>
+                <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-300 font-normal">
+                  📞 HD Calls
+                </span>
+              </div>
+
+              {/* Start Watching Reels Button */}
+              <button
+                type="button"
+                onClick={handleDismissWelcome}
+                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-medium text-sm shadow-[0_10px_25px_rgba(56,189,248,0.35)] flex items-center justify-center space-x-2 cursor-pointer transition-all active:scale-[0.98]"
+              >
+                <Play className="w-4 h-4 fill-white" />
+                <span>Start Watching Reels</span>
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
+      {/* Top Navigation Tabs: "Following" & "For You" - Extremely close together, NO vertical line divider, Spring animation */}
+      <div 
+        className={`absolute top-0 left-0 right-0 z-40 flex items-center justify-center pt-[max(calc(env(safe-area-inset-top,0px)+10px),14px)] pb-2 select-none pointer-events-none transition-opacity duration-200 lg:hidden ${
+          isReelsCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
+      >
+        <div className="flex items-center space-x-1 pointer-events-auto select-none">
+          <motion.button
             type="button"
             onClick={() => setActiveTab('following')}
-            className={`relative px-3 py-1 rounded-full text-[14px] tracking-tight transition-all duration-150 select-none cursor-pointer active:scale-95 ${
-              activeTab === 'following' 
-                ? 'text-white md:text-gray-900 bg-white/20 md:bg-white font-bold shadow-xs' 
-                : 'text-white/70 md:text-gray-600 hover:text-white md:hover:text-gray-900 font-medium'
-            }`}
+            animate={{ 
+              scale: activeTab === 'following' ? 1.05 : 0.85, 
+              y: activeTab === 'following' ? 0 : 3,
+              opacity: activeTab === 'following' ? 1 : 0.55
+            }}
+            transition={{ type: 'spring', stiffness: 420, damping: 26 }}
+            className="px-1 py-0.5 text-[13.5px] font-bold text-white relative flex flex-col items-center cursor-pointer select-none"
           >
-            Following
-          </button>
-          <button 
+            <span>Following</span>
+            {activeTab === 'following' && (
+              <motion.span 
+                layoutId="reelsActiveTabIndicator"
+                className="w-4 h-[2.5px] bg-white rounded-full mt-0.5 shadow-xs" 
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              />
+            )}
+          </motion.button>
+
+          <motion.button
             type="button"
             onClick={() => setActiveTab('forYou')}
-            className={`relative px-3 py-1 rounded-full text-[14px] tracking-tight transition-all duration-150 select-none cursor-pointer active:scale-95 ${
-              activeTab === 'forYou' 
-                ? 'text-white md:text-gray-900 bg-white/20 md:bg-white font-bold shadow-xs' 
-                : 'text-white/70 md:text-gray-600 hover:text-white md:hover:text-gray-900 font-medium'
-            }`}
+            animate={{ 
+              scale: activeTab === 'forYou' ? 1.05 : 0.85, 
+              y: activeTab === 'forYou' ? 0 : 3,
+              opacity: activeTab === 'forYou' ? 1 : 0.55
+            }}
+            transition={{ type: 'spring', stiffness: 420, damping: 26 }}
+            className="px-1 py-0.5 text-[13.5px] font-bold text-white relative flex flex-col items-center cursor-pointer select-none"
           >
-            For You
-          </button>
+            <span>For You</span>
+            {activeTab === 'forYou' && (
+              <motion.span 
+                layoutId="reelsActiveTabIndicator"
+                className="w-4 h-[2.5px] bg-white rounded-full mt-0.5 shadow-xs" 
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              />
+            )}
+          </motion.button>
         </div>
       </div>
 
       {/* Top Right Search Button */}
-      <div className={`absolute top-8 md:top-4 right-4 z-40 transition-opacity duration-300 ${isReelsCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}>
+      <div className={`absolute top-[max(calc(env(safe-area-inset-top,0px)+10px),16px)] right-4 md:right-8 z-40 transition-opacity duration-300 ${isReelsCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}>
         <button 
           onClick={() => pushPage('search')}
-          className="p-2 text-white md:text-gray-800 hover:opacity-80 transition-all active:scale-95 drop-shadow-md flex items-center justify-center"
+          className="p-2 text-white md:text-gray-800 dark:md:text-white hover:opacity-80 transition-all active:scale-95 drop-shadow-sm flex items-center justify-center cursor-pointer"
           title="Search"
         >
-          <Search className="w-5.5 h-5.5 text-white md:text-gray-800 stroke-[2.2]" />
+          <Search className="w-5 h-5 text-white md:text-gray-800 dark:md:text-white stroke-[2.2]" />
+        </button>
+      </div>
+
+      {/* PC Only Clean 2D Up/Down Navigation Floating Controller (Lag-Free, No Black Glow) */}
+      <div className={`hidden md:flex flex-col items-center fixed right-4 lg:right-7 top-1/2 -translate-y-1/2 z-50 reels-pc-glass-nav p-1 rounded-full select-none shadow-sm pointer-events-auto transition-opacity duration-200 ${isReelsCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+        <button 
+          type="button"
+          onClick={handlePrevReel}
+          title="Previous Reel (Arrow Up)"
+          aria-label="Previous Reel"
+          className="w-9.5 h-9.5 rounded-full flex items-center justify-center text-gray-800 dark:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-all active:scale-90 cursor-pointer"
+        >
+          <ChevronUp className="w-5 h-5 stroke-[2.2]" />
+        </button>
+        <div className="w-4 h-[1px] bg-black/10 dark:bg-white/10 my-0.5" />
+        <button 
+          type="button"
+          onClick={handleNextReel}
+          title="Next Reel (Arrow Down)"
+          aria-label="Next Reel"
+          className="w-9.5 h-9.5 rounded-full flex items-center justify-center text-gray-800 dark:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-all active:scale-90 cursor-pointer"
+        >
+          <ChevronDown className="w-5 h-5 stroke-[2.2]" />
         </button>
       </div>
 
@@ -266,7 +462,13 @@ export default function Reels() {
         id="global-reels-container"
         ref={reelsContainerRef}
         onScroll={handleScroll}
-        className="h-full w-full overflow-y-auto reels-scroll-viewport no-scrollbar bg-black md:bg-[#f8f9fa]"
+        className="h-full w-full overflow-y-auto reels-scroll-viewport no-scrollbar bg-black md:bg-white dark:md:bg-[#08080a] transform-gpu will-change-transform overscroll-y-contain select-none"
+        style={{ 
+          scrollSnapType: 'y mandatory', 
+          WebkitOverflowScrolling: 'touch',
+          scrollBehavior: 'smooth',
+          touchAction: 'pan-y'
+        }}
       >
         {filteredReels.length === 0 && activeTab === 'following' ? (
           <div className="h-full w-full flex flex-col items-center justify-center bg-black text-white p-6 text-center">
@@ -277,18 +479,11 @@ export default function Reels() {
           </div>
         ) : (
           filteredReels.slice(0, visibleCount).map((reel) => (
-            <div key={reel.id} className="reel-snap-item w-full h-full">
+            <div key={reel.id} className="reel-snap-item w-full h-full shrink-0 transform-gpu will-change-transform" style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}>
               <ReelItem reel={reel} />
             </div>
           ))
         )}
-      </div>
-
-      {/* Background Video Preloader for Fast Scrolling */}
-      <div className="hidden" aria-hidden="true">
-        {preloadVideoUrls.slice(0, 2).map((url, i) => (
-          <video key={i} src={`${url}#t=0.001`} preload="metadata" muted playsInline />
-        ))}
       </div>
     </div>
   );

@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, onSnapshot, query, collection, where, orderBy, getDocs, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Settings, Grid, Bookmark, UserSquare, Link as LinkIcon, Heart, MessageCircle, PlaySquare, Play, ArrowLeft, Globe, MoreHorizontal, Send, CheckCircle2, UserPlus, X, Lock, Eye, Loader2, Music, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Settings, Grid, Bookmark, UserSquare, Link as LinkIcon, Heart, MessageCircle, PlaySquare, Play, ArrowLeft, Globe, MoreHorizontal, Send, CheckCircle2, UserPlus, UserCheck, UserMinus, X, Lock, Eye, Loader2, Music, Image as ImageIcon, Sparkles, Camera, ChevronDown, Plus, Pencil } from 'lucide-react';
 import { useAppStore } from '../store';
 import { PostItem } from '../components/PostItem';
 import { VerifiedBadge } from '../components/VerifiedBadge';
@@ -16,28 +16,49 @@ import { Post, User } from '../types';
 import { formatTime, formatCount } from '../utils';
 import { FacebookProfileSkeleton, FacebookPostSkeleton, FacebookGridSkeleton } from '../components/Skeletons';
 import { AccountSwitcherModal } from '../components/AccountSwitcherModal';
+import { MediaCropModal } from '../components/MediaCropModal';
+
+const isVideoMedia = (url?: string | null): boolean => {
+  if (!url) return false;
+  return /\.(mp4|webm|mov|m4v|ogg)($|\?)/i.test(url) || url.startsWith('data:video') || url.includes('video/mp4') || url.includes('/video');
+};
 
 const UserRowWithFollow = React.memo(({ user, currentUser, onSelectUser }: { user: any, currentUser: any, onSelectUser: (user: any) => void }) => {
-  const [friendship, setFriendship] = useState({ following: false, followedBy: false, isFriend: false });
+  const { followingIds, followerIds, setFollowingIds } = useAppStore();
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!currentUser?.uid || !user?.uid) return;
-    checkFriendship(currentUser.uid, user.uid).then(setFriendship).catch(() => {});
-  }, [currentUser?.uid, user?.uid]);
+  // Synchronous, instant, glitch-free lookup from synchronized store
+  const isFollowing = currentUser && user?.uid ? ((followingIds || []).includes(user.uid)) : false;
+  const isFollowedBy = currentUser && user?.uid ? ((followerIds || []).includes(user.uid)) : false;
+  const isFriend = isFollowing && isFollowedBy;
 
   const handleFollowToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!currentUser || !user.uid || loading) return;
     setLoading(true);
+    const wasFollowing = isFollowing;
+    
+    // Instant optimistic update across all components
+    if (wasFollowing) {
+      setFollowingIds((followingIds || []).filter(id => id !== user.uid));
+    } else {
+      setFollowingIds([...(followingIds || []), user.uid]);
+    }
+
     try {
-      if (friendship.following) {
+      if (wasFollowing) {
         await unfollowUser(currentUser.uid, user.uid);
       } else {
         await followUser(currentUser, { uid: user.uid, name: user.name || 'User', avatar: user.avatar || '', username: user.username || '' });
       }
     } catch (err) {
       console.error(err);
+      // Revert on failure
+      if (wasFollowing) {
+        setFollowingIds([...(followingIds || []), user.uid]);
+      } else {
+        setFollowingIds((followingIds || []).filter(id => id !== user.uid));
+      }
     } finally {
       setLoading(false);
     }
@@ -47,35 +68,40 @@ const UserRowWithFollow = React.memo(({ user, currentUser, onSelectUser }: { use
 
   return (
     <div 
-      className="flex items-center justify-between p-2.5 hover:bg-white/40 rounded-2xl cursor-pointer transition-colors border border-transparent hover:border-purple-200/40 my-1"
+      className="flex items-center justify-between py-2 px-2.5 hover:bg-neutral-50/90 active:bg-neutral-100/70 rounded-2xl cursor-pointer transition-colors"
       onClick={() => onSelectUser(user)}
     >
-      <div className="flex items-center space-x-3 min-w-0">
+      <div className="flex items-center space-x-3 min-w-0 flex-1 pr-2">
         <img 
           src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random`} 
-          className="w-12 h-12 rounded-full object-cover border border-purple-200/50 shadow-sm shrink-0" 
+          className="w-10 h-10 rounded-full object-cover shrink-0 border border-neutral-100" 
           referrerPolicy="no-referrer" 
+          loading="lazy"
+          alt=""
         />
-        <div className="truncate">
-          <p className="font-normal text-[14px] text-gray-900 leading-tight truncate">{user.name || 'User'}</p>
-          <p className="text-gray-500 text-[11px] font-normal leading-tight mt-1 truncate">@{username}</p>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-[13.5px] text-neutral-900 leading-tight truncate">{user.name || 'User'}</p>
+          <p className="text-neutral-500 text-[11.5px] font-normal leading-tight mt-0.5 truncate">@{username}</p>
         </div>
       </div>
       {currentUser?.uid !== user.uid && (
-        <button 
-          onClick={handleFollowToggle}
-          className={`px-4 py-1.5 rounded-full text-xs font-normal transition-all active:scale-95 shadow-sm min-w-[95px] ${
-            friendship.isFriend 
-              ? 'bg-purple-200/60 text-purple-800 border border-purple-300/40 hover:bg-purple-200' 
-              : friendship.following 
-              ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' 
-              : friendship.followedBy 
-              ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm' 
-              : 'bg-purple-600 text-white hover:bg-purple-700'
-          }`}
-        >
-          {friendship.isFriend ? 'Friends' : friendship.following ? 'Following' : friendship.followedBy ? 'Follow Back' : 'Follow'}
-        </button>
+        <div className="flex items-center space-x-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <button 
+            onClick={handleFollowToggle}
+            disabled={loading}
+            className={`font-semibold text-[12px] px-3.5 py-1.5 rounded-full transition-all active:scale-95 border-0 ${
+              isFriend 
+                ? 'bg-neutral-100 text-neutral-800 hover:bg-neutral-200 shadow-none' 
+                : isFollowing 
+                ? 'bg-neutral-100 text-neutral-800 hover:bg-neutral-200 shadow-none' 
+                : isFollowedBy
+                ? 'bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 text-white shadow-sm'
+                : 'bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 text-white shadow-sm'
+            }`}
+          >
+            {isFriend ? 'Friends' : isFollowing ? 'Following' : isFollowedBy ? 'Follow Back' : 'Follow'}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -83,7 +109,7 @@ const UserRowWithFollow = React.memo(({ user, currentUser, onSelectUser }: { use
 
 export default function Profile() {
   const [activeTab, setActiveTab] = useState<'posts' | 'reels' | 'saved' | 'reposts' | 'private'>('reels');
-  const { viewingUser, setViewingUser, setViewingMedia, setViewingPost, setViewingReel, setViewingReelList, setViewingReelContext, currentUser, pushPage, popPage, setActiveChat, cachedProfilePosts, setCachedProfilePosts, cachedSavedPosts, setCachedSavedPosts, setIsBottomNavHidden, setSelectedCreateSong, setShowAccountSwitcherModal } = useAppStore();
+  const { viewingUser, setViewingUser, setViewingMedia, setViewingPost, setViewingReel, setViewingReelList, setViewingReelContext, currentUser, setCurrentUser, pushPage, popPage, setActiveChat, cachedProfilePosts, setCachedProfilePosts, cachedSavedPosts, setCachedSavedPosts, setIsBottomNavHidden, setSelectedCreateSong, setShowAccountSwitcherModal } = useAppStore();
   const isCurrentUser = !viewingUser || viewingUser.uid === currentUser?.uid;
   const targetUserId = isCurrentUser ? currentUser?.uid : viewingUser.uid;
   const [userData, setUserData] = useState<User | null>(null);
@@ -94,29 +120,38 @@ export default function Profile() {
   const [favoriteSongsList, setFavoriteSongsList] = useState<any[]>([]);
   const [totalLikes, setTotalLikes] = useState(0);
   const followingIds = useAppStore(state => state.followingIds);
+  const followerIds = useAppStore(state => state.followerIds);
+  const setFollowingIds = useAppStore(state => state.setFollowingIds);
   const [showFollowersList, setShowFollowersList] = useState<'followers' | 'following' | null>(null);
   const [peopleList, setPeopleList] = useState<any[]>([]);
-  const [friendship, setFriendship] = useState(() => {
-    if (!isCurrentUser && targetUserId) {
-      const isFollowing = followingIds?.includes(targetUserId) || false;
-      return { following: isFollowing, followedBy: false, isFriend: false };
-    }
-    return { following: false, followedBy: false, isFriend: false };
-  });
-  const [isFriendshipLoading, setIsFriendshipLoading] = useState(!isCurrentUser);
+  // Synchronous, glitch-free instant friendship calculation (no flashing or slow state changes)
+  const isTargetFollowing = Boolean(!isCurrentUser && targetUserId && (followingIds || []).includes(targetUserId));
+  const isTargetFollower = Boolean(!isCurrentUser && targetUserId && (followerIds || []).includes(targetUserId));
+  const isTargetFriend = isTargetFollowing && isTargetFollower;
+  const friendship = useMemo(() => ({
+    following: isTargetFollowing,
+    followedBy: isTargetFollower,
+    isFriend: isTargetFriend
+  }), [isTargetFollowing, isTargetFollower, isTargetFriend]);
   const [isPostsLoading, setIsPostsLoading] = useState(() => !cachedProfilePosts[targetUserId || user?.uid || '']);
-
-  useEffect(() => {
-    if (!isCurrentUser && targetUserId) {
-      const isFollowing = followingIds?.includes(targetUserId) || false;
-      setFriendship({ following: isFollowing, followedBy: false, isFriend: false });
-    }
-  }, [targetUserId, isCurrentUser, followingIds]);
   const [loading, setLoading] = useState(false);
   const [visibleCount, setVisibleCount] = useState(24);
   const [savedSubTab, setSavedSubTab] = useState<'all' | 'reels' | 'posts' | 'songs' | 'stickers'>('all');
   const [playingSongUrl, setPlayingSongUrl] = useState<string | null>(null);
+  const [isBlocked, setIsBlocked] = useState(false);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (!isCurrentUser && currentUser?.uid && targetUserId) {
+      import('../services/followService').then(({ isBlockedEitherWay }) => {
+        isBlockedEitherWay(currentUser.uid, targetUserId).then(res => {
+          setIsBlocked(Boolean(res));
+        });
+      });
+    } else {
+      setIsBlocked(false);
+    }
+  }, [isCurrentUser, currentUser?.uid, targetUserId]);
 
   useEffect(() => {
     return () => {
@@ -202,8 +237,118 @@ export default function Profile() {
   }, [favoriteSongsList, savedPosts]);
 
   const highlightInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingHighlight, setIsUploadingHighlight] = useState(false);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarCropModalOpen, setAvatarCropModalOpen] = useState(false);
+  const [avatarCropTargetFile, setAvatarCropTargetFile] = useState<File | null>(null);
+
   const pressTimer = useRef<any>(null);
+  const avatarHoldTimerRef = useRef<any>(null);
+  const isHoldTriggeredRef = useRef<boolean>(false);
+
+  const handleAvatarPressStart = () => {
+    isHoldTriggeredRef.current = false;
+    if (avatarHoldTimerRef.current) {
+      clearTimeout(avatarHoldTimerRef.current);
+    }
+    avatarHoldTimerRef.current = setTimeout(() => {
+      isHoldTriggeredRef.current = true;
+      const targetUrl = userData?.avatar || profileAvatar;
+      if (targetUrl) {
+        setViewingMedia({
+          url: targetUrl,
+          type: isVideoMedia(targetUrl) ? 'video' : 'image'
+        });
+      }
+    }, 450);
+  };
+
+  const handleAvatarPressEnd = () => {
+    if (avatarHoldTimerRef.current) {
+      clearTimeout(avatarHoldTimerRef.current);
+      avatarHoldTimerRef.current = null;
+    }
+  };
+
+  const handleAvatarFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAvatarCropTargetFile(file);
+      setAvatarCropModalOpen(true);
+    }
+    e.target.value = '';
+  };
+
+  const handleApplyCroppedAvatar = async (croppedFile: File, previewUrl: string) => {
+    if (!user?.uid) return;
+    setAvatarCropModalOpen(false);
+
+    // 1. Instant optimistic update in UI (0ms delay)
+    setUserData(prev => prev ? ({ ...prev, avatar: previewUrl }) : null);
+    if (isCurrentUser && currentUser) {
+      setCurrentUser({ ...currentUser, avatar: previewUrl });
+    }
+
+    // 2. Background cloud upload & database sync
+    setIsUploadingAvatar(true);
+    try {
+      const url = await uploadMedia(croppedFile, 'avatars');
+      await updateDoc(doc(db, 'users', user.uid), {
+        avatar: url
+      });
+      setUserData(prev => prev ? ({ ...prev, avatar: url }) : null);
+      if (isCurrentUser && currentUser) {
+        setCurrentUser({ ...currentUser, avatar: url });
+      }
+    } catch (err) {
+      console.error('Failed to update avatar:', err);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const CUTE_HIGHLIGHT_TITLES = [
+    '♡(> ਊ <)♡',
+    '♡•₊˚✦',
+    '(⋆˘◡˘⋆).*♡',
+    '(◍•ᴗ•◍)✧*。',
+    '˗ˏˋ ★ ˎˊ˗',
+    '✧(｡•̀ᴗ-)✧',
+    '♡ diary ♡',
+    '₊˚⊹♡',
+  ];
+
+  const handleUploadBanner = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.uid) return;
+
+    // 1. Instant optimistic update in UI (0ms delay)
+    const localPreview = URL.createObjectURL(file);
+    setUserData(prev => prev ? ({ ...prev, bannerUrl: localPreview }) : null);
+    if (isCurrentUser && currentUser) {
+      setCurrentUser({ ...currentUser, bannerUrl: localPreview });
+    }
+
+    // 2. Background cloud upload & database sync
+    setIsUploadingBanner(true);
+    try {
+      const url = await uploadMedia(file, 'banners');
+      await updateDoc(doc(db, 'users', user.uid), {
+        bannerUrl: url
+      });
+      setUserData(prev => prev ? ({ ...prev, bannerUrl: url }) : null);
+      if (isCurrentUser && currentUser) {
+        setCurrentUser({ ...currentUser, bannerUrl: url });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUploadingBanner(false);
+    }
+  };
 
   const handleUploadHighlight = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -214,6 +359,10 @@ export default function Profile() {
       await updateDoc(doc(db, 'users', user.uid), {
         highlights: arrayUnion(url)
       });
+      setUserData(prev => prev ? ({ ...prev, highlights: [...(prev.highlights || []), url] }) : null);
+      if (isCurrentUser && currentUser) {
+        setCurrentUser({ ...currentUser, highlights: [...(currentUser.highlights || []), url] });
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -309,10 +458,10 @@ export default function Profile() {
     }
   }, [activeTab, user?.uid]);
 
-  // Track and fetch profile views
+  // Track and fetch profile views (Self view is strictly excluded)
   useEffect(() => {
     if (user?.uid) {
-      if (!isCurrentUser && currentUser) {
+      if (!isCurrentUser && currentUser && currentUser.uid !== user.uid) {
         import('firebase/firestore').then(({ setDoc, doc }) => {
           setDoc(doc(db, 'users', user.uid, 'profileViews', currentUser.uid), {
             uid: currentUser.uid,
@@ -325,14 +474,24 @@ export default function Profile() {
 
       if (isCurrentUser) {
         let unsubscribeViews = () => {};
-        import('firebase/firestore').then(({ collection, onSnapshot }) => {
+        import('firebase/firestore').then(({ collection, onSnapshot, deleteDoc, doc }) => {
           const viewsRef = collection(db, 'users', user.uid, 'profileViews');
           unsubscribeViews = onSnapshot(viewsRef, (snapshot) => {
-            const count = snapshot.docs.length;
+            // Clean up any self-view document that might have been recorded previously
+            snapshot.docs.forEach(d => {
+              const data = d.data();
+              if (d.id === user.uid || data.uid === user.uid) {
+                deleteDoc(doc(db, 'users', user.uid, 'profileViews', d.id)).catch(() => {});
+              }
+            });
+
+            // Filter out own UID completely so user's own pfp never appears in profile views
+            const list = snapshot.docs
+              .map(d => ({ ...(d.data() as any), _docId: d.id }))
+              .filter((d: any) => d.uid && d.uid !== user.uid && d.uid !== currentUser?.uid && d._docId !== user.uid);
+            list.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
+            const count = list.length;
             setProfileViewsCount(count);
-            
-            const list = snapshot.docs.map(d => d.data());
-            list.sort((a: any, b: any) => b.timestamp - a.timestamp);
             setProfileViewers(list);
 
             const lastChecked = parseInt(localStorage.getItem('lastCheckedProfileViewsCount') || '0', 10);
@@ -351,8 +510,73 @@ export default function Profile() {
       }
     }
   }, [user?.uid, isCurrentUser, currentUser]);
+
+  // Hide bottom navigation bar when viewing Profile Views or Followers/Following list
+  useEffect(() => {
+    if (showProfileViews || showFollowersList) {
+      setIsBottomNavHidden(true);
+    } else {
+      setIsBottomNavHidden(false);
+    }
+    return () => {
+      setIsBottomNavHidden(false);
+    };
+  }, [showProfileViews, showFollowersList, setIsBottomNavHidden]);
   
+  const [showFriendOptionsModal, setShowFriendOptionsModal] = useState(false);
+  const [showNicknameModal, setShowNicknameModal] = useState(false);
+  const [customNickname, setCustomNickname] = useState('');
+  const [tempNickname, setTempNickname] = useState('');
+  const [customHighlightTitles, setCustomHighlightTitles] = useState<Record<number, string>>({});
+  const [editingHighlightIndex, setEditingHighlightIndex] = useState<number | null>(null);
+  const [tempHighlightTitle, setTempHighlightTitle] = useState('');
+
+  useEffect(() => {
+    if (targetUserId) {
+      try {
+        const raw = localStorage.getItem(`ennvo_hl_titles_${targetUserId}`);
+        setCustomHighlightTitles(raw ? JSON.parse(raw) : (userData as any)?.highlightTitles || {});
+      } catch {
+        setCustomHighlightTitles({});
+      }
+    }
+  }, [targetUserId, userData]);
+
+  const handleSaveHighlightTitle = async (idx: number, newTitle: string) => {
+    if (!newTitle.trim()) {
+      setEditingHighlightIndex(null);
+      return;
+    }
+    const updated = { ...customHighlightTitles, [idx]: newTitle.trim() };
+    setCustomHighlightTitles(updated);
+    if (targetUserId) {
+      try {
+        localStorage.setItem(`ennvo_hl_titles_${targetUserId}`, JSON.stringify(updated));
+        if (isCurrentUser && currentUser?.uid) {
+          await updateDoc(doc(db, 'users', currentUser.uid), { highlightTitles: updated });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setEditingHighlightIndex(null);
+  };
+
+  useEffect(() => {
+    if (targetUserId) {
+      try {
+        const map = JSON.parse(localStorage.getItem('ennvo_custom_nicknames') || '{}');
+        setCustomNickname(map[targetUserId] || '');
+      } catch {
+        setCustomNickname('');
+      }
+    } else {
+      setCustomNickname('');
+    }
+  }, [targetUserId]);
+
   const profileName = user?.name || 'User';
+  const displayName = customNickname || userData?.name || profileName || 'User';
   const profileAvatar = user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(profileName)}&background=random`;
   const profileHandle = user?.username ? `@${user.username}` : (user?.name ? `@${user.name.toLowerCase().replace(/\s+/g, '_')}` : '@user');
 
@@ -420,26 +644,8 @@ export default function Profile() {
         }, () => {});
       }
       
-      // Check friendship with real-time subscription for ultra speed
-      let unsubscribeFriendship: () => void = () => {};
-      if (!isCurrentUser && currentUser) {
-        const followingRef = doc(db, 'users', currentUser.uid, 'following', user.uid);
-        const followerRef = doc(db, 'users', user.uid, 'following', currentUser.uid);
-
-        const unsubFollowing = onSnapshot(followingRef, (doc1) => {
-          const following = doc1.exists();
-          const unsubFollowed = onSnapshot(followerRef, (doc2) => {
-            const followedBy = doc2.exists();
-            setFriendship({ following, followedBy, isFriend: following && followedBy });
-            setIsFriendshipLoading(false);
-          }, () => { setIsFriendshipLoading(false); });
-          unsubscribeFriendship = () => { unsubFollowing(); unsubFollowed(); };
-        }, () => { setIsFriendshipLoading(false); });
-      }
-
       return () => {
         unsubscribePosts();
-        unsubscribeFriendship();
         unsubscribeLikes();
         unsubscribePeople();
       };
@@ -460,15 +666,17 @@ export default function Profile() {
   }, [activeTab, isCurrentUser, user?.uid, setCachedSavedPosts]);
 
   const handleFollow = async () => {
-    if (!currentUser || !user || isCurrentUser) return;
+    if (!currentUser || !user || isCurrentUser || loading) return;
+    setLoading(true);
     
     // Optimistic update
-    const wasFollowing = friendship.following;
-    setFriendship(prev => ({ 
-      ...prev, 
-      following: !wasFollowing, 
-      isFriend: !wasFollowing ? prev.followedBy : false 
-    }));
+    const wasFollowing = isTargetFollowing;
+
+    if (wasFollowing) {
+      setFollowingIds((followingIds || []).filter(id => id !== user.uid));
+    } else {
+      setFollowingIds([...(followingIds || []), user.uid]);
+    }
 
     try {
       if (wasFollowing) {
@@ -478,12 +686,14 @@ export default function Profile() {
       }
     } catch (error) {
       // Revert on error
-      setFriendship(prev => ({ 
-        ...prev, 
-        following: wasFollowing, 
-        isFriend: wasFollowing ? prev.followedBy : false 
-      }));
+      if (wasFollowing) {
+        setFollowingIds([...(followingIds || []), user.uid]);
+      } else {
+        setFollowingIds((followingIds || []).filter(id => id !== user.uid));
+      }
       console.error(error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -532,25 +742,28 @@ export default function Profile() {
 
   return (
     <PullToRefresh onRefresh={handleRefreshProfile} className="h-full w-full">
-      <div className="h-full w-full overflow-y-auto bg-gradient-to-b from-[#e9d5ff] via-[#f3e8ff] to-[#faf5ff] flex flex-col items-center relative md:pl-24 profile-page-root" onScroll={handleScroll}>
+      <div className="h-full w-full overflow-y-auto bg-white flex flex-col items-center relative md:pl-24 profile-page-root animate-in fade-in duration-300" onScroll={handleScroll}>
       <AnimatePresence>
         {/* Profile Views List */}
         {showProfileViews && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-gradient-to-b from-[#e9d5ff] via-[#f3e8ff] to-[#faf5ff] animate-in slide-in-from-bottom duration-300">
-            <div className="min-h-[88px] md:min-h-[60px] pt-8 pb-3 md:pt-0 md:pb-0 bg-white/40 backdrop-blur-xl border-b border-white/60 flex items-center px-4 sticky top-0 z-10">
+          <div className="fixed inset-0 z-[120] flex flex-col bg-white animate-in slide-in-from-bottom duration-200">
+            <div className="h-14 bg-white/95 backdrop-blur-md border-b border-neutral-100 flex items-center justify-between px-3 sticky top-0 z-20 shrink-0">
               <button 
                 onClick={(e) => { e.stopPropagation(); setShowProfileViews(false); }} 
-                className="p-2 -ml-2 rounded-full hover:bg-white/50 text-gray-800 transition-colors"
+                className="w-9 h-9 rounded-full hover:bg-neutral-100 text-neutral-800 flex items-center justify-center transition-colors active:scale-90"
+                title="Back"
               >
-                <ArrowLeft className="w-6 h-6 text-gray-900" />
+                <ArrowLeft className="w-5 h-5 text-neutral-900" strokeWidth={2.2} />
               </button>
-              <h2 className="flex-1 text-center font-normal text-lg capitalize mr-10 text-gray-900">Profile Views</h2>
+              <h2 className="font-bold text-[16px] text-neutral-900 tracking-tight">Profile Views</h2>
+              <div className="w-9 h-9" />
             </div>
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+            <div className="flex-1 overflow-y-auto px-3 py-1.5 divide-y divide-neutral-100/70">
               {profileViewers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-purple-600/50">
-                  <Globe className="w-16 h-16 mb-4 opacity-30" />
-                  <p className="font-normal">No views yet</p>
+                <div className="flex flex-col items-center justify-center py-24 text-neutral-400">
+                  <Eye className="w-12 h-12 mb-3 text-neutral-300 stroke-[1.5]" />
+                  <p className="font-medium text-sm text-neutral-500">No profile views yet</p>
+                  <p className="text-xs text-neutral-400 mt-1">When others view your profile, they will appear here</p>
                 </div>
               ) : (
                 profileViewers.map((viewer) => (
@@ -570,21 +783,23 @@ export default function Profile() {
           </div>
         )}
         {showFollowersList && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-gradient-to-b from-[#e9d5ff] via-[#f3e8ff] to-[#faf5ff] animate-in slide-in-from-bottom duration-300">
-            <div className="min-h-[88px] md:min-h-[60px] pt-8 pb-3 md:pt-0 md:pb-0 bg-white/40 backdrop-blur-xl border-b border-white/60 flex items-center px-4 sticky top-0 z-10">
+          <div className="fixed inset-0 z-[120] flex flex-col bg-white animate-in slide-in-from-bottom duration-200">
+            <div className="h-14 bg-white/95 backdrop-blur-md border-b border-neutral-100 flex items-center justify-between px-3 sticky top-0 z-20 shrink-0">
               <button 
                 onClick={(e) => { e.stopPropagation(); setShowFollowersList(null); }} 
-                className="p-2 -ml-2 rounded-full hover:bg-white/50 text-gray-800 transition-colors"
+                className="w-9 h-9 rounded-full hover:bg-neutral-100 text-neutral-800 flex items-center justify-center transition-colors active:scale-90"
+                title="Back"
               >
-                <ArrowLeft className="w-6 h-6 text-gray-900" />
+                <ArrowLeft className="w-5 h-5 text-neutral-900" strokeWidth={2.2} />
               </button>
-              <h2 className="flex-1 text-center font-normal text-lg capitalize mr-10 text-gray-900">{showFollowersList}</h2>
+              <h2 className="font-bold text-[16px] text-neutral-900 capitalize tracking-tight">{showFollowersList}</h2>
+              <div className="w-9 h-9" />
             </div>
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+            <div className="flex-1 overflow-y-auto px-3 py-1.5 divide-y divide-neutral-100/70">
               {peopleList.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-purple-600/50">
-                  <UserPlus className="w-16 h-16 mb-4 opacity-30" />
-                  <p className="font-normal">No {showFollowersList} yet</p>
+                <div className="flex flex-col items-center justify-center py-24 text-neutral-400">
+                  <UserPlus className="w-12 h-12 mb-3 text-neutral-300 stroke-[1.5]" />
+                  <p className="font-medium text-sm text-neutral-500">No {showFollowersList} yet</p>
                 </div>
               ) : (
                 peopleList.map((person) => (
@@ -595,6 +810,7 @@ export default function Profile() {
                     onSelectUser={(u) => {
                       setViewingUser({ uid: u.uid, name: u.name, avatar: u.avatar });
                       setShowFollowersList(null);
+                      pushPage('profile');
                     }} 
                   />
                 ))
@@ -605,309 +821,856 @@ export default function Profile() {
       </AnimatePresence>
       
       <div className="w-full max-w-6xl mx-auto px-0 md:px-8 py-0 md:py-6">
-          {/* NEW Profile Header exact match to image, liquid glass on PC */}
-          <div className="relative overflow-hidden mb-0 md:mb-6 pb-2 pt-4 md:pt-8 md:pb-6 flex flex-col items-center w-full md:bg-white/40 md:backdrop-blur-2xl md:rounded-[32px] md:border md:border-white/80 md:shadow-[0_12px_36px_rgba(147,51,234,0.06)]">
-            
-            {/* Background decorations */}
-            <div className="absolute top-[-50px] left-[-50px] w-64 h-64 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-            <div className="absolute top-[-20px] right-[-20px] w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob" style={{animationDelay: '2s'}}></div>
-            
-            {/* Abstract curved lines (Top Left) */}
-            <div className="absolute top-0 left-0 w-64 h-64 z-0 opacity-40 pointer-events-none">
-              <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-full h-full fill-transparent stroke-white" strokeWidth="2">
-                <path d="M-20 80 Q 40 120 100 40 T 220 20" />
-                <path d="M-20 110 Q 50 150 120 70 T 220 50" strokeWidth="1" />
-              </svg>
-            </div>
-
-            {/* Moon decoration */}
-            <div className="absolute top-24 right-10 z-10 opacity-70 pointer-events-none">
-               <svg width="40" height="40" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-                 <path d="M21.2 15.5c-3.7 3.5-9.6 3.1-12.9-.1-3.3-3.3-3.7-9.2-.1-12.9C5.4 3.9 3 7.6 3 12c0 5 4 9 9 9 4.4 0 8.1-2.4 9.2-5.5z"/>
-               </svg>
-            </div>
-
-            {/* iOS Top Bar for Mobile & Clean Header - slightly lowered */}
-            <div className="w-full px-4 pt-6 pb-2.5 z-30 flex items-center justify-between">
-              {isCurrentUser ? (
-                /* Multi-Account Switcher Trigger: Light Glass Pill */
+          {/* BLOCKED ACCOUNT VIEW */}
+          {isBlocked ? (
+            <div className="w-full min-h-[60vh] flex flex-col items-center justify-center pt-8 pb-16 px-4 text-center select-none">
+              <div className="w-full px-4 pt-5 pb-3 flex items-center justify-between mb-8">
                 <button 
-                  onClick={() => setShowAccountSwitcherModal(true)}
-                  className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-white/70 hover:bg-white active:scale-95 transition-all shadow-2xs border border-white/90 backdrop-blur-xl"
-                  title="Switch or Add Account"
+                  onClick={() => popPage()} 
+                  className="p-2 -ml-2 text-neutral-800 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full active:scale-90 transition-all"
+                  title="Back"
                 >
-                  <Lock className="w-3.5 h-3.5 text-purple-700 shrink-0" />
-                  <span className="font-bold text-[13.5px] text-gray-900 tracking-tight max-w-[140px] truncate">
-                    {userData?.username || profileHandle.replace('@', '')}
-                  </span>
-                  <svg className="w-3.5 h-3.5 text-gray-500 ml-0.5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
+                  <ArrowLeft className="w-6 h-6 text-neutral-900 dark:text-white" strokeWidth={2.2} />
                 </button>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <button 
-                    onClick={() => popPage()} 
-                    className="p-1.5 rounded-full bg-white/70 backdrop-blur-xl text-gray-800 hover:bg-white active:scale-90 transition-all shadow-2xs border border-white/90"
-                  >
-                    <ArrowLeft className="w-5 h-5 text-gray-900" strokeWidth={2.2} />
-                  </button>
-                  <span className="font-bold text-[15px] text-gray-900 truncate max-w-[150px]">
-                    {userData?.username || profileHandle.replace('@', '')}
-                  </span>
-                </div>
-              )}
+                <span className="font-bold text-base text-neutral-900 dark:text-white">Profile</span>
+                <div className="w-8" />
+              </div>
 
-              {/* Action Icons (Light Glass frosted buttons) */}
-              <div className="flex items-center space-x-2">
-                <button 
-                  onClick={handleShare}
-                  className="w-9 h-9 rounded-full bg-white/70 backdrop-blur-xl border border-white/90 flex items-center justify-center text-gray-800 hover:text-purple-600 hover:bg-white active:scale-95 transition-all shadow-2xs"
-                  title="Share profile"
-                >
-                  <LinkIcon className="w-4 h-4" strokeWidth={2} />
-                </button>
-
-                <button 
-                  className="w-9 h-9 rounded-full bg-white/70 backdrop-blur-xl border border-white/90 flex items-center justify-center text-gray-800 hover:text-purple-600 hover:bg-white active:scale-95 transition-all shadow-2xs relative"
-                  onClick={() => {
-                    if (isCurrentUser) {
-                      localStorage.setItem('lastCheckedProfileViewsCount', profileViewsCount.toString());
-                      setUnreadViewsCount(0);
-                      setShowProfileViews(true);
-                    }
+              {/* PFP with Ennvo profile icon logo */}
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full p-1 bg-gradient-to-tr from-neutral-200 to-neutral-300 dark:from-neutral-700 dark:to-neutral-800 shadow-md mb-4 flex items-center justify-center overflow-hidden">
+                <img 
+                  src="/Ennvo Symbol.png" 
+                  alt="Ennvo Logo" 
+                  className="w-16 h-16 sm:w-18 sm:h-18 object-contain opacity-80"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
                   }}
-                  title="Profile views"
-                >
-                  {isCurrentUser && profileViewers.length > 0 ? (
-                    <div className="w-6 h-6 rounded-full overflow-hidden border border-gray-200 bg-white">
-                      <img src={profileViewers[0].avatar} alt="View" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    </div>
-                  ) : (
-                    <Eye className="w-4 h-4" strokeWidth={2} />
-                  )}
-                  {(isCurrentUser && unreadViewsCount > 0) ? (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold px-1 rounded-full border-2 border-[#f3e8ff] min-w-[15px] h-[15px] flex items-center justify-center shadow-xs">
-                      {unreadViewsCount > 99 ? '99+' : unreadViewsCount}
-                    </span>
-                  ) : null}
-                </button>
-
-                {isCurrentUser && (
-                  <button 
-                    onClick={() => pushPage('settings')}
-                    className="w-9 h-9 rounded-full bg-white/70 backdrop-blur-xl border border-white/90 flex items-center justify-center text-gray-800 hover:text-purple-600 hover:bg-white active:scale-95 transition-all shadow-2xs"
-                    title="Settings"
-                  >
-                    <Settings className="w-4 h-4" strokeWidth={2} />
-                  </button>
-                )}
+                />
               </div>
-            </div>
 
-            {/* Profile Picture with soft iridescent border */}
-            <div className="relative mt-2 mb-2 z-20">
-              <div className="w-[102px] h-[102px] rounded-full p-[3px] bg-gradient-to-tr from-purple-400 via-pink-400 to-indigo-400 shadow-md shadow-purple-200/50">
-                <div className="w-full h-full rounded-full border-[2.5px] border-white overflow-hidden bg-white">
-                  <img src={userData?.avatar || profileAvatar} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                </div>
-              </div>
-              {isCurrentUser && (
-                <div 
-                  className="absolute bottom-0 right-0 p-2 bg-white rounded-full border border-purple-100 shadow-md cursor-pointer text-gray-700 hover:bg-purple-50 active:scale-90 transition-all"
-                  onClick={() => pushPage('edit-profile')}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
-                </div>
-              )}
-            </div>
-
-            {/* Name & Username */}
-            <div className="text-center mb-2.5 z-20">
-              <h1 className="text-[18px] font-bold text-gray-900 tracking-tight flex items-center justify-center space-x-1">
-                <span>{userData?.name || profileName || 'User'}</span>
-                {user?.isVerified && <VerifiedBadge />}
+              <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white mb-1.5">
+                Account not found
               </h1>
-              <p className="text-purple-600/90 font-normal text-[13px] mt-0.5">@{userData?.username || profileHandle.replace('@', '')}</p>
-            </div>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-sm mt-1 mb-6 leading-relaxed">
+                The link you followed may be broken, or the account may have been removed or blocked.
+              </p>
 
-            {/* Unboxed Stats Counters - Compact & Closer Together */}
-            <div className="w-full max-w-[240px] mx-auto py-0.5 px-1 flex items-center justify-around mb-2.5 z-20">
-              <div 
-                className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform px-1.5 py-0.5"
-                onClick={() => setShowFollowersList('following')}
+              <button
+                onClick={() => popPage()}
+                className="px-6 py-2.5 rounded-full bg-neutral-900 hover:bg-black dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-black font-semibold text-sm active:scale-95 transition-all shadow-sm cursor-pointer"
               >
-                {!userData && (user?.followingCount === undefined || user?.followingCount === null) ? (
-                  <div className="w-8 h-3.5 bg-purple-200/60 rounded animate-pulse my-0.5" />
-                ) : (
-                  <span className="text-[15px] font-bold text-gray-900 leading-tight tracking-tight">
-                    {formatCount(userData?.followingCount ?? user?.followingCount ?? 0)}
-                  </span>
-                )}
-                <span className="text-gray-500 text-[11px] font-medium mt-0.5">Following</span>
-              </div>
-              <div className="w-[1px] h-4 bg-purple-200/80 shrink-0" />
-              <div 
-                className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform px-1.5 py-0.5"
-                onClick={() => setShowFollowersList('followers')}
-              >
-                {!userData && (user?.followersCount === undefined || user?.followersCount === null) ? (
-                  <div className="w-8 h-3.5 bg-purple-200/60 rounded animate-pulse my-0.5" />
-                ) : (
-                  <span className="text-[15px] font-bold text-gray-900 leading-tight tracking-tight">
-                    {formatCount(userData?.followersCount ?? user?.followersCount ?? 0)}
-                  </span>
-                )}
-                <span className="text-gray-500 text-[11px] font-medium mt-0.5">Followers</span>
-              </div>
-              <div className="w-[1px] h-4 bg-purple-200/80 shrink-0" />
-              <div className="flex flex-col items-center px-1.5 py-0.5">
-                {!userData && totalLikes === 0 && profilePosts.length === 0 ? (
-                  <div className="w-8 h-3.5 bg-purple-200/60 rounded animate-pulse my-0.5" />
-                ) : (
-                  <span className="text-[15px] font-bold text-gray-900 leading-tight tracking-tight">
-                    {formatCount(userData?.totalLikes ?? (totalLikes || profilePosts.reduce((sum, p) => sum + (p.likesCount || 0), 0)))}
-                  </span>
-                )}
-                <span className="text-gray-500 text-[11px] font-medium mt-0.5">Likes</span>
-              </div>
+                Go Back
+              </button>
             </div>
+          ) : (
+            <>
+          {/* Feed-matching Ambient Soft Blue Glow for Profiles without a custom banner */}
+          {!user?.bannerUrl && (
+            <div 
+              className="pointer-events-none absolute top-0 left-0 right-0 h-[260px] sm:h-[300px] bg-gradient-to-b from-sky-400/[0.15] via-blue-500/[0.05] to-transparent dark:from-blue-600/[0.22] dark:via-blue-800/[0.06] dark:to-transparent z-0" 
+              aria-hidden="true" 
+            />
+          )}
 
-            {/* Light Glass Action Buttons */}
-            <div className="flex items-center justify-center space-x-2.5 w-full px-6 mb-3 z-20 max-w-[340px]">
-              {isCurrentUser ? (
-                <>
-                  <button 
-                    onClick={() => pushPage('edit-profile')}
-                    className="flex-1 bg-white/70 hover:bg-white active:scale-95 text-gray-900 font-bold text-[13px] py-2 px-3 rounded-xl backdrop-blur-xl border border-white/90 shadow-2xs flex items-center justify-center transition-all"
-                  >
-                    <span>Edit profile</span>
-                  </button>
-                  <button 
-                    onClick={handleShare}
-                    className="flex-1 bg-white/70 hover:bg-white active:scale-95 text-gray-900 font-bold text-[13px] py-2 px-3 rounded-xl backdrop-blur-xl border border-white/90 shadow-2xs flex items-center justify-center transition-all"
-                  >
-                    <span>Share profile</span>
-                  </button>
-                  <button 
-                    onClick={() => setShowAccountSwitcherModal(true)}
-                    className="w-9 h-9 bg-white/70 hover:bg-white active:scale-95 text-purple-600 rounded-xl backdrop-blur-xl border border-white/90 shadow-2xs flex items-center justify-center transition-all shrink-0"
-                    title="Switch or Add Account"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button 
-                    onClick={handleFollow}
-                    disabled={loading}
-                    className={`flex-1 font-bold text-[13px] px-3 py-2 rounded-xl flex items-center justify-center disabled:opacity-50 transition-all active:scale-95 shadow-2xs ${
-                      friendship.following 
-                        ? 'bg-white/70 hover:bg-white text-purple-700 border border-purple-200 backdrop-blur-xl' 
-                        : 'bg-purple-600 text-white hover:bg-purple-700 shadow-purple-200'
-                    }`}
-                  >
-                    {friendship.isFriend ? 'Friends' : friendship.following ? 'Following' : friendship.followedBy ? 'Follow Back' : 'Follow'}
-                  </button>
-                  <button 
-                    onClick={handleMessage}
-                    className="flex-1 bg-white/70 hover:bg-white text-gray-900 font-bold text-[13px] px-3 py-2 rounded-xl border border-white/90 backdrop-blur-xl shadow-2xs flex items-center justify-center transition-all active:scale-95"
-                  >
-                    <span>Message</span>
-                  </button>
-                </>
-              )}
-            </div>
+          {/* MOBILE PROFILE HEADER */}
+          <div className="block md:hidden w-full relative">
+            {user?.bannerUrl ? (
+              /* Top edge-to-edge banner when bannerUrl is set */
+              <div className="w-full h-40 sm:h-44 relative overflow-hidden bg-gradient-to-b from-purple-100/70 via-purple-50/40 to-white">
+                {/* Filigree ornament flourish at top header */}
+                <div className="absolute top-2.5 left-1/2 -translate-x-1/2 pointer-events-none opacity-30 z-10">
+                  <svg className="w-20 h-4 text-purple-700/60" viewBox="0 0 100 24" fill="none" stroke="currentColor" strokeWidth="1.2">
+                    <path d="M4 12 C 16 3, 24 21, 35 12 C 42 6, 46 6, 50 12 C 54 18, 58 18, 65 12 C 76 3, 84 21, 96 12" />
+                    <circle cx="50" cy="12" r="1.5" fill="currentColor" />
+                    <circle cx="4" cy="12" r="1.2" fill="currentColor" />
+                    <circle cx="96" cy="12" r="1.2" fill="currentColor" />
+                  </svg>
+                </div>
 
-            {/* Glass Bio Card */}
-            {(userData?.bio || user?.bio || userData?.link || user?.link) && (
-              <div className="w-full px-5 md:px-8 z-20 max-w-[500px]">
-                <div className="bg-white/30 backdrop-blur-xl border border-white/60  rounded-2xl p-4 relative overflow-hidden">
-                  <div className="absolute top-1 left-3 text-purple-400 font-serif text-3xl leading-none">“</div>
-                  <div className="absolute bottom-4 right-4 text-purple-400 font-serif text-3xl leading-none rotate-180">“</div>
-                  
-                  <p className="text-center text-[14px] font-normal text-gray-800 leading-relaxed px-6 py-2 z-10 relative whitespace-pre-line">
-                    {userData?.bio || user?.bio}
-                  </p>
-                  
-                  {(userData?.link || user?.link) && (
-                    <>
-                      <div className="flex items-center justify-center my-3 relative z-10">
-                        <div className="h-[1px] bg-purple-200 w-12"></div>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-purple-400 mx-2"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                        <div className="h-[1px] bg-purple-200 w-12"></div>
-                      </div>
-                      
-                      <div className="flex items-center justify-center space-x-2 text-purple-500 pb-1 relative z-10">
-                        <LinkIcon className="w-3.5 h-3.5" />
-                        <a href={(userData?.link || user?.link)?.startsWith('http') ? (userData?.link || user?.link) : `https://${userData?.link || user?.link}`} target="_blank" rel="noopener noreferrer" className="text-[13px] font-normal hover:underline">
-                          {(userData?.link || user?.link)?.replace(/^https?:\/\//, '')}
-                        </a>
-                        {isCurrentUser && (
-                          <div className="bg-purple-500 rounded-full p-1 ml-4  text-white cursor-pointer active:scale-95" onClick={() => pushPage('edit-profile')}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-                          </div>
-                        )}
-                      </div>
-                    </>
+                {isVideoMedia(user.bannerUrl) ? (
+                  <video 
+                    src={user.bannerUrl} 
+                    autoPlay 
+                    loop 
+                    muted 
+                    playsInline 
+                    className="w-full h-full object-cover pointer-events-none" 
+                  />
+                ) : (
+                  <img 
+                    src={user.bannerUrl} 
+                    alt="Profile Banner" 
+                    className="w-full h-full object-cover" 
+                  />
+                )}
+                {/* Seamless blending: only the bottom edge fades smoothly into the white screen */}
+                <div className="absolute bottom-0 left-0 right-0 h-14 pointer-events-none bg-gradient-to-t from-white via-white/60 to-transparent" />
+
+                {/* Floating Top Navigation Bar */}
+                <div className="absolute top-0 left-0 right-0 px-3 pt-5 sm:pt-6 pb-2 z-30 flex items-center justify-between pointer-events-auto">
+                  {!isCurrentUser ? (
+                    <button 
+                      onClick={() => popPage()} 
+                      className="p-1.5 text-neutral-800 hover:text-neutral-900 active:scale-90 transition-all"
+                      title="Back"
+                    >
+                      <ArrowLeft className="w-6 h-6 text-neutral-800" strokeWidth={2.2} />
+                    </button>
+                  ) : (
+                    <div />
                   )}
-                  
-                  {/* Floral Corner Deco */}
-                  <div className="absolute -bottom-2 -right-4 w-28 h-28 opacity-60 pointer-events-none mix-blend-multiply">
-                     <svg viewBox="0 0 100 100" className="w-full h-full fill-purple-300">
-                        <path d="M 50 100 Q 40 80 10 70 Q 40 60 50 20 Q 60 60 90 70 Q 60 80 50 100 Z" />
-                        <path d="M 80 100 Q 70 90 50 85 Q 70 80 75 60 Q 80 80 95 85 Q 80 90 80 100 Z" fill="#d8b4fe"/>
-                        <path d="M 20 100 Q 30 90 50 85 Q 30 80 25 60 Q 20 80 5 85 Q 20 90 20 100 Z" fill="#e9d5ff" opacity="0.6"/>
-                     </svg>
+
+                  <div className="flex items-center space-x-2 ml-auto">
+                    {isCurrentUser && (
+                      <button 
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-800 hover:bg-neutral-100/60 active:scale-90 transition-all relative border-0 shadow-none overflow-visible"
+                        onClick={() => {
+                          localStorage.setItem('lastCheckedProfileViewsCount', profileViewsCount.toString());
+                          setUnreadViewsCount(0);
+                          setShowProfileViews(true);
+                        }}
+                        title="Profile views"
+                      >
+                        {profileViewers.length > 0 ? (
+                          <img src={profileViewers[0].avatar} alt="View" className="w-8 h-8 rounded-full object-cover border border-neutral-200" referrerPolicy="no-referrer" />
+                        ) : (
+                          <Eye className="w-4.5 h-4.5 text-neutral-800" strokeWidth={1.9} />
+                        )}
+                        {unreadViewsCount > 0 ? (
+                          <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8.5px] font-bold px-1 rounded-full border border-white min-w-[14px] h-[14px] flex items-center justify-center">
+                            {unreadViewsCount > 99 ? '99+' : unreadViewsCount}
+                          </span>
+                        ) : null}
+                      </button>
+                    )}
+
+                    {isCurrentUser && (
+                      <button 
+                        onClick={() => pushPage('settings')}
+                        className="w-8 h-8 rounded-full bg-white/90 hover:bg-neutral-100 text-neutral-700 shadow-xs flex items-center justify-center active:scale-90 transition-all backdrop-blur-md border border-neutral-200/50"
+                        title="Settings"
+                      >
+                        <Settings className="w-4 h-4 text-neutral-700" strokeWidth={1.8} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
-            )}
-            
-            {/* Highlights Row */}
-            {((userData?.highlights || user?.highlights || []).length > 0) && (
-              <div className="w-full mt-1 px-4 md:px-8 z-20 flex flex-wrap gap-4 items-center justify-center max-w-[500px]">
-                 {/* Map actual highlights here */}
-                 {(userData?.highlights || user?.highlights || []).map((highlight: string, i: number) => (
-                   <div 
-                     key={i} 
-                     className="flex flex-col items-center justify-center h-[60px] select-none"
-                     onPointerDown={() => handleHighlightPressStart(highlight)}
-                     onPointerUp={handleHighlightPressEnd}
-                     onPointerCancel={handleHighlightPressEnd}
-                     onMouseLeave={handleHighlightPressEnd}
-                     onTouchStart={() => handleHighlightPressStart(highlight)}
-                     onTouchEnd={handleHighlightPressEnd}
-                     onContextMenu={(e) => e.preventDefault()}
-                     onClick={() => setViewingHighlightUrl(highlight)}
-                   >
-                     <div className="w-[60px] h-[60px] rounded-full p-[2px] bg-gradient-to-br from-pink-400 to-purple-500 cursor-pointer hover:scale-105 transition-transform">
-                       <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-white">
-                         <img src={highlight} alt="Highlight" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                       </div>
-                     </div>
-                   </div>
-                 ))}
+            ) : (
+              /* Compact Top Navigation Bar when NO banner is set (NO empty gap at the top!) */
+              <div className="w-full px-3 pt-5 sm:pt-6 pb-1 flex items-center justify-between">
+                {!isCurrentUser ? (
+                  <button 
+                    onClick={() => popPage()} 
+                    className="p-1.5 text-neutral-800 hover:text-neutral-900 active:scale-90 transition-all"
+                    title="Back"
+                  >
+                    <ArrowLeft className="w-6 h-6 text-neutral-800" strokeWidth={2.2} />
+                  </button>
+                ) : (
+                  <div />
+                )}
 
-                 {/* New Highlight + Button - ONLY shown if highlights exist */}
-                 {isCurrentUser && (
-                   <div className="flex flex-col items-center justify-center h-[60px]">
-                     <div 
-                       className="w-[60px] h-[60px] rounded-full border border-dashed border-gray-400 flex items-center justify-center text-gray-700 cursor-pointer hover:bg-white/20 transition-colors"
-                       onClick={() => highlightInputRef.current?.click()}
-                     >
-                       {isUploadingHighlight ? (
-                         <Loader2 className="w-5 h-5 animate-spin" />
-                       ) : (
-                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                       )}
-                     </div>
-                     <input type="file" ref={highlightInputRef} className="hidden" accept="image/*" onChange={handleUploadHighlight} />
-                   </div>
-                 )}
+                <div className="flex items-center space-x-2 ml-auto">
+                  {isCurrentUser && (
+                    <button 
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-800 hover:bg-neutral-100/60 active:scale-90 transition-all relative border-0 shadow-none overflow-visible"
+                      onClick={() => {
+                        localStorage.setItem('lastCheckedProfileViewsCount', profileViewsCount.toString());
+                        setUnreadViewsCount(0);
+                        setShowProfileViews(true);
+                      }}
+                      title="Profile views"
+                    >
+                      {profileViewers.length > 0 ? (
+                        <img src={profileViewers[0].avatar} alt="View" className="w-8 h-8 rounded-full object-cover border border-neutral-200" referrerPolicy="no-referrer" />
+                      ) : (
+                        <Eye className="w-4.5 h-4.5 text-neutral-800" strokeWidth={1.9} />
+                      )}
+                      {unreadViewsCount > 0 ? (
+                        <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8.5px] font-bold px-1 rounded-full border border-white min-w-[14px] h-[14px] flex items-center justify-center">
+                          {unreadViewsCount > 99 ? '99+' : unreadViewsCount}
+                        </span>
+                      ) : null}
+                    </button>
+                  )}
+
+                  {isCurrentUser && (
+                    <button 
+                      onClick={() => pushPage('settings')}
+                      className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 shadow-none flex items-center justify-center active:scale-90 transition-all border-0"
+                      title="Settings"
+                    >
+                      <Settings className="w-4 h-4 text-neutral-700" strokeWidth={1.8} />
+                    </button>
+                  )}
+                </div>
               </div>
             )}
+
+            {/* Mobile Profile Details: Right Avatar if banner exists, LEFT Avatar if NO banner */}
+            <div className={`px-4 pb-3 ${user?.bannerUrl ? 'pt-0' : 'pt-1'} relative z-20`}>
+              {!user?.bannerUrl ? (
+                /* Dedicated layout for users with NO banner:
+                   Profile pic on LEFT, Name, Username, and Counters on RIGHT */
+                <div className="flex items-center space-x-4">
+                  {/* Left Side: Circular Profile Picture */}
+                  <div className="relative shrink-0">
+                    <div 
+                      className="w-[96px] h-[96px] sm:w-[104px] sm:h-[104px] rounded-full p-[2.5px] bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center relative cursor-pointer select-none"
+                      onPointerDown={handleAvatarPressStart}
+                      onPointerUp={handleAvatarPressEnd}
+                      onPointerCancel={handleAvatarPressEnd}
+                      onMouseLeave={handleAvatarPressEnd}
+                      onTouchStart={handleAvatarPressStart}
+                      onTouchEnd={handleAvatarPressEnd}
+                      onContextMenu={(e) => {
+                        if (isHoldTriggeredRef.current) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                      }}
+                      title={isCurrentUser ? "Hold to view full photo" : "Hold to view photo"}
+                    >
+                      <div className="w-full h-full rounded-full p-[2.5px] bg-white dark:bg-black flex items-center justify-center overflow-hidden">
+                        {isVideoMedia(userData?.avatar || profileAvatar) ? (
+                          <video 
+                            src={userData?.avatar || profileAvatar} 
+                            autoPlay 
+                            loop 
+                            muted 
+                            playsInline 
+                            className="w-full h-full object-cover rounded-full pointer-events-none" 
+                          />
+                        ) : (
+                          <img 
+                            src={userData?.avatar || profileAvatar} 
+                            alt="Profile" 
+                            className="w-full h-full object-cover rounded-full pointer-events-none" 
+                            referrerPolicy="no-referrer" 
+                          />
+                        )}
+                      </div>
+
+                      {/* Verified Blue Badge at PFP bottom-right (in place of pencil icon) */}
+                      {user?.isVerified ? (
+                        <div className="absolute bottom-0 right-0 z-20 pointer-events-none drop-shadow-sm">
+                          <VerifiedBadge className="w-6.5 h-6.5 sm:w-7 sm:h-7" />
+                        </div>
+                      ) : isCurrentUser ? (
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            pushPage('edit-profile');
+                          }}
+                          className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-sm flex items-center justify-center transition-all active:scale-90 border-2 border-white z-10"
+                          title="Edit profile"
+                        >
+                          <Pencil className="w-3 h-3 text-white" strokeWidth={2.2} />
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* Right Side: Name, Username, and Stats Counters (Shifted to the right with elegant spacing) */}
+                  <div className="flex-1 min-w-0 flex flex-col justify-center pl-2 sm:pl-2.5">
+                    <h1 className="text-[23px] sm:text-[26px] font-black text-neutral-950 tracking-tight flex items-center space-x-1.5 truncate leading-tight">
+                      <span className="truncate">{displayName}</span>
+                      {user?.isVerified && <VerifiedBadge />}
+                    </h1>
+                    <p className="text-neutral-500 font-medium text-[13px] sm:text-[13.5px] mt-0.5 truncate">
+                      @{userData?.username || profileHandle.replace('@', '')}
+                    </p>
+
+                    {/* Horizontal Stats counters on right side - Shifted right with balanced spacing */}
+                    <div className="flex items-center space-x-5 sm:space-x-6 mt-3">
+                      <div 
+                        className="flex flex-col cursor-pointer active:scale-95 transition-transform"
+                        onClick={() => setShowFollowersList('following')}
+                      >
+                        <span className="text-[17px] sm:text-[18px] font-black text-neutral-900 leading-none">
+                          {formatCount(userData?.followingCount ?? user?.followingCount ?? 0)}
+                        </span>
+                        <span className="text-neutral-500 text-[11px] font-medium mt-1">Following</span>
+                      </div>
+
+                      <div 
+                        className="flex flex-col cursor-pointer active:scale-95 transition-transform"
+                        onClick={() => setShowFollowersList('followers')}
+                      >
+                        <span className="text-[17px] sm:text-[18px] font-black text-neutral-900 leading-none">
+                          {formatCount(userData?.followersCount ?? user?.followersCount ?? 0)}
+                        </span>
+                        <span className="text-neutral-500 text-[11px] font-medium mt-1">Followers</span>
+                      </div>
+
+                      <div className="flex flex-col">
+                        <span className="text-[17px] sm:text-[18px] font-black text-neutral-900 leading-none">
+                          {formatCount(userData?.totalLikes ?? (totalLikes || profilePosts.reduce((sum, p) => sum + (p.likesCount || 0), 0)))}
+                        </span>
+                        <span className="text-neutral-500 text-[11px] font-medium mt-1">Likes</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Banner layout: Left Name & Stats, Right overlapping Avatar */
+                <div className="flex items-start justify-between">
+                  {/* Left Side: Name, Username, Stats */}
+                  <div className="flex-1 pr-3 pt-1 min-w-0">
+                    <h1 className="text-[22px] sm:text-[25px] font-extrabold text-neutral-900 tracking-tight flex items-center space-x-1.5 truncate leading-tight">
+                      <span className="truncate">{displayName}</span>
+                      {user?.isVerified && <VerifiedBadge />}
+                    </h1>
+                    <p className="text-neutral-500 font-medium text-[13.5px] sm:text-[14px] mt-0.5 truncate">
+                      @{userData?.username || profileHandle.replace('@', '')}
+                    </p>
+
+                    <div className="flex items-center space-x-5 sm:space-x-6 mt-3">
+                      <div 
+                        className="flex flex-col cursor-pointer active:scale-95 transition-transform"
+                        onClick={() => setShowFollowersList('following')}
+                      >
+                        <span className="text-[17px] sm:text-[18px] font-black text-gray-900 leading-none">
+                          {formatCount(userData?.followingCount ?? user?.followingCount ?? 0)}
+                        </span>
+                        <span className="text-gray-500 text-[11px] font-medium mt-1">Following</span>
+                      </div>
+
+                      <div 
+                        className="flex flex-col cursor-pointer active:scale-95 transition-transform"
+                        onClick={() => setShowFollowersList('followers')}
+                      >
+                        <span className="text-[17px] sm:text-[18px] font-black text-gray-900 leading-none">
+                          {formatCount(userData?.followersCount ?? user?.followersCount ?? 0)}
+                        </span>
+                        <span className="text-gray-500 text-[11px] font-medium mt-1">Followers</span>
+                      </div>
+
+                      <div className="flex flex-col">
+                        <span className="text-[17px] sm:text-[18px] font-black text-gray-900 leading-none">
+                          {formatCount(userData?.totalLikes ?? (totalLikes || profilePosts.reduce((sum, p) => sum + (p.likesCount || 0), 0)))}
+                        </span>
+                        <span className="text-gray-500 text-[11px] font-medium mt-1">Likes</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Side: Circular Profile Picture with Long-Press View & Edit Pen */}
+                  <div className="relative -mt-14 sm:-mt-16 shrink-0">
+                    <div 
+                      className="w-[114px] h-[114px] sm:w-[120px] sm:h-[120px] rounded-full p-[3px] bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center relative cursor-pointer select-none"
+                      onPointerDown={handleAvatarPressStart}
+                      onPointerUp={handleAvatarPressEnd}
+                      onPointerCancel={handleAvatarPressEnd}
+                      onMouseLeave={handleAvatarPressEnd}
+                      onTouchStart={handleAvatarPressStart}
+                      onTouchEnd={handleAvatarPressEnd}
+                      onContextMenu={(e) => {
+                        if (isHoldTriggeredRef.current) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                      }}
+                      title={isCurrentUser ? "Hold to view full photo" : "Hold to view photo"}
+                    >
+                      <div className="w-full h-full rounded-full p-[3px] bg-white dark:bg-black flex items-center justify-center overflow-hidden">
+                        {isVideoMedia(userData?.avatar || profileAvatar) ? (
+                          <video 
+                            src={userData?.avatar || profileAvatar} 
+                            autoPlay 
+                            loop 
+                            muted 
+                            playsInline 
+                            className="w-full h-full object-cover rounded-full pointer-events-none" 
+                          />
+                        ) : (
+                          <img 
+                            src={userData?.avatar || profileAvatar} 
+                            alt="Profile" 
+                            className="w-full h-full object-cover rounded-full pointer-events-none" 
+                            referrerPolicy="no-referrer" 
+                          />
+                        )}
+                      </div>
+
+                      {/* Verified Blue Badge at PFP bottom-right (in place of pencil icon) */}
+                      {user?.isVerified ? (
+                        <div className="absolute bottom-0 right-0 z-20 pointer-events-none drop-shadow-sm">
+                          <VerifiedBadge className="w-7 h-7 sm:w-7.5 sm:h-7.5" />
+                        </div>
+                      ) : isCurrentUser ? (
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            pushPage('edit-profile');
+                          }}
+                          className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-md flex items-center justify-center transition-all active:scale-90 border-2 border-white z-10"
+                          title="Edit profile"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-white" strokeWidth={2.2} />
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons Row */}
+              <div className="flex items-center space-x-2 w-full mt-4">
+                {isCurrentUser ? (
+                  <>
+                    <button 
+                      onClick={() => pushPage('edit-profile')}
+                      className="flex-1 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-semibold text-[13.5px] py-2.5 px-3 rounded-full transition-all border-0 shadow-none flex items-center justify-center space-x-1.5"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-neutral-600" />
+                      <span>Edit profile</span>
+                    </button>
+                    <button 
+                      onClick={handleShare}
+                      className="flex-1 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-semibold text-[13.5px] py-2.5 px-3 rounded-full transition-all border-0 shadow-none flex items-center justify-center"
+                    >
+                      <span>Share profile</span>
+                    </button>
+                    <button 
+                      onClick={() => setShowAccountSwitcherModal(true)}
+                      className="w-10 h-10 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 rounded-full flex items-center justify-center transition-all shrink-0 border-0 shadow-none"
+                      title="Switch Account"
+                    >
+                      <ChevronDown className="w-4.5 h-4.5 text-neutral-700" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {friendship.isFriend ? (
+                      /* If user is Friend: Message button has highlighted follow color, Friends button opens slide-up options */
+                      <>
+                        <button 
+                          onClick={handleMessage}
+                          className="flex-1 bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 active:scale-95 text-white font-semibold text-[13.5px] py-2.5 px-4 rounded-full shadow-sm flex items-center justify-center space-x-1.5 transition-all"
+                        >
+                          <MessageCircle className="w-4 h-4 text-white" />
+                          <span>Message</span>
+                        </button>
+                        <button 
+                          onClick={() => setShowFriendOptionsModal(true)}
+                          className="flex-1 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-semibold text-[13.5px] py-2.5 px-4 rounded-full transition-all border-0 shadow-none flex items-center justify-center space-x-1.5"
+                        >
+                          <span>Friends</span>
+                          <ChevronDown className="w-3.5 h-3.5 text-neutral-500" />
+                        </button>
+                      </>
+                    ) : (
+                      /* Regular Follow / Following / Follow Back */
+                      <>
+                        <button 
+                          onClick={handleFollow}
+                          disabled={loading}
+                          className={`flex-1 font-semibold text-[13.5px] px-4 py-2.5 rounded-full flex items-center justify-center disabled:opacity-50 transition-all active:scale-95 ${
+                            friendship.following 
+                              ? 'bg-neutral-100 text-neutral-800 hover:bg-neutral-200 border-0 shadow-none' 
+                              : 'bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 text-white shadow-sm'
+                          }`}
+                        >
+                          {friendship.following ? 'Following' : friendship.followedBy ? 'Follow Back' : 'Follow'}
+                        </button>
+                        <button 
+                          onClick={handleMessage}
+                          className="flex-1 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-semibold text-[13.5px] px-4 py-2.5 rounded-full transition-all active:scale-95 border-0 shadow-none flex items-center justify-center"
+                        >
+                          <span>Message</span>
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Bio Section - Beautiful clean typography */}
+              {(userData?.bio || user?.bio || userData?.link || user?.link) && (
+                <div className="w-full mt-3 px-0.5">
+                  {Boolean(userData?.bio || user?.bio) && (
+                    <p className="text-[13.5px] text-neutral-800 leading-relaxed whitespace-pre-line font-normal break-words">
+                      {userData?.bio || user?.bio}
+                    </p>
+                  )}
+                  {(userData?.link || user?.link) && (
+                    <div className="mt-2 flex items-center">
+                      <a 
+                        href={(userData?.link || user?.link)?.startsWith('http') ? (userData?.link || user?.link) : `https://${userData?.link || user?.link}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center space-x-1.5 px-3 py-1 bg-neutral-100 hover:bg-neutral-200 active:scale-95 text-neutral-800 text-[12px] font-medium rounded-full transition-all border border-neutral-200/70"
+                      >
+                        <LinkIcon className="w-3 h-3 text-neutral-500 shrink-0" />
+                        <span className="truncate max-w-[240px]">{(userData?.link || user?.link)?.replace(/^https?:\/\//, '')}</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Story Highlights Section */}
+              {(userData?.highlights || user?.highlights || []).length > 0 && (
+                <div className="w-full mt-3.5 overflow-x-auto hide-scrollbar pb-1">
+                  <div className="flex items-center space-x-3.5 min-w-max">
+                    {(userData?.highlights || user?.highlights || []).map((highlight: string, i: number) => {
+                      const title = customHighlightTitles[i] || (userData as any)?.highlightTitles?.[i] || CUTE_HIGHLIGHT_TITLES[i % CUTE_HIGHLIGHT_TITLES.length];
+                      return (
+                        <div 
+                          key={i} 
+                          className="flex flex-col items-center select-none group cursor-pointer"
+                          onPointerDown={() => handleHighlightPressStart(highlight)}
+                          onPointerUp={handleHighlightPressEnd}
+                          onPointerCancel={handleHighlightPressEnd}
+                          onMouseLeave={handleHighlightPressEnd}
+                          onTouchStart={() => handleHighlightPressStart(highlight)}
+                          onTouchEnd={handleHighlightPressEnd}
+                          onContextMenu={(e) => e.preventDefault()}
+                          onClick={() => setViewingHighlightUrl(highlight)}
+                        >
+                          <div className="w-[68px] h-[68px] sm:w-[74px] sm:h-[74px] rounded-[24px] p-[2.5px] bg-gradient-to-tr from-purple-300 via-pink-200 to-indigo-300 shadow-2xs group-hover:scale-105 active:scale-95 transition-transform duration-200">
+                            <div className="w-full h-full rounded-[21px] overflow-hidden bg-white border border-white/80">
+                              {isVideoMedia(highlight) ? (
+                                <video 
+                                  src={highlight} 
+                                  autoPlay 
+                                  loop 
+                                  muted 
+                                  playsInline 
+                                  className="w-full h-full object-cover pointer-events-none" 
+                                />
+                              ) : (
+                                <img src={highlight} alt="Highlight" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Editable highlight title for current user */}
+                          <div 
+                            className="flex items-center justify-center space-x-1 mt-1.5 cursor-pointer max-w-[76px]"
+                            onClick={(e) => {
+                              if (isCurrentUser) {
+                                e.stopPropagation();
+                                setEditingHighlightIndex(i);
+                                setTempHighlightTitle(title);
+                              }
+                            }}
+                            title={isCurrentUser ? "Click to edit title" : undefined}
+                          >
+                            <span className="text-[11px] font-medium text-neutral-800 tracking-tight text-center truncate">
+                              {title}
+                            </span>
+                            {isCurrentUser && (
+                              <Pencil className="w-2.5 h-2.5 text-neutral-400 opacity-60 hover:opacity-100 shrink-0" />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* DESKTOP PROFILE HEADER (PC Layout) */}
+          <div className="hidden md:block w-full mb-6 bg-white rounded-[32px] border border-neutral-100 shadow-sm overflow-hidden">
+            {user?.bannerUrl ? (
+              /* Desktop Panoramic Banner */
+              <div className="w-full h-56 lg:h-64 relative overflow-hidden bg-gradient-to-r from-purple-100 via-pink-50 to-indigo-100">
+                {isVideoMedia(user.bannerUrl) ? (
+                  <video src={user.bannerUrl} autoPlay loop muted playsInline className="w-full h-full object-cover pointer-events-none" />
+                ) : (
+                  <img src={user.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-black/20" />
+
+                {/* Desktop Banner Actions */}
+                <div className="absolute top-4 right-4 flex items-center space-x-2 z-20">
+                  <button 
+                    onClick={handleShare}
+                    className="w-8 h-8 rounded-full bg-white/90 hover:bg-white text-neutral-700 shadow-xs flex items-center justify-center active:scale-90 transition-all backdrop-blur-md border-0"
+                    title="Share Profile"
+                  >
+                    <LinkIcon className="w-3.5 h-3.5" />
+                  </button>
+                  {isCurrentUser && (
+                    <button 
+                      onClick={() => pushPage('settings')}
+                      className="w-8 h-8 rounded-full bg-white/90 hover:bg-white text-neutral-700 shadow-xs flex items-center justify-center active:scale-90 transition-all backdrop-blur-md border-0"
+                      title="Settings"
+                    >
+                      <Settings className="w-4 h-4 text-neutral-700" strokeWidth={1.8} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Desktop Top Bar when NO banner - Zero gap, clean buttons on right */
+              <div className="px-8 pt-4 pb-0 flex items-center justify-end space-x-2">
+                <button 
+                  onClick={handleShare}
+                  className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center active:scale-90 transition-all border-0"
+                  title="Share Profile"
+                >
+                  <LinkIcon className="w-3.5 h-3.5" />
+                </button>
+                {isCurrentUser && (
+                  <button 
+                    onClick={() => pushPage('settings')}
+                    className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center active:scale-90 transition-all border-0"
+                    title="Settings"
+                  >
+                    <Settings className="w-4 h-4 text-neutral-700" strokeWidth={1.8} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Desktop User Info & Stats */}
+            <div className={`px-8 pb-8 ${user?.bannerUrl ? 'pt-0' : 'pt-2'} relative`}>
+              <div className={`flex flex-col md:flex-row md:items-end justify-between ${user?.bannerUrl ? '-mt-16' : 'mt-0'} mb-6`}>
+                <div className="flex items-end space-x-6">
+                  {/* Avatar */}
+                  <div className="relative group shrink-0">
+                    <div 
+                      className="w-32 h-32 rounded-full p-[3.5px] bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center relative cursor-pointer select-none"
+                      onPointerDown={handleAvatarPressStart}
+                      onPointerUp={handleAvatarPressEnd}
+                      onPointerCancel={handleAvatarPressEnd}
+                      onMouseLeave={handleAvatarPressEnd}
+                      onTouchStart={handleAvatarPressStart}
+                      onTouchEnd={handleAvatarPressEnd}
+                      onContextMenu={(e) => {
+                        if (isHoldTriggeredRef.current) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                      }}
+                      title={isCurrentUser ? "Hold to view full photo" : "Hold to view photo"}
+                    >
+                      <div className="w-full h-full rounded-full p-[3px] bg-white dark:bg-black flex items-center justify-center overflow-hidden">
+                        {isVideoMedia(userData?.avatar || profileAvatar) ? (
+                          <video 
+                            src={userData?.avatar || profileAvatar} 
+                            autoPlay 
+                            loop 
+                            muted 
+                            playsInline 
+                            className="w-full h-full object-cover rounded-full pointer-events-none" 
+                          />
+                        ) : (
+                          <img 
+                            src={userData?.avatar || profileAvatar} 
+                            alt="Profile" 
+                            className="w-full h-full object-cover rounded-full pointer-events-none" 
+                            referrerPolicy="no-referrer" 
+                          />
+                        )}
+                      </div>
+
+                      {/* Verified Blue Badge at PFP bottom-right (in place of pencil icon on desktop) */}
+                      {user?.isVerified ? (
+                        <div className="absolute bottom-1 right-1 z-20 pointer-events-none drop-shadow-sm">
+                          <VerifiedBadge className="w-8 h-8" />
+                        </div>
+                      ) : isCurrentUser ? (
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            pushPage('edit-profile');
+                          }}
+                          className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-md flex items-center justify-center transition-all active:scale-90 border-2 border-white z-10"
+                          title="Edit profile"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-white" strokeWidth={2.2} />
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* Name & Handle */}
+                  <div className="pb-1 pl-2">
+                    <h1 className="text-3xl font-black text-neutral-950 tracking-tight flex items-center space-x-2">
+                      <span>{displayName}</span>
+                      {user?.isVerified && <VerifiedBadge />}
+                    </h1>
+                    <p className="text-neutral-500 font-medium text-sm mt-0.5">
+                      @{userData?.username || profileHandle.replace('@', '')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Desktop Action Buttons - 2D clean buttons */}
+                <div className="flex items-center space-x-2.5 mt-4 md:mt-0">
+                  {isCurrentUser ? (
+                    <>
+                      <button 
+                        onClick={() => pushPage('edit-profile')}
+                        className="px-5 py-2.5 rounded-full bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-semibold text-sm transition-all border-0 shadow-none flex items-center space-x-1.5"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-neutral-600" />
+                        <span>Edit profile</span>
+                      </button>
+                      <button 
+                        onClick={handleShare}
+                        className="px-5 py-2.5 rounded-full bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-semibold text-sm transition-all border-0 shadow-none flex items-center justify-center"
+                      >
+                        <span>Share profile</span>
+                      </button>
+                      <button 
+                        onClick={() => setShowAccountSwitcherModal(true)}
+                        className="w-10 h-10 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 rounded-full flex items-center justify-center transition-all shrink-0 border-0 shadow-none"
+                        title="Switch Account"
+                      >
+                        <ChevronDown className="w-4.5 h-4.5 text-neutral-700" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {friendship.isFriend ? (
+                        <>
+                          <button 
+                            onClick={handleMessage}
+                            className="px-6 py-2.5 rounded-full bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 active:scale-95 text-white font-semibold text-sm shadow-sm flex items-center space-x-1.5 transition-all"
+                          >
+                            <MessageCircle className="w-4 h-4 text-white" />
+                            <span>Message</span>
+                          </button>
+                          <button 
+                            onClick={() => setShowFriendOptionsModal(true)}
+                            className="px-6 py-2.5 rounded-full bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-semibold text-sm transition-all border-0 shadow-none flex items-center space-x-1.5"
+                          >
+                            <span>Friends</span>
+                            <ChevronDown className="w-3.5 h-3.5 text-neutral-500" />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button 
+                            onClick={handleFollow}
+                            disabled={loading}
+                            className={`px-6 py-2.5 rounded-full font-semibold text-sm transition-all active:scale-95 ${
+                              friendship.following 
+                                ? 'bg-neutral-100 text-neutral-800 hover:bg-neutral-200 border-0 shadow-none' 
+                                : 'bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 text-white shadow-sm'
+                            }`}
+                          >
+                            {friendship.following ? 'Following' : friendship.followedBy ? 'Follow Back' : 'Follow'}
+                          </button>
+                          <button 
+                            onClick={handleMessage}
+                            className="px-6 py-2.5 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-semibold text-sm transition-all active:scale-95 border-0 shadow-none"
+                          >
+                            Message
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Stats Row Desktop */}
+              <div className="flex items-center space-x-8 py-3 px-5 bg-white/50 backdrop-blur-md rounded-2xl border border-white/80 max-w-lg mb-5 shadow-2xs">
+                <div 
+                  className="flex items-center space-x-2 cursor-pointer active:scale-95 transition-transform"
+                  onClick={() => setShowFollowersList('following')}
+                >
+                  <span className="text-base font-bold text-gray-900">
+                    {formatCount(userData?.followingCount ?? user?.followingCount ?? 0)}
+                  </span>
+                  <span className="text-gray-500 text-xs font-medium">Following</span>
+                </div>
+                <div className="w-px h-4 bg-purple-200/80" />
+                <div 
+                  className="flex items-center space-x-2 cursor-pointer active:scale-95 transition-transform"
+                  onClick={() => setShowFollowersList('followers')}
+                >
+                  <span className="text-base font-bold text-gray-900">
+                    {formatCount(userData?.followersCount ?? user?.followersCount ?? 0)}
+                  </span>
+                  <span className="text-gray-500 text-xs font-medium">Followers</span>
+                </div>
+                <div className="w-px h-4 bg-purple-200/80" />
+                <div className="flex items-center space-x-2">
+                  <span className="text-base font-bold text-gray-900">
+                    {formatCount(userData?.totalLikes ?? (totalLikes || profilePosts.reduce((sum, p) => sum + (p.likesCount || 0), 0)))}
+                  </span>
+                  <span className="text-gray-500 text-xs font-medium">Likes</span>
+                </div>
+              </div>
+
+              {/* Bio & Link Desktop */}
+              {(userData?.bio || user?.bio || userData?.link || user?.link) && (
+                <div className="max-w-2xl mb-6">
+                  {Boolean(userData?.bio || user?.bio) && (
+                    <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line font-normal">
+                      {userData?.bio || user?.bio}
+                    </p>
+                  )}
+                  {(userData?.link || user?.link) && (
+                    <div className="flex items-center space-x-1.5 text-purple-600 mt-2">
+                      <LinkIcon className="w-4 h-4 shrink-0" />
+                      <a 
+                        href={(userData?.link || user?.link)?.startsWith('http') ? (userData?.link || user?.link) : `https://${userData?.link || user?.link}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-xs font-medium hover:underline"
+                      >
+                        {(userData?.link || user?.link)?.replace(/^https?:\/\//, '')}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Desktop Highlights (without plus button) */}
+              {(userData?.highlights || user?.highlights || []).length > 0 && (
+                <div className="pt-2 border-t border-purple-100/60">
+                  <div className="flex items-center space-x-4 overflow-x-auto hide-scrollbar py-2">
+                    {(userData?.highlights || user?.highlights || []).map((highlight: string, i: number) => (
+                      <div 
+                        key={i} 
+                        className="flex flex-col items-center select-none group cursor-pointer"
+                        onPointerDown={() => handleHighlightPressStart(highlight)}
+                        onPointerUp={handleHighlightPressEnd}
+                        onPointerCancel={handleHighlightPressEnd}
+                        onMouseLeave={handleHighlightPressEnd}
+                        onTouchStart={() => handleHighlightPressStart(highlight)}
+                        onTouchEnd={handleHighlightPressEnd}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClick={() => setViewingHighlightUrl(highlight)}
+                      >
+                        <div className="w-16 h-16 rounded-[22px] p-[2.5px] bg-gradient-to-tr from-purple-300 via-pink-200 to-indigo-300 shadow-2xs group-hover:scale-105 active:scale-95 transition-transform duration-200">
+                          <div className="w-full h-full rounded-[19px] overflow-hidden bg-white border border-white/80">
+                            {isVideoMedia(highlight) ? (
+                              <video src={highlight} autoPlay loop muted playsInline className="w-full h-full object-cover pointer-events-none" />
+                            ) : (
+                              <img src={highlight} alt="Highlight" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-medium text-gray-700 tracking-tight text-center mt-1.5 max-w-[70px] truncate">
+                          {CUTE_HIGHLIGHT_TITLES[i % CUTE_HIGHLIGHT_TITLES.length]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
         {/* Modern Tabs */}
@@ -919,45 +1682,131 @@ export default function Profile() {
           </div>
         ) : (
           <>
-            <div className="flex w-full mt-0 border-t border-gray-100 md:border-none md:bg-white/60 md:backdrop-blur-xl md:rounded-2xl md:p-1.5 md:max-w-md md:mx-auto md:mb-6 md:border md:border-white/80 md:shadow-2xs">
-              <button 
-                onClick={() => setActiveTab('posts')}
-                className={`flex-1 flex justify-center items-center py-3 md:py-2 md:rounded-xl border-b-2 md:border-b-0 transition-all ${activeTab === 'posts' ? 'border-black text-black md:bg-white md:shadow-xs md:text-purple-700' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-              >
-                <Grid className="w-5 h-5 mx-auto" />
-              </button>
-              <button 
-                onClick={() => setActiveTab('reels')}
-                className={`flex-1 flex justify-center items-center py-3 md:py-2 md:rounded-xl border-b-2 md:border-b-0 transition-all ${activeTab === 'reels' ? 'border-black text-black md:bg-white md:shadow-xs md:text-purple-700' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-              >
-                <PlaySquare className="w-5 h-5 mx-auto" />
-              </button>
-              <button 
-                onClick={() => setActiveTab('reposts')}
-                className={`flex-1 flex justify-center items-center py-3 md:py-2 md:rounded-xl border-b-2 md:border-b-0 transition-all ${activeTab === 'reposts' ? 'border-black text-black md:bg-white md:shadow-xs md:text-purple-700' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
-              </button>
-              {isCurrentUser && (
+            {/* Clean Edge-to-Edge Screen-Matching Profile Navigation Tab Bar */}
+            <div className="w-full border-t border-b border-neutral-200/70 dark:border-neutral-800/80 bg-white/95 dark:bg-black/95 backdrop-blur-md sticky top-0 z-20 select-none">
+              <div className="max-w-[600px] mx-auto w-full flex items-center justify-around">
+                
+                {/* 1. Posts Tab */}
                 <button 
-                  onClick={() => setActiveTab('saved')}
-                  className={`flex-1 flex justify-center items-center py-3 md:py-2 md:rounded-xl border-b-2 md:border-b-0 transition-all ${activeTab === 'saved' ? 'border-black text-black md:bg-white md:shadow-xs md:text-purple-700' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                  type="button"
+                  onClick={() => setActiveTab('posts')}
+                  className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group active:scale-95 ${
+                    activeTab === 'posts' 
+                      ? 'text-neutral-950 dark:text-white font-medium' 
+                      : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
+                  }`}
+                  title="Posts"
+                  aria-label="Posts"
                 >
-                  <Bookmark className="w-5 h-5 mx-auto" />
+                  <Grid className="w-5 h-5 transition-transform group-hover:scale-105" strokeWidth={activeTab === 'posts' ? 2.4 : 1.8} />
+                  {activeTab === 'posts' && (
+                    <motion.div 
+                      layoutId="profileActiveTabLine"
+                      transition={{ type: "spring", stiffness: 450, damping: 34 }}
+                      className="absolute bottom-0 left-3 right-3 h-[2px] bg-neutral-950 dark:bg-white rounded-full"
+                    />
+                  )}
                 </button>
-              )}
-              {isCurrentUser && privatePosts.length > 0 && (
+
+                {/* 2. Reels Tab */}
                 <button 
-                  onClick={() => setActiveTab('private')}
-                  title="Private Posts & Reels"
-                  className={`flex-1 flex justify-center items-center py-3 md:py-2 md:rounded-xl border-b-2 md:border-b-0 transition-all relative ${activeTab === 'private' ? 'border-purple-600 text-purple-600 md:bg-white md:shadow-xs' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                  type="button"
+                  onClick={() => setActiveTab('reels')}
+                  className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group active:scale-95 ${
+                    activeTab === 'reels' 
+                      ? 'text-neutral-950 dark:text-white font-medium' 
+                      : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
+                  }`}
+                  title="Reels"
+                  aria-label="Reels"
                 >
-                  <Lock className="w-5 h-5 mx-auto" />
-                  <span className="absolute top-2 right-1/4 bg-purple-600 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full shadow-xs">
-                    {privatePosts.length}
-                  </span>
+                  <PlaySquare className="w-5 h-5 transition-transform group-hover:scale-105" strokeWidth={activeTab === 'reels' ? 2.4 : 1.8} />
+                  {activeTab === 'reels' && (
+                    <motion.div 
+                      layoutId="profileActiveTabLine"
+                      transition={{ type: "spring", stiffness: 450, damping: 34 }}
+                      className="absolute bottom-0 left-3 right-3 h-[2px] bg-neutral-950 dark:bg-white rounded-full"
+                    />
+                  )}
                 </button>
-              )}
+
+                {/* 3. Reposts Tab */}
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab('reposts')}
+                  className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group active:scale-95 ${
+                    activeTab === 'reposts' 
+                      ? 'text-neutral-950 dark:text-white font-medium' 
+                      : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
+                  }`}
+                  title="Reposts"
+                  aria-label="Reposts"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={activeTab === 'reposts' ? 2.4 : 1.8} strokeLinecap="round" strokeLinejoin="round" className="transition-transform group-hover:scale-105">
+                    <path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
+                  </svg>
+                  {activeTab === 'reposts' && (
+                    <motion.div 
+                      layoutId="profileActiveTabLine"
+                      transition={{ type: "spring", stiffness: 450, damping: 34 }}
+                      className="absolute bottom-0 left-3 right-3 h-[2px] bg-neutral-950 dark:bg-white rounded-full"
+                    />
+                  )}
+                </button>
+
+                {/* 4. Saved / Favorites Tab */}
+                {isCurrentUser && (
+                  <button 
+                    type="button"
+                    onClick={() => setActiveTab('saved')}
+                    className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group active:scale-95 ${
+                      activeTab === 'saved' 
+                        ? 'text-neutral-950 dark:text-white font-medium' 
+                        : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
+                    }`}
+                    title="Favorites & Saved"
+                    aria-label="Favorites & Saved"
+                  >
+                    <Bookmark className="w-5 h-5 transition-transform group-hover:scale-105" strokeWidth={activeTab === 'saved' ? 2.4 : 1.8} />
+                    {activeTab === 'saved' && (
+                      <motion.div 
+                        layoutId="profileActiveTabLine"
+                        transition={{ type: "spring", stiffness: 450, damping: 34 }}
+                        className="absolute bottom-0 left-3 right-3 h-[2px] bg-neutral-950 dark:bg-white rounded-full"
+                      />
+                    )}
+                  </button>
+                )}
+
+                {/* 5. Private Tab (if private posts exist) */}
+                {isCurrentUser && privatePosts.length > 0 && (
+                  <button 
+                    type="button"
+                    onClick={() => setActiveTab('private')}
+                    className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group active:scale-95 ${
+                      activeTab === 'private' 
+                        ? 'text-purple-600 dark:text-purple-400 font-medium' 
+                        : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
+                    }`}
+                    title="Private Posts"
+                    aria-label="Private Posts"
+                  >
+                    <span className="relative flex items-center justify-center">
+                      <Lock className="w-4.5 h-4.5 transition-transform group-hover:scale-105" strokeWidth={activeTab === 'private' ? 2.4 : 1.8} />
+                      <span className="absolute -top-1 -right-2 bg-purple-600 text-white text-[9px] font-bold px-1 py-0.2 rounded-full leading-none">
+                        {privatePosts.length}
+                      </span>
+                    </span>
+                    {activeTab === 'private' && (
+                      <motion.div 
+                        layoutId="profileActiveTabLine"
+                        transition={{ type: "spring", stiffness: 450, damping: 34 }}
+                        className="absolute bottom-0 left-3 right-3 h-[2px] bg-purple-600 rounded-full"
+                      />
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Posts Feed */}
@@ -1073,6 +1922,16 @@ export default function Profile() {
                     <PlaySquare className="w-12 h-12 mb-3 text-purple-300/40" />
                     <h3 className="text-base font-normal text-gray-800 mb-1">No Reels Yet</h3>
                     <p className="text-xs text-gray-400">Reels created will appear here</p>
+                  </div>
+                )}
+                {reels.length > visibleCount && (
+                  <div className="col-span-3 sm:col-span-4 md:col-span-5 lg:col-span-6 flex justify-center py-6">
+                    <button
+                      onClick={() => setVisibleCount((prev) => prev + 24)}
+                      className="px-6 py-2.5 rounded-full bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 text-xs font-semibold active:scale-95 transition-all cursor-pointer shadow-xs"
+                    >
+                      Load More Reels ({reels.length - visibleCount} remaining)
+                    </button>
                   </div>
                 )}
               </div>
@@ -1502,6 +2361,208 @@ export default function Profile() {
                   className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white p-2.5 rounded-full transition-all active:scale-95 shrink-0 flex items-center justify-center"
                 >
                   {sendingHighlightReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Friend Options Bottom Sheet Modal */}
+        {showFriendOptionsModal && (
+          <div 
+            className="fixed inset-0 z-[150] bg-black/40 backdrop-blur-xs flex items-end justify-center animate-in fade-in duration-200"
+            onClick={() => {
+              setShowFriendOptionsModal(false);
+              setShowNicknameModal(false);
+            }}
+          >
+            <div 
+              className="w-full max-w-md bg-white rounded-t-[28px] p-5 pb-8 space-y-3 animate-in slide-in-from-bottom duration-300 shadow-2xl border-t border-neutral-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-10 h-1 bg-neutral-200 rounded-full mx-auto mb-3" />
+              
+              {!showNicknameModal ? (
+                <>
+                  <div className="text-center pb-2 border-b border-neutral-100">
+                    <h3 className="font-bold text-[16px] text-neutral-900">
+                      {displayName}
+                    </h3>
+                    <p className="text-neutral-500 text-xs mt-0.5">
+                      @{userData?.username || profileHandle.replace('@', '')}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5 pt-1">
+                    <button
+                      onClick={() => {
+                        setTempNickname(customNickname || userData?.name || '');
+                        setShowNicknameModal(true);
+                      }}
+                      className="w-full py-3 px-4 rounded-2xl hover:bg-neutral-100 active:bg-neutral-200 flex items-center space-x-3 text-neutral-800 font-semibold text-[14px] transition-colors text-left"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-700">
+                        <Pencil className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-neutral-900">Set Custom Name</p>
+                        <p className="text-xs text-neutral-500">Add a custom nickname for this friend</p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={async () => {
+                        setShowFriendOptionsModal(false);
+                        await handleFollow();
+                      }}
+                      className="w-full py-3 px-4 rounded-2xl hover:bg-rose-50 active:bg-rose-100 flex items-center space-x-3 text-rose-600 font-semibold text-[14px] transition-colors text-left"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-rose-100/70 flex items-center justify-center text-rose-600">
+                        <UserMinus className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-rose-600">Unfollow</p>
+                        <p className="text-xs text-rose-400">Remove from friends & following list</p>
+                      </div>
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => setShowFriendOptionsModal(false)}
+                    className="w-full py-3 rounded-2xl bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-semibold text-[14px] transition-all mt-2"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <div className="space-y-4 pt-1">
+                  <div className="text-center">
+                    <h3 className="font-bold text-[16px] text-neutral-900">Custom Nickname</h3>
+                    <p className="text-xs text-neutral-500 mt-0.5">Only you can see this custom name</p>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={tempNickname}
+                    onChange={(e) => setTempNickname(e.target.value)}
+                    placeholder="Enter custom nickname..."
+                    className="w-full px-4 py-3 rounded-2xl bg-neutral-100 border border-neutral-200 text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
+                    autoFocus
+                  />
+
+                  <div className="flex space-x-2 pt-1">
+                    <button
+                      onClick={() => setShowNicknameModal(false)}
+                      className="flex-1 py-3 rounded-2xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-semibold text-sm transition-all"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (targetUserId) {
+                          try {
+                            const currentMap = JSON.parse(localStorage.getItem('ennvo_custom_nicknames') || '{}');
+                            if (tempNickname.trim()) {
+                              currentMap[targetUserId] = tempNickname.trim();
+                              setCustomNickname(tempNickname.trim());
+                            } else {
+                              delete currentMap[targetUserId];
+                              setCustomNickname('');
+                            }
+                            localStorage.setItem('ennvo_custom_nicknames', JSON.stringify(currentMap));
+                          } catch (e) {
+                            console.error(e);
+                          }
+                        }
+                        setShowNicknameModal(false);
+                        setShowFriendOptionsModal(false);
+                      }}
+                      className="flex-1 py-3 rounded-2xl bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-sm transition-all"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        </>
+        )}
+
+        {/* Hidden inputs for uploading banner & avatar */}
+        <input 
+          type="file" 
+          ref={bannerInputRef} 
+          onChange={handleUploadBanner} 
+          accept="image/*,video/*" 
+          className="hidden" 
+        />
+        <input 
+          type="file" 
+          ref={avatarInputRef} 
+          onChange={handleAvatarFileSelect} 
+          accept="image/*,video/*" 
+          className="hidden" 
+        />
+
+        {/* Media Crop Modal for Avatar */}
+        <MediaCropModal 
+          isOpen={avatarCropModalOpen}
+          file={avatarCropTargetFile}
+          cropType="avatar"
+          onClose={() => setAvatarCropModalOpen(false)}
+          onApply={handleApplyCroppedAvatar}
+        />
+
+        {/* Edit Highlight Title Modal - 2D Clean */}
+        {editingHighlightIndex !== null && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/40 animate-in fade-in duration-150">
+            <div className="bg-white rounded-3xl p-5 max-w-xs w-full shadow-lg border border-neutral-100 space-y-4 animate-in zoom-in-95 duration-150">
+              <div className="text-center">
+                <h3 className="text-base font-bold text-neutral-900 tracking-tight">Edit Highlight Name</h3>
+                <p className="text-xs text-neutral-500 mt-0.5">Customize the title of this highlight</p>
+              </div>
+
+              <input 
+                type="text" 
+                value={tempHighlightTitle} 
+                onChange={(e) => setTempHighlightTitle(e.target.value)} 
+                placeholder="Highlight name"
+                maxLength={30}
+                autoFocus
+                className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-2xl text-[14px] text-neutral-900 focus:outline-none focus:border-purple-500 transition-colors"
+              />
+
+              <div className="flex space-x-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEditingHighlightIndex(null)}
+                  className="flex-1 py-2.5 rounded-2xl border border-neutral-200 text-neutral-700 font-semibold text-xs hover:bg-neutral-50 active:scale-95 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const newTitle = tempHighlightTitle.trim() || 'Highlight';
+                    const newTitles = { ...customHighlightTitles, [editingHighlightIndex]: newTitle };
+                    setCustomHighlightTitles(newTitles);
+                    try {
+                      localStorage.setItem(`ennvo_hl_titles_${user?.uid}`, JSON.stringify(newTitles));
+                      if (isCurrentUser && user?.uid) {
+                        await updateDoc(doc(db, 'users', user.uid), {
+                          highlightTitles: newTitles
+                        });
+                      }
+                    } catch (err) {
+                      console.error("Failed to save highlight title:", err);
+                    }
+                    setEditingHighlightIndex(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 active:scale-95 text-white font-semibold text-xs transition-all shadow-sm"
+                >
+                  Save
                 </button>
               </div>
             </div>

@@ -1,20 +1,31 @@
 import React, { useState, useCallback, memo, useEffect, useRef, lazy, Suspense } from 'react';
-import { X, Heart, MessageCircle, Share2, Play, ArrowLeft, MoreHorizontal, Send, Bookmark, VolumeX, ChevronUp, ChevronDown, Globe, ImageIcon, UserPlus, MapPin, Share, Trash2, Download, Music, Sparkles } from 'lucide-react';
+import { X, Heart, MessageCircle, Share2, Play, ArrowLeft, MoreHorizontal, Send, Bookmark, VolumeX, ChevronUp, ChevronDown, Globe, ImageIcon, UserPlus, MapPin, Share, Trash2, Download, Music, Sparkles, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
+import { App as CapApp } from '@capacitor/app';
+import { StatusBar, Style } from '@capacitor/status-bar';
 
-const Home = lazy(() => import('./pages/Home'));
-const Search = lazy(() => import('./pages/Search'));
-const Reels = lazy(() => import('./pages/Reels'));
-const Messages = lazy(() => import('./pages/Messages'));
-const Notifications = lazy(() => import('./pages/Notifications'));
+import Home from './pages/Home';
+import Search from './pages/Search';
+import Reels from './pages/Reels';
+import Messages from './pages/Messages';
+import Notifications from './pages/Notifications';
 const Profile = lazy(() => import('./pages/Profile'));
 const EditProfile = lazy(() => import('./pages/EditProfile'));
-const Create = lazy(() => import('./pages/Create'));
-const SearchPage = lazy(() => import('./pages/SearchPage'));
-const Settings = lazy(() => import('./pages/Settings'));
-const Auth = lazy(() => import('./pages/Auth'));
+import Create from './pages/Create';
+import SearchPage from './pages/SearchPage';
+import Settings from './pages/Settings';
+import Auth from './pages/Auth';
+const AdminApp = lazy(() => import('../admin/src/AdminApp'));
+
+// Background prefetch for Profile & EditProfile chunks for ultra-smooth instant feel
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    import('./pages/Profile');
+    import('./pages/EditProfile');
+  }, 1200);
+}
 
 import MiniChat from './components/MiniChat';
 import { CallOverlay } from './components/CallOverlay';
@@ -27,6 +38,7 @@ import {
   FacebookStorySkeleton, 
   FacebookReelSkeleton, 
   FacebookProfileSkeleton, 
+  FacebookEditProfileSkeleton,
   FacebookMessageListSkeleton,
   FacebookSearchSkeleton 
 } from './components/Skeletons';
@@ -35,26 +47,34 @@ import { deleteStory } from './services/storyService';
 import { subscribeReels } from './services/postService';
 import { deviceNotification } from './services/deviceNotification';
 import { formatTime, downloadMediaFile } from './utils';
-import { doc, onSnapshot, collection, query, where, getDocFromServer } from 'firebase/firestore';
-import { db } from './firebase';
+import { doc, onSnapshot, collection, query, where, limit } from 'firebase/firestore';
+import { db, auth } from './firebase';
 import { ReelItem, SharePortal } from './components/ReelItem';
 import { LikesList } from './components/LikesList';
 import { AnalyticsModal } from './components/AnalyticsModal';
 import { UploadProgressBar } from './components/UploadProgressBar';
+import { ReelCameraModal } from './components/ReelCameraModal';
 import { getPost } from './services/postService';
 import { MediaViewerModal } from './components/MediaViewerModal';
-
-// Test connection strictly once on boot
-async function testFirestoreConnection() {
-  try {
-    await getDocFromServer(doc(db, 'system', 'connection_test'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn("Firestore is in offline mode. Please check your configuration.");
-    }
-  }
-}
-testFirestoreConnection();
+import { bridge, PendingSharePayload } from './native/bridge';
+import { 
+  startNotificationCenter, 
+  stopNotificationCenter, 
+  setInAppToastListener, 
+  setActiveChatInCenter 
+} from './services/notificationCenter';
+import { registerNativePushAndReplies, unregisterNativePush } from './services/nativePushReplies';
+import { initDeepLinkListeners, openFromLink } from './services/deepLinkService';
+import { subscribeAppConfig, AndroidAppConfig, notifyAppReady } from './services/appConfigService';
+import { ErrorBoundary, initGlobalErrorHandlers } from './components/ErrorBoundary';
+import { 
+  BannedSuspendedModal, 
+  MaintenanceScreen, 
+  AppUpdateModal, 
+  ShareReceivedSheet, 
+  BannedInfo 
+} from './components/AppStatusModals';
+import { applyRouteSEO } from './services/seoService';
 
 import { playNotificationSound } from './services/soundService';
 
@@ -65,100 +85,33 @@ const playNotifChime = () => {
 const InAppToaster = memo(() => {
   const { currentUser, setViewingMedia, setViewingReel, pushPage, setViewingUser, setHighlightedCommentId, setHighlightedPostId, setActiveChat, activeChat } = useAppStore();
   const [toast, setToast] = useState<any | null>(null);
-  const initialLoadRef = React.useRef(true);
-  const initialMsgLoadRef = React.useRef(true);
   const timeoutRef = React.useRef<any>(null);
 
+  const isUserTyping = useCallback(() => {
+    if (typeof document === 'undefined') return false;
+    const active = document.activeElement;
+    if (!active) return false;
+    const tag = active.tagName?.toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return true;
+    if ((active as HTMLElement).isContentEditable) return true;
+    return false;
+  }, []);
+
   useEffect(() => {
-    if (!currentUser) return;
-    const unsub = onSnapshot(collection(db, 'notifications', currentUser.uid, 'items'), (snap) => {
-      if (initialLoadRef.current) {
-        initialLoadRef.current = false;
+    setInAppToastListener((t) => {
+      // Suppress in-app toast if user is actively typing, or if it's a typing indicator toast
+      if (isUserTyping() || t?.type === 'typing') {
         return;
       }
-      const changes = snap.docChanges();
-      changes.forEach(change => {
-        if (change.type === 'added') {
-          const data = change.doc.data();
-          if (data.createdAt && Date.now() - data.createdAt.toMillis() < 10000) {
-             setToast({ id: change.doc.id, ...data });
-             playNotifChime();
-             try {
-               deviceNotification.show({
-                 title: data.actorName || 'Ennvo',
-                 body: data.type === 'like' ? 'liked your post.' : data.type === 'comment' ? `commented: ${data.content}` : data.type === 'follow' ? 'started following you.' : (data.content || 'New activity'),
-                 icon: data.actorAvatar || '/Ennvo.png',
-                 type: 'activity',
-                 tag: `notif-${change.doc.id}`
-               });
-             } catch (e) {}
-             if (timeoutRef.current) clearTimeout(timeoutRef.current);
-             timeoutRef.current = setTimeout(() => setToast(null), 4500);
-          }
-        }
-      });
-    }, (err) => console.warn('Notif toast error:', err));
+      setToast(t);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setToast(null), 4500);
+    });
 
-    const unsubMsg = onSnapshot(query(collection(db, 'conversations'), where('participantIds', 'array-contains', currentUser.uid)), (snap) => {
-      if (initialMsgLoadRef.current) {
-        initialMsgLoadRef.current = false;
-        return;
-      }
-      const changes = snap.docChanges();
-      changes.forEach(change => {
-        if (change.type === 'modified' || change.type === 'added') {
-          const data = change.doc.data();
-          const otherId = data.participantIds?.find((id: string) => id !== currentUser.uid);
-          const name = data.participantNames?.[otherId] || 'User';
-          const avatar = data.participantAvatars?.[otherId] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
-
-          // 1. Friend typing in-app notification when user is in another page/chat
-          if (otherId && data.typing?.[otherId] && activeChat !== change.doc.id) {
-            const typingTime = data.typing[otherId];
-            if (Date.now() - typingTime < 4000) {
-              setToast({
-                id: `${change.doc.id}-typing`,
-                type: 'typing',
-                actorName: name,
-                actorAvatar: avatar,
-                content: 'is typing a message...',
-                conversationId: change.doc.id
-              });
-              if (timeoutRef.current) clearTimeout(timeoutRef.current);
-              timeoutRef.current = setTimeout(() => setToast(null), 3200);
-              return;
-            }
-          }
-
-          // 2. Incoming message alert
-          if (data.unreadCount?.[currentUser.uid] > 0 && data.updatedAt && Date.now() - data.updatedAt.toMillis() < 10000 && activeChat !== change.doc.id) {
-             setToast({ 
-               id: change.doc.id, 
-               type: 'message', 
-               actorName: name, 
-               actorAvatar: avatar, 
-               content: data.lastMessage,
-               conversationId: change.doc.id
-             });
-             playNotifChime();
-             try {
-               deviceNotification.show({
-                 title: name,
-                 body: data.lastMessage || 'Sent a new message',
-                 icon: avatar || '/Ennvo.png',
-                 type: 'message',
-                 tag: `msg-${change.doc.id}`
-               });
-             } catch (e) {}
-             if (timeoutRef.current) clearTimeout(timeoutRef.current);
-             timeoutRef.current = setTimeout(() => setToast(null), 4500);
-          }
-        }
-      });
-    }, (err) => console.warn('Msg toast error:', err));
-
-    return () => { unsub(); unsubMsg(); };
-  }, [currentUser, activeChat]);
+    return () => {
+      setInAppToastListener(null);
+    };
+  }, [isUserTyping]);
 
   if (!toast) return null;
 
@@ -168,14 +121,22 @@ const InAppToaster = memo(() => {
   return (
     <AnimatePresence>
       <motion.div 
-        initial={{ y: -80, opacity: 0, scale: 0.95 }}
+        initial={{ y: -70, opacity: 0, scale: 0.92 }}
         animate={{ y: 0, opacity: 1, scale: 1 }}
-        exit={{ y: -80, opacity: 0, scale: 0.95 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 350, mass: 0.6 }}
-        className="fixed top-8 sm:top-6 left-0 right-0 z-[300] flex justify-center pointer-events-none px-4 pt-safe"
+        exit={{ y: -70, opacity: 0, scale: 0.92 }}
+        transition={{ type: 'spring', damping: 24, stiffness: 340, mass: 0.6 }}
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={0.35}
+        onDragEnd={(_, info) => {
+          if (info.offset.y < -20 || info.velocity.y < -250) {
+            setToast(null);
+          }
+        }}
+        className="fixed top-[max(calc(env(safe-area-inset-top,0px)+8px),12px)] left-0 right-0 z-[350] flex justify-center pointer-events-none px-3 sm:px-4"
       >
         <div 
-          className="bg-white/85 backdrop-blur-xl shadow-[0_12px_32px_-8px_rgba(0,0,0,0.16),0_0_1px_1px_rgba(255,255,255,0.9)_inset] border border-white/70 rounded-[22px] flex items-center px-3.5 py-2.5 pointer-events-auto cursor-pointer max-w-sm w-full transition-transform active:scale-[0.98] relative overflow-hidden group backdrop-saturate-150 transform-gpu"
+          className="bg-white/95 dark:bg-[#121824]/95 text-neutral-900 dark:text-white shadow-[0_16px_40px_rgba(14,165,233,0.18),0_4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.45)] border border-sky-200/90 dark:border-sky-500/25 rounded-[26px] p-3.5 pointer-events-auto cursor-pointer max-w-[400px] w-full transition-transform active:scale-[0.985] relative overflow-hidden group backdrop-blur-2xl transform-gpu select-none"
           onClick={async () => {
              setToast(null);
              if (toast.type === 'message' || toast.type === 'typing') {
@@ -208,74 +169,94 @@ const InAppToaster = memo(() => {
              }
           }}
         >
-          <div className="relative shrink-0">
-            <img 
-              src={toast.actorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(toast.actorName || 'User')}&background=random`} 
-              className="w-10 h-10 rounded-full object-cover border border-white/90 shadow-2xs" 
-              alt="avatar" 
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-2xs border border-gray-100 scale-90">
-              {toast.type === 'typing' ? (
-                <span className="w-2.5 h-2.5 rounded-full bg-purple-600 animate-ping" />
-              ) : toast.type === 'message' ? (
-                <MessageCircle className="w-2.5 h-2.5 text-blue-500 fill-blue-500" />
-              ) : toast.type === 'like' ? (
-                <Heart className="w-2.5 h-2.5 text-red-500 fill-red-500" />
-              ) : (
-                <Sparkles className="w-2.5 h-2.5 text-[#FF2C55]" />
-              )}
+          {/* Soft Sky Blue Ambient Backlight Glow */}
+          <div className="absolute -top-12 -left-12 w-36 h-36 bg-sky-400/20 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-12 -right-12 w-36 h-36 bg-blue-500/15 rounded-full blur-2xl pointer-events-none" />
+
+          {/* Pull-Up Grabber Bar */}
+          <div className="w-8 h-1 rounded-full bg-sky-300/60 dark:bg-sky-500/40 mx-auto -mt-1 mb-2 pointer-events-none" />
+
+          {/* Top App Brand Bar */}
+          <div className="flex items-center justify-between px-0.5 mb-2 pointer-events-none">
+            <div className="flex items-center space-x-1.5">
+              <img 
+                src="/Ennvo.png" 
+                alt="Ennvo" 
+                className="w-4 h-4 rounded-[4.5px] object-cover ring-1 ring-sky-300/40 shadow-xs" 
+              />
+              <span className="text-[10.5px] font-black tracking-widest text-sky-600 dark:text-sky-400 uppercase">ENNVO</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <span className="text-[10px] font-semibold text-neutral-400 dark:text-neutral-400">now</span>
             </div>
           </div>
-          
-          {toast.type === 'typing' ? (
-            <>
-              <div className="ml-3 flex-1 min-w-0 pr-1 flex flex-col justify-center">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-[13px] font-bold text-gray-900 leading-tight truncate">
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center min-w-0 flex-1">
+              <div className="relative shrink-0 mr-3">
+                <img 
+                  src={toast.actorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(toast.actorName || 'User')}&background=random`} 
+                  className="w-11 h-11 rounded-full object-cover border-2 border-white dark:border-neutral-800 shadow-sm ring-2 ring-sky-400/40" 
+                  alt="avatar" 
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute -bottom-0.5 -right-0.5 w-4.5 h-4.5 bg-white dark:bg-neutral-900 rounded-full flex items-center justify-center shadow-xs border border-sky-100 dark:border-neutral-800 scale-95">
+                  {toast.type === 'typing' ? (
+                    <span className="w-2.5 h-2.5 rounded-full bg-sky-500 animate-ping" />
+                  ) : toast.type === 'message' ? (
+                    <MessageCircle className="w-2.5 h-2.5 text-sky-500 fill-sky-500" />
+                  ) : toast.type === 'like' ? (
+                    <Heart className="w-2.5 h-2.5 text-rose-500 fill-rose-500" />
+                  ) : (
+                    <Sparkles className="w-2.5 h-2.5 text-sky-500 fill-sky-500" />
+                  )}
+                </div>
+              </div>
+
+              {toast.type === 'typing' ? (
+                <div className="flex-1 min-w-0 pr-2">
+                  <h4 className="text-[13.5px] font-bold text-neutral-900 dark:text-white leading-tight truncate">
                     {toast.actorName || 'Friend'}
                   </h4>
-                  <span className="text-[10px] font-semibold text-purple-600 ml-2 animate-pulse">typing...</span>
-                </div>
-                <div className="flex items-center space-x-1.5 mt-0.5">
-                  <span className="text-[11.5px] font-medium text-gray-600 truncate">
-                    is typing a message
-                  </span>
-                  <div className="flex items-center space-x-1 bg-purple-50 px-1.5 py-0.5 rounded-full">
-                    <span className="w-1 h-1 rounded-full bg-purple-600 animate-bounce [animation-delay:0ms]" />
-                    <span className="w-1 h-1 rounded-full bg-purple-600 animate-bounce [animation-delay:150ms]" />
-                    <span className="w-1 h-1 rounded-full bg-purple-600 animate-bounce [animation-delay:300ms]" />
+                  <div className="flex items-center space-x-1.5 mt-0.5">
+                    <span className="text-[12px] font-semibold text-sky-600 dark:text-sky-400 truncate">
+                      typing a message...
+                    </span>
+                    <div className="flex items-center space-x-1 bg-sky-100 dark:bg-sky-950/60 px-1.5 py-0.5 rounded-full">
+                      <span className="w-1 h-1 rounded-full bg-sky-500 animate-bounce [animation-delay:0ms]" />
+                      <span className="w-1 h-1 rounded-full bg-sky-500 animate-bounce [animation-delay:150ms]" />
+                      <span className="w-1 h-1 rounded-full bg-sky-500 animate-bounce [animation-delay:300ms]" />
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <button 
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setToast(null);
-                  setActiveChat(toast.conversationId);
-                  pushPage('messages');
-                }}
-                className="text-white bg-purple-600 hover:bg-purple-700 font-semibold text-[11px] px-3 py-1 rounded-full shrink-0 ml-2 transition-transform active:scale-95 shadow-2xs"
-              >
-                Chat
-              </button>
-            </>
-          ) : toast.type === 'message' ? (
-            <>
-              <div className="ml-3 flex-1 min-w-0 pr-1 flex flex-col justify-center">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-[13px] font-semibold text-gray-900 leading-tight truncate">
+              ) : toast.type === 'message' ? (
+                <div className="flex-1 min-w-0 pr-2">
+                  <h4 className="text-[13.5px] font-bold text-neutral-900 dark:text-white leading-tight truncate">
                     {toast.actorName || 'User'}
                   </h4>
-                  <span className="text-[10px] font-medium text-gray-400 ml-2">now</span>
+                  <p className="text-[12px] font-normal text-neutral-600 dark:text-neutral-200 truncate leading-tight mt-0.5">
+                    {toast.content}
+                  </p>
                 </div>
-                <p className="text-[12px] font-normal text-gray-600 truncate leading-tight mt-0.5">
-                  {toast.content}
-                </p>
-              </div>
+              ) : (
+                <div className="flex-1 min-w-0 pr-2">
+                  <h4 className="text-[13.5px] font-bold text-neutral-900 dark:text-white leading-tight truncate">
+                    {toast.actorName || 'User'}
+                  </h4>
+                  <p className="text-[12px] text-neutral-600 dark:text-neutral-200 font-normal leading-snug mt-0.5 truncate">
+                    {toast.type === 'like' && 'liked your post'}
+                    {toast.type === 'comment' && `commented: ${toast.content}`}
+                    {toast.type === 'follow' && 'started following you'}
+                    {toast.type === 'mention' && 'mentioned you'}
+                    {toast.type === 'favorite' && 'saved your post'}
+                    {(toast.type as string) === 'repost' && 'reposted your video'}
+                  </p>
+                </div>
+              )}
+            </div>
 
+            {/* Right Action / Media Box */}
+            {toast.type === 'message' ? (
               <button 
                 type="button"
                 onClick={(e) => {
@@ -284,57 +265,36 @@ const InAppToaster = memo(() => {
                   setActiveChat(toast.conversationId);
                   pushPage('messages');
                 }}
-                className="text-white bg-black hover:bg-gray-800 font-semibold text-[11.5px] px-3 py-1 rounded-full shrink-0 ml-2 transition-transform active:scale-95 shadow-2xs"
+                className="text-white bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 font-semibold text-[11.5px] px-3.5 py-1.5 rounded-full shrink-0 ml-2 transition-transform active:scale-95 shadow-sm shadow-sky-500/25"
               >
                 Reply
               </button>
-            </>
-          ) : (
-            <div className="ml-3 flex-1 min-w-0 pr-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-medium text-gray-400 tracking-wider uppercase">Ennvo</span>
-                <span className="text-[10px] font-medium text-gray-400 ml-2">now</span>
+            ) : hasMedia ? (
+              <div className="w-11 h-11 rounded-2xl bg-neutral-100 dark:bg-black/60 overflow-hidden relative shrink-0 ml-2 border border-sky-200/80 dark:border-white/20 shadow-xs flex items-center justify-center">
+                {isVideo ? (
+                  <>
+                    <video 
+                      src={`${hasMedia}#t=0.001`} 
+                      className="w-full h-full object-cover" 
+                      preload="metadata" 
+                      muted 
+                      playsInline
+                    />
+                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center pointer-events-none">
+                      <Play className="w-3.5 h-3.5 text-white fill-white drop-shadow-md" />
+                    </div>
+                  </>
+                ) : (
+                  <img 
+                    src={hasMedia} 
+                    className="w-full h-full object-cover" 
+                    alt="Thumbnail" 
+                    referrerPolicy="no-referrer"
+                  />
+                )}
               </div>
-              <p className="text-[12.5px] text-gray-900 font-normal leading-snug mt-0.5">
-                <span className="font-semibold text-gray-900 mr-1">{toast.actorName || 'User'}</span>
-                <span className="text-gray-700 font-normal">
-                  {toast.type === 'like' && 'liked your post.'}
-                  {toast.type === 'comment' && `commented: ${toast.content}`}
-                  {toast.type === 'follow' && 'started following you.'}
-                  {toast.type === 'mention' && 'mentioned you.'}
-                  {toast.type === 'favorite' && 'saved your post.'}
-                  {(toast.type as string) === 'repost' && 'reposted your video.'}
-                </span>
-              </p>
-            </div>
-          )}
-
-          {/* Small side media box displaying strictly an Image/Video Thumbnail for Reels */}
-          {toast.type !== 'message' && hasMedia && (
-            <div className="w-10 h-10 rounded-xl bg-gray-900 overflow-hidden relative shrink-0 ml-2 border border-white/80 shadow-2xs flex items-center justify-center">
-              {isVideo ? (
-                <video 
-                  src={`${hasMedia}#t=0.001`} 
-                  className="w-full h-full object-cover" 
-                  preload="metadata" 
-                  muted 
-                  playsInline
-                />
-              ) : (
-                <img 
-                  src={hasMedia} 
-                  className="w-full h-full object-cover" 
-                  alt="Thumbnail" 
-                  referrerPolicy="no-referrer"
-                />
-              )}
-              {isVideo && (
-                <div className="absolute inset-0 bg-black/25 flex items-center justify-center pointer-events-none">
-                  <Play className="w-3 h-3 text-white fill-white drop-shadow-md" />
-                </div>
-              )}
-            </div>
-          )}
+            ) : null}
+          </div>
         </div>
       </motion.div>
     </AnimatePresence>
@@ -351,13 +311,15 @@ export default function App() {
     viewingReel, setViewingReel, 
     viewingReelList, setViewingReelList,
     viewingReelContext, setViewingReelContext,
-    activeChat, showCreatePost, 
+    activeChat, showCreatePost, showReelCamera,
     isAuthenticated, isAuthLoading, 
     currentUser, setCurrentUser, 
     setNotificationCount,
     setMessageCount,
     isBottomNavHidden,
-    popPage
+    popPage,
+    cachedReels,
+    appTheme
   } = useAppStore();
 
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -374,71 +336,44 @@ export default function App() {
     };
   }, []);
 
-  // Android Native Hardware Back Button Handler & Capacitor Native Integration
+  // Hide native Capacitor Splash Screen on mount
   useEffect(() => {
-    (window as any).handleAndroidBack = () => {
-      const state = useAppStore.getState();
-      if (state.viewingReel) {
-        state.setViewingReel(null);
-        state.setViewingReelList(null);
-        return true;
-      }
-      if (state.viewingMedia) {
-        state.setViewingMedia(null);
-        return true;
-      }
-      if (state.activeChat) {
-        state.setActiveChat(null);
-        return true;
-      }
-      if (state.navigationStack && state.navigationStack.length > 1) {
-        state.popPage();
-        return true;
-      }
-      return false; // Returns false to let native Android handle app minimization or exit
-    };
-
-    // Capacitor Native Hardware Back Button & Splash Screen integration
-    let unlistenBack: (() => void) | null = null;
-    import('@capacitor/app').then(({ App }) => {
-      App.addListener('backButton', () => {
-        const handled = (window as any).handleAndroidBack?.();
-        if (!handled) {
-          const now = Date.now();
-          if (now - lastBackPressRef.current < 2000) {
-            App.exitApp();
-          } else {
-            lastBackPressRef.current = now;
-            setShowExitToast(true);
-            setTimeout(() => setShowExitToast(false), 2000);
-          }
-        }
-      }).then(handle => {
-        unlistenBack = () => handle.remove();
-      });
-    }).catch(() => {});
-
     import('@capacitor/splash-screen').then(({ SplashScreen }) => {
       SplashScreen.hide();
     }).catch(() => {});
+  }, []);
 
-    return () => {
-      delete (window as any).handleAndroidBack;
-      if (unlistenBack) unlistenBack();
+  // Expose global openChat & incomingCall trigger for Android Native Notification Intents
+  useEffect(() => {
+    (window as any).openChat = (convId: string) => {
+      if (!convId) return;
+      const store = useAppStore.getState();
+      store.pushPage('messages');
+      store.setActiveChat(convId);
+    };
+
+    (window as any).handleIncomingCall = (callerName: string, callerAvatar: string, type: string, callId: string) => {
+      // Trigger in-app incoming call overlay
+      window.dispatchEvent(new CustomEvent('nativeIncomingCall', {
+        detail: { callerName, callerAvatar, type, callId }
+      }));
     };
   }, []);
 
-  // Preload all tab page modules immediately on boot so lazy loading is instant
+  // Preload secondary tab page modules during idle time after initial mount
   useEffect(() => {
-    import('./pages/Home');
-    import('./pages/Reels');
-    import('./pages/Messages');
-    import('./pages/Profile');
-    import('./pages/Create');
-    import('./pages/SearchPage');
-    import('./pages/Notifications');
-    import('./pages/EditProfile');
-    import('./pages/Settings');
+    const timer = setTimeout(() => {
+      import('./pages/Home');
+      import('./pages/Reels');
+      import('./pages/Messages');
+      import('./pages/Profile');
+      import('./pages/Create');
+      import('./pages/SearchPage');
+      import('./pages/Notifications');
+      import('./pages/EditProfile');
+      import('./pages/Settings');
+    }, 2000);
+    return () => clearTimeout(timer);
   }, []);
 
   const [showExitToast, setShowExitToast] = useState(false);
@@ -459,11 +394,142 @@ export default function App() {
     }
   }, [currentUser, isAuthenticated]);
 
+  // Meta theme-color synchronization for browsers
   useEffect(() => {
-    // Intercept mobile hardware back button
-    window.history.pushState({ page: 'init' }, '');
-    const handlePopState = () => {
+    const isDark = appTheme === 'dark' || currentPage === 'home' || currentPage === 'create' || !!viewingReel || !!viewingMedia;
+    const targetColor = isDark ? '#000000' : '#ffffff';
+
+    let metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (!metaThemeColor) {
+      metaThemeColor = document.createElement('meta');
+      metaThemeColor.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaThemeColor);
+    }
+    metaThemeColor.setAttribute('content', targetColor);
+  }, [currentPage, appTheme, viewingReel, viewingMedia]);
+
+  // State for App Updates, Banned Accounts, Native Shares, and Battery Prompt
+  const [appConfig, setAppConfig] = useState<AndroidAppConfig | null>(null);
+  const [showOptionalUpdate, setShowOptionalUpdate] = useState(false);
+  const [bannedInfo, setBannedInfo] = useState<BannedInfo | null>(null);
+  const [pendingShare, setPendingShare] = useState<PendingSharePayload | null>(null);
+  const [showBatteryPrompt, setShowBatteryPrompt] = useState(false);
+
+  // Prompt background battery exemption for incoming calls/messages on first login
+  useEffect(() => {
+    if (isAuthenticated && currentUser) {
+      const prompted = localStorage.getItem('ennvo_battery_prompt_done');
+      if (!prompted) {
+        const timer = setTimeout(() => {
+          setShowBatteryPrompt(true);
+        }, 3500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isAuthenticated, currentUser]);
+
+  // 1. Initialize Error Handlers, Deep Links & Notify App Ready
+  useEffect(() => {
+    initGlobalErrorHandlers();
+    initDeepLinkListeners();
+    notifyAppReady();
+
+    // Check for native shares
+    const checkShare = () => {
+      const s = bridge.getPendingShare();
+      if (s && (s.text || (s.files && s.files.length > 0))) {
+        setPendingShare(s);
+      }
+    };
+    checkShare();
+    (window as any).onShareReceived = () => checkShare();
+  }, []);
+
+  // 2. Listen for Remote App Configuration & Update System (PROMPT-1 Task 10)
+  useEffect(() => {
+    const unsub = subscribeAppConfig((cfg) => {
+      setAppConfig(cfg);
+      const appInfo = bridge.getAppInfo();
+      const currentCode = appInfo.versionCode || 1;
+      if (currentCode < cfg.latestVersionCode && !cfg.forceUpdate && currentCode >= cfg.minVersionCode) {
+        const dismissedVer = sessionStorage.getItem(`ennvo_update_dismissed_${cfg.latestVersionCode}`);
+        if (!dismissedVer) {
+          setShowOptionalUpdate(true);
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // 3. Centralized Notification Center & Native Push Token registration (PROMPT-1 Tasks 3 & 4)
+  useEffect(() => {
+    if (currentUser?.uid) {
+      startNotificationCenter(currentUser.uid);
+      registerNativePushAndReplies(currentUser.uid);
+      bridge.setUserId(currentUser.uid);
+    } else {
+      stopNotificationCenter();
+      bridge.setUserId('');
+    }
+    return () => {
+      stopNotificationCenter();
+    };
+  }, [currentUser?.uid]);
+
+  useEffect(() => {
+    setActiveChatInCenter(activeChat);
+  }, [activeChat]);
+
+  // 4. Banned and Disabled Accounts Enforcement (PROMPT-1 Task 11)
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const unsub = onSnapshot(doc(db, 'users', currentUser.uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        const status = data?.status;
+        const bannedUntil = data?.bannedUntil;
+        const isSuspended = status === 'suspended' && (!bannedUntil || bannedUntil > Date.now());
+        const isBanned = status === 'banned';
+
+        if (isBanned || isSuspended) {
+          setBannedInfo({
+            status: isBanned ? 'banned' : 'suspended',
+            bannedUntil: bannedUntil,
+            reason: data?.banReason || 'Violation of community safety standards',
+          });
+          auth.signOut();
+        }
+      }
+    });
+    return () => unsub();
+  }, [currentUser?.uid]);
+
+  useEffect(() => {
+    // Keep history state stack populated for hardware back button (Capacitor & Web popstate)
+    if (typeof window !== 'undefined' && !window.history.state) {
+      window.history.pushState({ page: 'init' }, '');
+    }
+
+    const handleNavigationBack = () => {
       const store = useAppStore.getState();
+
+      // 0. Dispatch custom 'appBackPress' event for open inline modals / sheets / comment boxes / share boxes
+      const customEvent = new CustomEvent('appBackPress', { cancelable: true });
+      const isHandled = !window.dispatchEvent(customEvent);
+      if (isHandled) {
+        // A modal or sheet handled the back press and closed itself!
+        window.history.pushState({ page: 'init' }, '');
+        return;
+      }
+
+      // 1. Check viewing profile overlay
+      if (store.viewingUser) {
+        store.setViewingUser(null);
+        window.history.pushState({ page: 'init' }, '');
+        return;
+      }
+
+      // 2. Fullscreen overlays & modals
       if (store.viewingMedia) {
         store.setViewingMedia(null);
         window.history.pushState({ page: 'init' }, '');
@@ -476,11 +542,17 @@ export default function App() {
       }
       if (store.viewingReel) {
         store.setViewingReel(null);
+        store.setViewingReelList(null);
         window.history.pushState({ page: 'init' }, '');
         return;
       }
       if (store.showCreatePost) {
         store.setShowCreatePost(false);
+        window.history.pushState({ page: 'init' }, '');
+        return;
+      }
+      if (store.showReelCamera) {
+        store.setShowReelCamera(false);
         window.history.pushState({ page: 'init' }, '');
         return;
       }
@@ -499,22 +571,51 @@ export default function App() {
         window.history.pushState({ page: 'init' }, '');
         return;
       }
+      if (store.miniChatUser) {
+        store.setMiniChatUser(null);
+        window.history.pushState({ page: 'init' }, '');
+        return;
+      }
+
+      // 3. If inside active chat in Messages -> return to chats list
       if (store.currentPage === 'messages' && store.activeChat) {
         store.setActiveChat(null);
         window.history.pushState({ page: 'init' }, '');
         return;
       }
-      if (store.navigationStack.length > 1) {
+
+      // 4. Sub-pages / Detail views (e.g. edit-profile)
+      if (store.currentPage === 'edit-profile') {
         store.popPage();
         window.history.pushState({ page: 'init' }, '');
         return;
       }
 
-      // Root page double back press to exit handling
+      // 5. Check if the URL pathname changed during popstate
+      if (typeof window !== 'undefined' && window.location.pathname) {
+        const curPath = window.location.pathname;
+        if (curPath && curPath !== '/' && curPath !== '/home') {
+          openFromLink(curPath);
+          return;
+        }
+      }
+
+      // 6. Main Navigation Tabs (if on any tab other than 'home' -> go directly to 'home')
+      if (store.currentPage !== 'home') {
+        store.setCurrentPage('home');
+        window.history.pushState({ page: 'init' }, '');
+        return;
+      }
+
+      // 6. Already at Root 'home' -> Double back press within 2.5s to exit
       const now = Date.now();
       if (lastBackPressRef.current && (now - lastBackPressRef.current < 2500)) {
         if (typeof (window as any).AndroidApp?.exitApp === 'function') {
           (window as any).AndroidApp.exitApp();
+        } else if (typeof (window as any).AndroidInterface?.exitApp === 'function') {
+          (window as any).AndroidInterface.exitApp();
+        } else {
+          CapApp.exitApp().catch(() => {});
         }
       } else {
         lastBackPressRef.current = now;
@@ -523,8 +624,25 @@ export default function App() {
         window.history.pushState({ page: 'init' }, '');
       }
     };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+
+    window.addEventListener('popstate', handleNavigationBack);
+    (window as any).handleAndroidBack = handleNavigationBack;
+
+    let capBackSub: any = null;
+    try {
+      CapApp.addListener('backButton', () => {
+        handleNavigationBack();
+      }).then(sub => {
+        capBackSub = sub;
+      }).catch(() => {});
+    } catch (e) {}
+
+    return () => {
+      window.removeEventListener('popstate', handleNavigationBack);
+      if (capBackSub && capBackSub.remove) {
+        capBackSub.remove();
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -549,15 +667,6 @@ export default function App() {
     } catch (err) {
       console.warn('onMessageListener notice:', err);
     }
-
-    // Real-time user profile sync
-    const unsubscribeUserDoc = onSnapshot(doc(db, 'users', currentUser.uid), (docSnap) => {
-      if (docSnap.exists()) {
-        const uData = { uid: docSnap.id, ...docSnap.data() } as any;
-        useAppStore.getState().setUserInCache(uData);
-        useAppStore.getState().setCurrentUser(uData);
-      }
-    }, (err) => console.warn('User sync error:', err));
 
     let initialConvsLoaded = false;
     const prevConvsMap = new Map<string, { lastMessage: string, unread: number }>();
@@ -589,36 +698,6 @@ export default function App() {
         const unread = data.unreadCount?.[currentUser.uid] || 0;
         total += unread;
 
-        if (initialConvsLoaded) {
-          const prev = prevConvsMap.get(doc.id);
-          const hasNewMsg = prev ? (unread > prev.unread || (data.lastMessage && data.lastMessage !== prev.lastMessage)) : (unread > 0);
-          const isFromOther = data.lastSenderId ? data.lastSenderId !== currentUser.uid : true;
-
-          // Only trigger desktop system notification if it's a new message sent by someone else
-          if (hasNewMsg && isFromOther && data.lastMessage) {
-            const otherId = (data.participantIds || []).find((id: string) => id !== currentUser.uid);
-            const otherName = data.isGroup 
-              ? (data.groupName || 'Group Chat') 
-              : (data.participantNames?.[otherId] || 'Friend');
-            const otherAvatar = data.isGroup 
-              ? (data.groupAvatar || '/Ennvo.png') 
-              : (data.participantAvatars?.[otherId] || '/Ennvo.png');
-
-            deviceNotification.show({
-              title: `${otherName} 💬`,
-              body: data.lastMessage,
-              icon: otherAvatar,
-              tag: `chat-${doc.id}`,
-              type: 'message',
-              data: { conversationId: doc.id }
-            });
-          }
-        }
-
-        prevConvsMap.set(doc.id, {
-          lastMessage: data.lastMessage || '',
-          unread
-        });
       });
 
       initialConvsLoaded = true;
@@ -630,23 +709,18 @@ export default function App() {
       useAppStore.getState().setFollowingIds(ids);
     }, (err) => console.warn('Following count error:', err));
 
+    const unsubscribeFollowers = onSnapshot(collection(db, 'users', currentUser.uid, 'followers'), (snap) => {
+      const ids = snap.docs.map(d => d.id);
+      useAppStore.getState().setFollowerIds(ids);
+    }, (err) => console.warn('Followers count error:', err));
+
     return () => {
-      unsubscribeUserDoc();
       unsubscribeNotifs();
       unsubscribeMessages();
       unsubscribeFollowing();
+      unsubscribeFollowers();
     };
   }, [isAuthenticated, currentUser?.uid, setNotificationCount, setMessageCount]);
-  
-  const [realReels, setRealReels] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const unsubscribe = subscribeReels((reels) => {
-      setRealReels(reels.slice(0, 50));
-    });
-    return () => unsubscribe();
-  }, [isAuthenticated]);
 
   useEffect(() => {
     const unsubscribe = onAuthChange((user) => {
@@ -665,7 +739,9 @@ export default function App() {
     currentPage === 'create' || 
     currentPage === 'edit-profile' ||
     currentPage === 'settings' ||
+    currentPage === 'admin' ||
     showCreatePost || 
+    showReelCamera ||
     !!viewingStory || 
     !!viewingMedia || 
     !!viewingReel || 
@@ -674,14 +750,16 @@ export default function App() {
 
   const isSidebarHidden = isBottomNavHidden ||
     currentPage === 'edit-profile' ||
+    currentPage === 'admin' ||
     !!viewingStory || 
     !!viewingMedia || 
     !!viewingReel;
 
   const isReelsPage = currentPage === 'home';
 
+  // Instant boot: only mount active page first; visited pages persist on navigation
   const [visitedPages, setVisitedPages] = useState<Set<PageType>>(
-    () => new Set([currentPage, 'home', 'reels', 'messages', 'profile', 'search', 'notifications'])
+    () => new Set([currentPage])
   );
 
   useEffect(() => {
@@ -693,71 +771,190 @@ export default function App() {
     });
   }, [currentPage]);
 
+  // Synchronize SEO metadata and robots directives with SPA navigation
+  useEffect(() => {
+    applyRouteSEO(currentPage, {
+      userName: currentUser?.name,
+      isAuth: isAuthenticated,
+    });
+  }, [currentPage, currentUser?.name, isAuthenticated]);
+
+  const getTopBarBgClass = useCallback(() => {
+    if (viewingStory || viewingMedia || viewingReel || currentPage === 'home' || currentPage === 'create') {
+      return 'bg-black';
+    }
+    if (appTheme === 'dark') {
+      return 'bg-black';
+    }
+    return 'bg-white dark:bg-black';
+  }, [viewingStory, viewingMedia, viewingReel, currentPage, appTheme]);
+
+  const getBottomBarBgClass = useCallback(() => {
+    if (viewingStory || viewingMedia || viewingReel || currentPage === 'home' || currentPage === 'create') {
+      return 'bg-black';
+    }
+    if (appTheme === 'dark') {
+      return 'bg-black';
+    }
+    return 'bg-white dark:bg-black';
+  }, [viewingStory, viewingMedia, viewingReel, currentPage, appTheme]);
+
   if (!isAuthenticated && !isAuthLoading) {
     return <Auth />;
   }
 
   return (
-    <div className={`flex h-[100dvh] w-full text-black overflow-hidden font-sans relative ${isReelsPage ? 'bg-black md:bg-[#f8f9fa]' : 'bg-[#faf5ff]'}`}>
-      {/* Offline Status Pill - Informative TikTok/FB style banner */}
-      {!isOnline && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[9999] px-3 py-1 bg-amber-500/90 backdrop-blur-md text-white text-[11px] font-semibold rounded-full shadow-md flex items-center space-x-1.5 pointer-events-none animate-in fade-in slide-in-from-top-2 duration-300">
-          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-          <span>Offline Mode • Viewing Saved Content</span>
+    <ErrorBoundary screenName="Ennvo">
+      <div className="flex flex-col h-[100dvh] w-full text-neutral-900 dark:text-white overflow-hidden font-sans relative antialiased bg-black md:bg-white dark:md:bg-black select-none">
+        
+        {/* Main Middle Content Area */}
+        <div className={`flex-1 w-full h-full flex overflow-hidden relative ${isReelsPage ? 'bg-black md:bg-white dark:md:bg-[#08080a]' : 'bg-white dark:bg-black'}`}>
+          {/* Offline Status Pill - Informative TikTok/FB style banner */}
+          {!isOnline && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[9999] px-3 py-1 bg-amber-500/90 backdrop-blur-md text-white text-[11px] font-semibold rounded-full shadow-md flex items-center space-x-1.5 pointer-events-none animate-in fade-in slide-in-from-top-2 duration-300">
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+              <span>Offline Mode • Viewing Saved Content</span>
+            </div>
+          )}
+
+          {!isSidebarHidden && (
+            <Sidebar currentPage={currentPage} />
+          )}
+          <main className="w-full flex-1 h-full overflow-hidden relative gpu-accelerated">
+            <Suspense fallback={
+              currentPage === 'home' ? (
+                <FacebookReelSkeleton />
+              ) : currentPage === 'profile' ? (
+                <FacebookProfileSkeleton />
+              ) : currentPage === 'edit-profile' ? (
+                <FacebookEditProfileSkeleton />
+              ) : currentPage === 'messages' ? (
+                <div className="w-full h-full bg-white max-w-[480px]">
+                  <FacebookMessageListSkeleton />
+                </div>
+              ) : currentPage === 'search' ? (
+                <FacebookSearchSkeleton />
+              ) : (
+                <div className="w-full h-full overflow-hidden bg-white max-w-[620px] mx-auto pt-2 px-3 space-y-4">
+                  <FacebookStorySkeleton />
+                  <FacebookPostSkeleton />
+                </div>
+              )
+            }>
+              {Array.from(visitedPages).map((pageKey) => {
+                const isActive = currentPage === pageKey;
+                return (
+                  <div 
+                    key={pageKey} 
+                    style={{ display: isActive ? 'block' : 'none', opacity: isActive ? 1 : 0 }}
+                    className={`w-full h-full absolute inset-0 ${isActive ? 'z-10 pointer-events-auto opacity-100' : 'z-0 pointer-events-none opacity-0 hidden'} transform-gpu ${pageKey === 'admin' ? 'overflow-y-auto' : ''}`}
+                  >
+                    {pageKey === 'home' && <Reels />}
+                    {pageKey === 'search' && <SearchPage />}
+                    {pageKey === 'reels' && <Home />}
+                    {pageKey === 'messages' && <Messages />}
+                    {pageKey === 'notifications' && <Notifications />}
+                    {pageKey === 'create' && (isActive ? <Create /> : null)}
+                    {pageKey === 'profile' && <Profile />}
+                    {pageKey === 'edit-profile' && (isActive ? <EditProfile /> : null)}
+                    {pageKey === 'settings' && (isActive ? <Settings /> : null)}
+                    {pageKey === 'admin' && (isActive ? <AdminApp onExitAdmin={() => popPage()} /> : null)}
+                  </div>
+                );
+              })}
+            </Suspense>
+          </main>
+          {!isNavHidden && <BottomNav />}
         </div>
+
+        <AccountSwitcherModal />
+
+      {/* Banned or Suspended Account Screen (PROMPT-1 Task 11) */}
+      {bannedInfo && (
+        <BannedSuspendedModal
+          info={bannedInfo}
+          onDismiss={() => {
+            setBannedInfo(null);
+            localStorage.clear();
+            window.location.reload();
+          }}
+        />
       )}
 
-      {!isSidebarHidden && (
-        <Sidebar currentPage={currentPage} />
+      {/* Full-Screen Maintenance Mode Screen (PROMPT-1 Task 10) */}
+      {appConfig?.maintenance?.enabled && !currentUser?.isAdmin && (
+        <MaintenanceScreen message={appConfig.maintenance.message} />
       )}
-      <main className={`w-full flex-1 h-full overflow-hidden relative gpu-accelerated`}>
-        <Suspense fallback={
-          currentPage === 'home' ? (
-            <FacebookReelSkeleton />
-          ) : currentPage === 'profile' ? (
-            <FacebookProfileSkeleton />
-          ) : currentPage === 'messages' ? (
-            <div className="w-full h-full bg-white max-w-[480px]">
-              <FacebookMessageListSkeleton count={9} />
-            </div>
-          ) : currentPage === 'search' ? (
-            <FacebookSearchSkeleton />
-          ) : (
-            <div className="w-full h-full overflow-hidden bg-white max-w-[620px] mx-auto pt-2 px-3 space-y-4">
-              <FacebookStorySkeleton />
-              <FacebookPostSkeleton />
-            </div>
-          )
-        }>
-          {Array.from(visitedPages).map((pageKey) => {
-            const isActive = currentPage === pageKey;
-            return (
-              <div 
-                key={pageKey} 
-                style={{ display: isActive ? 'block' : 'none' }}
-                className={`w-full h-full absolute inset-0 ${isActive ? 'z-10 pointer-events-auto' : 'z-0 pointer-events-none'} transform-gpu`}
-              >
-                {pageKey === 'home' && <Reels />}
-                {pageKey === 'search' && <SearchPage />}
-                {pageKey === 'reels' && <Home />}
-                {pageKey === 'messages' && <Messages />}
-                {pageKey === 'notifications' && <Notifications />}
-                {pageKey === 'create' && (isActive ? <Create /> : null)}
-                {pageKey === 'profile' && <Profile />}
-                {pageKey === 'edit-profile' && (isActive ? <EditProfile /> : null)}
-                {pageKey === 'settings' && (isActive ? <Settings /> : null)}
-              </div>
-            );
-          })}
-        </Suspense>
-      </main>
-      {!isNavHidden && <BottomNav />}
-      <AccountSwitcherModal />
+
+      {/* Force or Required Update Screen (PROMPT-1 Task 10) */}
+      {appConfig && (bridge.getAppInfo().versionCode < appConfig.minVersionCode || (appConfig.forceUpdate && bridge.getAppInfo().versionCode < appConfig.latestVersionCode)) && (
+        <AppUpdateModal config={appConfig} forced={true} />
+      )}
+
+      {/* Optional New Version Available Modal (PROMPT-1 Task 10) */}
+      {showOptionalUpdate && appConfig && (
+        <AppUpdateModal
+          config={appConfig}
+          forced={false}
+          onDismiss={() => {
+            sessionStorage.setItem(`ennvo_update_dismissed_${appConfig.latestVersionCode}`, 'true');
+            setShowOptionalUpdate(false);
+          }}
+        />
+      )}
+
+      {/* Share to Ennvo Sheet from Native Intent (PROMPT-1 Task 9) */}
+      {pendingShare && (
+        <ShareReceivedSheet
+          share={pendingShare}
+          onClose={() => setPendingShare(null)}
+        />
+      )}
 
       {/* Exit Toast Notification */}
       {showExitToast && (
         <div className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-gray-900/95 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-2xl z-[200] border border-white/20 backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-200">
           আর একবার ব্যাক চাপুন অ্যাপ থেকে বের হতে
+        </div>
+      )}
+
+      {/* Battery Optimization / Background Alerts Dialog */}
+      {showBatteryPrompt && (
+        <div className="fixed inset-0 z-[400] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200 font-sans">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center space-y-4">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-100 dark:bg-purple-950/60 flex items-center justify-center text-purple-600 dark:text-purple-400">
+              <Zap className="w-7 h-7" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                Background Notifications
+              </h3>
+              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                Allow Ennvo to run in the background so you instantly receive incoming calls and direct messages even when the app is closed.
+              </p>
+            </div>
+            <div className="flex flex-col space-y-2 pt-2">
+              <button
+                onClick={() => {
+                  localStorage.setItem('ennvo_battery_prompt_done', 'true');
+                  setShowBatteryPrompt(false);
+                  bridge.requestBatteryExemption();
+                }}
+                className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-2xl font-semibold text-sm shadow-lg active:scale-95 transition-all"
+              >
+                Enable Background Calls & Alerts
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.setItem('ennvo_battery_prompt_done', 'true');
+                  setShowBatteryPrompt(false);
+                }}
+                className="w-full py-2.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              >
+                Maybe Later
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -776,6 +973,7 @@ export default function App() {
 
       <InAppToaster />
       <UploadProgressBar />
+      <ReelCameraModal />
       <LikesList />
       <ViewsList />
       <AnalyticsModal />
@@ -789,6 +987,16 @@ export default function App() {
       {/* Global Reel Viewer (Modal) */}
       {viewingReel && (
         <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center animate-in fade-in duration-200">
+          {/* Always visible prominent close button for PC & Mobile in top-left */}
+          <button 
+            type="button"
+            onClick={() => { setViewingReel(null); setViewingReelList(null); }}
+            className="fixed top-[max(calc(env(safe-area-inset-top,0px)+12px),16px)] left-4 sm:top-6 sm:left-6 z-[160] p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/20 shadow-2xl transition-transform active:scale-90 cursor-pointer flex items-center justify-center group"
+            title="Close Reel"
+            aria-label="Close Reel"
+          >
+            <X className="w-5.5 h-5.5 text-white stroke-[2.5]" />
+          </button>
           <div id="global-reels-container" className="h-[100dvh] w-full overflow-y-auto reels-scroll-viewport no-scrollbar overscroll-none overflow-x-hidden">
             {/* If we have a single reel or specific list */}
             {viewingReel.single ? (
@@ -801,9 +1009,9 @@ export default function App() {
                 if (viewingReelList && viewingReelList.length > 0) {
                   reelsList = viewingReelList;
                 } else if (viewingReelContext && viewingReelContext !== 'all') {
-                  reelsList = realReels.filter(r => r.authorId === viewingReelContext);
+                  reelsList = (cachedReels || []).filter(r => r.authorId === viewingReelContext);
                 } else {
-                  reelsList = realReels;
+                  reelsList = cachedReels || [];
                 }
 
                 const activeIndex = viewingReel ? reelsList.findIndex(r => r.id === viewingReel.id) : 0;
@@ -828,7 +1036,8 @@ export default function App() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }
 
@@ -921,6 +1130,8 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
   const [showHeartAnim, setShowHeartAnim] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [isSongSaved, setIsSongSaved] = useState(false);
+  const [songToast, setSongToast] = useState<string | null>(null);
   const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
@@ -928,8 +1139,15 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
     import('./services/storyService').then((s) => {
       unsub = s.subscribeStories((fetchedStories) => {
         if (fetchedStories && fetchedStories.length > 0) {
-          setStoriesList(fetchedStories);
-          const foundIdx = fetchedStories.findIndex((st) => st.id === story.id);
+          const targetAuthorId = story.authorId || story.authorUID || story.userId;
+          const authorStories = fetchedStories.filter((st) => {
+            const stAuthorId = st.authorId || (st as any).authorUID || (st as any).userId;
+            return targetAuthorId && stAuthorId && targetAuthorId === stAuthorId;
+          });
+
+          const finalGroup = authorStories.length > 0 ? authorStories : [story];
+          setStoriesList(finalGroup);
+          const foundIdx = finalGroup.findIndex((st) => st.id === story.id);
           if (foundIdx !== -1) {
             setCurrentIndex(foundIdx);
           }
@@ -939,9 +1157,34 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
     return () => {
       if (unsub) unsub();
     };
-  }, [story.id]);
+  }, [story.id, story.authorId]);
 
   const currentStory = storiesList[currentIndex] || story;
+
+  const handleSaveSong = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const songTitle = currentStory.songTitle || currentStory.songInfo?.title || 'Story Audio';
+    const songUrl = currentStory.songUrl || currentStory.songInfo?.url;
+    if (!songUrl) return;
+
+    try {
+      const { toggleSongFavorite } = await import('./services/postService');
+      const songId = currentStory.songId || currentStory.songInfo?.id || `story_song_${currentStory.id}`;
+      const newSaved = !isSongSaved;
+      setIsSongSaved(newSaved);
+      if (currentUser?.uid) {
+        await toggleSongFavorite(songId, currentUser.uid, {
+          title: songTitle,
+          artist: currentStory.authorName || 'Artist',
+          url: songUrl
+        });
+      }
+      setSongToast(newSaved ? '🎵 Song saved to library!' : 'Song removed from library');
+      setTimeout(() => setSongToast(null), 2500);
+    } catch (err) {
+      console.error('Failed to save song:', err);
+    }
+  };
 
   const handleNext = useCallback(() => {
     if (currentIndex < storiesList.length - 1) {
@@ -1031,6 +1274,24 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
   };
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    const handleBack = (e: Event) => {
+      e.preventDefault();
+      onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('appBackPress', handleBack);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('appBackPress', handleBack);
+    };
+  }, [onClose]);
+
+  useEffect(() => {
     let interval: any;
     const startTime = Date.now();
     
@@ -1068,75 +1329,123 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
     }
   };
 
+  const hasSong = Boolean(currentStory.songTitle || currentStory.songInfo?.title || currentStory.songArtist);
+
+  const quickEmojis = ['❤️', '🔥', '😂', '👏', '😍', '😮'];
+
+  const handleQuickEmoji = async (emoji: string) => {
+    if (!currentUser || currentUser.uid === currentStory.authorId) return;
+    setShowHeartAnim(true);
+    setTimeout(() => setShowHeartAnim(false), 900);
+    try {
+      const { createConversation, sendMessage } = await import('./services/chatService');
+      const convId = await createConversation(
+        [currentUser.uid, currentStory.authorId],
+        {
+          [currentUser.uid]: { name: currentUser.name, avatar: currentUser.avatar },
+          [currentStory.authorId]: { name: currentStory.authorName || currentStory.name, avatar: currentStory.authorAvatar || currentStory.avatar }
+        }
+      );
+      await sendMessage(convId, currentUser.uid, 'text', `${emoji} Reacted to your story`, undefined, undefined, {
+        id: currentStory.id, content: currentStory.text || 'Story context', type: currentStory.type || 'story', mediaUrl: currentStory.mediaUrl || currentStory.bg
+      });
+    } catch (_) {}
+  };
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-200 select-none">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black sm:bg-black/90 sm:backdrop-blur-xl p-0 sm:p-4 select-none">
+      {/* Toast for Song Saved */}
+      {songToast && (
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[150] bg-neutral-900/95 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-2xl border border-white/20 backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200">
+          {songToast}
+        </div>
+      )}
+
+      {/* PC Floating Close Button */}
+      <button 
+        type="button"
+        onClick={onClose} 
+        className="hidden sm:flex fixed top-5 right-5 sm:top-6 sm:right-6 z-[160] p-3 rounded-full bg-white/10 hover:bg-white/25 text-white border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer"
+        title="Close Story (Esc)"
+        aria-label="Close Story"
+      >
+        <X className="w-5 h-5 stroke-[2.5]" />
+      </button>
+
+      {/* Main Full-Bleed Story Canvas (Mobile edge-to-edge, PC sleek phone mockup) */}
       <div 
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
-        className="w-full h-full sm:h-[92vh] sm:max-w-[420px] bg-zinc-950 sm:rounded-[36px] rounded-[28px] overflow-hidden relative shadow-2xl border border-white/10 flex flex-col justify-between animate-in zoom-in-95 duration-200"
+        className="w-full h-full sm:w-[390px] md:w-[410px] sm:h-[min(calc(100vh-32px),820px)] sm:max-h-[94vh] bg-black sm:rounded-[32px] overflow-hidden relative shadow-2xl sm:border sm:border-white/10 flex flex-col justify-between my-auto mx-auto"
       >
         {/* Top Segmented Progress Bar */}
-        <div className="absolute top-4 left-4 right-4 flex space-x-1.5 z-40">
+        <div className="absolute top-[max(calc(env(safe-area-inset-top,0px)+8px),12px)] left-3 right-3 flex space-x-1.5 z-40">
           {storiesList.map((st, idx) => (
-            <div key={st.id || idx} className="h-1 bg-white/25 rounded-full flex-1 overflow-hidden backdrop-blur-sm">
+            <div key={st.id || idx} className="h-1 bg-white/30 rounded-full flex-1 overflow-hidden backdrop-blur-xs">
               <div 
-                className="h-full bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.9)] transition-all duration-50" 
+                className="h-full bg-white rounded-full transition-all duration-50" 
                 style={{ 
                   width: idx < currentIndex ? '100%' : idx === currentIndex ? `${progress}%` : '0%' 
                 }}
-              ></div>
+              />
             </div>
           ))}
         </div>
 
-        {/* Floating Glass Header */}
-        <div className="absolute top-8 left-3.5 right-3.5 flex items-center justify-between z-40">
-          <div className="flex items-center space-x-2.5 bg-black/45 backdrop-blur-xl border border-white/15 px-3 py-1.5 rounded-full shadow-lg max-w-[75%] min-w-0">
+        {/* Top Header: Creator Info & Controls */}
+        <div className="absolute top-[max(calc(env(safe-area-inset-top,0px)+22px),26px)] left-3 right-3 flex items-center justify-between z-40">
+          {/* Creator Pill */}
+          <div className="flex items-center space-x-2 bg-black/40 backdrop-blur-md border border-white/15 pl-1.5 pr-3 py-1.5 rounded-full shadow-lg max-w-[80%] min-w-0">
             <div className="p-[1.5px] rounded-full bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600 shrink-0">
               <img 
                 src={currentStory.authorAvatar || currentStory.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentStory.authorName || currentStory.name)}&background=random`} 
-                className="w-8 h-8 rounded-full border border-black/50 object-cover" 
+                className="w-7 h-7 rounded-full border border-black/50 object-cover" 
                 alt="Avatar" 
                 referrerPolicy="no-referrer"
               />
             </div>
             <div className="flex flex-col min-w-0 pr-1">
-              <span className="text-white font-medium text-[13.5px] drop-shadow-md truncate">{currentStory.authorName || currentStory.name}</span>
-              <span className="text-white/70 text-[10.5px] font-normal drop-shadow-sm">{currentStory.createdAt ? formatTime(currentStory.createdAt) : 'Just now'}</span>
+              <span className="text-white font-semibold text-[13px] drop-shadow-md truncate">{currentStory.authorName || currentStory.name}</span>
+              <span className="text-white/70 text-[10px] font-normal drop-shadow-xs">{currentStory.createdAt ? formatTime(currentStory.createdAt) : 'Just now'}</span>
             </div>
+
+            {/* Song Pill */}
+            {hasSong && (
+              <button
+                type="button"
+                onClick={handleSaveSong}
+                className="flex items-center space-x-1 bg-white/20 hover:bg-white/30 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/25 text-white active:scale-95 transition-transform shrink-0 cursor-pointer shadow-xs max-w-[120px]"
+                title="Click to save song"
+              >
+                <Music className="w-2.5 h-2.5 text-purple-300 animate-spin [animation-duration:5s] shrink-0" />
+                <span className="text-[10px] font-medium truncate drop-shadow-xs max-w-[70px]">
+                  {currentStory.songTitle || currentStory.songInfo?.title || 'Audio'}
+                </span>
+                <Bookmark className={`w-2.5 h-2.5 shrink-0 ${isSongSaved ? 'text-amber-300 fill-amber-300' : 'text-white/80'}`} />
+              </button>
+            )}
           </div>
 
+          {/* Right Header Controls */}
           <div className="flex items-center space-x-1.5 shrink-0">
             {currentUser?.uid === currentStory.authorId && (
               <button 
                 onClick={handleDelete} 
                 title="Delete Story" 
-                className="w-9 h-9 bg-black/40 hover:bg-red-500/80 rounded-full flex items-center justify-center transition-all text-white backdrop-blur-xl border border-white/15 active:scale-90 shadow-lg"
+                className="w-8 h-8 bg-black/40 hover:bg-red-500/80 rounded-full flex items-center justify-center transition-all text-white backdrop-blur-md border border-white/15 active:scale-90 shadow-md cursor-pointer"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
             <button 
               onClick={onClose} 
               title="Close" 
-              className="w-9 h-9 bg-black/40 hover:bg-white/25 rounded-full flex items-center justify-center transition-all text-white backdrop-blur-xl border border-white/15 active:scale-90 shadow-lg"
+              className="w-8 h-8 bg-black/40 hover:bg-white/25 rounded-full flex items-center justify-center transition-all text-white backdrop-blur-md border border-white/15 active:scale-90 shadow-md cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
-
-        {/* Attached Song Floating Pill */}
-        {(currentStory.songTitle || currentStory.songArtist) && (
-          <div className="absolute top-20 left-3.5 z-40 animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="flex items-center space-x-2 bg-black/50 backdrop-blur-xl border border-white/15 px-3 py-1.5 rounded-full shadow-lg">
-              <Music className="w-3.5 h-3.5 text-purple-400 animate-spin [animation-duration:5s]" />
-              <span className="text-white text-xs font-medium max-w-[210px] truncate drop-shadow">
-                {currentStory.songTitle} {currentStory.songArtist ? `• ${currentStory.songArtist}` : ''}
-              </span>
-            </div>
-          </div>
-        )}
 
         {/* Audio Element if Story has music */}
         {currentStory.songUrl && currentStory.type !== 'video' && (
@@ -1144,14 +1453,22 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
         )}
 
         {/* Story Media */}
-        {currentStory.type === 'video' || (currentStory.mediaUrl && (currentStory.mediaUrl.includes('.mp4') || currentStory.mediaUrl.includes('video'))) ? (
+        {currentStory.type === 'video' || (currentStory.mediaUrl && (currentStory.mediaUrl.match(/\.(mp4|webm|mov|m4v|ogg|3gp)($|#|\?)/i) || currentStory.mediaUrl.includes('/stories/') || currentStory.mediaUrl.includes('video'))) ? (
           <video 
             ref={videoRef}
             src={currentStory.mediaUrl || currentStory.bg} 
             autoPlay 
             playsInline 
-            preload="metadata"
+            // @ts-ignore
+            webkit-playsinline="true"
+            // @ts-ignore
+            x5-playsinline="true"
+            poster={currentStory.thumbnailUrl || undefined}
+            preload="auto"
             onLoadedMetadata={onVideoLoaded}
+            onCanPlay={() => {
+              videoRef.current?.play().catch(() => {});
+            }}
             className="w-full h-full object-cover" 
           />
         ) : (
@@ -1163,63 +1480,70 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
           />
         )}
 
-        {/* Story Text - Placed Elegantly Near Top */}
-        {currentStory.text && (
-          <div className={`absolute left-3.5 right-3.5 z-30 pointer-events-none transition-all duration-300 ${
-            (currentStory.songTitle || currentStory.songArtist) ? 'top-[115px]' : 'top-20'
-          }`}>
-            <div className="bg-black/60 backdrop-blur-md border border-white/15 rounded-2xl px-4 py-2.5 max-w-[90%] mx-auto shadow-xl">
-              <p className="text-white text-sm sm:text-base font-medium text-center drop-shadow leading-snug">
-                {currentStory.text}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Left / Right Tap Zones for Instant Navigation */}
+        {/* Left / Right Tap Zones for Navigation */}
         <div className="absolute inset-0 flex z-20 pointer-events-auto">
-          <div onClick={handlePrev} className="w-[35%] h-[80%] my-auto cursor-pointer" title="Previous Story" />
-          <div className="w-[30%] h-[80%] my-auto" />
-          <div onClick={handleNext} className="w-[35%] h-[80%] my-auto cursor-pointer" title="Next Story" />
+          <div onClick={handlePrev} className="w-[35%] h-[75%] my-auto cursor-pointer" title="Previous Story" />
+          <div className="w-[30%] h-[75%] my-auto" />
+          <div onClick={handleNext} className="w-[35%] h-[75%] my-auto cursor-pointer" title="Next Story" />
         </div>
 
+        {/* Floating Heart Reaction Pop Animation */}
         {showHeartAnim && (
           <div className="absolute inset-0 flex items-center justify-center p-6 z-[60] pointer-events-none">
-            <Heart className="w-36 h-36 text-red-500 fill-red-500 scale-150 animate-ping opacity-0" />
+            <Heart className="w-32 h-32 text-rose-500 fill-rose-500 animate-ping opacity-0" />
           </div>
         )}
 
-        {/* Floating Bottom Reply Bar */}
-        <div className="absolute bottom-4 sm:bottom-6 left-0 right-0 px-3.5 sm:px-4 flex items-center space-x-2 z-30 pb-[max(env(safe-area-inset-bottom),8px)]">
-          <div className="flex-1 bg-black/45 backdrop-blur-xl border border-white/15 rounded-full px-4 py-2 flex items-center shadow-lg">
-            <input 
-              type="text" 
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSendReply();
-              }}
-              placeholder={`Reply to ${currentStory.authorName || currentStory.name}...`} 
-              className="flex-1 bg-transparent text-white placeholder-white/60 text-[13.5px] focus:outline-none font-normal" 
-            />
-            {replyText.trim() && (
-              <button onClick={handleSendReply} className="p-1 text-purple-400 hover:text-purple-300 transition-colors shrink-0">
-                <Send className="w-4 h-4" />
+        {/* Bottom Floating Area: Quick Emojis + Modern Reply Input Bar */}
+        <div className="absolute bottom-0 left-0 right-0 z-30 pb-[max(calc(env(safe-area-inset-bottom,0px)+10px),14px)] px-3 sm:px-4 space-y-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-8">
+          {/* Quick Reaction Emojis */}
+          <div className="flex items-center justify-around px-2">
+            {quickEmojis.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => handleQuickEmoji(emoji)}
+                className="w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-lg active:scale-125 transition-transform cursor-pointer shadow-sm"
+              >
+                {emoji}
               </button>
-            )}
+            ))}
           </div>
-          <button 
-            onClick={handleReact} 
-            className="w-10 h-10 bg-black/45 backdrop-blur-xl border border-white/15 rounded-full flex items-center justify-center text-white hover:bg-black/60 transition-all active:scale-90 shrink-0 shadow-lg"
-          >
-            <Heart className={`w-5 h-5 ${isLiked ? 'fill-red-500 text-red-500' : 'text-white'}`} />
-          </button>
-          <button 
-            onClick={handleShare} 
-            className="w-10 h-10 bg-black/45 backdrop-blur-xl border border-white/15 rounded-full flex items-center justify-center text-white hover:bg-black/60 transition-all active:scale-90 shrink-0 shadow-lg"
-          >
-            <Share2 className="w-5 h-5 text-white" />
-          </button>
+
+          {/* Reply Form */}
+          <div className="flex items-center space-x-2">
+            <div className="flex-1 bg-white/20 hover:bg-white/25 focus-within:bg-white/30 backdrop-blur-xl border border-white/20 rounded-full px-4 py-2 flex items-center shadow-lg transition-all">
+              <input 
+                type="text" 
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSendReply();
+                }}
+                placeholder={`Reply to ${currentStory.authorName || currentStory.name}...`} 
+                className="flex-1 bg-transparent text-white placeholder-white/70 text-[13.5px] focus:outline-none font-normal" 
+              />
+              {replyText.trim() && (
+                <button onClick={handleSendReply} className="p-1 text-white hover:text-purple-300 transition-colors shrink-0 cursor-pointer">
+                  <Send className="w-4 h-4 fill-white" />
+                </button>
+              )}
+            </div>
+
+            <button 
+              onClick={handleReact} 
+              className="w-10 h-10 bg-black/45 backdrop-blur-xl border border-white/15 rounded-full flex items-center justify-center text-white hover:bg-black/60 transition-all active:scale-90 shrink-0 shadow-lg cursor-pointer"
+            >
+              <Heart className={`w-5 h-5 ${isLiked ? 'fill-rose-500 text-rose-500' : 'text-white'}`} />
+            </button>
+
+            <button 
+              onClick={handleShare} 
+              className="w-10 h-10 bg-black/45 backdrop-blur-xl border border-white/15 rounded-full flex items-center justify-center text-white hover:bg-black/60 transition-all active:scale-90 shrink-0 shadow-lg cursor-pointer"
+            >
+              <Share2 className="w-5 h-5 text-white" />
+            </button>
+          </div>
         </div>
 
         {showShareModal && (
@@ -1531,7 +1855,41 @@ const CommentsFeed = ({ postId }: { postId: string }) => {
                 <button onClick={() => handleDeleteComment(comment.id)} className="text-[10px] text-gray-400 hover:text-red-500 uppercase font-normal">Delete</button>
               )}
             </div>
-            <p className="text-[14px] text-gray-800 leading-snug">{comment.text}</p>
+            {comment.text && <p className="text-[14px] text-gray-800 leading-snug">{comment.text}</p>}
+            {comment.stickerUrl && (() => {
+              let stkUrl = comment.stickerUrl;
+              if (stkUrl.includes('/uploads/')) {
+                stkUrl = `/uploads/${stkUrl.split('/uploads/')[1]}`;
+              }
+              const isVid = stkUrl.endsWith('.mp4') || stkUrl.endsWith('.webm') || stkUrl.endsWith('.mov');
+              const isImg = stkUrl.startsWith('http') || stkUrl.startsWith('/') || stkUrl.startsWith('data:') || stkUrl.endsWith('.webp') || stkUrl.endsWith('.png') || stkUrl.endsWith('.gif') || stkUrl.endsWith('.jpg') || stkUrl.endsWith('.jpeg');
+              return (
+                <div className="my-1">
+                  {isVid ? (
+                    <video src={stkUrl} autoPlay loop muted playsInline className="h-16 w-16 object-contain rounded-xl shadow-xs" />
+                  ) : isImg ? (
+                    <img 
+                      src={stkUrl} 
+                      className="h-16 w-16 object-contain rounded-xl shadow-xs" 
+                      alt="Sticker" 
+                      referrerPolicy="no-referrer" 
+                      onError={(e) => {
+                        const el = e.currentTarget;
+                        if (stkUrl.includes('/uploads/') && !el.dataset.retried) {
+                          el.dataset.retried = 'true';
+                          el.src = `/uploads/${stkUrl.split('/uploads/')[1]}`;
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span className="text-2xl">{stkUrl}</span>
+                  )}
+                </div>
+              );
+            })()}
+            {comment.imageUrl && (
+              <img src={comment.imageUrl} className="mt-1 max-h-36 max-w-[180px] rounded-xl object-cover border border-gray-100" alt="Attachment" />
+            )}
           </div>
         </div>
       ))}

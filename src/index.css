@@ -12,6 +12,76 @@
   }
 }
 
+@keyframes flyUpAndShatter {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    filter: blur(0px);
+  }
+  35% {
+    opacity: 0.9;
+    transform: translate(var(--dx, 0px), var(--dy, -16px)) scale(0.9) rotate(var(--rot, 15deg));
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--dx, 0px) * 1.5), calc(var(--dy, -24px) * 1.6)) scale(0.2) rotate(calc(var(--rot, 15deg) * 2));
+    filter: blur(1.5px);
+  }
+}
+
+.animate-shatter-fly {
+  animation: flyUpAndShatter 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity, filter;
+  pointer-events: none;
+}
+
+@keyframes charPopIn {
+  0% {
+    opacity: 0.85;
+    transform: translateY(3px) scale(0.92);
+    filter: blur(0px);
+  }
+  40% {
+    opacity: 0.95;
+    transform: translateY(-1px) scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px) scale(1.1);
+    filter: blur(0.8px);
+  }
+}
+
+.animate-char-pop {
+  animation: charPopIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity, filter;
+  pointer-events: none;
+}
+
+@keyframes letterDissolve {
+  0% {
+    opacity: 0.9;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translateY(-5px) scale(0.85);
+    filter: blur(0.5px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.6);
+    filter: blur(1.5px);
+  }
+}
+
+.animate-letter-dissolve {
+  animation: letterDissolve 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity, filter;
+}
+
 /* Hide scrollbar for Chrome, Safari and Opera */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
@@ -23,12 +93,24 @@
   scrollbar-width: none;  /* Firefox */
 }
 
+/* Hide native browser / webview big play icon overlay on video elements */
+video::-webkit-media-controls,
+video::-webkit-media-controls-start-playback-button,
+video::-webkit-media-controls-overlay-play-button,
+video::-webkit-media-controls-play-button {
+  display: none !important;
+  -webkit-appearance: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 html {
   background-color: #ffffff;
 }
 
 html.dark {
-  background-color: #0b0914;
+  background-color: #000000;
   color-scheme: dark;
 }
 
@@ -38,6 +120,7 @@ body {
   font-synthesis: none;
   -webkit-text-stroke: 0px transparent;
   text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
   font-weight: 400;
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -47,12 +130,18 @@ body {
   -webkit-touch-callout: none;
   overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
+}
+
+/* Global Soft Rounded Stroke & Geometry Precision for Icons */
+svg {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
 }
 
 html.dark body {
-  background-color: #0b0914;
-  color: #f3f4f6;
+  background-color: #000000;
+  color: #ffffff;
 }
 
 button, a, input, select, textarea {
@@ -67,6 +156,7 @@ button, a, input, select, textarea {
 
 .gpu-accelerated {
   transform: translateZ(0);
+  backface-visibility: hidden;
   will-change: transform, opacity;
 }
 
@@ -78,6 +168,19 @@ button, a, input, select, textarea {
   100% {
     background-position: 200% 0;
   }
+}
+
+@keyframes eq-bar {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
+.animate-eq-1 { animation: eq-bar 0.75s ease-in-out infinite; }
+.animate-eq-2 { animation: eq-bar 0.75s ease-in-out infinite 0.2s; }
+.animate-eq-3 { animation: eq-bar 0.75s ease-in-out infinite 0.4s; }
+.animate-eq-4 { animation: eq-bar 0.75s ease-in-out infinite 0.15s; }
+
+.font-brand {
+  font-family: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif;
 }
 
 .fb-shimmer {
@@ -198,23 +301,33 @@ video:not([controls]) {
 
 /* Base Liquid Glass Capsule Styling for Dark Mode (Reels Video Page) */
 .ultra-glass-nav.dark-mode {
-    background: rgba(20, 20, 28, 0.72);
-    backdrop-filter: blur(14px) saturate(160%);
-    -webkit-backdrop-filter: blur(14px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    border-top: 1.5px solid rgba(255, 255, 255, 0.65);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    background: rgba(0, 0, 0, 0.90);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-top: 1.5px solid rgba(255, 255, 255, 0.45);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
 }
 
 /* Liquid Glass Capsule Styling for Light/White Pages */
 .ultra-glass-nav.light-mode {
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(14px) saturate(160%);
-    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     border: 1px solid rgba(255, 255, 255, 0.85);
     border-top: 1.8px solid rgba(255, 255, 255, 0.98);
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), inset 0 1px 1.5px rgba(255, 255, 255, 0.95);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), inset 0 1px 1.5px rgba(255, 255, 255, 0.95);
+}
+
+/* Liquid Glass Capsule Styling for Profile Page (Lavender theme matching) */
+.ultra-glass-nav.profile-mode {
+    background: rgba(243, 232, 255, 0.92);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1.2px solid rgba(216, 180, 254, 0.85);
+    border-top: 1.8px solid rgba(255, 255, 255, 0.98);
+    box-shadow: 0 4px 16px rgba(147, 51, 234, 0.12), inset 0 1px 2px rgba(255, 255, 255, 0.95);
 }
 
 .circle-slot {
@@ -255,6 +368,25 @@ video:not([controls]) {
     transform: scaleX(1.18) scaleY(1.04) translate3d(0, 0, 0);
     border-radius: 20px;
     box-shadow: 0 0 14px rgba(255, 255, 255, 0.5);
+}
+
+/* Active Bubble Circle on Profile Page - Soft Lavender */
+.ultra-glass-nav.profile-mode .active-glass-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 1px solid rgba(216, 180, 254, 0.9);
+    box-shadow: 0 4px 12px rgba(147, 51, 234, 0.15), inset 0 1.5px 2px #ffffff;
+    transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease, border-radius 0.15s ease;
+    will-change: transform;
+    transform: translate3d(0, 0, 0);
+}
+
+.ultra-glass-nav.profile-mode .active-glass-circle.is-holding {
+    transform: scaleX(1.18) scaleY(1.04) translate3d(0, 0, 0);
+    border-radius: 20px;
+    box-shadow: 0 6px 16px rgba(147, 51, 234, 0.3);
 }
 
 /* Active Bubble Circle on Light/White Pages - Ultra Fast */
@@ -314,6 +446,17 @@ video:not([controls]) {
     stroke: #ffffff;
     transform: scale(1.1);
     filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8));
+}
+
+/* Icons on Profile Page */
+.ultra-glass-nav.profile-mode .glass-nav-icon {
+    stroke: #7e22ce;
+}
+
+.ultra-glass-nav.profile-mode .glass-nav-item.active .glass-nav-icon {
+    stroke: #581c87;
+    transform: scale(1.1);
+    filter: drop-shadow(0 1px 2px rgba(88, 28, 135, 0.2));
 }
 
 /* Icons on White/Light Pages */
@@ -448,38 +591,27 @@ video:not([controls]) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: linear-gradient(
-    165deg,
-    rgba(255, 255, 255, 0.78) 0%,
-    rgba(255, 255, 255, 0.45) 100%
-  );
-  backdrop-filter: blur(28px) saturate(210%);
-  -webkit-backdrop-filter: blur(28px) saturate(210%);
-  border: 1.5px solid rgba(255, 255, 255, 0.85);
-  border-top: 2px solid rgba(255, 255, 255, 0.98);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.09),
-              0 2px 8px rgba(0, 0, 0, 0.03),
-              inset 0 1.5px 2px rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 18px -2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.02);
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
-  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: transform;
 }
 
+html.dark .ultra-glass-pc-dock,
 .ultra-glass-pc-dock.dark-mode {
-  background: linear-gradient(
-    165deg,
-    rgba(255, 255, 255, 0.25) 0%,
-    rgba(255, 255, 255, 0.08) 100%
-  );
-  backdrop-filter: blur(28px) saturate(200%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-top: 1.5px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.35),
-              inset 0 1.5px 2px rgba(255, 255, 255, 0.7);
+  background: rgba(18, 18, 22, 0.88);
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
 }
 
 .ultra-glass-pc-item {
@@ -525,11 +657,29 @@ video:not([controls]) {
   stroke: #0f172a !important;
 }
 
+.ultra-glass-pc-dock.dark-mode .ultra-glass-pc-icon,
+html.dark .ultra-glass-pc-dock .ultra-glass-pc-icon {
+  stroke: rgba(255, 255, 255, 0.65) !important;
+}
+
+.ultra-glass-pc-dock.dark-mode .ultra-glass-pc-item:hover .ultra-glass-pc-icon,
+html.dark .ultra-glass-pc-dock .ultra-glass-pc-item:hover .ultra-glass-pc-icon {
+  stroke: #ffffff !important;
+}
+
 .ultra-glass-pc-item.active .ultra-glass-pc-icon {
   stroke: #020617 !important;
   stroke-width: 2.4 !important;
   transform: scale(1.08);
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+}
+
+.ultra-glass-pc-dock.dark-mode .ultra-glass-pc-item.active .ultra-glass-pc-icon,
+html.dark .ultra-glass-pc-dock .ultra-glass-pc-item.active .ultra-glass-pc-icon {
+  stroke: #ffffff !important;
+  stroke-width: 2.4 !important;
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35));
 }
 
 /* =========================================================
@@ -540,7 +690,6 @@ video:not([controls]) {
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior-y: contain !important;
   touch-action: pan-y !important;
-  scroll-behavior: smooth;
   transform: translateZ(0);
   will-change: scroll-position;
 }
@@ -554,6 +703,54 @@ video:not([controls]) {
   overflow: hidden;
   transform: translateZ(0);
   backface-visibility: hidden;
+  contain: content;
+}
+
+/* =========================================================
+   PC ULTRA CLEAN 2D REELS BUTTONS & CONTROLLERS (LAG-FREE GPU)
+   ========================================================= */
+.reels-pc-glass-btn {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: none !important;
+  transform: translateZ(0);
+  will-change: transform;
+  transition: transform 0.1s ease, background-color 0.1s ease;
+}
+
+.reels-pc-glass-btn:hover {
+  background: #f4f4f5;
+  transform: scale(1.06);
+}
+
+.reels-pc-glass-btn:active {
+  transform: scale(0.90);
+}
+
+html.dark .reels-pc-glass-btn {
+  background: #18191c;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: none !important;
+}
+
+html.dark .reels-pc-glass-btn:hover {
+  background: #25262b;
+}
+
+/* PC Clean 2D Navigation Controller (Up / Down) */
+.reels-pc-glass-nav {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transform: translateY(-50%) translateZ(0);
+  will-change: transform;
+  transition: transform 0.1s ease;
+}
+
+html.dark .reels-pc-glass-nav {
+  background: #18191c;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
 /* Remove ugly intrusive default video play buttons, posters, and controls in Android/iOS WebView */
@@ -724,53 +921,57 @@ video::-webkit-media-controls-enclosure {
 }
 
 /* ==========================================================================
-   GLOBAL DARK MODE STYLING (Except Profile Page)
-   User Rule: "profile page bade sob page dark hobe sonen feed page,search,
-   massage,create,setting mane ja ja ace sob akdom parfect babe drak hobe"
+   GLOBAL DARK MODE STYLING (Except Profile Page & Active Chat View)
+   True Solid OLED Black (#000000) Theme
    ========================================================================== */
 
 html.dark {
-  background-color: #0b0914;
+  background-color: #000000 !important;
   color-scheme: dark;
 }
 
 html.dark body {
-  background-color: #0b0914;
-  color: #f8fafc;
+  background-color: #000000 !important;
+  color: #ffffff;
+}
+
+html.dark #root {
+  background-color: #000000 !important;
 }
 
 /* Base surface overrides in dark mode (excluding profile page & chat view) */
 html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white,
+html.dark article:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *),
 html.dark nav:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white,
 html.dark header:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white,
 html.dark footer:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white,
 html.dark aside:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white,
 html.dark section:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white,
 html.dark form:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white {
-  background-color: #131927 !important;
+  background-color: #000000 !important;
 }
 
 html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white\/95,
 html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white\/90,
 html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white\/85,
 html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white\/80 {
-  background-color: rgba(19, 25, 39, 0.94) !important;
+  background-color: rgba(0, 0, 0, 0.95) !important;
 }
 
 html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white\/70,
 html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-white\/60 {
-  background-color: rgba(19, 25, 39, 0.75) !important;
+  background-color: rgba(0, 0, 0, 0.8) !important;
 }
 
 html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-slate-50,
 html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-gray-50,
 html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-\[\#faf5ff\],
 html.dark main:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).bg-\[\#faf5ff\] {
-  background-color: #0b0914 !important;
+  background-color: #000000 !important;
 }
 
 html.dark #home-scroll-container {
-  background-color: #0b0914 !important;
+  background-color: #000000 !important;
 }
 
 /* Borders in dark mode */
@@ -783,23 +984,23 @@ html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, 
 html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).border-white\/70,
 html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).border-white\/80,
 html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).border-white\/90 {
-  border-color: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* Divide borders */
 html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
-  border-color: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* Text colors in dark mode */
 html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).text-gray-900,
 html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).text-black {
-  color: #f8fafc !important;
+  color: #ffffff !important;
 }
 
 html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).text-gray-800,
 html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).text-gray-700 {
-  color: #e2e8f0 !important;
+  color: #f1f5f9 !important;
 }
 
 html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *).text-gray-600,
@@ -814,7 +1015,7 @@ html.dark *:not(.profile-page-root, .profile-page-root *, .chat-view-container, 
 /* Inputs and textareas outside chat */
 html.dark input:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *),
 html.dark textarea:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *) {
-  color: #f8fafc !important;
+  color: #ffffff !important;
 }
 
 html.dark input:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *)::placeholder,
@@ -826,24 +1027,44 @@ html.dark textarea:not(.profile-page-root, .profile-page-root *, .chat-view-cont
 html.dark button:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *):hover.hover\:bg-gray-50,
 html.dark button:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *):hover.hover\:bg-gray-50\/70,
 html.dark div:not(.profile-page-root, .profile-page-root *, .chat-view-container, .chat-view-container *):hover.hover\:bg-gray-100\/70 {
-  background-color: rgba(255, 255, 255, 0.06) !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 /* Navigation Dock & Bottom Bar in dark mode */
 html.dark .ultra-glass-pc-dock {
-  background: rgba(19, 25, 39, 0.9) !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4) !important;
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(28px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(200%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* PC Side Navigation in Dark Mode */
+html.dark .ultra-glass-pc-dock .ultra-glass-pc-icon {
+  stroke: rgba(255, 255, 255, 0.45) !important;
+  filter: none !important;
+}
+
+html.dark .ultra-glass-pc-dock .ultra-glass-pc-item:hover .ultra-glass-pc-icon {
+  stroke: rgba(255, 255, 255, 0.82) !important;
+  filter: none !important;
+}
+
+html.dark .ultra-glass-pc-dock .ultra-glass-pc-item.active .ultra-glass-pc-icon {
+  stroke: #ffffff !important;
+  stroke-width: 2.35 !important;
+  filter: none !important;
 }
 
 html.dark .bottom-nav-classic {
-  background: rgba(19, 25, 39, 0.95) !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: #000000 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
 }
 
 /* Chat text input container inside chat stays light glass */
 html.dark form.bg-white\/60:not(.chat-view-container *) {
-  background-color: rgba(19, 25, 39, 0.8) !important;
+  background-color: rgba(0, 0, 0, 0.85) !important;
   border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
@@ -966,6 +1187,349 @@ html.dark .profile-page-root .border-purple-200,
 html.dark .profile-page-root .border-purple-200\/80 {
   border-color: rgba(233, 213, 255, 0.8) !important;
 }
+
+/* ========================================================
+   ACTIVITY & NOTIFICATIONS PAGE - ULTRA SOFT IOS EXPERIENCE
+   ======================================================== */
+:root {
+  --ios-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ios-bounce: cubic-bezier(0.34, 1.45, 0.64, 1);
+  
+  --act-bg: #f2f2f7;
+  --act-card-bg: rgba(255, 255, 255, 0.88);
+  --act-card-border: rgba(0, 0, 0, 0.06);
+  --act-card-shine: rgba(255, 255, 255, 1);
+  --act-text-primary: #000000;
+  --act-text-secondary: rgba(60, 60, 67, 0.6);
+  --act-accent: #007aff;
+  --act-accent-glow: rgba(0, 122, 255, 0.2);
+  --act-glass-nav-bg: rgba(255, 255, 255, 0.85);
+  --act-glass-nav-border: rgba(255, 255, 255, 0.95);
+  --act-pill-active-bg: #000000;
+  --act-pill-active-text: #ffffff;
+  --act-pill-inactive-text: #3c3c43;
+}
+
+html.dark {
+  --act-bg: #000000;
+  --act-card-bg: rgba(255, 255, 255, 0.08);
+  --act-card-border: rgba(255, 255, 255, 0.15);
+  --act-card-shine: rgba(255, 255, 255, 0.12);
+  --act-text-primary: #ffffff;
+  --act-text-secondary: rgba(255, 255, 255, 0.52);
+  --act-accent: #007aff;
+  --act-accent-glow: rgba(0, 122, 255, 0.35);
+  --act-glass-nav-bg: rgba(26, 26, 32, 0.7);
+  --act-glass-nav-border: rgba(255, 255, 255, 0.28);
+  --act-pill-active-bg: #ffffff;
+  --act-pill-active-text: #000000;
+  --act-pill-inactive-text: rgba(255, 255, 255, 0.72);
+}
+
+.act-ambient-glow {
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 340px;
+  height: 220px;
+  background: radial-gradient(circle at 50% 40%, rgba(0, 122, 255, 0.2) 0%, rgba(0, 122, 255, 0.06) 40%, transparent 70%);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.8;
+}
+
+/* Header */
+.act-header-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--act-card-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--act-text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  transition: transform 0.2s var(--ios-spring), background 0.3s;
+}
+
+.act-header-btn:active {
+  transform: scale(0.88);
+}
+
+/* Card Item - Ultra Optimized for 60/120 FPS on Low-End Devices */
+.act-card-item {
+  background: var(--act-card-bg);
+  border: 1px solid var(--act-card-border);
+  border-radius: 26px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), inset 0 1px 1px var(--act-card-shine);
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.22s var(--ios-spring), box-shadow 0.22s;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  contain: layout style paint;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 72px;
+}
+
+.act-card-item:hover {
+  transform: translate3d(0, -2px, 0);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08), inset 0 1px 1px var(--act-card-shine);
+}
+
+.act-card-item:active {
+  transform: scale(0.965) translate3d(0, 0, 0) !important;
+  transition: transform 0.12s ease-out;
+}
+
+/* Badges */
+.act-badge-icon {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #fff;
+  border: 2px solid var(--act-bg);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.act-badge-like { background: #ff2d55; }
+.act-badge-comment { background: #34c759; }
+.act-badge-mention { background: #af52de; }
+.act-badge-follow { background: #007aff; }
+
+/* Buttons */
+.act-btn-pill {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.2s var(--ios-spring), background 0.3s, box-shadow 0.3s;
+}
+
+.act-btn-pill:active {
+  transform: scale(0.92);
+}
+
+.act-btn-follow-back {
+  background: linear-gradient(to right, #ff3b5c, #ff5376);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(255, 59, 92, 0.35);
+}
+
+.act-btn-following {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--act-text-primary);
+  border: 1px solid var(--act-card-border);
+}
+
+html:not(.dark) .act-btn-following {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.act-btn-solid-follow {
+  background: linear-gradient(to right, #ff3b5c, #ff5376);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(255, 59, 92, 0.35);
+}
+
+/* Stack Accordion Physics - GPU Composited (No CPU blur) */
+.act-stack-deck {
+  position: relative;
+  cursor: pointer;
+  transition: padding 0.5s var(--ios-spring);
+  contain: layout;
+  perspective: 1000px;
+}
+
+.act-stack-deck .act-card-item {
+  margin-bottom: 0px;
+  transform-origin: center top;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  transition: 
+    margin-top 0.52s var(--ios-spring),
+    transform 0.52s var(--ios-spring),
+    opacity 0.35s ease;
+}
+
+/* Collapsed State */
+.act-stack-deck.is-collapsed .act-card-item:nth-child(1) {
+  margin-top: 0px;
+  transform: translate3d(0, 0, 0) scale(1);
+  z-index: 5;
+  opacity: 1;
+}
+
+.act-stack-deck.is-collapsed .act-card-item:nth-child(2) {
+  margin-top: -54px;
+  transform: translate3d(0, 14px, 0) scale(0.95);
+  z-index: 4;
+  opacity: 0.88;
+}
+
+.act-stack-deck.is-collapsed .act-card-item:nth-child(3) {
+  margin-top: -54px;
+  transform: translate3d(0, 27px, 0) scale(0.89);
+  z-index: 3;
+  opacity: 0.65;
+}
+
+.act-stack-deck.is-collapsed .act-card-item:nth-child(n+4) {
+  margin-top: -54px;
+  transform: translate3d(0, 38px, 0) scale(0.83);
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Expanded State */
+.act-stack-deck.is-expanded .act-card-item {
+  margin-top: 10px;
+  transform: translate3d(0, 0, 0) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.act-stack-deck.is-expanded .act-card-item:nth-child(1) { transition-delay: 0.00s; }
+.act-stack-deck.is-expanded .act-card-item:nth-child(2) { transition-delay: 0.03s; }
+.act-stack-deck.is-expanded .act-card-item:nth-child(3) { transition-delay: 0.06s; }
+.act-stack-deck.is-expanded .act-card-item:nth-child(4) { transition-delay: 0.09s; }
+.act-stack-deck.is-expanded .act-card-item:nth-child(5) { transition-delay: 0.12s; }
+.act-stack-deck.is-expanded .act-card-item:nth-child(6) { transition-delay: 0.15s; }
+.act-stack-deck.is-expanded .act-card-item:nth-child(n+7) { transition-delay: 0.18s; }
+
+/* Handle Banner */
+.act-stack-handle-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+  cursor: pointer;
+  touch-action: none;
+  transition: transform 0.2s var(--ios-spring);
+}
+
+.act-stack-handle-banner:active {
+  transform: scale(0.96);
+}
+
+.act-stack-pill-handle {
+  width: 40px;
+  height: 5px;
+  border-radius: 12px;
+  background: var(--act-text-secondary);
+  opacity: 0.6;
+  margin-bottom: 7px;
+  transition: all 0.35s var(--ios-spring);
+}
+
+.act-stack-handle-banner:hover .act-stack-pill-handle {
+  opacity: 1;
+  width: 52px;
+  background: var(--act-accent);
+}
+
+/* Bottom Glass Navigation Bar */
+.act-bottom-nav-container {
+  position: absolute;
+  bottom: 24px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 80;
+  pointer-events: none;
+}
+
+.act-glass-nav-pill {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--act-glass-nav-bg);
+  border: 1.5px solid var(--act-glass-nav-border);
+  border-radius: 40px;
+  padding: 5px;
+  backdrop-filter: blur(40px) saturate(210%);
+  -webkit-backdrop-filter: blur(40px) saturate(210%);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.6);
+}
+
+html.dark .act-glass-nav-pill {
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.15);
+}
+
+.act-capsule-slider {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 5px;
+  width: calc(50% - 5px);
+  background: var(--act-pill-active-bg);
+  border-radius: 35px;
+  transition: transform 0.42s var(--ios-bounce);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  z-index: 1;
+}
+
+.act-nav-btn {
+  position: relative;
+  z-index: 2;
+  border: none;
+  background: transparent;
+  padding: 9px 24px;
+  border-radius: 35px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--act-pill-inactive-text);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  transition: color 0.3s ease, transform 0.15s;
+}
+
+.act-nav-btn:active {
+  transform: scale(0.93);
+}
+
+.act-nav-btn.active {
+  color: var(--act-pill-active-text);
+}
+
+/* Soft slide up animation */
+@keyframes actSoftSlideUp {
+  0% { opacity: 0; transform: translateY(28px) scale(0.97); filter: blur(4px); }
+  70% { filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+.act-animate-in {
+  opacity: 0;
+  animation: actSoftSlideUp 0.65s var(--ios-spring) forwards;
+  will-change: transform, opacity;
+}
+
 
 
 

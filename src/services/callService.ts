@@ -1,18 +1,32 @@
+/**
+ * Ennvo High-Performance WebRTC Video & Voice Call Service
+ * Integrated with Native Android Bridge, Trickle ICE, Dynamic Reconnection & Bandwidth Control.
+ */
+
 import { 
   collection, 
   addDoc, 
   doc, 
   onSnapshot, 
   updateDoc, 
-  setDoc,
-  getDocs,
+  getDoc,
   query,
   where,
-  orderBy,
   limit,
-  serverTimestamp 
+  Unsubscribe
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { bridge } from '../native/bridge';
+import { getCachedAppConfig } from './appConfigService';
+import { playIncomingRingtone, playOutgoingRingtone, stopCallSounds } from './soundService';
+
+export const playRingtone = (type: 'incoming' | 'outgoing' = 'incoming') => {
+  if (type === 'incoming') {
+    playIncomingRingtone();
+  } else {
+    playOutgoingRingtone();
+  }
+};
 
 export interface CallData {
   id: string;
@@ -23,28 +37,22 @@ export interface CallData {
   receiverName: string;
   receiverAvatar: string;
   type: 'audio' | 'video';
-  status: 'ringing' | 'accepted' | 'rejected' | 'ended';
+  status: 'ringing' | 'accepted' | 'rejected' | 'ended' | 'reconnecting';
   createdAt: number;
   offer?: any;
   answer?: any;
 }
 
-const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [
-    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302', 'stun:stun3.l.google.com:19302', 'stun:stun4.l.google.com:19302'] },
-    { urls: ['stun:global.stun.twilio.com:3478'] },
-    { urls: ['stun:stun.services.mozilla.com'] }
-  ],
-  iceCandidatePoolSize: 10
-};
-
 let peerConnection: RTCPeerConnection | null = null;
 let localStream: MediaStream | null = null;
 let remoteStream: MediaStream | null = null;
-let ringtoneAudioCtx: AudioContext | null = null;
-let ringtoneInterval: any = null;
 let iceCandidateQueue: RTCIceCandidateInit[] = [];
 let currentFacingMode: 'user' | 'environment' = 'user';
+let activeCallId: string | null = null;
+let reconnectAttempts = 0;
+let isCallConnected = false;
+let currentCallType: 'audio' | 'video' = 'audio';
+let activeCallPartnerName = '';
 
 type StreamListener = (local: MediaStream | null, remote: MediaStream | null) => void;
 const streamListeners = new Set<StreamListener>();
@@ -61,6 +69,131 @@ export const notifyStreamChanges = () => {
   streamListeners.forEach(l => l(localStream, remoteStream));
 };
 
+const getEffectiveIceServers = (): RTCIceServer[] => {
+  const config = getCachedAppConfig();
+  if (config?.rtc?.iceServers && config.rtc.iceServers.length > 0) {
+    return config.rtc.iceServers;
+  }
+  return [
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
+    { urls: ['stun:global.stun.twilio.com:3478'] },
+    { urls: ['stun:stun.services.mozilla.com'] }
+  ];
+};
+
+/**
+ * Optimized SDP Munger for Opus Audio & Video bitrates
+ */
+const setOpusBandwidthAndFec = (sdp: string, maxBitrateKbps: number = 32): string => {
+  let lines = sdp.split('\r\n');
+  let opusPayload: string | null = null;
+
+  for (const line of lines) {
+    const match = line.match(/^a=rtpmap:(\d+)\s+opus\/48000/i);
+    if (match) {
+      opusPayload = match[1];
+      break;
+    }
+  }
+
+  if (opusPayload) {
+    lines = lines.map(line => {
+      if (line.startsWith(`a=fmtp:${opusPayload}`)) {
+        if (!line.includes('useinbandfec')) {
+          line += ';useinbandfec=1;usedtx=1;maxaveragebitrate=' + (maxBitrateKbps * 1000);
+        }
+      }
+      return line;
+    });
+  }
+
+  return lines.join('\r\n');
+};
+
+/**
+ * Configure RTCRtpSender parameters for low-end mobile hardware
+ */
+const tuneSenderParameters = async (pc: RTCPeerConnection) => {
+  try {
+    const senders = pc.getSenders();
+    for (const sender of senders) {
+      if (sender.track?.kind === 'video') {
+        const params = sender.getParameters();
+        if (!params.encodings || params.encodings.length === 0) {
+          params.encodings = [{}];
+        }
+        params.encodings[0].maxBitrate = 600000; // 600 kbps cap
+        params.degradationPreference = 'maintain-framerate';
+        await sender.setParameters(params);
+      }
+    }
+  } catch (e) {
+    console.warn('[CallService] Sender parameter tuning notice:', e);
+  }
+};
+
+/**
+ * Synthetic fallback stream when hardware camera/mic is blocked or unavailable
+ */
+const createSyntheticAudioStream = (): MediaStream => {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return new MediaStream();
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const dst = ctx.createMediaStreamDestination();
+    const gain = ctx.createGain();
+    gain.gain.value = 0.0001;
+    osc.connect(gain);
+    gain.connect(dst);
+    osc.start();
+    return dst.stream;
+  } catch (e) {
+    return new MediaStream();
+  }
+};
+
+export const getMediaStreamWithFallback = async (type: 'audio' | 'video'): Promise<MediaStream> => {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    return createSyntheticAudioStream();
+  }
+
+  // Mobile-optimized constraints for cheap phones (640x480 @ 24fps)
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 48000,
+        channelCount: 1, // Mono
+      },
+      video: type === 'video' ? {
+        facingMode: 'user',
+        width: { ideal: 640, max: 1280 },
+        height: { ideal: 480, max: 720 },
+        frameRate: { ideal: 24, max: 24 }
+      } : false
+    });
+  } catch (err1) {
+    console.warn('[CallService] Ideal constraints failed, falling back to basic audio/video:', err1);
+  }
+
+  if (type === 'video') {
+    try {
+      return await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    } catch (err2) {
+      console.warn('[CallService] Basic video failed, falling back to audio only:', err2);
+    }
+  }
+
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch (err3) {
+    return createSyntheticAudioStream();
+  }
+};
+
 export const switchCamera = async () => {
   if (!localStream) return;
   const videoTrack = localStream.getVideoTracks()[0];
@@ -71,14 +204,14 @@ export const switchCamera = async () => {
   try {
     const newStream = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: { facingMode: currentFacingMode }
+      video: { facingMode: currentFacingMode, width: { ideal: 640 }, height: { ideal: 480 } }
     });
     const newVideoTrack = newStream.getVideoTracks()[0];
     if (newVideoTrack) {
       if (peerConnection) {
         const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
         if (sender) {
-          sender.replaceTrack(newVideoTrack);
+          await sender.replaceTrack(newVideoTrack);
         }
       }
       videoTrack.stop();
@@ -125,20 +258,8 @@ export const setVideoDisabled = (disabled: boolean): boolean => {
   return disabled;
 };
 
-import { playIncomingRingtone, playOutgoingRingtone, stopCallSounds } from './soundService';
-
-export const playRingtone = (isIncoming: boolean) => {
-  if (isIncoming) {
-    playIncomingRingtone();
-  } else {
-    playOutgoingRingtone();
-  }
-};
-
-const handledCallIds = new Set<string>();
-
-export const markCallHandled = (callId: string) => {
-  if (callId) handledCallIds.add(callId);
+export const setSpeaker = (on: boolean) => {
+  bridge.setSpeaker(on);
 };
 
 export const stopRingtone = () => {
@@ -147,8 +268,14 @@ export const stopRingtone = () => {
 
 export const cleanupMedia = () => {
   stopRingtone();
+  bridge.endCall();
+  bridge.dismissIncomingCall();
+  bridge.setPip(false, 0, 0);
+
   if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
+    localStream.getTracks().forEach(track => {
+      try { track.stop(); } catch (e) {}
+    });
     localStream = null;
   }
   if (peerConnection) {
@@ -159,15 +286,27 @@ export const cleanupMedia = () => {
   }
   remoteStream = null;
   iceCandidateQueue = [];
+  activeCallId = null;
+  reconnectAttempts = 0;
+  isCallConnected = false;
   notifyStreamChanges();
 };
 
+const handledCallIds = new Set<string>();
+export const markCallHandled = (callId: string) => {
+  if (callId) handledCallIds.add(callId);
+};
+
+/**
+ * Incoming call subscription with background native notifications
+ */
 export const subscribeIncomingCalls = (userId: string, callback: (call: CallData | null) => void) => {
   if (!userId) return () => {};
-  // Query by receiverId only to avoid needing a Firestore composite index
+
   const q = query(
     collection(db, 'calls'),
-    where('receiverId', '==', userId)
+    where('receiverId', '==', userId),
+    limit(5)
   );
 
   return onSnapshot(q, (snapshot) => {
@@ -175,103 +314,62 @@ export const subscribeIncomingCalls = (userId: string, callback: (call: CallData
       const now = Date.now();
       const ringingCalls = snapshot.docs
         .map(d => ({ id: d.id, ...d.data() } as CallData))
-        .filter(c => c.status === 'ringing' && !handledCallIds.has(c.id) && (now - (c.createdAt || 0)) < 30000)
+        .filter(c => c.status === 'ringing' && !handledCallIds.has(c.id) && (now - (c.createdAt || 0)) < 35000)
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
       if (ringingCalls.length > 0) {
-        callback(ringingCalls[0]);
+        const topCall = ringingCalls[0];
+        
+        // If app is currently minimized/backgrounded, trigger full-screen native incoming call
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+          bridge.showIncomingCall(
+            topCall.callerName || 'Ennvo User',
+            topCall.callerAvatar || '',
+            topCall.type === 'video' ? 'video' : 'voice',
+            topCall.id
+          );
+        }
+
+        callback(topCall);
         return;
       }
     }
+    bridge.dismissIncomingCall();
     callback(null);
-  }, (err) => {
-    console.error('Error listening to incoming calls:', err);
-  });
+  }, (err) => console.warn('[CallService] incoming calls error:', err));
 };
 
-// Media Stream Fallback for devices without camera/mic or overconstrained hardware
-const createSyntheticAudioStream = (): MediaStream => {
-  try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return new MediaStream();
-    const ctx = new AudioCtx();
-    const osc = ctx.createOscillator();
-    const dst = ctx.createMediaStreamDestination();
-    const gain = ctx.createGain();
-    gain.gain.value = 0.0001; // Silent tone
-    osc.connect(gain);
-    gain.connect(dst);
-    osc.start();
-    return dst.stream;
-  } catch (e) {
-    return new MediaStream();
-  }
-};
-
-export const getMediaStreamWithFallback = async (type: 'audio' | 'video'): Promise<MediaStream> => {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    console.warn('getUserMedia not supported, using synthetic media stream.');
-    return createSyntheticAudioStream();
-  }
-
-  // 1. Ideal Constraints - Mobile optimized crisp low-latency video & audio
-  try {
-    return await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-      video: type === 'video' ? { 
-        facingMode: 'user', 
-        width: { ideal: 640, max: 1280 }, 
-        height: { ideal: 480, max: 720 },
-        frameRate: { ideal: 24, max: 30 }
-      } : false
-    });
-  } catch (err1) {
-    console.warn('Ideal media constraints failed, trying basic constraints...', err1);
-  }
-
-  // 2. Basic Video/Audio
-  if (type === 'video') {
-    try {
-      return await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-    } catch (err2) {
-      console.warn('Basic video constraints failed, trying audio only...', err2);
-    }
-  }
-
-  // 3. Basic Audio-only
-  try {
-    return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-  } catch (err3) {
-    console.warn('Audio constraints failed or device missing, using synthetic fallback...', err3);
-  }
-
-  // 4. Synthetic fallback
-  return createSyntheticAudioStream();
-};
-
+/**
+ * Initiate an Outgoing Call
+ */
 export const initiateCall = async (
   caller: { uid: string; name: string; avatar: string },
   receiver: { uid: string; name: string; avatar: string },
   type: 'audio' | 'video',
   onRemoteStream: (stream: MediaStream) => void,
-  onCallStatusChange: (status: 'ringing' | 'accepted' | 'rejected' | 'ended') => void
+  onCallStatusChange: (status: 'ringing' | 'accepted' | 'rejected' | 'ended' | 'reconnecting') => void
 ): Promise<{ callId: string; stream: MediaStream }> => {
   cleanupMedia();
-  playRingtone(false);
+  currentCallType = type;
+  activeCallPartnerName = receiver.name || 'Ennvo Call';
 
-  // 1. Get Local Stream (with automatic hardware fallback)
+  playOutgoingRingtone();
+
+  // 1. Pre-warm media and connection
   localStream = await getMediaStreamWithFallback(type);
   notifyStreamChanges();
 
-  // 2. Setup RTCPeerConnection
-  peerConnection = new RTCPeerConnection(RTC_CONFIG);
+  const rtcConfig: RTCConfiguration = {
+    iceServers: getEffectiveIceServers(),
+    iceCandidatePoolSize: 4
+  };
+
+  peerConnection = new RTCPeerConnection(rtcConfig);
   localStream.getTracks().forEach(track => {
     peerConnection?.addTrack(track, localStream!);
   });
+
+  tuneSenderParameters(peerConnection);
 
   remoteStream = new MediaStream();
   peerConnection.ontrack = (event) => {
@@ -283,12 +381,38 @@ export const initiateCall = async (
         remoteStream.addTrack(event.track);
       }
     }
-    const freshStream = new MediaStream(remoteStream.getTracks());
-    onRemoteStream(freshStream);
+    onRemoteStream(new MediaStream(remoteStream.getTracks()));
     notifyStreamChanges();
   };
 
-  // 3. Create Call Document in Firestore
+  // Reconnection & ICE State handler
+  peerConnection.oniceconnectionstatechange = async () => {
+    const state = peerConnection?.iceConnectionState;
+    if (state === 'disconnected' || state === 'failed') {
+      if (reconnectAttempts < 3 && activeCallId) {
+        reconnectAttempts++;
+        onCallStatusChange('reconnecting');
+        try {
+          const restartOffer = await peerConnection?.createOffer({ iceRestart: true });
+          if (restartOffer && peerConnection) {
+            await peerConnection.setLocalDescription(restartOffer);
+            await updateDoc(doc(db, 'calls', activeCallId), {
+              offer: { type: restartOffer.type, sdp: setOpusBandwidthAndFec(restartOffer.sdp) }
+            });
+          }
+        } catch (e) {
+          console.warn('[CallService] ICE restart failed:', e);
+        }
+      } else {
+        endCall(activeCallId || '');
+      }
+    } else if (state === 'connected' || state === 'completed') {
+      reconnectAttempts = 0;
+      onCallStatusChange('accepted');
+    }
+  };
+
+  // 2. Create Call in Firestore
   const callDocRef = await addDoc(collection(db, 'calls'), {
     callerId: caller.uid,
     callerName: caller.name || 'User',
@@ -302,24 +426,44 @@ export const initiateCall = async (
   });
 
   const callId = callDocRef.id;
+  activeCallId = callId;
 
-  // 4. ICE Candidates
+  // Dispatch High-Priority DATA-ONLY Call Push for native notification (rings even when app is closed)
+  fetch('/api/native/send-push', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      targetUserId: receiver.uid,
+      type: 'call',
+      name: caller.name || 'Caller',
+      avatar: caller.avatar || '',
+      callType: type,
+      callId
+    })
+  }).catch((err) => console.warn('[Call] Failed triggering call push:', err));
+
+  // 3. Batch Trickle ICE Candidates
   const callerCandidatesCol = collection(db, 'calls', callId, 'callerCandidates');
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
-      addDoc(callerCandidatesCol, event.candidate.toJSON()).catch(console.error);
+      addDoc(callerCandidatesCol, event.candidate.toJSON()).catch(() => {});
     }
   };
 
-  // 5. Create Offer
-  const offer = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offer);
+  // 4. Create Offer with Opus FEC & Bitrate tuning
+  const rawOffer = await peerConnection.createOffer();
+  const mungedOffer = {
+    type: rawOffer.type,
+    sdp: setOpusBandwidthAndFec(rawOffer.sdp || '')
+  };
+  await peerConnection.setLocalDescription(mungedOffer);
 
   await updateDoc(callDocRef, {
-    offer: { type: offer.type, sdp: offer.sdp }
+    offer: mungedOffer
   });
 
-  // 6. Listen for Call status & Answer
+  // 5. Listen for answer & status
+  let unsubReceiverCandidates: Unsubscribe | null = null;
   const unsubscribeCall = onSnapshot(callDocRef, async (snapshot) => {
     const data = snapshot.data();
     if (!data) return;
@@ -329,28 +473,33 @@ export const initiateCall = async (
       onCallStatusChange(data.status);
       cleanupMedia();
       unsubscribeCall();
+      if (unsubReceiverCandidates) unsubReceiverCandidates();
     } else if (data.status === 'accepted' && data.answer && !peerConnection?.currentRemoteDescription) {
       stopRingtone();
+      isCallConnected = true;
+      bridge.startCall(receiver.name || 'Ennvo Call', type === 'video');
+      bridge.setPip(true, 9, 16);
       onCallStatusChange('accepted');
+
       const rtcAnswer = new RTCSessionDescription(data.answer);
       await peerConnection?.setRemoteDescription(rtcAnswer);
 
-      // Drain any queued ICE candidates
+      // Drain queue
       while (iceCandidateQueue.length > 0) {
         const cand = iceCandidateQueue.shift();
         if (cand && peerConnection) {
-          peerConnection.addIceCandidate(new RTCIceCandidate(cand)).catch(console.error);
+          peerConnection.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
         }
       }
 
       // Listen for receiver candidates
       const receiverCandidatesCol = collection(db, 'calls', callId, 'receiverCandidates');
-      onSnapshot(receiverCandidatesCol, (candSnapshot) => {
+      unsubReceiverCandidates = onSnapshot(receiverCandidatesCol, (candSnapshot) => {
         candSnapshot.docChanges().forEach(change => {
           if (change.type === 'added') {
             const candData = change.doc.data();
             if (peerConnection?.remoteDescription) {
-              peerConnection.addIceCandidate(new RTCIceCandidate(candData)).catch(console.error);
+              peerConnection.addIceCandidate(new RTCIceCandidate(candData)).catch(() => {});
             } else {
               iceCandidateQueue.push(candData);
             }
@@ -363,21 +512,36 @@ export const initiateCall = async (
   return { callId, stream: localStream };
 };
 
+/**
+ * Accept Incoming Call
+ */
 export const acceptIncomingCall = async (
   call: CallData,
   onRemoteStream: (stream: MediaStream) => void,
-  onCallStatusChange: (status: 'ringing' | 'accepted' | 'rejected' | 'ended') => void
+  onCallStatusChange: (status: 'ringing' | 'accepted' | 'rejected' | 'ended' | 'reconnecting') => void
 ): Promise<{ stream: MediaStream }> => {
   cleanupMedia();
   stopRingtone();
+  bridge.dismissIncomingCall();
+
+  currentCallType = call.type;
+  activeCallId = call.id;
+  activeCallPartnerName = call.callerName || 'Ennvo Call';
 
   localStream = await getMediaStreamWithFallback(call.type);
   notifyStreamChanges();
 
-  peerConnection = new RTCPeerConnection(RTC_CONFIG);
+  const rtcConfig: RTCConfiguration = {
+    iceServers: getEffectiveIceServers(),
+    iceCandidatePoolSize: 4
+  };
+
+  peerConnection = new RTCPeerConnection(rtcConfig);
   localStream.getTracks().forEach(track => {
     peerConnection?.addTrack(track, localStream!);
   });
+
+  tuneSenderParameters(peerConnection);
 
   remoteStream = new MediaStream();
   peerConnection.ontrack = (event) => {
@@ -389,46 +553,18 @@ export const acceptIncomingCall = async (
         remoteStream.addTrack(event.track);
       }
     }
-    const freshStream = new MediaStream(remoteStream.getTracks());
-    onRemoteStream(freshStream);
+    onRemoteStream(new MediaStream(remoteStream.getTracks()));
     notifyStreamChanges();
   };
 
-  // Set remote offer from caller
-  if (call.offer) {
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(call.offer));
-  }
-
-  // Receiver candidates
-  const receiverCandidatesCol = collection(db, 'calls', call.id, 'receiverCandidates');
-  peerConnection.onicecandidate = (event) => {
-    if (event.candidate) {
-      addDoc(receiverCandidatesCol, event.candidate.toJSON()).catch(console.error);
-    }
-  };
-
-  // Create Answer
-  const answer = await peerConnection.createAnswer();
-  await peerConnection.setLocalDescription(answer);
-
-  // Update Call Doc status to accepted
-  const callDocRef = doc(db, 'calls', call.id);
-  await updateDoc(callDocRef, {
-    answer: { type: answer.type, sdp: answer.sdp },
-    status: 'accepted'
-  });
-
-  // Immediately notify local receiver UI that call is accepted to start callDuration timer
-  onCallStatusChange('accepted');
-
-  // Listen for caller candidates
+  // Listen for caller candidates in parallel immediately
   const callerCandidatesCol = collection(db, 'calls', call.id, 'callerCandidates');
-  onSnapshot(callerCandidatesCol, (candSnapshot) => {
+  const unsubCallerCandidates = onSnapshot(callerCandidatesCol, (candSnapshot) => {
     candSnapshot.docChanges().forEach(change => {
       if (change.type === 'added') {
         const candData = change.doc.data();
         if (peerConnection?.remoteDescription) {
-          peerConnection.addIceCandidate(new RTCIceCandidate(candData)).catch(console.error);
+          peerConnection.addIceCandidate(new RTCIceCandidate(candData)).catch(() => {});
         } else {
           iceCandidateQueue.push(candData);
         }
@@ -436,13 +572,59 @@ export const acceptIncomingCall = async (
     });
   });
 
-  // Listen for call ended / status updates
-  const unsubscribeCall = onSnapshot(callDocRef, (snapshot) => {
-    const data = snapshot.data();
-    if (data?.status === 'ended' || data?.status === 'rejected') {
+  if (call.offer) {
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(call.offer));
+  } else {
+    // Fallback: fetch offer doc if missing
+    try {
+      const snap = await getDoc(doc(db, 'calls', call.id));
+      if (snap.exists() && snap.data()?.offer) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(snap.data()!.offer));
+      }
+    } catch (e) {}
+  }
+
+  const receiverCandidatesCol = collection(db, 'calls', call.id, 'receiverCandidates');
+  peerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+      addDoc(receiverCandidatesCol, event.candidate.toJSON()).catch(() => {});
+    }
+  };
+
+  const rawAnswer = await peerConnection.createAnswer();
+  const mungedAnswer = {
+    type: rawAnswer.type,
+    sdp: setOpusBandwidthAndFec(rawAnswer.sdp || '')
+  };
+  await peerConnection.setLocalDescription(mungedAnswer);
+
+  const callDocRef = doc(db, 'calls', call.id);
+  await updateDoc(callDocRef, {
+    answer: mungedAnswer,
+    status: 'accepted'
+  });
+
+  // Flush any queued caller candidates instantly
+  while (iceCandidateQueue.length > 0) {
+    const cand = iceCandidateQueue.shift();
+    if (cand && peerConnection && peerConnection.remoteDescription) {
+      peerConnection.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+    }
+  }
+
+  isCallConnected = true;
+  bridge.startCall(call.callerName || 'Ennvo Call', call.type === 'video');
+  bridge.setPip(true, 9, 16);
+  onCallStatusChange('accepted');
+
+  const unsubscribeCall = onSnapshot(callDocRef, (snap) => {
+    const data = snap.data();
+    if (data && (data.status === 'ended' || data.status === 'rejected')) {
+      stopRingtone();
       onCallStatusChange(data.status);
       cleanupMedia();
       unsubscribeCall();
+      if (unsubCallerCandidates) unsubCallerCandidates();
     }
   });
 
@@ -451,22 +633,35 @@ export const acceptIncomingCall = async (
 
 export const rejectCall = async (callId: string) => {
   markCallHandled(callId);
+  bridge.dismissIncomingCall();
   stopRingtone();
   try {
     await updateDoc(doc(db, 'calls', callId), { status: 'rejected' });
-  } catch (e) {
-    console.error(e);
-  }
+  } catch (e) {}
   cleanupMedia();
 };
 
 export const endCall = async (callId: string) => {
   markCallHandled(callId);
+  bridge.dismissIncomingCall();
+  bridge.endCall();
   stopRingtone();
   try {
-    await updateDoc(doc(db, 'calls', callId), { status: 'ended' });
-  } catch (e) {
-    console.error(e);
-  }
+    if (callId) {
+      await updateDoc(doc(db, 'calls', callId), { status: 'ended' });
+    }
+  } catch (e) {}
   cleanupMedia();
 };
+
+// Wire Native Hangup Callback
+if (typeof window !== 'undefined') {
+  const w = window as any;
+  w.onNativeHangup = () => {
+    if (activeCallId) {
+      endCall(activeCallId);
+    } else {
+      cleanupMedia();
+    }
+  };
+}

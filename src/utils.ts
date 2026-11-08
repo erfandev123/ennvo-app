@@ -100,10 +100,10 @@ export const generateVideoThumbnail = async (fileOrUrl: File | string): Promise<
       video.onseeked = () => {
         try {
           const canvas = document.createElement('canvas');
-          const width = video.videoWidth || 1080;
-          const height = video.videoHeight || 1920;
-          canvas.width = Math.min(1080, width);
-          canvas.height = Math.round((canvas.width * height) / width) || 1920;
+          const width = video.videoWidth || 360;
+          const height = video.videoHeight || 640;
+          canvas.width = Math.min(360, width);
+          canvas.height = Math.round((canvas.width * height) / width) || 640;
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -133,7 +133,7 @@ export const generateVideoThumbnail = async (fileOrUrl: File | string): Promise<
               }
             }
 
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.68);
             cleanup();
             return resolve(dataUrl);
           }
@@ -239,4 +239,53 @@ export const downloadMediaFile = async (url: string, filename?: string) => {
     a.click();
     document.body.removeChild(a);
   }
+};
+
+export const getBackendHost = (): string => {
+  if (typeof window !== 'undefined') {
+    // 1. Check if user or admin saved custom backend URL in settings/storage
+    const saved = localStorage.getItem('ennvo_backend_url');
+    if (saved && saved.startsWith('http')) {
+      return saved.replace(/\/$/, '');
+    }
+    // 2. If running in normal browser (not file:// or capacitor://localhost), use current origin
+    const origin = window.location.origin;
+    if (origin && origin !== 'null' && !origin.includes('capacitor://') && !origin.includes('file://') && (!origin.includes('localhost') || origin.includes('3000'))) {
+      return origin.replace(/\/$/, '');
+    }
+  }
+  // 3. Current active production backend URL for Android APK & remote WebView
+  return 'https://ais-dev-ququzv7htl2qshqf3skacy-736538280490.asia-northeast1.run.app';
+};
+
+export const getApiEndpoint = (path: string): string => {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin;
+    const isNativeApp =
+      window.location.protocol.includes('capacitor') ||
+      window.location.protocol.includes('file') ||
+      !!(window as any).Android ||
+      !!(window as any).AndroidInterface ||
+      !origin ||
+      origin === 'null' ||
+      (origin.includes('localhost') && !origin.includes('3000'));
+    if (isNativeApp) {
+      return `${getBackendHost()}${cleanPath}`;
+    }
+  }
+  return cleanPath;
+};
+
+export const formatMediaUrl = (url?: string | null): string => {
+  if (!url || typeof url !== 'string') return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
+    return url;
+  }
+  if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
+    const path = url.startsWith('/') ? url : `/${url}`;
+    const host = getBackendHost();
+    return `${host}${path}`;
+  }
+  return url;
 };

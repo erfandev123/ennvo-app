@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { deleteMedia, uploadMedia } from "./githubStorage";
+import { ensureFirebaseAuth } from "./authService";
 import { generateVideoThumbnail } from "../utils";
 
 export interface Story {
@@ -52,22 +53,19 @@ export const uploadStory = async (
   }
 ) => {
   try {
+    const authUid = await ensureFirebaseAuth();
     let mediaUrl = "";
     let thumbnailUrl = "";
     let type: "image" | "video" | "text" = "text";
 
     if (file) {
       type = file.type.startsWith("video") ? "video" : "image";
-      try {
-        mediaUrl = await uploadMedia(file, "stories");
-      } catch (uploadErr) {
-        console.warn("uploadMedia failed for story, using data url fallback:", uploadErr);
-        mediaUrl = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => resolve("");
-          reader.readAsDataURL(file);
-        });
+      mediaUrl = await uploadMedia(file, "stories");
+      if (!mediaUrl) {
+        throw new Error("Failed to upload story media. Please check your internet connection.");
+      }
+      if (mediaUrl.startsWith("data:video") && mediaUrl.length > 500000) {
+        throw new Error("Video file size is too large for fallback. Please check internet connection.");
       }
       if (type === "video") {
         try {
@@ -78,7 +76,7 @@ export const uploadStory = async (
       }
     }
 
-    const currentAuthId = auth.currentUser?.uid || userId;
+    const currentAuthId = auth.currentUser?.uid || userId || authUid;
     const authorName = userName || auth.currentUser?.displayName || "User";
     const authorAvatar = userAvatar || auth.currentUser?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=5633D8&color=fff`;
 
@@ -97,7 +95,7 @@ export const uploadStory = async (
     };
 
     if (mediaUrl) storyData.mediaUrl = mediaUrl;
-    if (thumbnailUrl) storyData.thumbnailUrl = thumbnailUrl;
+    if (thumbnailUrl && thumbnailUrl.length < 300000) storyData.thumbnailUrl = thumbnailUrl;
     if (text && text.trim()) storyData.text = text.trim();
     if (songId) storyData.songId = songId;
     if (extraSong?.title) storyData.songTitle = extraSong.title;
@@ -113,9 +111,29 @@ export const uploadStory = async (
   }
 };
 
+const preloadStoryMedia = (stories: Story[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    stories.slice(0, 20).forEach(s => {
+      if (s.mediaUrl && s.type === 'image') {
+        const img = new Image();
+        img.src = s.mediaUrl;
+      }
+      if (s.thumbnailUrl) {
+        const img = new Image();
+        img.src = s.thumbnailUrl;
+      }
+      if (s.authorAvatar) {
+        const img = new Image();
+        img.src = s.authorAvatar;
+      }
+    });
+  } catch (e) {}
+};
+
 export const subscribeStories = (
   callback: (stories: Story[]) => void,
-  _mode: "home" | "inbox" = "home",
+  _mode?: "home" | "inbox" | string,
 ) => {
   const q = query(
     collection(db, "stories"),
@@ -143,6 +161,7 @@ export const subscribeStories = (
           }
           return true;
         });
+      preloadStoryMedia(stories);
       callback(stories);
     },
     (error) => {
@@ -160,6 +179,7 @@ export const subscribeStories = (
             return true;
           })
           .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        preloadStoryMedia(stories);
         callback(stories);
       });
     }

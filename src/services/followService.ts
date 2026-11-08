@@ -2,7 +2,7 @@ import { doc, setDoc, deleteDoc, increment, updateDoc, getDoc, serverTimestamp, 
 import { db } from '../firebase';
 
 export const followUser = async (currentUser: any, targetUser: any) => {
-  if (currentUser.uid === targetUser.uid) return;
+  if (!currentUser?.uid || !targetUser?.uid || currentUser.uid === targetUser.uid) return;
 
   const followingRef = doc(db, 'users', currentUser.uid, 'following', targetUser.uid);
   const followerRef = doc(db, 'users', targetUser.uid, 'followers', currentUser.uid);
@@ -12,14 +12,14 @@ export const followUser = async (currentUser: any, targetUser: any) => {
       // Current user follows target user
       transaction.set(followingRef, { 
         createdAt: serverTimestamp(),
-        name: targetUser.name,
-        avatar: targetUser.avatar
+        name: targetUser.name || 'User',
+        avatar: targetUser.avatar || ''
       });
       // Target user gets a new follower
       transaction.set(followerRef, { 
         createdAt: serverTimestamp(),
-        name: currentUser.name,
-        avatar: currentUser.avatar
+        name: currentUser.name || 'User',
+        avatar: currentUser.avatar || ''
       });
       transaction.set(doc(db, 'users', currentUser.uid), { followingCount: increment(1) }, { merge: true });
       transaction.set(doc(db, 'users', targetUser.uid), { followersCount: increment(1) }, { merge: true });
@@ -33,11 +33,21 @@ export const followUser = async (currentUser: any, targetUser: any) => {
       console.error('Failed to send follow notification:', e);
     }
   } catch (error: any) {
-    throw new Error(error.message);
+    console.error("followUser transaction error, trying direct writes:", error);
+    try {
+      await setDoc(followingRef, { createdAt: serverTimestamp(), name: targetUser.name || 'User', avatar: targetUser.avatar || '' });
+      await setDoc(followerRef, { createdAt: serverTimestamp(), name: currentUser.name || 'User', avatar: currentUser.avatar || '' });
+      await setDoc(doc(db, 'users', currentUser.uid), { followingCount: increment(1) }, { merge: true });
+      await setDoc(doc(db, 'users', targetUser.uid), { followersCount: increment(1) }, { merge: true });
+    } catch (fallbackErr: any) {
+      console.error("followUser fallback failed:", fallbackErr);
+      throw new Error(fallbackErr.message || error.message);
+    }
   }
 };
 
 export const unfollowUser = async (currentUserId: string, targetUserId: string) => {
+  if (!currentUserId || !targetUserId || currentUserId === targetUserId) return;
   const followingRef = doc(db, 'users', currentUserId, 'following', targetUserId);
   const followerRef = doc(db, 'users', targetUserId, 'followers', currentUserId);
 
@@ -49,14 +59,15 @@ export const unfollowUser = async (currentUserId: string, targetUserId: string) 
       transaction.set(doc(db, 'users', targetUserId), { followersCount: increment(-1) }, { merge: true });
     });
   } catch (error: any) {
-    console.error("unfollowUser error:", error);
-    // Fallback if transaction fails due to count sync
+    console.error("unfollowUser transaction error, trying direct deletes:", error);
     try {
       await deleteDoc(followingRef);
       await deleteDoc(followerRef);
-    } catch (e) {
+      await setDoc(doc(db, 'users', currentUserId), { followingCount: increment(-1) }, { merge: true });
+      await setDoc(doc(db, 'users', targetUserId), { followersCount: increment(-1) }, { merge: true });
+    } catch (e: any) {
       console.error("unfollowUser fallback error:", e);
-      throw new Error(error.message);
+      throw new Error(e.message || error.message);
     }
   }
 };
@@ -119,6 +130,16 @@ export const blockUser = async (currentUserId: string, targetUserId: string, tar
       avatar: avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=random`,
       blockedAt: serverTimestamp()
     });
+
+    // Also record in blockedPairs so either user can verify block status
+    try {
+      await setDoc(doc(db, 'blockedPairs', `${currentUserId}_${targetUserId}`), {
+        blocker: currentUserId,
+        blocked: targetUserId,
+        timestamp: serverTimestamp()
+      });
+    } catch (_) {}
+
     // Automatically remove mutual friend/follow relationship when blocking
     try {
       await deleteFriend(currentUserId, targetUserId);
@@ -133,6 +154,9 @@ export const unblockUser = async (currentUserId: string, targetUserId: string) =
   try {
     const blockRef = doc(db, 'users', currentUserId, 'blockedUsers', targetUserId);
     await deleteDoc(blockRef);
+    try {
+      await deleteDoc(doc(db, 'blockedPairs', `${currentUserId}_${targetUserId}`));
+    } catch (_) {}
   } catch (error: any) {
     console.error("unblockUser error:", error);
     throw new Error(error.message);
@@ -145,6 +169,31 @@ export const isUserBlocked = async (currentUserId: string, targetUserId: string)
     const snap = await getDoc(blockRef);
     return snap.exists();
   } catch (error) {
+    return false;
+  }
+};
+
+export const isBlockedEitherWay = async (currentUserId: string, targetUserId: string) => {
+  if (!currentUserId || !targetUserId || currentUserId === targetUserId) return false;
+  try {
+    // Check if current user blocked target
+    const myBlockRef = doc(db, 'users', currentUserId, 'blockedUsers', targetUserId);
+    const mySnap = await getDoc(myBlockRef);
+    if (mySnap.exists()) return true;
+
+    // Check if target user blocked current user
+    const theirBlockRef = doc(db, 'users', targetUserId, 'blockedUsers', currentUserId);
+    const theirSnap = await getDoc(theirBlockRef);
+    if (theirSnap.exists()) return true;
+
+    // Also check global blockedPairs
+    const pair1 = await getDoc(doc(db, 'blockedPairs', `${currentUserId}_${targetUserId}`));
+    if (pair1.exists()) return true;
+    const pair2 = await getDoc(doc(db, 'blockedPairs', `${targetUserId}_${currentUserId}`));
+    if (pair2.exists()) return true;
+
+    return false;
+  } catch (_) {
     return false;
   }
 };

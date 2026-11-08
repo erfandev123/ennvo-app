@@ -33,7 +33,6 @@ export const isMediaOffline = (idOrUrl: string): boolean => {
   return index.some(item => item.id === idOrUrl || item.originalUrl === idOrUrl);
 };
 
-// Save a media file into CacheStorage for offline playback
 export const saveMediaOffline = async (
   item: {
     id: string;
@@ -48,26 +47,31 @@ export const saveMediaOffline = async (
   if (!item.url || typeof window === 'undefined') return false;
 
   try {
-    if (!('caches' in window)) {
-      console.warn('CacheStorage not supported in this environment');
-      return false;
+    const mediaType = item.type || (item.url.includes('.mp4') || item.url.includes('video') ? 'video' : 'image');
+
+    // 1. Try standard CacheStorage
+    if ('caches' in window) {
+      try {
+        const cache = await caches.open(CACHE_NAME);
+        let response: Response | null = null;
+        try {
+          response = await fetch(item.url, { mode: 'cors' });
+        } catch (corsErr) {
+          // Fallback fetch
+          response = await fetch(item.url).catch(() => null);
+        }
+
+        if (response && response.ok) {
+          await cache.put(item.url, response.clone());
+        }
+      } catch (cacheErr) {
+        console.warn('CacheStorage write warning:', cacheErr);
+      }
     }
 
-    const cache = await caches.open(CACHE_NAME);
-
-    // Fetch media with CORS
-    const response = await fetch(item.url, { mode: 'cors' });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch media: ${response.statusText}`);
-    }
-
-    // Clone response to put into cache
-    await cache.put(item.url, response.clone());
-
-    // Update metadata index
+    // 2. Update metadata index in localStorage
     const index = getOfflineMediaIndex();
     const existingIdx = index.findIndex(i => i.id === item.id || i.originalUrl === item.url);
-    const mediaType = item.type || (item.url.includes('.mp4') || item.url.includes('video') ? 'video' : 'image');
 
     const newItem: OfflineMediaItem = {
       id: item.id,

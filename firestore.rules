@@ -1,8 +1,367 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasAdminClaim() {
+      return isAuthenticated() && (
+        request.auth.token.role in ['superadmin', 'admin', 'moderator', 'support', 'analyst'] ||
+        request.auth.token.isAdmin == true ||
+        request.auth.token.admin == true
+      );
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'superadmin';
+    }
+
+    function isModeratorOrAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role in ['superadmin', 'admin', 'moderator'] ||
+        request.auth.token.isAdmin == true
+      );
+    }
+
+    // =========================================================================
+    // Users Collection & Profile Subcollections
+    // =========================================================================
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isOwner(userId);
+      allow update: if (
+        isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'bannedUntil', 'banReason', 'isAdmin', 'role', 'roles'])
+      ) || (
+        isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount', 'followingCount', 'postsCount'])
+      ) || hasAdminClaim();
+      allow delete: if hasAdminClaim();
+
+      // Followers & Following
+      match /followers/{followerId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+      match /following/{followingId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+      match /blockedUsers/{blockedId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /profileViews/{viewerId} {
+        allow read: if isOwner(userId);
+        allow write: if isAuthenticated();
+      }
+
+      // Video & Post Favorites (Save / Unsave)
+      match /favorites/{postId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+
+      // Favorite Songs (Save / Unsave)
+      match /favoriteSongs/{songId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+
+      // User Reposts (Add / Delete)
+      match /reposts/{postId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+
+      // Saved Stickers (Save / Unsave / Delete)
+      match /saved_stickers/{stickerId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+    }
+
+    // Blocked Pairs Top-Level Collection
+    match /blockedPairs/{pairId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // =========================================================================
+    // Posts & Reels (Likes, Comments, Replies, Reposts, Favorites, Views)
+    // =========================================================================
+    match /posts/{postId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && (
+        request.auth.uid == request.resource.data.authorId ||
+        request.auth.uid == request.resource.data.userId ||
+        request.auth.uid == request.resource.data.authorUID
+      );
+      allow update: if (isAuthenticated() && (
+        resource.data.authorId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.authorUID == request.auth.uid ||
+        // Counter increments for like, comment, repost, view, and favorite
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'likesCount', 'commentsCount', 'repostsCount', 'viewsCount', 'favoritesCount'
+        ])
+      )) || isModeratorOrAdmin();
+      allow delete: if (isAuthenticated() && (
+        resource.data.authorId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.authorUID == request.auth.uid
+      )) || isModeratorOrAdmin();
+
+      // Post Likes
+      match /likes/{userId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+
+      // Post Favorites
+      match /favorites/{userId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+
+      // Post Reposts
+      match /reposts/{userId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+
+      // Post Views
+      match /views/{userId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+
+      // Post Comments & Comment Replies
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuthenticated();
+        allow update: if (isAuthenticated() && (
+          resource.data.authorId == request.auth.uid ||
+          resource.data.userId == request.auth.uid ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'repliesCount', 'updatedAt'])
+        )) || isModeratorOrAdmin();
+        allow delete: if (isAuthenticated() && (
+          resource.data.authorId == request.auth.uid ||
+          resource.data.userId == request.auth.uid ||
+          get(/databases/$(database)/documents/posts/$(postId)).data.authorId == request.auth.uid ||
+          isModeratorOrAdmin()
+        ));
+
+        // Comment Likes
+        match /likes/{userId} {
+          allow read: if true;
+          allow write: if isOwner(userId);
+        }
+
+        // Subcollection Replies under comments
+        match /replies/{replyId} {
+          allow read: if true;
+          allow create: if isAuthenticated();
+          allow update, delete: if (isAuthenticated() && (
+            resource.data.authorId == request.auth.uid ||
+            resource.data.userId == request.auth.uid ||
+            isModeratorOrAdmin()
+          ));
+
+          match /likes/{userId} {
+            allow read: if true;
+            allow write: if isOwner(userId);
+          }
+        }
+      }
+
+      // Activity Replies & Interaction Replies in Reels
+      match /activityReplies/{replyId} {
+        allow read: if true;
+        allow create: if isAuthenticated();
+        allow update, delete: if isAuthenticated() && (
+          resource.data.authorUid == request.auth.uid ||
+          resource.data.authorId == request.auth.uid ||
+          resource.data.userId == request.auth.uid ||
+          isModeratorOrAdmin()
+        );
+      }
+
+      // Activity Likes in Reels
+      match /activityLikes/{likeDocId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+    }
+
+    // Top-Level Reposts Collection
+    match /reposts/{repostId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.authorId == request.auth.uid ||
+        hasAdminClaim()
+      );
+    }
+
+    // =========================================================================
+    // Stories
+    // =========================================================================
+    match /stories/{storyId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.authorId;
+      allow update: if (isAuthenticated() && (
+        resource.data.authorId == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewsCount', 'likesCount'])
+      )) || isModeratorOrAdmin();
+      allow delete: if (isAuthenticated() && resource.data.authorId == request.auth.uid) || isModeratorOrAdmin();
+
+      match /views/{userId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+    }
+
+    // =========================================================================
+    // Chat Conversations & Messages
+    // =========================================================================
+    match /conversations/{conversationId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid in resource.data.participantIds ||
+        hasAdminClaim()
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        request.auth.uid in resource.data.participantIds ||
+        hasAdminClaim()
+      );
+      allow delete: if isAuthenticated() && (
+        request.auth.uid in resource.data.participantIds ||
+        hasAdminClaim()
+      );
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && (
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds ||
+          hasAdminClaim()
+        );
+        allow create: if isAuthenticated() && request.auth.uid == request.resource.data.senderId;
+        allow update, delete: if isAuthenticated() && (
+          resource.data.senderId == request.auth.uid ||
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds ||
+          hasAdminClaim()
+        );
+      }
+    }
+
+    // =========================================================================
+    // WebRTC Calls
+    // =========================================================================
+    match /calls/{callId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.callerId ||
+        request.auth.uid == resource.data.receiverId ||
+        hasAdminClaim()
+      );
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.callerId;
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.callerId ||
+        request.auth.uid == resource.data.receiverId ||
+        hasAdminClaim()
+      );
+      allow delete: if hasAdminClaim();
+
+      match /callerCandidates/{candId} {
+        allow read, write: if isAuthenticated();
+      }
+      match /receiverCandidates/{candId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    // =========================================================================
+    // Notifications
+    // =========================================================================
+    match /notifications/{userId}/items/{item} {
+      allow read, update, delete: if isOwner(userId) || hasAdminClaim();
+      allow create: if isAuthenticated();
+    }
+
+    // =========================================================================
+    // Music & Songs Library (Add, Delete, List)
+    // =========================================================================
+    match /songs/{songId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        resource.data.creatorId == request.auth.uid ||
+        resource.data.authorId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        !('creatorId' in resource.data) ||
+        hasAdminClaim()
+      );
+    }
+
+    // =========================================================================
+    // Custom & Community Stickers (List, Add, Delete)
+    // =========================================================================
+    match /stickers/{stickerId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        resource.data.authorId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        !('authorId' in resource.data) ||
+        hasAdminClaim()
+      );
+    }
+
+    // =========================================================================
+    // Verification Requests
+    // =========================================================================
+    match /verification_requests/{reqId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        hasAdminClaim()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if hasAdminClaim();
+    }
+
+    // =========================================================================
+    // Reports, Config, Stats, Audit Logs
+    // =========================================================================
+    match /reports/{reportId} {
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.reporterId;
+      allow read, update: if hasAdminClaim();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /appConfig/{configDoc} {
+      allow read: if true;
+      allow write: if hasAdminClaim();
+    }
+
+    match /stats/{statDoc} {
+      allow read: if true;
+      allow write: if hasAdminClaim();
+
+      match /daily/{dateDoc} {
+        allow read: if true;
+        allow write: if hasAdminClaim();
+      }
+    }
+
+    match /adminLogs/{logId} {
+      allow read: if hasAdminClaim();
+      allow create: if hasAdminClaim();
+      allow update, delete: if false; // STRICT IMMUTABILITY
     }
   }
 }

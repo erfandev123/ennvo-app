@@ -101,15 +101,38 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const previewTouchStartX = useRef<number | null>(null);
   const previewTouchEndX = useRef<number | null>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const isVideoFile = (f: File | { name?: string; type?: string }) => {
+    if (f.type && f.type.startsWith('video/')) return true;
+    const ext = (f.name || '').split('.').pop()?.toLowerCase() || '';
+    return ['mp4', 'mov', 'webm', 'mkv', '3gp', 'avi', 'm4v'].includes(ext);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []) as File[];
     if (files.length === 0) return;
 
     setPostFiles((prev) => [...prev, ...files]);
-    const newPreviews = files.map((file) => ({
-      url: URL.createObjectURL(file),
-      type: file.type.startsWith('video') ? ('video' as const) : ('image' as const),
-    }));
+    const newPreviews = await Promise.all(
+      files.map(async (file) => {
+        const isVid = isVideoFile(file);
+        let url = '';
+        try {
+          url = URL.createObjectURL(file);
+        } catch (err) {
+          console.warn('URL.createObjectURL failed, falling back to FileReader:', err);
+          url = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve((reader.result as string) || '');
+            reader.onerror = () => resolve('');
+            reader.readAsDataURL(file);
+          });
+        }
+        return {
+          url,
+          type: isVid ? ('video' as const) : ('image' as const),
+        };
+      })
+    );
     setPostPreviews((prev) => [...prev, ...newPreviews]);
     e.target.value = '';
   };
@@ -224,7 +247,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     } catch (e) {}
 
     try {
-      const type = 'post';
+      const isVideoFile = postFiles.length === 1 && postFiles[0].type.startsWith('video');
+      const type = isVideoFile ? 'reel' : 'post';
       await createPost(currentUser.uid, currentUser, postText, postFiles, type, selectedSong?.id, {
         location: selectedLocation,
         taggedUsers: taggedUsers,
@@ -268,21 +292,27 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 50 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="fixed inset-0 z-[120] bg-white text-gray-900 flex flex-col font-sans overflow-hidden"
+        className="fixed inset-0 z-[120] bg-white dark:bg-black text-neutral-900 dark:text-white flex flex-col font-sans overflow-hidden"
       >
-        {/* Android Native Header Bar */}
-        <div className="pt-10 sm:pt-4 px-4 pb-3 bg-white border-b border-gray-100 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+        {/* Soft feed-style ambient top glow */}
+        <div 
+          className="pointer-events-none absolute top-0 left-0 right-0 h-[240px] bg-gradient-to-b from-sky-400/[0.14] via-blue-500/[0.05] to-transparent dark:from-blue-600/[0.20] dark:via-blue-800/[0.05] dark:to-transparent z-0" 
+          aria-hidden="true" 
+        />
+
+        {/* Header Bar: Clean, transparent, NO border, NO black glow */}
+        <div className="pt-10 sm:pt-4 px-4 pb-3 bg-transparent border-0 flex items-center justify-between sticky top-0 z-30 shadow-none">
           <div className="flex items-center space-x-3">
             <button
               onClick={() => {
                 if (audioRef.current) audioRef.current.pause();
                 onClose();
               }}
-              className="p-2 -ml-2 text-gray-800 hover:bg-gray-100 rounded-full transition-all active:scale-95"
+              className="p-2 -ml-2 text-neutral-800 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/10 rounded-full transition-all active:scale-95 cursor-pointer border-0 shadow-none"
             >
               <ArrowLeft className="w-6 h-6" />
             </button>
-            <h2 className="text-lg font-bold text-gray-900 tracking-tight">Create post</h2>
+            <h2 className="text-lg font-bold text-neutral-900 dark:text-white tracking-tight">Create post</h2>
           </div>
 
           <button

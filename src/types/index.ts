@@ -6,8 +6,10 @@ export interface User {
   mobileNumber?: string;
   phoneNumber?: string;
   avatar: string;
+  bannerUrl?: string;
   bio: string;
   gender?: 'male' | 'female' | 'other';
+  dob?: string;
   location?: string;
   link?: string;
   isVerified?: boolean;
@@ -30,6 +32,12 @@ export interface User {
   hasPassword?: boolean;
   authProvider?: 'password' | 'google' | 'both';
   accountType?: 'personal' | 'business';
+  isAdmin?: boolean;
+  role?: 'superadmin' | 'admin' | 'moderator' | 'support' | 'analyst' | 'user';
+  isBanned?: boolean;
+  banReason?: string;
+  bannedUntil?: any;
+  notifMode?: 'on' | 'off' | 'secret';
   createdAt: any;
 }
 
@@ -64,6 +72,11 @@ export interface Post {
   aspectRatioFit?: 'contain' | 'cover';
   createdAt: any;
   thumbnailUrl?: string;
+  isPromoted?: boolean;
+  promotedAt?: any;
+  isPinned?: boolean;
+  isFeatured?: boolean;
+  status?: string;
   mediaDetails?: {
     originalSize?: string;
     compressedSize?: string;
@@ -145,7 +158,7 @@ export interface Message {
 
 export interface Notification {
   id: string;
-  type: 'like' | 'comment' | 'follow' | 'mention' | 'reply' | 'favorite' | 'comment_like';
+  type: 'like' | 'comment' | 'follow' | 'mention' | 'reply' | 'favorite' | 'comment_like' | 'repost';
   actorId: string;
   actorName: string;
   actorAvatar: string;

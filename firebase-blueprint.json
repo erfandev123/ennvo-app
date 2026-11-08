@@ -18,6 +18,10 @@
         "highlights": { "type": "array" },
         "verified": { "type": "boolean" },
         "isPrivate": { "type": "boolean" },
+        "dob": { "type": "string" },
+        "gender": { "type": "string" },
+        "hasPassword": { "type": "boolean" },
+        "authProvider": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },

@@ -1,6 +1,13 @@
-import React, { memo, useRef, useState, useCallback } from 'react';
-import { Home, Inbox, User, PlusSquare, LayoutList } from 'lucide-react';
-import { useAppStore } from '../store';
+import React, { memo, useRef, useCallback, useState } from 'react';
+import { motion } from 'motion/react';
+import { useAppStore, PageType } from '../store';
+import { 
+  NavHomeIcon, 
+  NavFeedIcon, 
+  NavMessageIcon, 
+  NavCreateIcon, 
+  NavProfileIcon 
+} from './NavIcons';
 
 const BottomNav = memo(() => {
   const currentPage = useAppStore(state => state.currentPage);
@@ -13,34 +20,33 @@ const BottomNav = memo(() => {
   const navStyle = useAppStore(state => state.navStyle);
   const appTheme = useAppStore(state => state.appTheme);
   const setShowAccountSwitcherModal = useAppStore(state => state.setShowAccountSwitcherModal);
+  const setShowReelCamera = useAppStore(state => state.setShowReelCamera);
 
   const navItems = [
-    { id: 'home', icon: Home, label: 'Home' },
-    { id: 'reels', icon: LayoutList, label: 'Feed' },
-    { id: 'create', icon: PlusSquare, label: 'New' },
-    { id: 'messages', icon: Inbox, label: 'Inbox', badge: messageCount + notificationCount },
-    { id: 'profile', icon: User, label: 'Profile' },
+    { id: 'home', icon: NavHomeIcon, label: 'Home' },
+    { id: 'reels', icon: NavFeedIcon, label: 'Feed' },
+    { id: 'create', icon: NavCreateIcon, label: 'New' },
+    { id: 'messages', icon: NavMessageIcon, label: 'Inbox', badge: messageCount + notificationCount },
+    { id: 'profile', icon: NavProfileIcon, label: 'Profile' },
   ];
 
   const lastClickRef = useRef<{ [key: string]: number }>({});
-
-  // Gesture Drag-To-Navigate State for Glass Nav
   const navRef = useRef<HTMLElement>(null);
-  const circleSlotRef = useRef<HTMLDivElement>(null);
-  const isPointerDownRef = useRef(false);
-  const startXRef = useRef(0);
-  const hasDraggedRef = useRef(false);
-  const hoverIndexRef = useRef<number | null>(null);
-  const rafIdRef = useRef<number | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isHolding, setIsHolding] = useState(false);
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [dragHoveredId, setDragHoveredId] = useState<string | null>(null);
+  const isDraggingRef = useRef<boolean>(false);
 
   const handleItemClick = useCallback((id: string) => {
     const now = Date.now();
     const lastClick = lastClickRef.current[id] || 0;
     const isDoubleClick = now - lastClick < 300;
     lastClickRef.current[id] = now;
+
+    if (id === 'create') {
+      const { setSelectedCreateMode } = useAppStore.getState();
+      setSelectedCreateMode('reel');
+      setShowReelCamera(true);
+      return;
+    }
 
     if (id === 'profile') {
       setViewingUser(null);
@@ -62,250 +68,181 @@ const BottomNav = memo(() => {
     }
 
     if (typeof window !== 'undefined' && window.navigator?.vibrate) {
-      try { window.navigator.vibrate(8); } catch (e) {}
+      try { window.navigator.vibrate(6); } catch (e) {}
     }
 
     pushPage(id as any);
-  }, [currentPage, pushPage, setViewingUser]);
+  }, [currentPage, pushPage, setViewingUser, setShowReelCamera, setShowAccountSwitcherModal]);
+
+  // Touch gesture slider / drag between navigation items (iPhone-style fluid sliding)
+  const getIndexFromTouchX = useCallback((clientX: number) => {
+    if (!navRef.current) return -1;
+    const rect = navRef.current.getBoundingClientRect();
+    if (clientX < rect.left || clientX > rect.right) return -1;
+    const relativeX = clientX - rect.left;
+    const itemWidth = rect.width / navItems.length;
+    const index = Math.floor(relativeX / itemWidth);
+    return Math.max(0, Math.min(navItems.length - 1, index));
+  }, [navItems.length]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    isDraggingRef.current = true;
+    const idx = getIndexFromTouchX(e.touches[0].clientX);
+    if (idx >= 0) {
+      setDragHoveredId(navItems[idx].id);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDraggingRef.current) return;
+    const idx = getIndexFromTouchX(e.touches[0].clientX);
+    if (idx >= 0) {
+      const nextId = navItems[idx].id;
+      setDragHoveredId((prev) => {
+        if (prev !== nextId) {
+          if (typeof window !== 'undefined' && window.navigator?.vibrate) {
+            try { window.navigator.vibrate(4); } catch (err) {}
+          }
+          return nextId;
+        }
+        return prev;
+      });
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (isDraggingRef.current && dragHoveredId) {
+      handleItemClick(dragHoveredId);
+    }
+    isDraggingRef.current = false;
+    setDragHoveredId(null);
+  };
 
   const isReels = currentPage === 'home';
   const isDarkNav = appTheme === 'dark' || isReels;
+  const effectiveActiveId = dragHoveredId || currentPage;
 
-  // Render New Ultra Liquid Glass Navigation Bar
+  // Ultra-Lightweight iPhone Instagram-Style Floating Glass Navigation Bar
   if (navStyle === 'glass') {
-    const getGlassActiveIndex = () => {
-      if (currentPage === 'home') return 0;
-      if (currentPage === 'reels') return 1;
-      if (currentPage === 'create') return 2;
-      if (currentPage === 'messages') return 3;
-      if (currentPage === 'profile' && viewingUser === null) return 4;
-      return 0;
-    };
-
-    const activeGlassIndex = getGlassActiveIndex();
     const totalBadge = messageCount + notificationCount;
 
-    // Pointer events for drag-to-navigate
-    const handlePointerDown = (e: React.PointerEvent<HTMLElement>) => {
-      if (e.button !== 0) return;
-      isPointerDownRef.current = true;
-      startXRef.current = e.clientX;
-      hasDraggedRef.current = false;
-      hoverIndexRef.current = activeGlassIndex;
-      setIsHolding(true);
-      setHoverIndex(activeGlassIndex);
-    };
-
-    const handlePointerMove = (e: React.PointerEvent<HTMLElement>) => {
-      if (!isPointerDownRef.current || !navRef.current) return;
-      const clientX = e.clientX;
-      const dx = clientX - startXRef.current;
-
-      if (!hasDraggedRef.current && Math.abs(dx) > 6) {
-        hasDraggedRef.current = true;
-        setIsDragging(true);
-
-        if (e.currentTarget.setPointerCapture) {
-          try {
-            e.currentTarget.setPointerCapture(e.pointerId);
-          } catch (err) {}
-        }
-      }
-
-      if (hasDraggedRef.current) {
-        if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = requestAnimationFrame(() => {
-          if (!navRef.current) return;
-          const rect = navRef.current.getBoundingClientRect();
-          const navWidth = rect.width;
-          const itemWidth = navWidth / 5;
-
-          const targetSlotLeft = clientX - rect.left - (itemWidth / 2);
-          const clampedSlotLeft = Math.max(0, Math.min(navWidth - itemWidth, targetSlotLeft));
-          
-          if (circleSlotRef.current) {
-            circleSlotRef.current.style.transform = `translate3d(${clampedSlotLeft}px, 0, 0)`;
-          }
-
-          const relativeX = Math.max(0, Math.min(navWidth - 1, clientX - rect.left));
-          const currentSlot = Math.min(4, Math.floor(relativeX / itemWidth));
-
-          if (currentSlot !== hoverIndexRef.current) {
-            hoverIndexRef.current = currentSlot;
-            setHoverIndex(currentSlot);
-            if (typeof window !== 'undefined' && window.navigator?.vibrate) {
-              try { window.navigator.vibrate(6); } catch (err) {}
-            }
-          }
-        });
-      }
-    };
-
-    const handlePointerUp = (e: React.PointerEvent<HTMLElement>) => {
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
-      if (!isPointerDownRef.current) return;
-      isPointerDownRef.current = false;
-
-      if (e.currentTarget.hasPointerCapture && e.currentTarget.hasPointerCapture(e.pointerId)) {
-        try {
-          e.currentTarget.releasePointerCapture(e.pointerId);
-        } catch (err) {}
-      }
-
-      if (circleSlotRef.current) {
-        circleSlotRef.current.style.transform = '';
-      }
-
-      const finalHoverIndex = hoverIndexRef.current;
-      if (hasDraggedRef.current && finalHoverIndex !== null) {
-        const targetItem = navItems[finalHoverIndex];
-        if (targetItem) {
-          handleItemClick(targetItem.id);
-        }
-      }
-
-      setIsDragging(false);
-      setIsHolding(false);
-      setHoverIndex(null);
-      hoverIndexRef.current = null;
-      hasDraggedRef.current = false;
-    };
-
-    const displayIndex = isDragging && hoverIndex !== null ? hoverIndex : activeGlassIndex;
-
     return (
-      <div className="md:hidden fixed bottom-6 sm:bottom-8 left-0 right-0 z-[60] flex justify-center pointer-events-none pb-[env(safe-area-inset-bottom)] gpu-accelerated">
+      <div className="md:hidden fixed bottom-5 sm:bottom-6 left-0 right-0 z-[60] flex justify-center pointer-events-none pb-[env(safe-area-inset-bottom)]">
         <nav 
           ref={navRef}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          className={`ultra-glass-nav pointer-events-auto select-none ${isDarkNav ? 'dark-mode' : 'light-mode'} ${isHolding || isDragging ? 'is-holding' : ''}`}
+          aria-label="Bottom Navigation"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className={`pointer-events-auto select-none flex items-center justify-between h-[52px] w-auto min-w-[285px] max-w-[330px] px-2 py-1 rounded-full backdrop-blur-2xl transition-colors duration-200 touch-none ${
+            isDarkNav
+              ? 'bg-black/80 border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.15)] text-white'
+              : 'bg-white/90 border border-sky-100 shadow-[0_8px_30px_rgba(14,165,233,0.12),0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,0.95)] text-slate-800'
+          }`}
         >
-          {/* Dynamic Percentage / Continuous Draggable Indicator Slot */}
-          <div 
-            ref={circleSlotRef}
-            className={`circle-slot ${isDragging ? 'is-dragging' : ''}`} 
-            style={{ 
-              transform: `translate3d(${activeGlassIndex * 100}%, 0, 0)` 
-            }}
-          >
-            <div className={`active-glass-circle ${isHolding || isDragging ? 'is-holding' : ''}`}></div>
-          </div>
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = effectiveActiveId === item.id && (item.id !== 'profile' || viewingUser === null);
 
-          {/* 1. Cute Perfect Home Icon */}
-          <button 
-            className={`glass-nav-item ${displayIndex === 0 ? 'active' : ''}`}
-            onClick={(e) => {
-              if (hasDraggedRef.current) return;
-              handleItemClick('home');
-            }}
-          >
-            <svg className="glass-nav-icon" viewBox="0 0 24 24">
-              <path d="M3.75 10.5L11.1 4.35a1.5 1.5 0 0 1 1.8 0l7.35 6.15M5.5 9.5V19.25a1.75 1.75 0 0 0 1.75 1.75h9.5a1.75 1.75 0 0 0 1.75-1.75V9.5"></path>
-            </svg>
-          </button>
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleItemClick(item.id)}
+                className="relative flex-1 h-full flex items-center justify-center px-1 rounded-full cursor-pointer transition-transform active:scale-90"
+                title={item.label}
+              >
+                {/* iPhone Smooth Fluid Pill with Haptic Spring */}
+                {isActive && (
+                  <motion.div
+                    layoutId="iphoneGlassActivePill"
+                    transition={{ type: 'spring', stiffness: 520, damping: 38 }}
+                    className={`absolute inset-1 rounded-full ${
+                      isDarkNav 
+                        ? 'bg-white/20 border border-white/25 shadow-xs' 
+                        : 'bg-sky-500/12 border border-sky-300/50 shadow-xs'
+                    }`}
+                  />
+                )}
 
-          {/* 2. Cute Perfect Feed Icon */}
-          <button 
-            className={`glass-nav-item ${displayIndex === 1 ? 'active' : ''}`}
-            onClick={(e) => {
-              if (hasDraggedRef.current) return;
-              handleItemClick('reels');
-            }}
-          >
-            <svg className="glass-nav-icon" viewBox="0 0 24 24">
-              <rect x="3.75" y="3.75" width="6.5" height="6.5" rx="2.25"></rect>
-              <rect x="13.75" y="3.75" width="6.5" height="6.5" rx="2.25"></rect>
-              <rect x="13.75" y="13.75" width="6.5" height="6.5" rx="2.25"></rect>
-              <rect x="3.75" y="13.75" width="6.5" height="6.5" rx="2.25"></rect>
-            </svg>
-          </button>
-
-          {/* 3. Special Cute Post Icon (+) */}
-          <button 
-            className={`glass-nav-item ${displayIndex === 2 ? 'active' : ''}`}
-            onClick={(e) => {
-              if (hasDraggedRef.current) return;
-              handleItemClick('create');
-            }}
-          >
-            <div className="post-btn-glow">
-              <svg className="glass-nav-icon" viewBox="0 0 24 24" style={{ width: '18px', height: '18px', strokeWidth: 2.8 }}>
-                <path d="M12 5.5v13M5.5 12h13"></path>
-              </svg>
-            </div>
-          </button>
-
-          {/* 4. Cute Perfect Message Icon */}
-          <button 
-            className={`glass-nav-item ${displayIndex === 3 ? 'active' : ''}`}
-            onClick={(e) => {
-              if (hasDraggedRef.current) return;
-              handleItemClick('messages');
-            }}
-          >
-            <div className="relative flex items-center justify-center">
-              <svg className="glass-nav-icon" viewBox="0 0 24 24">
-                <path d="M12 3.75c-4.56 0-8.25 3.47-8.25 7.75 0 1.63.53 3.14 1.45 4.38L4 19.75l4.13-1.1c1.2.45 2.52.7 3.87.7 4.56 0 8.25-3.47 8.25-7.75S16.56 3.75 12 3.75z"></path>
-              </svg>
-              {totalBadge > 0 && (
-                <div className="absolute -top-1.5 -right-2 bg-[#FE2C55] text-white text-[9px] font-semibold min-w-[15px] h-[15px] rounded-full flex items-center justify-center px-1 shadow-xs border border-white/40">
-                  {totalBadge > 99 ? '99+' : totalBadge}
+                <div className="relative z-10 flex items-center justify-center">
+                  {item.id === 'create' ? (
+                    <div className="w-[32px] h-[32px] rounded-full bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-sm shadow-sky-500/35 hover:scale-105 active:scale-95 transition-transform">
+                      <NavCreateIcon size={17} className="text-white" />
+                    </div>
+                  ) : item.id === 'profile' ? (
+                    currentUser?.avatar ? (
+                      <img 
+                        src={currentUser.avatar} 
+                        className={`w-[24px] h-[24px] rounded-full object-cover transition-all ${
+                          isActive 
+                            ? 'ring-2 ring-sky-500 ring-offset-1 ring-offset-transparent scale-105' 
+                            : 'opacity-85 hover:opacity-100'
+                        }`} 
+                        alt="Profile" 
+                      />
+                    ) : (
+                      <NavProfileIcon 
+                        size={21} 
+                        filled={isActive} 
+                        className={isActive ? (isDarkNav ? 'text-white' : 'text-sky-600') : (isDarkNav ? 'text-white/60' : 'text-slate-500')} 
+                      />
+                    )
+                  ) : (
+                    <div className="relative flex items-center justify-center">
+                      <Icon 
+                        size={21} 
+                        filled={isActive} 
+                        className={`transition-colors duration-150 ${
+                          isActive 
+                            ? (isDarkNav ? 'text-white scale-105' : 'text-sky-600 scale-105') 
+                            : (isDarkNav ? 'text-white/60 hover:text-white' : 'text-slate-500 hover:text-slate-900')
+                        }`} 
+                      />
+                      {item.id === 'messages' && totalBadge > 0 && (
+                        <div className="absolute -top-1.5 -right-2 bg-[#FE2C55] text-white text-[9px] font-bold min-w-[15px] h-[15px] rounded-full flex items-center justify-center px-1 border border-white shadow-xs">
+                          {totalBadge > 99 ? '99+' : totalBadge}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </button>
-
-          {/* 5. Cute Perfect Profile Icon */}
-          <button 
-            className={`glass-nav-item ${displayIndex === 4 ? 'active' : ''}`}
-            onClick={(e) => {
-              if (hasDraggedRef.current) return;
-              handleItemClick('profile');
-            }}
-          >
-            {currentUser?.avatar ? (
-              <img 
-                src={currentUser.avatar} 
-                className={`w-[22px] h-[22px] rounded-full object-cover transition-transform ${displayIndex === 4 ? 'ring-1.5 ring-white' : 'opacity-80'}`} 
-                alt="Profile" 
-              />
-            ) : (
-              <svg className="glass-nav-icon" viewBox="0 0 24 24">
-                <circle cx="12" cy="7.75" r="3.75"></circle>
-                <path d="M4.75 19.25a7.25 7.25 0 0 1 14.5 0"></path>
-              </svg>
-            )}
-          </button>
+              </button>
+            );
+          })}
         </nav>
       </div>
     );
   }
 
-  // Render Classic Standard Android Navigation Bar
+  // Classic Standard Navigation Bar (Uniform styling across all pages, zero purple)
+  const classicNavBgClass = isDarkNav ? 'bg-black border-white/10 text-white' : 'bg-white border-gray-100 shadow-md text-gray-900';
+
   return (
-    <div className={`md:hidden fixed bottom-0 left-0 right-0 bottom-nav-classic ${isDarkNav ? 'bg-[#131927]/95 border-white/10 text-white' : 'bg-white border-gray-100 shadow-md text-gray-900'} backdrop-blur-xl border-t flex items-center justify-around h-[calc(54px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] z-[60] px-3 select-none gpu-accelerated`}>
+    <div className={`md:hidden fixed bottom-0 left-0 right-0 bottom-nav-classic ${classicNavBgClass} backdrop-blur-xl border-t flex items-center justify-around h-[calc(54px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] z-[60] px-3 select-none gpu-accelerated`}>
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = currentPage === item.id && (item.id !== 'profile' || viewingUser === null);
         
+        const getIconColor = () => {
+          if (isDarkNav) {
+            return isActive ? 'text-white' : 'text-gray-400 hover:text-gray-200';
+          }
+          return isActive ? 'text-sky-600' : 'text-gray-400 hover:text-gray-600';
+        };
+
         return (
           <button
             key={item.id}
             onClick={() => handleItemClick(item.id)}
-            className="flex items-center justify-center flex-1 h-full relative active:scale-95 transform-gpu transition-transform duration-100 ease-out select-none touch-manipulation cursor-pointer"
+            className="flex items-center justify-center flex-1 h-full relative active:scale-90 transform-gpu transition-transform duration-75 ease-out select-none touch-manipulation cursor-pointer"
           >
             <div className="relative flex flex-col items-center justify-center pointer-events-none">
               {item.id === 'profile' ? (
-                <div className={`rounded-full transition-all duration-150 ${isActive ? (isDarkNav ? 'ring-2 ring-purple-400 p-[1px]' : 'ring-2 ring-purple-600 p-[1px]') : ''}`}>
+                <div className={`rounded-full transition-all duration-150 ${isActive ? (isDarkNav ? 'ring-2 ring-sky-400 p-[1px]' : 'ring-2 ring-sky-500 p-[1px]') : ''}`}>
                   <img 
                     src={currentUser?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || '')}&background=random`} 
-                    className={`w-[22px] h-[22px] rounded-full object-cover shadow-2xs`} 
+                    className="w-[22px] h-[22px] rounded-full object-cover shadow-2xs" 
                     alt="Profile" 
                     loading="lazy" 
                     decoding="async" 
@@ -313,16 +250,17 @@ const BottomNav = memo(() => {
                   />
                 </div>
               ) : item.id === 'create' ? (
-                <div className="w-[38px] h-[28px] rounded-lg bg-gradient-to-tr from-purple-600 via-fuchsia-500 to-pink-500 flex items-center justify-center shadow-md shadow-purple-500/25">
-                  <PlusSquare 
-                    className="w-[18px] h-[18px] text-white" 
-                    strokeWidth={2.2}
+                <div className="w-[36px] h-[28px] rounded-lg bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-sky-500/25">
+                  <NavCreateIcon 
+                    size={17}
+                    className="text-white" 
                   />
                 </div>
               ) : (
                 <Icon 
-                  className={`w-[22px] h-[22px] transition-all duration-150 ${isActive ? (isDarkNav ? 'text-white' : 'text-purple-600') : (isDarkNav ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600')}`} 
-                  strokeWidth={isActive ? 2.3 : 1.7}
+                  size={22}
+                  filled={isActive}
+                  className={`transition-all duration-150 ${getIconColor()}`} 
                 />
               )}
               

@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
   Search,
   Video,
@@ -23,6 +24,8 @@ import {
   MoreHorizontal,
   UserPlus,
   Bell,
+  BellOff,
+  Pin,
   MessageCircle,
   Play,
   Pause,
@@ -48,10 +51,14 @@ import {
   Star,
   FileText,
   Paperclip,
+  Printer,
   Sticker as StickerIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { PullToRefresh } from "../components/PullToRefresh";
+import StoryNoteViewerModal from "../components/StoryNoteViewerModal";
+import CreateGroupModal from "../components/CreateGroupModal";
+import StatusNoteModal from "../components/StatusNoteModal";
 import {
   collection,
   query,
@@ -62,6 +69,7 @@ import {
 import { db } from "../firebase";
 import { subscribeNotifications } from "../services/notificationService";
 
+import { VideoSticker } from "../components/VideoSticker";
 import { useAppStore } from "../store";
 import { safeFile, formatTime, downloadMediaFile } from "../utils";
 import {
@@ -73,7 +81,9 @@ import {
   deleteConversation,
 } from "../services/chatService";
 import { ChatThemeStudioModal } from "../components/ChatThemeStudioModal";
-import { StickerPickerModal } from "../components/StickerPickerModal";
+import { StickerPickerModal, StickerViewerModal } from "../components/StickerPickerModal";
+import Notifications from "./Notifications";
+import { ActivityStackView, FollowerStackView } from "../components/ActivityStackView";
 import {
   getSmartStickerSuggestions,
   CuratedSticker,
@@ -195,7 +205,7 @@ const FollowerItem = React.memo(
 
     return (
       <div
-        className="flex items-center justify-between p-3 hover:bg-purple-50/50 rounded-2xl cursor-pointer transition-all active:scale-[0.98]"
+        className="flex items-center justify-between px-3.5 py-2.5 hover:bg-neutral-50 active:bg-neutral-100/70 border-b border-neutral-100/80 transition-colors cursor-pointer select-none"
         onClick={() => {
           setViewingUser({
             uid: realtimeUser.id || follower.id,
@@ -205,36 +215,39 @@ const FollowerItem = React.memo(
           pushPage("profile");
         }}
       >
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 min-w-0 flex-1">
           <img
             src={
               realtimeUser.avatar ||
               follower.avatar ||
               `https://ui-avatars.com/api/?name=${encodeURIComponent(realtimeUser.name || follower.name || "User")}&background=random`
             }
-            className="w-13 h-13 rounded-full object-cover"
+            className="w-11 h-11 rounded-full object-cover shrink-0 border border-neutral-100/80"
             alt="follower"
             referrerPolicy="no-referrer"
           />
-          <div>
-            <p className="font-normal text-[15px] text-gray-900">
+          <div className="min-w-0 flex-1 pr-2">
+            <p className="font-medium text-[13.5px] text-neutral-900 dark:text-neutral-100 truncate tracking-tight">
               {realtimeUser.name || follower.name || "New Follower"}
             </p>
-            <p className="text-[12px] text-gray-500 font-normal">Started following you</p>
+            <p className="text-[11.5px] text-neutral-500 font-normal truncate mt-0.5">
+              Started following you
+            </p>
           </div>
         </div>
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             setIsOptimisticFollowing(true);
             onFollowBack(follower);
           }}
-          className={`px-5 py-2 rounded-full text-[13px] font-medium transition-all active:scale-95 ${
+          className={`px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-all active:scale-95 border-0 shrink-0 cursor-pointer ${
             isFriend
-              ? "bg-purple-100 text-purple-700"
+              ? "bg-neutral-100 text-neutral-800 hover:bg-neutral-200"
               : isActuallyFollowing
-                ? "bg-purple-50 text-purple-600 border border-purple-100"
-                : "bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
+                ? "bg-neutral-100 text-neutral-800 hover:bg-neutral-200"
+                : "bg-[#fe2c55] text-white hover:brightness-105 shadow-none"
           }`}
         >
           {isFriend ? "Friends" : isActuallyFollowing ? "Following" : "Follow back"}
@@ -475,85 +488,208 @@ const ReelMessageBubble = React.memo(({
   const coverPic = reel?.thumbnailUrl || reel?.thumbnail || reel?.coverUrl || msg.thumbnailUrl || msg.coverUrl || reel?.media?.[0] || msg.mediaUrl;
   const isVideo = Boolean(coverPic && (coverPic.includes('.mp4') || coverPic.includes('.webm') || coverPic.includes('.mov') || coverPic.includes('video/')));
 
-  return (
-    <div className="flex flex-col max-w-[170px] will-change-transform">
-      <div
-        className="relative w-36 sm:w-40 aspect-[9/15] rounded-[18px] overflow-hidden cursor-pointer bg-neutral-950 group shadow-md border border-black/10 dark:border-white/15 transition-transform duration-200 active:scale-[0.98]"
-        onClick={() => {
-          if (reel) {
-            setViewingReel({ ...reel, single: true });
-            setViewingReelContext("chat");
-          } else if (msg.mediaUrl || msg.postId) {
-            setViewingReel({
-              id: msg.postId || msg.id,
-              authorId: msg.senderId,
-              authorName: reel?.authorName || "Reel",
-              authorAvatar: reel?.authorAvatar || "",
-              media: [coverPic || msg.mediaUrl],
-              text: "",
-              type: "reel",
-              single: true,
-            });
-            setViewingReelContext("chat");
-          }
-        }}
-      >
-        <div className="w-full h-full relative overflow-hidden bg-neutral-900">
-          {isVideo ? (
-            <video
-              src={`${coverPic}#t=0.001`}
-              className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-300"
-              preload="none"
-              muted
-              playsInline
-            />
-          ) : (
-            <img
-              src={coverPic}
-              className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-300"
-              alt="Reel cover"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-            />
-          )}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-9 h-9 rounded-full bg-black/45 backdrop-blur-md border border-white/25 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
-              <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+    return (
+      <div className="flex flex-col max-w-[145px] will-change-transform">
+        <div
+          className="relative w-28 sm:w-32 aspect-[9/14] max-h-[165px] rounded-2xl overflow-hidden cursor-pointer bg-neutral-900 group border-0 transition-transform duration-150 active:scale-[0.97] shadow-none select-none"
+          onClick={() => {
+            if (reel) {
+              setViewingReel({ ...reel, single: true });
+              setViewingReelContext("chat");
+            } else if (msg.mediaUrl || msg.postId) {
+              setViewingReel({
+                id: msg.postId || msg.id,
+                authorId: msg.senderId,
+                authorName: reel?.authorName || "Reel",
+                authorAvatar: reel?.authorAvatar || "",
+                media: [coverPic || msg.mediaUrl],
+                text: "",
+                type: "reel",
+                single: true,
+              });
+              setViewingReelContext("chat");
+            }
+          }}
+        >
+          <div className="w-full h-full relative overflow-hidden bg-neutral-900">
+            {isVideo ? (
+              <video
+                src={`${coverPic}#t=0.001`}
+                className="w-full h-full object-cover opacity-100 group-hover:scale-105 transition-transform duration-200"
+                preload="none"
+                muted
+                playsInline
+              />
+            ) : (
+              <img
+                src={coverPic}
+                className="w-full h-full object-cover opacity-100 group-hover:scale-105 transition-transform duration-200"
+                alt="Reel cover"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+              />
+            )}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-7 h-7 rounded-full bg-white/95 text-neutral-900 flex items-center justify-center group-hover:scale-110 transition-transform shadow-xs">
+                <Play className="w-3.5 h-3.5 fill-neutral-900 translate-x-0.5" />
+              </div>
             </div>
           </div>
-        </div>
-        
-        {/* Author pic and name inside corner overlay */}
-        {(reel || msg.senderId) && (
-          <div className="absolute top-2 left-2 z-20 flex items-center space-x-1.5 bg-black/55 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/15 select-none max-w-[85%]">
-            <img
-              src={reel?.authorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(reel?.authorName || "User")}&background=random`}
-              className="w-3.5 h-3.5 rounded-full object-cover border border-white/50 shrink-0"
-              alt={reel?.authorName || "User"}
-              referrerPolicy="no-referrer"
+          
+          {/* Author pic and name inside corner overlay */}
+          {(reel || msg.senderId) && (
+            <div className="absolute top-1.5 left-1.5 z-20 flex items-center space-x-1 bg-black/65 backdrop-blur-xs px-1.5 py-0.5 rounded-full border border-white/20 select-none max-w-[90%]">
+              <img
+                src={reel?.authorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(reel?.authorName || "User")}&background=random`}
+                className="w-3.5 h-3.5 rounded-full object-cover border border-white/40 shrink-0"
+                alt={reel?.authorName || "User"}
+                referrerPolicy="no-referrer"
+              />
+              <span className="text-[9.5px] text-white font-medium truncate leading-none">
+                {reel?.authorName || "Reel"}
+              </span>
+            </div>
+          )}
+          <div className="absolute inset-x-0 bottom-0 px-2 py-1 bg-gradient-to-t from-black/85 via-black/40 to-transparent flex items-center justify-between pointer-events-none z-10">
+            <span className="text-[8.5px] text-white/90 font-bold tracking-wide uppercase">Reel</span>
+            <Video
+              className="w-3 h-3 text-white/90 drop-shadow-sm"
+              strokeWidth={2}
             />
-            <span className="text-[10.5px] text-white font-medium truncate leading-none">
-              {reel?.authorName || "Reel"}
-            </span>
           </div>
-        )}
-        <div className="absolute inset-x-0 bottom-0 px-2 py-1.5 bg-gradient-to-t from-black/85 via-black/40 to-transparent flex items-center justify-between pointer-events-none z-10">
-          <span className="text-[9.5px] text-white/90 font-semibold tracking-wide uppercase">Reel</span>
-          <Video
-            className="w-3.5 h-3.5 text-white/90 drop-shadow-md"
-            strokeWidth={2}
-          />
         </div>
+      </div>
+    );
+});
+
+const MultipleReelsDeck = React.memo(({
+  reels,
+  setViewingReel,
+  setViewingReelContext,
+}: {
+  reels: any[];
+  setViewingReel: any;
+  setViewingReelContext: any;
+}) => {
+  if (!reels || reels.length === 0) return null;
+
+  // Subtle stylish fanned card angles: -5deg, 4deg, -2deg, 5deg, -3deg ("beke beke")
+  const tiltAngles = [-5, 4, -2, 5, -3];
+
+  return (
+    <div className="flex flex-col will-change-transform select-none my-1 max-w-[320px]">
+      <div className="relative flex items-center h-[170px] px-2 py-1 overflow-x-auto no-scrollbar scroll-smooth">
+        {reels.map((item, i) => {
+          const rotation = tiltAngles[i % tiltAngles.length];
+          const coverPic = item.thumbnailUrl || item.thumbnail || item.coverUrl || item.mediaUrl || item.media?.[0];
+          const isVid = Boolean(coverPic && (coverPic.includes('.mp4') || coverPic.includes('.webm') || coverPic.includes('.mov') || coverPic.includes('video/')));
+
+          return (
+            <div
+              key={item.id || item.postId || i}
+              onClick={(e) => {
+                e.stopPropagation();
+                setViewingReel({
+                  id: item.postId || item.id,
+                  authorId: item.senderId || item.authorId || '',
+                  authorName: item.authorName || 'Reel',
+                  authorAvatar: item.authorAvatar || '',
+                  media: [coverPic],
+                  text: item.text || '',
+                  type: 'reel',
+                  single: true,
+                });
+                setViewingReelContext('chat');
+              }}
+              style={{
+                transform: `rotate(${rotation}deg) translateZ(0)`,
+                marginLeft: i === 0 ? 0 : '-52px',
+                zIndex: i + 1,
+              }}
+              className="relative w-28 sm:w-32 aspect-[9/14] max-h-[160px] rounded-2xl overflow-hidden cursor-pointer bg-neutral-900 border-2 border-white dark:border-neutral-800 shadow-[0_6px_20px_rgba(0,0,0,0.25)] hover:scale-105 hover:rotate-0 hover:z-40 active:scale-95 transition-all duration-200 transform-gpu shrink-0 group"
+            >
+              {isVid ? (
+                <video
+                  src={`${coverPic}#t=0.001`}
+                  className="w-full h-full object-cover pointer-events-none"
+                  preload="none"
+                  muted
+                  playsInline
+                />
+              ) : (
+                <img
+                  src={coverPic}
+                  className="w-full h-full object-cover pointer-events-none"
+                  alt="Reel"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                />
+              )}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/20 group-hover:bg-black/10 transition-colors">
+                <div className="w-6 h-6 rounded-full bg-white/95 text-neutral-900 flex items-center justify-center shadow-xs">
+                  <Play className="w-3 h-3 fill-neutral-900 translate-x-0.5" />
+                </div>
+              </div>
+              <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/75 rounded-md text-[9px] text-white font-bold flex items-center space-x-0.5 pointer-events-none">
+                <Video className="w-2.5 h-2.5" />
+                <span>Reel</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 mt-1 pl-1 flex items-center space-x-1">
+        <span>🎬 {reels.length} Reels</span>
       </div>
     </div>
   );
 });
 
-const VoiceMessageBubble = ({ msg, isMe, borderRadius }: { msg: any; isMe: boolean; borderRadius: string }) => {
+const VoiceMessageBubble = ({ msg, isMe }: { msg: any; isMe: boolean; borderRadius?: string }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(msg.duration || msg.replyTo?.duration || 3);
+  const [duration, setDuration] = useState(msg.duration || msg.replyTo?.duration || 4);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // 60fps smooth continuous scrubber animation without sudden jumps
+  useEffect(() => {
+    if (!isPlaying) return;
+    let rafId: number;
+    const smoothStep = () => {
+      if (audioRef.current && !isNaN(audioRef.current.currentTime)) {
+        setCurrentTime(audioRef.current.currentTime);
+      }
+      rafId = requestAnimationFrame(smoothStep);
+    };
+    rafId = requestAnimationFrame(smoothStep);
+    return () => cancelAnimationFrame(rafId);
+  }, [isPlaying]);
+
+  // Deterministic, realistic human speech waveform amplitude envelope (natural peaks, troughs, pauses)
+  const waveformHeights = useMemo(() => {
+    if (Array.isArray(msg.waveform) && msg.waveform.length >= 16) {
+      return msg.waveform;
+    }
+    const seedStr = (msg.id || '') + (msg.mediaUrl || '') + (msg.duration || '4');
+    let hash = 0;
+    for (let j = 0; j < seedStr.length; j++) {
+      hash = (hash << 5) - hash + seedStr.charCodeAt(j);
+      hash |= 0;
+    }
+    const count = 28;
+    const bars: number[] = [];
+    for (let i = 0; i < count; i++) {
+      // Natural speech envelope: low start, speech peaks, intermittent natural breaths/pauses
+      const pseudo = Math.abs(Math.sin((hash + i * 19) * 0.42));
+      const pseudo2 = Math.abs(Math.cos((hash + i * 31) * 0.28));
+      let height = Math.floor(22 + pseudo * 56 + pseudo2 * 22);
+      if ((i + Math.abs(hash)) % 6 === 0) {
+        height = Math.max(16, Math.floor(height * 0.32)); // speech pause
+      }
+      bars.push(Math.min(100, Math.max(18, height)));
+    }
+    return bars;
+  }, [msg.id, msg.mediaUrl, msg.duration, msg.waveform]);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
@@ -567,15 +703,32 @@ const VoiceMessageBubble = ({ msg, isMe, borderRadius }: { msg: any; isMe: boole
   const formatSecs = (s: number) => {
     const mins = Math.floor(s / 60);
     const secs = Math.floor(s % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+    if (mins > 0) {
+      return `${mins}:${secs.toString().padStart(2, "0")}`;
+    }
+    return `0:${secs.toString().padStart(2, "0")}`;
   };
 
+  const progressPct = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
+
   return (
-    <div className={`px-4 py-2.5 flex items-center space-x-3 min-w-[210px] sm:min-w-[240px] rounded-[26px] ${isMe ? "bg-[#FE2C55] text-white shadow-2xs" : "bg-white text-gray-900 border border-gray-100/90 shadow-2xs"}`}>
+    <div
+      className={`px-3 py-2 inline-flex items-center space-x-2.5 min-w-[210px] sm:min-w-[240px] max-w-[285px] rounded-[22px] select-none transition-all relative ${
+        isMe
+          ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white"
+          : "bg-neutral-100 dark:bg-[#1f242d] text-neutral-900 dark:text-white border border-neutral-200/80 dark:border-neutral-800"
+      }`}
+    >
+      {/* Left Play/Pause Circular Button */}
       <button
         type="button"
         onClick={togglePlay}
-        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 ${isMe ? "bg-white text-[#FE2C55] shadow-2xs hover:bg-gray-50" : "bg-[#FE2C55] text-white shadow-2xs hover:bg-red-600"}`}
+        className={`w-8.5 h-8.5 rounded-full flex items-center justify-center shrink-0 cursor-pointer active:scale-90 transition-transform border-0 shadow-xs ${
+          isMe
+            ? "bg-white text-blue-600"
+            : "bg-sky-500 text-white"
+        }`}
+        title={isPlaying ? "Pause voice message" : "Play voice message"}
       >
         {isPlaying ? (
           <Pause className="w-4 h-4 fill-current" />
@@ -584,26 +737,57 @@ const VoiceMessageBubble = ({ msg, isMe, borderRadius }: { msg: any; isMe: boole
         )}
       </button>
 
-      <div className="flex-1 flex flex-col justify-center space-y-1 min-w-0">
-        <div className="flex items-center space-x-0.5 h-4 w-full px-0.5">
-          {[35, 65, 25, 80, 45, 95, 55, 35, 85, 50, 30, 70, 40, 90, 60, 25, 75, 45].map((height, i) => (
-            <div
-              key={i}
-              className={`flex-1 rounded-full transition-all duration-150 ${isMe ? "bg-white" : "bg-rose-500"}`}
-              style={{
-                height: isPlaying ? `${Math.max(22, (height + (i % 3) * 20) % 100)}%` : `${height * 0.45}%`,
-                opacity: (i / 18) <= (currentTime / (duration || 1)) ? 1 : 0.35,
-              }}
-            />
-          ))}
+      {/* Middle Waveform Line-by-Line Visualizer (Vertically centered in middle of box) */}
+      <div className="flex-1 flex flex-col justify-center min-w-0 pr-1">
+        <div 
+          className="relative flex items-center justify-between h-7 w-full cursor-pointer py-0 select-none my-auto"
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const pct = Math.max(0, Math.min(1, clickX / rect.width));
+            if (audioRef.current && duration > 0) {
+              const targetTime = pct * duration;
+              audioRef.current.currentTime = targetTime;
+              setCurrentTime(targetTime);
+            }
+          }}
+        >
+          {waveformHeights.map((h, i) => {
+            const barProgress = (i / (waveformHeights.length - 1)) * 100;
+            const isFilled = barProgress <= progressPct;
+            return (
+              <div
+                key={i}
+                className="flex items-center justify-center h-full px-[0.5px]"
+              >
+                <div
+                  className={`w-[2.2px] sm:w-[2.6px] rounded-full transition-colors duration-150 ${
+                    isFilled
+                      ? isMe ? "bg-white" : "bg-sky-500 dark:bg-sky-400"
+                      : isMe ? "bg-white/35" : "bg-neutral-300 dark:bg-neutral-700"
+                  }`}
+                  style={{
+                    height: `${Math.max(16, h)}%`,
+                  }}
+                />
+              </div>
+            );
+          })}
+
+          {/* Scrubber Pip - Inside the waveform lines, strictly centered, continuous gliding dot */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 pointer-events-none will-change-[left]"
+            style={{ left: `${progressPct}%` }}
+          >
+            <div className={`w-2.5 h-2.5 rounded-full ${isMe ? 'bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]' : 'bg-sky-500 dark:bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]'}`} />
+          </div>
         </div>
 
-        <div className={`flex justify-between items-center text-[10.5px] font-medium tracking-tight ${isMe ? "text-white/90" : "text-gray-500"}`}>
-          <span>{formatSecs(currentTime)}</span>
-          <div className="flex items-center space-x-1">
-            <Mic className={`w-3 h-3 ${isMe ? "text-white/80" : "text-rose-500"}`} />
-            <span>{formatSecs(duration)}</span>
-          </div>
+        {/* Right Bottom Voice Duration in Seconds (NO date/time) */}
+        <div className="flex justify-end items-center pr-0.5">
+          <span className={`text-[10px] font-mono font-medium tracking-tight ${isMe ? 'text-white/80' : 'text-neutral-500 dark:text-neutral-400'}`}>
+            {formatSecs(isPlaying ? currentTime : duration)}
+          </span>
         </div>
       </div>
 
@@ -654,7 +838,8 @@ const MessageBubble = React.memo(function MessageBubble({
   setViewingReel,
   setViewingReelContext,
   setViewingMedia,
-  handleStartCall
+  handleStartCall,
+  onViewSticker
 }: {
   msg: any;
   isMe: boolean;
@@ -675,6 +860,7 @@ const MessageBubble = React.memo(function MessageBubble({
   setViewingReelContext: (c: any) => void;
   setViewingMedia: (m: any) => void;
   handleStartCall: (type: 'audio' | 'video') => void;
+  onViewSticker?: (url: string, type?: 'image' | 'video' | 'animated') => void;
 }) {
   const bubbleRef = React.useRef<HTMLDivElement>(null);
   const replyIconLeftRef = React.useRef<HTMLDivElement>(null);
@@ -779,18 +965,18 @@ const MessageBubble = React.memo(function MessageBubble({
   const bubbleContent = (
     <div
       id={`msg-${msg.id}`}
-      className={`flex ${isMe ? "justify-end" : "justify-start"} ${isFirstInGroup ? "mt-2.5" : "mt-[1px]"} group relative touch-pan-y chat-msg-row-opt`}
+      className={`flex ${isMe ? "justify-end pr-0.5 sm:pr-1" : "justify-start pl-0.5 sm:pl-1"} ${isFirstInGroup ? "mt-2" : "mt-[1px]"} group relative touch-pan-y chat-msg-row-opt`}
       onContextMenu={(e) => onLongPress(e, msg.id)}
     >
       {!isMe && isLastInGroup && avatarUrl && (
         <img
           src={avatarUrl}
-          className="w-7 h-7 rounded-full mr-2 self-end mb-1 object-cover"
+          className="w-7 h-7 rounded-full mr-1.5 self-end mb-0.5 object-cover shrink-0"
           alt="Avatar"
           loading="lazy"
         />
       )}
-      {!isMe && !isLastInGroup && <div className="w-9 shrink-0"></div>}
+      {!isMe && !isLastInGroup && <div className="w-8.5 shrink-0"></div>}
 
       {isMe && (
         <div className="hidden sm:group-hover:flex items-center opacity-0 group-hover:opacity-100 transition-opacity pr-2">
@@ -811,7 +997,7 @@ const MessageBubble = React.memo(function MessageBubble({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
-        className={`flex flex-col max-w-[78%] ${isMe ? "items-end" : "items-start"} relative group/bubble select-none`}
+        className={`flex flex-col max-w-[84%] sm:max-w-[80%] ${isMe ? "items-end" : "items-start"} relative group/bubble select-none`}
       >
         {/* Swipe Right to Reply Indicator */}
         <div 
@@ -871,7 +1057,7 @@ const MessageBubble = React.memo(function MessageBubble({
                     (msg.replyTo.type === "sticker" || msg.replyTo.stickerUrl ? "Sticker" :
                      msg.replyTo.type === "image" ? "Photo" :
                      msg.replyTo.type === "voice" ? "Voice message" :
-                     msg.replyTo.type === "reel" ? "Reel" : "Media")}
+                     msg.replyTo.type === "reel" ? "Reel" : "Attachment")}
                 </p>
               </div>
             </div>
@@ -879,7 +1065,30 @@ const MessageBubble = React.memo(function MessageBubble({
 
           <div className="max-w-full relative">
             {(() => {
-              if (msg.type === "reel") {
+              if (msg.type === "reel" || msg.type === "reels" || msg.type === "multi_reel") {
+                if (msg.reels && Array.isArray(msg.reels) && msg.reels.length > 1) {
+                  return (
+                    <MultipleReelsDeck
+                      reels={msg.reels}
+                      setViewingReel={setViewingReel}
+                      setViewingReelContext={setViewingReelContext}
+                    />
+                  );
+                }
+                if (msg.mediaUrls && Array.isArray(msg.mediaUrls) && msg.mediaUrls.length > 1) {
+                  return (
+                    <MultipleReelsDeck
+                      reels={msg.mediaUrls.map((url: string, idx: number) => ({
+                        id: `${msg.id}_${idx}`,
+                        postId: msg.postId,
+                        mediaUrl: url,
+                        authorName: senderName || "Reel",
+                      }))}
+                      setViewingReel={setViewingReel}
+                      setViewingReelContext={setViewingReelContext}
+                    />
+                  );
+                }
                 return (
                   <ReelMessageBubble
                     msg={msg}
@@ -887,26 +1096,12 @@ const MessageBubble = React.memo(function MessageBubble({
                     setViewingReelContext={setViewingReelContext}
                   />
                 );
-              } else if (msg.type === "voice") {
+              } else if (msg.type === "voice" || msg.type === "audio") {
                 return (
                   <VoiceMessageBubble
                     msg={msg}
                     isMe={isMe}
-                    borderRadius={borderRadius}
                   />
-                );
-              } else if (msg.type === "audio") {
-                return (
-                  <div
-                    className={`px-4 py-3 ${borderRadius} ${isMe ? "bg-[#FE2C55] text-white shadow-xs" : "bg-[#F2F4F7] text-gray-900 border border-gray-100/80 shadow-2xs"}`}
-                  >
-                    <audio
-                      controls
-                      src={msg.mediaUrl}
-                      className={`h-8 ${isMe ? "invert filter grayscale" : ""}`}
-                      style={{ maxWidth: "200px" }}
-                    />
-                  </div>
                 );
               } else if (msg.type === "video") {
                 const mediaUser = senderInfo || { name: senderName || "User", avatar: avatarUrl || "" };
@@ -985,7 +1180,7 @@ const MessageBubble = React.memo(function MessageBubble({
                   const isVidDoc = msg.mediaUrl?.startsWith('data:video') || Boolean(msg.mediaUrl?.match(/\.(mp4|webm|mov)/i));
                   return (
                     <div
-                      className="relative group cursor-pointer rounded-2xl overflow-hidden max-w-[250px] shadow-sm transition-transform duration-200 active:scale-98"
+                      className="relative group cursor-pointer rounded-2xl overflow-hidden max-w-[200px] sm:max-w-[220px] shadow-2xs border border-black/10 select-none transition-transform duration-200 active:scale-98"
                       onClick={() =>
                         setViewingMedia({
                           type: isVidDoc ? "video" : "image",
@@ -997,7 +1192,7 @@ const MessageBubble = React.memo(function MessageBubble({
                       }
                     >
                       {isVidDoc ? (
-                        <div className="relative w-full h-44 bg-black flex items-center justify-center">
+                        <div className="relative w-full h-36 bg-black flex items-center justify-center">
                           <video
                             src={msg.mediaUrl}
                             className="w-full h-full object-cover"
@@ -1005,8 +1200,8 @@ const MessageBubble = React.memo(function MessageBubble({
                             playsInline
                           />
                           <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
-                            <div className="w-10 h-10 rounded-full bg-white/85 text-gray-900 flex items-center justify-center shadow-md">
-                              <Play className="w-5 h-5 fill-gray-900 translate-x-0.5" />
+                            <div className="w-8.5 h-8.5 rounded-full bg-white/90 text-neutral-900 flex items-center justify-center shadow-xs">
+                              <Play className="w-4 h-4 fill-neutral-900 translate-x-0.5" />
                             </div>
                           </div>
                         </div>
@@ -1014,15 +1209,15 @@ const MessageBubble = React.memo(function MessageBubble({
                         <img
                           src={msg.mediaUrl}
                           alt="Document media"
-                          className="w-full h-auto max-h-72 object-cover transition-transform duration-300 group-hover:scale-102"
+                          className="w-full h-auto max-h-[200px] object-cover transition-transform duration-300 group-hover:scale-102"
                           loading="lazy"
                         />
                       )}
 
-                      {/* Small HD Document Badge top left */}
+                      {/* Small Document Badge top left */}
                       <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/70 backdrop-blur-md text-white rounded-lg flex items-center space-x-1 border border-white/20 shadow-xs">
-                        <FileText className="w-3 h-3 text-purple-300" />
-                        <span className="text-[9px] font-bold tracking-wider uppercase">{fExt} HD</span>
+                        <FileText className="w-3 h-3 text-neutral-300" />
+                        <span className="text-[9px] font-bold tracking-wider uppercase">{fExt}</span>
                       </div>
 
                       {/* Download button bottom right */}
@@ -1032,23 +1227,23 @@ const MessageBubble = React.memo(function MessageBubble({
                           e.stopPropagation();
                           downloadMediaFile(msg.mediaUrl!, fName);
                         }}
-                        className="absolute bottom-2 right-2 p-1.5 bg-black/70 hover:bg-black text-white rounded-full transition-all shadow-md backdrop-blur-sm active:scale-90"
-                        title="Download HD Original File"
+                        className="absolute bottom-2 right-2 p-1.5 bg-black/70 hover:bg-black text-white rounded-full transition-all shadow-xs backdrop-blur-sm active:scale-90 border-0 cursor-pointer"
+                        title="Download File"
                       >
-                        <Download className="w-3.5 h-3.5" />
+                        <Download className="w-3 h-3" />
                       </button>
                     </div>
                   );
                 }
 
                 return (
-                  <div className={`flex items-center space-x-3 p-3 rounded-2xl ${isMe ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-900'} max-w-[260px]`}>
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isMe ? 'bg-white/20' : 'bg-purple-600 text-white'}`}>
-                      <FileText className="w-4 h-4" />
+                  <div className={`flex items-center space-x-2 p-2 rounded-2xl ${isMe ? 'bg-neutral-900 dark:bg-black text-white dark:border dark:border-white/30' : 'bg-neutral-100 dark:bg-black text-neutral-900 dark:text-white border border-neutral-200/80 dark:border-white/30'} max-w-[185px] sm:max-w-[200px] select-none shadow-none`}>
+                    <div className={`w-7.5 h-7.5 rounded-xl flex items-center justify-center shrink-0 ${isMe ? 'bg-white/20 text-white' : 'bg-neutral-200 text-neutral-800'}`}>
+                      <FileText className="w-3.5 h-3.5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold truncate">{fName}</p>
-                      <span className="text-[9.5px] opacity-75 uppercase">{fExt} File</span>
+                      <p className="text-xs font-bold truncate leading-tight">{fName}</p>
+                      <span className="text-[9px] opacity-75 uppercase">{fExt}</span>
                     </div>
                     <button
                       type="button"
@@ -1056,9 +1251,9 @@ const MessageBubble = React.memo(function MessageBubble({
                         e.stopPropagation();
                         downloadMediaFile(msg.mediaUrl || msg.content, fName);
                       }}
-                      className="p-2 rounded-lg bg-white/20 hover:bg-white/30 text-current active:scale-90"
+                      className="p-1 rounded-lg bg-black/10 hover:bg-black/20 text-current active:scale-90 transition-all border-0 cursor-pointer"
                     >
-                      <Download className="w-3.5 h-3.5" />
+                      <Download className="w-3 h-3" />
                     </button>
                   </div>
                 );
@@ -1066,7 +1261,7 @@ const MessageBubble = React.memo(function MessageBubble({
                 const mediaUser = senderInfo || { name: senderName || "User", avatar: avatarUrl || "" };
                 return (
                   <div
-                    className="relative group cursor-pointer rounded-2xl overflow-hidden max-w-[240px] shadow-sm"
+                    className="relative group cursor-pointer rounded-2xl overflow-hidden w-[235px] sm:w-[260px] max-w-[78vw] aspect-[4/3] bg-neutral-900/5 border border-neutral-200/70 select-none shadow-xs"
                     onClick={() =>
                       setViewingMedia({
                         type: "image",
@@ -1080,12 +1275,12 @@ const MessageBubble = React.memo(function MessageBubble({
                     <img
                       src={msg.mediaUrl}
                       alt="Sent image"
-                      className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
+                      className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-102"
                       loading="lazy"
                     />
-                    <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                      <div className="bg-black/60 text-white text-[11px] font-normal px-3 py-1.5 rounded-full backdrop-blur-sm">
-                        View Full Screen
+                    <div className="absolute inset-0 bg-black/15 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                      <div className="bg-black/60 text-white text-[10px] font-medium px-2 py-0.5 rounded-full backdrop-blur-sm">
+                        View
                       </div>
                     </div>
                     {/* Quick Download button */}
@@ -1095,41 +1290,60 @@ const MessageBubble = React.memo(function MessageBubble({
                         e.stopPropagation();
                         downloadMediaFile(msg.mediaUrl!, `photo_${msg.id || Date.now()}.jpg`);
                       }}
-                      className="absolute bottom-2 right-2 p-1.5 bg-black/60 hover:bg-black/85 active:scale-90 text-white rounded-full transition-all shadow-md backdrop-blur-sm"
+                      className="absolute bottom-1.5 right-1.5 p-1 bg-black/60 hover:bg-black/85 active:scale-90 text-white rounded-full transition-all shadow-xs backdrop-blur-sm border-0 cursor-pointer"
                       title="Download Photo"
                     >
-                      <Download className="w-3.5 h-3.5" />
+                      <Download className="w-3 h-3" />
                     </button>
                   </div>
                 );
-              } else if (msg.type === "sticker" || msg.stickerUrl) {
-                const isVideoSticker = msg.stickerType === "video" || (msg.mediaUrl && (msg.mediaUrl.includes(".mp4") || msg.mediaUrl.includes(".webm") || msg.mediaUrl.includes(".mov")));
-                const stickerSrc = msg.stickerUrl || msg.mediaUrl;
+              } else if (
+                msg.type === "sticker" || 
+                !!msg.stickerUrl || 
+                (!!msg.mediaUrl && (msg.content === "Sent a sticker" || msg.content === "Sticker" || msg.mediaUrl.includes("/stickers/"))) ||
+                (msg.content === "Sent a sticker" && !!msg.mediaUrl)
+              ) {
+                let stickerSrc = msg.stickerUrl || msg.mediaUrl || "";
+                if (!stickerSrc && msg.content && (msg.content.startsWith("http") || msg.content.startsWith("/") || msg.content.startsWith("data:"))) {
+                  stickerSrc = msg.content;
+                }
+                if (stickerSrc.includes("/uploads/")) {
+                  stickerSrc = `/uploads/${stickerSrc.split("/uploads/")[1]}`;
+                }
+                const isVideoSticker = msg.stickerType === "video" || (stickerSrc && (stickerSrc.includes(".mp4") || stickerSrc.includes(".webm") || stickerSrc.includes(".mov")));
                 return (
                   <div
-                    className="relative group/stk cursor-pointer p-0.5 transition-all duration-200 active:scale-95 max-w-[170px] sm:max-w-[210px] select-none hover:scale-[1.03]"
-                    onClick={(e) => onLongPress(e, msg.id)}
-                    title="Click or Long-press for Sticker actions"
+                    className="relative group/stk cursor-pointer transition-all duration-200 active:scale-95 max-w-[210px] sm:max-w-[240px] select-none hover:scale-[1.02] bg-transparent border-0 shadow-none outline-none"
+                    onClick={() => {
+                      if (onViewSticker && stickerSrc) {
+                        onViewSticker(stickerSrc, isVideoSticker ? 'video' : 'image');
+                      }
+                    }}
+                    onContextMenu={(e) => onContextMenu(e, msg.id)}
+                    title="Click for Sticker preview and actions"
                   >
                     {isVideoSticker ? (
-                      <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-[28px] overflow-hidden bg-transparent flex items-center justify-center drop-shadow-md">
-                        <video
+                      <div className="w-40 h-40 sm:w-48 sm:h-48 overflow-hidden bg-transparent border-0 shadow-none flex items-center justify-center">
+                        <VideoSticker
                           src={stickerSrc}
-                          autoPlay
-                          loop
-                          muted
-                          playsInline
-                          className="w-full h-full object-cover rounded-[28px] pointer-events-none"
+                          className="w-full h-full object-contain rounded-2xl pointer-events-none bg-transparent border-0 shadow-none"
                         />
                       </div>
                     ) : (
-                      <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-[28px] overflow-hidden bg-transparent flex items-center justify-center drop-shadow-md">
+                      <div className="w-40 h-40 sm:w-48 sm:h-48 overflow-hidden bg-transparent border-0 shadow-none flex items-center justify-center">
                         <img
                           src={stickerSrc}
                           alt="Sticker"
                           loading="lazy"
                           referrerPolicy="no-referrer"
-                          className="w-full h-full object-contain pointer-events-none select-none rounded-[28px] mix-blend-multiply dark:mix-blend-normal"
+                          className="w-full h-full object-contain pointer-events-none select-none rounded-2xl bg-transparent border-0 shadow-none"
+                          onError={(e) => {
+                            const el = e.currentTarget;
+                            if (stickerSrc.includes('/uploads/') && !el.dataset.retried) {
+                              el.dataset.retried = 'true';
+                              el.src = `/uploads/${stickerSrc.split('/uploads/')[1]}`;
+                            }
+                          }}
                         />
                       </div>
                     )}
@@ -1160,32 +1374,32 @@ const MessageBubble = React.memo(function MessageBubble({
                 const durationLabel = parts[1] || '';
 
                 return (
-                  <div className={`p-3.5 rounded-2xl flex flex-col space-y-2.5 max-w-[260px] shadow-sm border ${
+                  <div className={`p-3 rounded-2xl flex flex-col space-y-2 max-w-[225px] select-none border-0 shadow-none ${
                     isMissed || isDeclined 
-                      ? "bg-rose-50/95 border-rose-200/80 text-rose-950" 
+                      ? "bg-rose-50 dark:bg-rose-950/40 text-rose-950 dark:text-rose-200" 
                       : isMe 
-                        ? "bg-purple-600 text-white border-purple-500/80 shadow-purple-600/20" 
-                        : "bg-white border-purple-100 text-gray-900 shadow-xs"
+                        ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white" 
+                        : "bg-[#F2F4F7] dark:bg-[#27272A] text-neutral-900 dark:text-white"
                   }`}>
-                    <div className="flex items-center space-x-3">
-                      <div className={`p-2.5 rounded-full shrink-0 ${
+                    <div className="flex items-center space-x-2.5">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                         isMissed || isDeclined 
-                          ? "bg-rose-100 text-rose-600" 
+                          ? "bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400" 
                           : isMe 
                             ? "bg-white/20 text-white" 
-                            : "bg-purple-100 text-purple-700"
+                            : "bg-purple-100 dark:bg-white/10 text-purple-700 dark:text-white"
                       }`}>
                         {isVideoCall ? <Video className="w-4 h-4" /> : (isMissed || isDeclined) ? <PhoneOff className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-[13px] truncate leading-tight">{mainLabel}</h4>
+                        <h4 className="font-semibold text-[13px] truncate leading-tight text-neutral-900 dark:text-white">{mainLabel}</h4>
                         {durationLabel && (
                           <p className={`text-[11px] font-medium mt-0.5 ${
                             isMissed || isDeclined 
-                              ? "text-rose-600" 
+                              ? "text-rose-600 dark:text-rose-400" 
                               : isMe 
-                                ? "text-purple-100" 
-                                : "text-purple-600"
+                                ? "text-white/80" 
+                                : "text-neutral-500 dark:text-neutral-400"
                           }`}>
                             Duration: {durationLabel}
                           </p>
@@ -1197,10 +1411,10 @@ const MessageBubble = React.memo(function MessageBubble({
                       <button
                         type="button"
                         onClick={() => handleStartCall(isVideoCall ? 'video' : 'audio')}
-                        className={`w-full py-1.5 px-3 rounded-xl text-xs font-medium flex items-center justify-center space-x-1.5 transition-all active:scale-95 border ${
+                        className={`w-full py-1.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all active:scale-95 border-0 cursor-pointer shadow-none ${
                           isMe 
-                            ? "bg-white/15 hover:bg-white/25 text-white border-white/20" 
-                            : "bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200/60"
+                            ? "bg-white/20 hover:bg-white/30 text-white" 
+                            : "bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-white"
                         }`}
                       >
                         <Phone className="w-3.5 h-3.5" />
@@ -1212,7 +1426,11 @@ const MessageBubble = React.memo(function MessageBubble({
               } else {
                 return (
                   <div
-                    className={`px-4 py-2.5 text-[15px] leading-snug whitespace-pre-wrap break-words inline-block ${borderRadius} ${isMe ? "bg-[#FE2C55] text-white shadow-xs font-normal" : "bg-[#F2F4F7] text-gray-900 border border-gray-100/80 shadow-2xs font-normal"}`}
+                    className={`px-3.5 py-2 text-[15px] leading-snug whitespace-pre-wrap break-words inline-block ${borderRadius} border-0 shadow-none font-normal ${
+                      isMe 
+                        ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white" 
+                        : "bg-[#F2F4F7] dark:bg-[#27272A] text-neutral-900 dark:text-white"
+                    }`}
                   >
                     {msg.content}
                   </div>
@@ -1222,11 +1440,17 @@ const MessageBubble = React.memo(function MessageBubble({
           </div>
 
           {(msg as any).reaction && (
-            <div
-              className={`absolute -bottom-3 ${isMe ? "right-2" : "left-2"} bg-white border border-gray-100 rounded-full px-1.5 py-0.5 text-sm z-10 shadow-xs`}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleReaction(msg.id, (msg as any).reaction);
+              }}
+              title="Click to remove reaction"
+              className={`absolute -bottom-2 ${isMe ? "right-1.5" : "left-1.5"} text-[15px] z-20 bg-transparent border-0 p-0 shadow-none outline-none select-none cursor-pointer hover:scale-125 active:scale-90 transition-transform`}
             >
               {(msg as any).reaction}
-            </div>
+            </button>
           )}
         </div>
 
@@ -1286,6 +1510,18 @@ const MessageBubble = React.memo(function MessageBubble({
   );
 });
 
+let canvasCache: HTMLCanvasElement | null = null;
+const getTextWidth = (text: string, font = '15px system-ui, -apple-system, sans-serif'): number => {
+  if (typeof document === 'undefined') return text.length * 8.5;
+  if (!canvasCache) {
+    canvasCache = document.createElement('canvas');
+  }
+  const context = canvasCache.getContext('2d');
+  if (!context) return text.length * 8.5;
+  context.font = font;
+  return context.measureText(text).width;
+};
+
 export default function Messages() {
   const {
     chatTheme,
@@ -1309,7 +1545,10 @@ export default function Messages() {
     cachedConversations: conversations,
     setCachedConversations: setConversations,
     setIsBottomNavHidden,
-    setActiveCallState
+    setActiveCallState,
+    followingIds,
+    setFollowingIds,
+    followerIds
   } = useAppStore();
 
   const handleStartCall = async (type: 'audio' | 'video') => {
@@ -1382,6 +1621,19 @@ export default function Messages() {
     ? jarvisMessages
     : (activeChat && messagesCache[activeChat]) || [];
   const [inputText, setInputText] = useState("");
+  const [shatteredLetters, setShatteredLetters] = useState<
+    { id: string; char: string; x: number; rot: number; dx: number; dy: number; size?: number; color?: string }[]
+  >([]);
+  const [typedPops, setTypedPops] = useState<{ id: string; char: string; x: number }[]>([]);
+  const [conversationThemeOverrides, setConversationThemeOverrides] = useState<
+    Record<string, { theme?: string; blur?: boolean; brightness?: number }>
+  >(() => {
+    try {
+      return JSON.parse(localStorage.getItem('chat_theme_overrides') || '{}');
+    } catch {
+      return {};
+    }
+  });
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [presenceData, setPresenceData] = useState<{
@@ -1396,6 +1648,8 @@ export default function Messages() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const prevScrollHeightRef = useRef<number>(0);
   const shouldAutoScrollRef = useRef<boolean>(true);
+  const activityTouchStartXRef = useRef<number | null>(null);
+  const activityTouchStartYRef = useRef<number | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -1407,6 +1661,70 @@ export default function Messages() {
     convId: string;
     otherUid?: string;
   } | null>(null);
+
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'clear_chat' | 'delete_friend' | 'delete_chat';
+    convId: string;
+    otherUid?: string;
+    friendName: string;
+  } | null>(null);
+
+  // Hide mobile bottom navigation bar when context menu or confirmation modal is open
+  useEffect(() => {
+    if (chatContextMenu || confirmAction) {
+      setIsBottomNavHidden(true);
+    } else {
+      if (!activeChat) {
+        setIsBottomNavHidden(false);
+      }
+    }
+  }, [chatContextMenu, confirmAction, activeChat, setIsBottomNavHidden]);
+
+  useEffect(() => {
+    return () => {
+      setIsBottomNavHidden(false);
+    };
+  }, [setIsBottomNavHidden]);
+
+  const [pinnedChatIds, setPinnedChatIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("ennvo_pinned_chats") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  const [mutedChatIds, setMutedChatIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("ennvo_muted_chats") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  const togglePinChat = (convId: string) => {
+    setPinnedChatIds((prev) => {
+      const isPinned = prev.includes(convId);
+      const next = isPinned ? prev.filter((id) => id !== convId) : [convId, ...prev];
+      try {
+        localStorage.setItem("ennvo_pinned_chats", JSON.stringify(next));
+      } catch (_) {}
+      return next;
+    });
+    setChatContextMenu(null);
+  };
+
+  const toggleMuteChat = (convId: string) => {
+    setMutedChatIds((prev) => {
+      const isMuted = prev.includes(convId);
+      const next = isMuted ? prev.filter((id) => id !== convId) : [convId, ...prev];
+      try {
+        localStorage.setItem("ennvo_muted_chats", JSON.stringify(next));
+      } catch (_) {}
+      return next;
+    });
+    setChatContextMenu(null);
+  };
   const [activityTab, setActivityTab] = useState<"activity" | "followers">("activity");
   const [isOnline, setIsOnline] = useState<boolean>(() =>
     typeof navigator !== "undefined" ? navigator.onLine : true
@@ -1434,7 +1752,7 @@ export default function Messages() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showPrivacySheet, setShowPrivacySheet] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [selectedMediaItems, setSelectedMediaItems] = useState<{ id: string; type: 'image' | 'video'; url: string; name?: string }[]>([]);
+  const [selectedMediaItems, setSelectedMediaItems] = useState<{ id: string; type: 'image' | 'video'; url: string; name?: string; file?: File }[]>([]);
   const selectedImagePreview = selectedMediaItems.length > 0 ? selectedMediaItems[0].url : null;
   const selectedMediaType = selectedMediaItems.length > 0 ? selectedMediaItems[0].type : "image";
   const [showSharedMedia, setShowSharedMedia] = useState(false);
@@ -1443,6 +1761,12 @@ export default function Messages() {
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [liveVolumeLevels, setLiveVolumeLevels] = useState<number[]>(() => [8, 14, 10, 18, 12, 22, 16, 24, 14, 20, 12, 18, 8, 14]);
+  const audioContextRef = useRef<any>(null);
+  const analyserRef = useRef<any>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const [viewingStickerUrl, setViewingStickerUrl] = useState<string | null>(null);
+  const [viewingStickerType, setViewingStickerType] = useState<'image' | 'video' | 'animated'>('image');
   const [replyingTo, setReplyingTo] = useState<any | null>(null);
   const [showChatSettings, setShowChatSettings] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
@@ -1451,6 +1775,8 @@ export default function Messages() {
   const [storyFile, setStoryFile] = useState<File | null>(null);
   const [storyUploading, setStoryUploading] = useState(false);
   const isTypingActiveRef = useRef<boolean>(false);
+
+
   const typingTimerRef = useRef<any>(null);
 
   const isChatInitialLoadedRef = useRef<boolean>(false);
@@ -1546,8 +1872,147 @@ export default function Messages() {
 
   const [newGroupAvatar, setNewGroupAvatar] = useState<string | null>(null);
   const groupPfpInputRef = useRef<HTMLInputElement>(null);
+  const [groupName, setGroupName] = useState("");
+  const [selectedGroupUserIds, setSelectedGroupUserIds] = useState<string[]>([]);
+  const [groupSearchQuery, setGroupSearchQuery] = useState("");
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [groupCreateError, setGroupCreateError] = useState<string | null>(null);
+
   const [showStatusInput, setShowStatusInput] = useState(false);
+  const [statusNoteMode, setStatusNoteMode] = useState<"create" | "edit">("create");
   const [statusNoteText, setStatusNoteText] = useState("");
+  const [viewingNoteUser, setViewingNoteUser] = useState<{
+    id: string;
+    name: string;
+    avatar: string;
+    username?: string;
+    statusNote: string;
+    timestamp?: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (showCreateGroup || showStatusInput || viewingNoteUser) {
+      setIsBottomNavHidden(true);
+      return () => {
+        setIsBottomNavHidden(false);
+      };
+    }
+  }, [showCreateGroup, showStatusInput, viewingNoteUser, setIsBottomNavHidden]);
+
+  useEffect(() => {
+    if (!showPrivacySheet && !showCreateGroup && !showThemeSettings && !showChatSettings && !viewingStickerUrl && !viewingNoteUser && selectedMediaItems.length === 0 && !showSharedMedia && !isSearchExpanded) return;
+    const handleBack = (e: Event) => {
+      e.preventDefault();
+      if (viewingNoteUser) setViewingNoteUser(null);
+      else if (viewingStickerUrl) setViewingStickerUrl(null);
+      else if (showPrivacySheet) setShowPrivacySheet(false);
+      else if (showCreateGroup) setShowCreateGroup(false);
+      else if (showThemeSettings) setShowThemeSettings(false);
+      else if (showChatSettings) setShowChatSettings(false);
+      else if (selectedMediaItems.length > 0) setSelectedMediaItems([]);
+      else if (showSharedMedia) setShowSharedMedia(false);
+      else if (isSearchExpanded) { setIsSearchExpanded(false); setSearchQuery(""); }
+    };
+    window.addEventListener('appBackPress', handleBack);
+    return () => window.removeEventListener('appBackPress', handleBack);
+  }, [showPrivacySheet, showCreateGroup, showThemeSettings, showChatSettings, viewingStickerUrl, viewingNoteUser, selectedMediaItems, showSharedMedia, isSearchExpanded]);
+
+  const availableGroupCandidates = React.useMemo(() => {
+    const map = new Map<string, { id: string; name: string; avatar: string; username?: string }>();
+    followers.forEach((f) => {
+      const fid = f.id as string;
+      if (fid && fid !== currentUser?.uid) {
+        map.set(fid, {
+          id: fid,
+          name: f.name || f.username || "Friend",
+          avatar: f.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(f.name || "Friend")}&background=random`,
+          username: f.username,
+        });
+      }
+    });
+    conversations.forEach((c) => {
+      if (!c.isGroup && c.participantIds) {
+        c.participantIds.forEach((id: string) => {
+          if (id && id !== currentUser?.uid && !map.has(id)) {
+            const p = c.participants?.[id] || userDataCache[id];
+            map.set(id, {
+              id,
+              name: p?.name || "Friend",
+              avatar: p?.avatar || `https://ui-avatars.com/api/?name=User&background=random`,
+            });
+          }
+        });
+      }
+    });
+    Object.entries(userDataCache).forEach(([uid, u]: [string, any]) => {
+      if (uid !== currentUser?.uid && !map.has(uid)) {
+        map.set(uid, {
+          id: uid,
+          name: u?.name || "Friend",
+          avatar: u?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u?.name || "Friend")}&background=random`,
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [followers, conversations, userDataCache, currentUser?.uid]);
+
+  const handleNoteReply = async (targetUserId: string, messageText: string, noteText: string) => {
+    if (!currentUser) return;
+    const { createConversation, sendMessage } = await import("../services/chatService");
+    
+    let targetConv = conversations.find(
+      (c) => !c.isGroup && c.participantIds?.includes(targetUserId) && c.participantIds?.length === 2
+    );
+    let convId = targetConv?.id;
+    if (!convId) {
+      const targetUser = userDataCache[targetUserId] || followers.find((f) => f.id === targetUserId);
+      convId = await createConversation(
+        [currentUser.uid, targetUserId],
+        {
+          [currentUser.uid]: {
+            name: currentUser.name || "User",
+            avatar: currentUser.avatar || "",
+          },
+          [targetUserId]: {
+            name: targetUser?.name || "User",
+            avatar: targetUser?.avatar || "",
+          },
+        }
+      );
+    }
+    
+    const formattedContent = `💬 Replying to note: "${noteText}"\n${messageText}`;
+    await sendMessage(convId, currentUser.uid, "text", formattedContent);
+  };
+
+  const handleNoteReaction = async (targetUserId: string, emoji: string, noteText: string) => {
+    if (!currentUser) return;
+    const { createConversation, sendMessage } = await import("../services/chatService");
+    
+    let targetConv = conversations.find(
+      (c) => !c.isGroup && c.participantIds?.includes(targetUserId) && c.participantIds?.length === 2
+    );
+    let convId = targetConv?.id;
+    if (!convId) {
+      const targetUser = userDataCache[targetUserId] || followers.find((f) => f.id === targetUserId);
+      convId = await createConversation(
+        [currentUser.uid, targetUserId],
+        {
+          [currentUser.uid]: {
+            name: currentUser.name || "User",
+            avatar: currentUser.avatar || "",
+          },
+          [targetUserId]: {
+            name: targetUser?.name || "User",
+            avatar: targetUser?.avatar || "",
+          },
+        }
+      );
+    }
+    
+    await sendMessage(convId, currentUser.uid, "text", `Reacted ${emoji} to your note: "${noteText}"`);
+  };
+
   const [showStickerModal, setShowStickerModal] = useState(false);
   const [communityStickersCache, setCommunityStickersCache] = useState<any[]>([]);
 
@@ -1621,6 +2086,11 @@ export default function Messages() {
     setShowStickerModal(false);
     shouldAutoScrollRef.current = true;
 
+    let cleanStickerUrl = stickerUrl;
+    if (cleanStickerUrl.includes('/uploads/')) {
+      cleanStickerUrl = `/uploads/${cleanStickerUrl.split('/uploads/')[1]}`;
+    }
+
     // Optimistic message in UI
     const tempId = 'temp_' + Date.now();
     const optMsg: any = {
@@ -1628,9 +2098,9 @@ export default function Messages() {
       tempId: tempId,
       senderId: currentUser.uid,
       type: 'sticker',
-      content: '',
-      mediaUrl: stickerUrl,
-      stickerUrl: stickerUrl,
+      content: cleanStickerUrl,
+      mediaUrl: cleanStickerUrl,
+      stickerUrl: cleanStickerUrl,
       stickerType: stickerType || 'image',
       createdAt: { toMillis: () => Date.now() },
       status: 'sent',
@@ -1659,8 +2129,8 @@ export default function Messages() {
         activeChat,
         currentUser.uid,
         'sticker' as any,
-        '',
-        stickerUrl,
+        cleanStickerUrl,
+        cleanStickerUrl,
         undefined,
         replyData
       );
@@ -1708,12 +2178,74 @@ export default function Messages() {
   const isCanceledRef = useRef(false);
   const fetchedUserIdsRef = useRef<Set<string>>(new Set());
   const subscribedPresenceRef = useRef<Map<string, () => void>>(new Map());
+  const isPagingRef = useRef(false);
   const isSendingMsgRef = useRef(false);
 
   const startRecording = async () => {
     isCanceledRef.current = false;
+    // Immediate 0ms synchronous UI transition for lag-free responsiveness
+    setIsRecording(true);
+    setRecordingDuration(0);
+    if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+    durationIntervalRef.current = setInterval(() => {
+      setRecordingDuration((prev) => prev + 1);
+    }, 1000);
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (isCanceledRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      // Initialize real Web Audio Analyser for live visualizer
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          if (ctx.state === 'suspended') {
+            await ctx.resume().catch(() => {});
+          }
+          audioContextRef.current = ctx;
+          const source = ctx.createMediaStreamSource(stream);
+          const analyser = ctx.createAnalyser();
+          analyser.fftSize = 64;
+          analyser.smoothingTimeConstant = 0.5;
+          source.connect(analyser);
+          analyserRef.current = analyser;
+
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          const updateLiveMeter = () => {
+            if (isCanceledRef.current) return;
+            analyser.getByteFrequencyData(dataArray);
+            
+            // Calculate overall mic energy
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+              sum += dataArray[i];
+            }
+            const avgEnergy = sum / dataArray.length;
+            const boost = Math.min(1.5, Math.max(0.6, avgEnergy / 30));
+
+            const barsCount = 20;
+            const step = Math.max(1, Math.floor(dataArray.length / barsCount));
+            const levels: number[] = [];
+            for (let i = 0; i < barsCount; i++) {
+              const val = dataArray[i * step] || 0;
+              // Map 0-255 with dynamic boost to 4px - 24px height
+              const scaled = Math.round((val / 255) * 22 * boost);
+              const h = Math.max(4, Math.min(24, scaled));
+              levels.push(h);
+            }
+            setLiveVolumeLevels(levels);
+            animFrameRef.current = requestAnimationFrame(updateLiveMeter);
+          };
+          animFrameRef.current = requestAnimationFrame(updateLiveMeter);
+        }
+      } catch (meterErr) {
+        console.warn("Audio meter setup:", meterErr);
+      }
+
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
@@ -1724,6 +2256,11 @@ export default function Messages() {
 
       mediaRecorder.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
+        if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+        if (audioContextRef.current) {
+          audioContextRef.current.close().catch(() => {});
+          audioContextRef.current = null;
+        }
         if (isCanceledRef.current) return;
 
         const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
@@ -1736,6 +2273,22 @@ export default function Messages() {
             activeChat !== "activity" &&
             currentUser
           ) {
+            const tempVoiceId = "opt_voice_" + Date.now();
+            const optVoiceMsg = {
+              id: tempVoiceId,
+              tempId: tempVoiceId,
+              senderId: currentUser.uid,
+              type: "voice",
+              content: "",
+              mediaUrl: dataUrl,
+              duration: Math.max(1, recordingDuration),
+              createdAt: { toMillis: () => Date.now() },
+              status: "sent"
+            };
+            setMessagesCache((prev) => ({
+              ...prev,
+              [activeChat]: [...(prev[activeChat] || []), optVoiceMsg]
+            }));
             sendMessage(
               activeChat,
               currentUser.uid,
@@ -1751,20 +2304,8 @@ export default function Messages() {
       };
 
       mediaRecorder.start();
-      setIsRecording(true);
-      setRecordingDuration(0);
-      if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
-      durationIntervalRef.current = setInterval(() => {
-        setRecordingDuration((prev) => prev + 1);
-      }, 1000);
     } catch (err) {
-      console.error("Microphone fallback activated", err);
-      setIsRecording(true);
-      setRecordingDuration(0);
-      if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
-      durationIntervalRef.current = setInterval(() => {
-        setRecordingDuration((prev) => prev + 1);
-      }, 1000);
+      console.warn("Microphone hardware fallback activated", err);
     }
   };
 
@@ -1772,11 +2313,32 @@ export default function Messages() {
     if (isRecording) {
       setIsRecording(false);
       if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
         mediaRecorderRef.current.stop();
       } else if (!isCanceledRef.current) {
         const synthUrl = "https://actions.google.com/sounds/v1/ambiences/outdoor_park.ogg";
         if (activeChat && currentUser) {
+          const tempVoiceId = "opt_voice_" + Date.now();
+          const optVoiceMsg = {
+            id: tempVoiceId,
+            tempId: tempVoiceId,
+            senderId: currentUser.uid,
+            type: "voice",
+            content: "",
+            mediaUrl: synthUrl,
+            duration: Math.max(1, recordingDuration),
+            createdAt: { toMillis: () => Date.now() },
+            status: "sent"
+          };
+          setMessagesCache((prev) => ({
+            ...prev,
+            [activeChat]: [...(prev[activeChat] || []), optVoiceMsg]
+          }));
           sendMessage(
             activeChat,
             currentUser.uid,
@@ -1795,6 +2357,11 @@ export default function Messages() {
     isCanceledRef.current = true;
     setIsRecording(false);
     if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
     }
@@ -1850,6 +2417,60 @@ export default function Messages() {
     });
   };
 
+  const compressImageFileToSafeBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            // Adaptive scaling based on original file size
+            const isVeryLarge = file.size > 2 * 1024 * 1024;
+            let MAX_DIM = isVeryLarge ? 750 : 850;
+            let { width, height } = img;
+            if (width > MAX_DIM || height > MAX_DIM) {
+              if (width > height) {
+                height = Math.round((height * MAX_DIM) / width);
+                width = MAX_DIM;
+              } else {
+                width = Math.round((width * MAX_DIM) / height);
+                height = MAX_DIM;
+              }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, width);
+            canvas.height = Math.max(1, height);
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              let dataUrl = canvas.toDataURL("image/jpeg", 0.65);
+              // If base64 is still over 80KB, downscale more to guarantee Firestore safety
+              if (dataUrl.length > 80000) {
+                const smallCanvas = document.createElement("canvas");
+                smallCanvas.width = Math.max(1, Math.round(width * 0.75));
+                smallCanvas.height = Math.max(1, Math.round(height * 0.75));
+                const sCtx = smallCanvas.getContext("2d");
+                if (sCtx) {
+                  sCtx.drawImage(canvas, 0, 0, smallCanvas.width, smallCanvas.height);
+                  dataUrl = smallCanvas.toDataURL("image/jpeg", 0.5);
+                }
+              }
+              resolve(dataUrl);
+            } else {
+              resolve((event.target?.result as string) || '');
+            }
+          } catch (e) {
+            resolve((event.target?.result as string) || '');
+          }
+        };
+        img.onerror = () => resolve((event.target?.result as string) || '');
+        img.src = event.target?.result as string;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files: File[] = Array.from(e.target.files || []);
     if (
@@ -1861,36 +2482,18 @@ export default function Messages() {
     )
       return;
 
-    const newItems: { id: string; type: 'image' | 'video'; url: string; name?: string }[] = [];
+    const newItems: { id: string; type: 'image' | 'video'; url: string; name?: string; file?: File }[] = [];
 
     for (const file of files) {
       const isVideo = file.type.startsWith("video/");
-      if (isVideo) {
-        const dataUrl = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (ev) => resolve(ev.target?.result as string);
-          reader.onerror = () => resolve('');
-          reader.readAsDataURL(file);
-        });
-        if (dataUrl) {
-          newItems.push({
-            id: 'vid_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-            type: "video",
-            url: dataUrl,
-            name: file.name
-          });
-        }
-      } else {
-        const dataUrl = await processHighQualityChatImage(file);
-        if (dataUrl) {
-          newItems.push({
-            id: 'img_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-            type: "image",
-            url: dataUrl,
-            name: file.name
-          });
-        }
-      }
+      const previewUrl = URL.createObjectURL(file);
+      newItems.push({
+        id: (isVideo ? 'vid_' : 'img_') + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        type: isVideo ? "video" : "image",
+        url: previewUrl,
+        name: file.name,
+        file: file
+      });
     }
 
     setSelectedMediaItems((prev) => [...prev, ...newItems]);
@@ -2103,9 +2706,13 @@ export default function Messages() {
             // Check if synced
             const isSynced = newMsgs.some(nm =>
               nm.senderId === m.senderId &&
-              nm.type === m.type &&
-              nm.content === m.content &&
-              Math.abs((nm.createdAt?.toMillis?.() || Date.now()) - (m.createdAt?.toMillis?.() || Date.now())) < 20000
+              (nm.type === m.type || (nm.type === 'image' && m.type === 'image')) &&
+              (
+                nm.content === m.content ||
+                (m.mediaUrl && nm.mediaUrl && (nm.mediaUrl === m.mediaUrl || nm.mediaUrl.includes(m.mediaUrl.split('/').pop() || 'xyz'))) ||
+                (m.type === 'image' || m.type === 'video' || m.type === 'sticker')
+              ) &&
+              Math.abs((nm.createdAt?.toMillis?.() || Date.now()) - (m.createdAt?.toMillis?.() || Date.now())) < 30000
             );
             return !isSynced;
           });
@@ -2348,7 +2955,7 @@ export default function Messages() {
         tempId: tempId,
         senderId: currentUser.uid,
         type: single.type,
-        content: textToSend || (single.type === 'video' ? 'Sent a video' : 'Sent an image'),
+        content: textToSend || (single.type === 'video' ? 'Sent a video' : 'Sent a photo'),
         mediaUrl: single.url,
         createdAt: { toMillis: () => Date.now() },
         status: 'sent',
@@ -2410,31 +3017,78 @@ export default function Messages() {
     isSendingMsgRef.current = false;
 
     try {
-      if (mediaItemsToSend.length === 1) {
-        const single = mediaItemsToSend[0];
-        await sendMessage(
-          activeChat,
-          currentUser.uid,
-          single.type,
-          textToSend || (single.type === "video" ? "Sent a video" : "Sent an image"),
-          single.url,
-          undefined,
-          replyData
+      if (mediaItemsToSend.length > 0) {
+        // Parallel media resolution with timeout and lightweight base64 fallback
+        const resolvedItems = await Promise.all(
+          mediaItemsToSend.map(async (item) => {
+            let targetUrl = item.url;
+            if (item.file) {
+              try {
+                const { uploadMedia } = await import("../services/githubStorage");
+                const uploadPromise = uploadMedia(item.file, "chat_media");
+                const timeoutPromise = new Promise<string>((_, reject) =>
+                  setTimeout(() => reject(new Error("upload_timeout")), 6000)
+                );
+                targetUrl = await Promise.race([uploadPromise, timeoutPromise]);
+              } catch (upErr) {
+                console.warn("Direct upload error or timeout, compressing to lightweight base64:", upErr);
+                if (item.type === "image") {
+                  targetUrl = await compressImageFileToSafeBase64(item.file);
+                }
+              }
+            } else if (targetUrl.startsWith("data:image/") && targetUrl.length > 60000) {
+              const { compressChatImageBase64 } = await import("../services/chatService");
+              targetUrl = await compressChatImageBase64(targetUrl);
+            }
+            return { type: item.type, url: targetUrl };
+          })
         );
-      } else if (mediaItemsToSend.length > 1) {
-        await sendMessage(
-          activeChat,
-          currentUser.uid,
-          'album',
-          textToSend || `Sent ${mediaItemsToSend.length} photos/videos`,
-          mediaItemsToSend[0].url,
-          undefined,
-          replyData,
-          {
-            mediaUrls: mediaItemsToSend.map(m => m.url),
-            mediaItems: mediaItemsToSend.map(m => ({ type: m.type, url: m.url }))
+
+        // Safe dispatch: if any URL is base64 data, send individually so Firestore 1MB doc limit is NEVER exceeded
+        const hasBase64 = resolvedItems.some((it) => it.url.startsWith("data:"));
+
+        if (resolvedItems.length === 1) {
+          const single = resolvedItems[0];
+          await sendMessage(
+            activeChat,
+            currentUser.uid,
+            single.type,
+            textToSend || (single.type === "video" ? "Sent a video" : "Sent a photo"),
+            single.url,
+            undefined,
+            replyData
+          );
+        } else if (!hasBase64) {
+          // All are remote CDN URLs (tiny strings) -> safe for album
+          await sendMessage(
+            activeChat,
+            currentUser.uid,
+            'album',
+            textToSend || `Sent ${resolvedItems.length} photos/videos`,
+            resolvedItems[0].url,
+            undefined,
+            replyData,
+            {
+              mediaUrls: resolvedItems.map((m) => m.url),
+              mediaItems: resolvedItems,
+            }
+          );
+        } else {
+          // Send sequentially so each photo gets stored cleanly without hitting size limit
+          let isFirst = true;
+          for (const item of resolvedItems) {
+            await sendMessage(
+              activeChat,
+              currentUser.uid,
+              item.type,
+              isFirst ? (textToSend || (item.type === "video" ? "Sent a video" : "Sent a photo")) : (item.type === "video" ? "Sent a video" : "Sent a photo"),
+              item.url,
+              undefined,
+              isFirst ? replyData : undefined
+            );
+            isFirst = false;
           }
-        );
+        }
       } else {
         await sendMessage(
           activeChat,
@@ -2453,9 +3107,10 @@ export default function Messages() {
     }
   };
 
-  const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTyping = (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
     const val = e.target.value;
     setInputText(val);
+
     if (
       activeChat &&
       activeChat !== "followers" &&
@@ -2497,26 +3152,116 @@ export default function Messages() {
   };
 
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
-
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const longPressedRef = useRef(false);
+
+  const handlePrintChat = (convId: string, otherUid?: string) => {
+    setChatContextMenu(null);
+    const conv = conversations.find((c) => c.id === convId);
+    const otherName = conv?.participantNames?.[otherUid || ""] || (conv as any)?.groupName || "Chat";
+    const chatMsgs = (convId && messagesCache[convId]) || [];
+
+    try {
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        const msgsHtml = chatMsgs
+          .map((m: any) => {
+            const isMe = m.senderId === currentUser?.uid;
+            const sName = isMe ? (currentUser?.name || "You") : otherName;
+            const time = m.createdAt
+              ? new Date(
+                  m.createdAt.seconds ? m.createdAt.seconds * 1000 : (m.createdAt || Date.now())
+                ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              : "";
+            return `
+              <div style="margin-bottom: 10px; padding: 8px 12px; border-radius: 12px; background: ${isMe ? "#ede9fe" : "#f4f4f5"}; max-width: 80%; margin-${isMe ? "left" : "right"}: auto; font-family: sans-serif;">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #71717a; margin-bottom: 4px;">
+                  <strong>${sName}</strong>
+                  <span>${time}</span>
+                </div>
+                <div style="font-size: 14px; color: #18181b; word-break: break-word;">
+                  ${m.content || (m.type === "reel" ? "🎬 [Reel Shared]" : m.type === "image" ? "📷 [Photo]" : "📎 [Attachment]")}
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Print Chat - ${otherName}</title>
+              <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; max-width: 680px; margin: 0 auto; color: #18181b; }
+                h1 { font-size: 18px; margin-bottom: 4px; }
+                p.sub { font-size: 12px; color: #71717a; margin-bottom: 20px; border-bottom: 1px solid #e4e4e7; padding-bottom: 12px; }
+              </style>
+            </head>
+            <body>
+              <h1>Chat with ${otherName}</h1>
+              <p class="sub">Exported from Ennvo • ${new Date().toLocaleDateString()}</p>
+              ${msgsHtml || '<p style="color: #a1a1aa; text-align: center; margin-top: 40px;">No messages in this chat yet</p>'}
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 300);
+      } else {
+        window.print();
+      }
+    } catch (_) {
+      window.print();
+    }
+  };
 
   const handleChatTouchStart = (
     e: React.TouchEvent | React.MouseEvent,
     convId: string,
     otherUid?: string,
   ) => {
+    if ("button" in e && e.button !== 0) return;
     longPressedRef.current = false;
-    const x = "touches" in e ? e.touches[0].clientX : e.clientX;
-    const y = "touches" in e ? e.touches[0].clientY : e.clientY;
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    touchStartPosRef.current = { x: clientX, y: clientY };
+
+    if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
     touchTimerRef.current = setTimeout(() => {
       longPressedRef.current = true;
-      setChatContextMenu({ x, y, convId, otherUid });
-    }, 500); // 500ms long press
+      if (typeof window !== "undefined" && window.navigator?.vibrate) {
+        try { window.navigator.vibrate(28); } catch (_) {}
+      }
+      setChatContextMenu({ x: clientX, y: clientY, convId, otherUid });
+    }, 320);
+  };
+
+  const handleChatTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
+    if (!touchStartPosRef.current) return;
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    const dx = Math.abs(clientX - touchStartPosRef.current.x);
+    const dy = Math.abs(clientY - touchStartPosRef.current.y);
+    if (dx > 12 || dy > 12) {
+      if (touchTimerRef.current) {
+        clearTimeout(touchTimerRef.current);
+        touchTimerRef.current = null;
+      }
+    }
   };
 
   const handleChatTouchEnd = () => {
     if (touchTimerRef.current) {
       clearTimeout(touchTimerRef.current);
+      touchTimerRef.current = null;
+    }
+    if (longPressedRef.current) {
+      setTimeout(() => {
+        longPressedRef.current = false;
+      }, 250);
     }
   };
 
@@ -2632,7 +3377,7 @@ export default function Messages() {
   }, [conversations, currentUser?.uid, jarvisTimeMs, jarvisLastMsg?.content, latestPendingRequestTime, pendingRequestsCount]);
 
   const filteredConversations = React.useMemo(() => {
-    return allUnifiedConversations.filter((conv: any) => {
+    const list = allUnifiedConversations.filter((conv: any) => {
       if (!searchQuery.trim()) return true;
       if (conv.id === "jarvis") {
         return "ennvo jarvis".includes(searchQuery.toLowerCase());
@@ -2647,7 +3392,15 @@ export default function Messages() {
         "User";
       return name.toLowerCase().includes(searchQuery.toLowerCase());
     });
-  }, [allUnifiedConversations, searchQuery, currentUser?.uid, userDataCache]);
+
+    return list.sort((a: any, b: any) => {
+      const aPinned = pinnedChatIds.includes(a.id);
+      const bPinned = pinnedChatIds.includes(b.id);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return 0;
+    });
+  }, [allUnifiedConversations, searchQuery, currentUser?.uid, userDataCache, pinnedChatIds]);
 
   const activeConversation = conversations.find((c) => c.id === activeChat);
   const otherParticipantId = activeConversation?.participantIds?.find(
@@ -2708,9 +3461,17 @@ export default function Messages() {
       }
     : null;
 
-  const activeConvTheme = (activeConversation as any)?.theme || 
+  const themeOverride = activeChat ? conversationThemeOverrides[activeChat] : undefined;
+  const activeConvTheme = themeOverride?.theme || 
+    (activeConversation as any)?.theme || 
     (activeChat === "jarvis" ? (localStorage.getItem("jarvis_chat_theme") || chatTheme) : chatTheme) || 
     "/chat-background.png";
+  const activeConvThemeBlur = themeOverride?.blur !== undefined
+    ? Boolean(themeOverride.blur)
+    : Boolean((activeConversation as any)?.themeBlur);
+  const activeConvThemeBrightness = typeof themeOverride?.brightness === 'number'
+    ? themeOverride.brightness
+    : (typeof (activeConversation as any)?.themeBrightness === 'number' ? (activeConversation as any).themeBrightness : 1);
 
   const scrollToBottom = (force = false) => {
     if (messagesContainerRef.current && (shouldAutoScrollRef.current || force)) {
@@ -2859,8 +3620,8 @@ export default function Messages() {
 
         if (msg.type === "system") {
           return (
-            <div key={messageKey} className="my-2.5 flex items-center justify-center">
-              <div className="px-3.5 py-1 bg-black/40 backdrop-blur-md text-white/95 text-[11.5px] font-medium rounded-full border border-white/10 shadow-xs tracking-tight text-center max-w-[85%] animate-in fade-in zoom-in-95">
+            <div key={messageKey} className="my-2 flex items-center justify-center select-none">
+              <div className="px-3.5 py-1 bg-neutral-100 text-neutral-600 text-[11.5px] font-medium rounded-full border border-neutral-200/80 tracking-tight text-center max-w-[85%]">
                 {msg.content}
               </div>
             </div>
@@ -2899,6 +3660,10 @@ export default function Messages() {
             setViewingReelContext={setViewingReelContext}
             setViewingMedia={setViewingMedia}
             handleStartCall={handleStartCall}
+            onViewSticker={(url, type) => {
+              setViewingStickerUrl(url);
+              setViewingStickerType(type || 'image');
+            }}
           />
         );
       }),
@@ -2907,78 +3672,107 @@ export default function Messages() {
 
   return (
     <div
-      className="h-full w-full flex bg-white overflow-hidden relative md:pl-[88px] lg:pl-[96px]"
+      className="h-full w-full flex bg-white dark:bg-black overflow-hidden relative select-none [webkit-font-smoothing:antialiased] [text-rendering:optimizeLegibility]"
       onClick={closeContextMenu}
     >
-      {/* Left Sidebar (Contacts) */}
+      {/* Unified subtle lag-free ambient soft blue glow fixed at top matching feed */}
+      <div 
+        className="pointer-events-none fixed top-0 left-0 right-0 h-[260px] sm:h-[300px] bg-gradient-to-b from-sky-400/[0.14] via-blue-500/[0.05] to-transparent dark:from-blue-600/[0.20] dark:via-blue-800/[0.05] dark:to-transparent z-0" 
+        aria-hidden="true" 
+      />
+
+      {/* Left Sidebar (Contacts & Stories) - Pure High-White Glass & Solid OLED Dark Mode Seamlessly under PC Dock */}
       <div
-        className={`w-full md:w-[350px] flex-shrink-0 border-r border-gray-100 flex-col h-full bg-white z-10 ${activeChat ? "hidden md:flex" : "flex"}`}
+        className={`w-full md:w-[380px] lg:w-[410px] md:pl-[84px] lg:pl-[92px] flex-shrink-0 border-r border-neutral-200/40 dark:border-white/10 flex-col h-full bg-transparent md:bg-white/70 dark:md:bg-black/40 md:backdrop-blur-xl z-10 transition-colors ${activeChat ? "hidden md:flex" : "flex"}`}
       >
-        {/* Header - Pure 2D Bar with Glass Buttons */}
-        <div className="px-4 pt-[calc(env(safe-area-inset-top,0px)+22px)] pb-2.5 flex items-center justify-between sticky top-0 bg-white border-b border-gray-100 z-20 w-full min-h-[80px] md:min-h-[72px] transition-all">
+        {/* Top Controls Area (NO Boxed Header - completely transparent so blur & background flows seamlessly to the top) */}
+        <div className="px-3 sm:px-4 pt-[max(calc(env(safe-area-inset-top,0px)+8px),12px)] pb-2 flex items-center justify-between sticky top-0 bg-transparent border-0 z-20 w-full min-h-[52px] transition-all select-none">
           {isSearchExpanded ? (
-            <div className="relative flex items-center flex-1 animate-in fade-in slide-in-from-right-2">
-              <Search
-                className="w-4 h-4 absolute left-3.5 text-gray-400 pointer-events-none"
-                strokeWidth={2.2}
-              />
-              <input
-                type="text"
-                placeholder="Search friends..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white/80 backdrop-blur-lg rounded-full pl-10 pr-9 py-2 text-[14.5px] focus:outline-none focus:ring-2 focus:ring-purple-200/80 border border-gray-200/80 shadow-2xs transition-all font-normal text-gray-900 placeholder:text-gray-400"
-                autoFocus
-              />
+            <div className="relative flex items-center flex-1 space-x-2 animate-in fade-in duration-150">
+              <div className="relative flex-1 flex items-center">
+                <Search
+                  className="w-4 h-4 absolute left-3.5 text-neutral-400 dark:text-neutral-500 pointer-events-none"
+                  strokeWidth={2.2}
+                />
+                <input
+                  type="text"
+                  placeholder="Search chats, people..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white/80 hover:bg-white dark:bg-white/10 dark:hover:bg-white/15 dark:border dark:border-white/10 rounded-full pl-9.5 pr-8 py-2 text-[13.5px] font-medium text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none transition-all shadow-none"
+                  autoFocus
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 p-1 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 active:scale-90 transition-transform cursor-pointer border-0 bg-transparent"
+                  >
+                    <X className="w-4 h-4" strokeWidth={2.2} />
+                  </button>
+                )}
+              </div>
               <button
+                type="button"
                 onClick={() => {
                   setIsSearchExpanded(false);
                   setSearchQuery("");
                 }}
-                className="absolute right-3 p-1 text-gray-400 hover:text-gray-700 active:scale-90 transition-transform cursor-pointer"
+                className="px-3 py-1.5 text-[13px] font-semibold text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white active:scale-95 transition-all cursor-pointer border-0 bg-transparent shrink-0"
               >
-                <X className="w-4 h-4" strokeWidth={2.5} />
+                Cancel
               </button>
             </div>
           ) : (
             <>
+              {/* Left Button: Group Icon Button (Styled like feed search button) */}
               <button
-                className="p-2 text-gray-700 hover:text-gray-900 active:scale-95 transition-all cursor-pointer rounded-full"
+                type="button"
                 onClick={() => setShowCreateGroup(true)}
+                className="w-10 h-10 rounded-full bg-white/70 dark:bg-white/10 hover:bg-neutral-100 dark:hover:bg-white/15 active:scale-90 transition-all flex items-center justify-center text-neutral-800 dark:text-neutral-100 cursor-pointer border border-black/5 dark:border-white/10 shadow-xs touch-manipulation shrink-0"
                 title="New Group"
               >
-                <UserPlus
-                  className="w-5.5 h-5.5"
-                  strokeWidth={2}
-                />
+                <Users className="w-5 h-5 text-neutral-800 dark:text-neutral-100" strokeWidth={2.1} />
               </button>
-              <div
-                className="flex items-center space-x-1.5 cursor-pointer relative select-none active:scale-95 transition-transform px-3 py-1 rounded-full"
-                onClick={() => setShowPrivacySheet(true)}
-              >
-                <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? "bg-emerald-500" : "bg-gray-400"}`} />
-                <h1 className="text-[17px] font-bold text-gray-900 tracking-tight">
-                  {isOnline ? "Online" : "Offline"}
-                </h1>
-                <ChevronDown
-                  className="w-4 h-4 text-gray-700 mt-[1px]"
-                  strokeWidth={2.4}
-                />
-                {privacyMode === "private" && (
-                  <div className="ml-1">
-                    <EyeOff className="w-3.5 h-3.5 text-purple-600" strokeWidth={2.5} />
-                  </div>
-                )}
-              </div>
+
+              {/* Center: Chats text with down arrow -> opens online/offline/privacy menu on click */}
               <button
-                className="p-2 text-gray-700 hover:text-gray-900 active:scale-95 transition-all cursor-pointer rounded-full"
-                onClick={() => setIsSearchExpanded(true)}
-                title="Search"
+                type="button"
+                onClick={() => setShowPrivacySheet(true)}
+                className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full hover:bg-white/60 dark:hover:bg-white/10 active:scale-95 transition-all cursor-pointer border-0 bg-transparent shadow-none touch-manipulation group"
+                title="Chats, Online Status & Privacy"
               >
-                <Search
-                  className="w-5.5 h-5.5"
-                  strokeWidth={2}
-                />
+                <h1 className="text-[20px] font-extrabold tracking-[-0.4px] text-neutral-950 dark:text-white leading-none">
+                  Chats
+                </h1>
+                <ChevronDown className="w-4 h-4 text-neutral-500 dark:text-neutral-400 shrink-0 transition-transform group-hover:translate-y-0.5" strokeWidth={2.4} />
+                {isOnline && (
+                  <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0 ml-0.5" />
+                )}
+                {(() => {
+                  const unreadCount = conversations.reduce((acc, c) => {
+                    if (currentUser && c.unreadCount && c.unreadCount[currentUser.uid] > 0) {
+                      return acc + 1;
+                    }
+                    return acc;
+                  }, 0);
+                  if (unreadCount === 0) return null;
+                  return (
+                    <span className="px-1.5 py-0.5 text-[10.5px] font-black bg-[#FE2C55] text-white rounded-full leading-none shadow-none ml-1">
+                      {unreadCount}
+                    </span>
+                  );
+                })()}
+              </button>
+
+              {/* Right Button: Search Icon Button (Styled like feed search button) */}
+              <button
+                type="button"
+                onClick={() => setIsSearchExpanded(true)}
+                className="w-10 h-10 rounded-full bg-white/70 dark:bg-white/10 hover:bg-neutral-100 dark:hover:bg-white/15 active:scale-90 transition-all flex items-center justify-center text-neutral-800 dark:text-neutral-100 cursor-pointer border border-black/5 dark:border-white/10 shadow-xs touch-manipulation shrink-0"
+                title="Search chats"
+              >
+                <Search className="w-4.5 h-4.5 text-neutral-800 dark:text-neutral-100" strokeWidth={2.2} />
               </button>
             </>
           )}
@@ -2987,48 +3781,73 @@ export default function Messages() {
         {/* Scrollable Area (Stories + Contacts) */}
         <PullToRefresh onRefresh={async () => { await new Promise(r => setTimeout(r, 450)); }} className="flex-1 overflow-y-auto scrollbar-hide pb-[80px] [webkit-font-smoothing:antialiased]">
           <div className="w-full">
-          {/* Prominent Unique Circular Dual-Ring Stories Section */}
+          {/* Prominent Stories Section - Clean 2D with dedicated headroom so note bubble never touches or hides in header */}
           {!searchQuery.trim() && (
-            <div className="w-full py-2 my-0 overflow-x-auto scrollbar-hide px-3 bg-white">
-              <div className="flex space-x-3.5 min-w-max items-center">
-                <div className="flex flex-col items-center flex-shrink-0 cursor-pointer pt-3 pb-0.5 relative">
+            <div className="w-full pt-5 pb-2 my-0 overflow-x-auto scrollbar-hide px-3.5 bg-transparent">
+              <div className="flex space-x-3 min-w-max items-center">
+                
+                {/* Current User Story + Thought Cloud What's up Note (Clear headroom below header) */}
+                <div className="flex flex-col items-center flex-shrink-0 cursor-pointer pt-2 pb-0.5 relative">
                   <div className="relative">
-                    {/* Always Pure Glass Note Bubble overlapping avatar top */}
+                    {/* Pure Translucent Glass "What's up?" Thought Cloud Bubble - Wraps to nice lines nicely */}
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
-                        setShowStatusInput(true);
+                        if ((currentUser as any)?.statusNote) {
+                          setViewingNoteUser({
+                            id: currentUser.uid,
+                            name: currentUser.name || "Me",
+                            avatar: currentUser.avatar || "",
+                            statusNote: (currentUser as any).statusNote,
+                            timestamp: Date.now(),
+                          });
+                        } else {
+                          setStatusNoteMode("create");
+                          setStatusNoteText("");
+                          setShowStatusInput(true);
+                        }
                       }}
-                      className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-white/80 border border-white/90 shadow-2xs rounded-full z-20 w-auto max-w-[104px] cursor-pointer hover:bg-white/95 transition-all active:scale-95 flex items-center justify-center backdrop-blur-xl"
+                      className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-white/85 dark:bg-neutral-900/85 backdrop-blur-md border border-white/70 dark:border-white/20 shadow-sm rounded-[18px] z-30 w-auto min-w-[82px] max-w-[136px] cursor-pointer hover:scale-105 active:scale-95 transition-all flex items-center justify-center select-none text-center"
+                      title={(currentUser as any)?.statusNote ? "View your note" : "Share a note"}
                     >
-                      <span className="text-[10.5px] font-bold text-purple-700 leading-tight block text-center truncate max-w-[88px]">
-                        {(currentUser as any)?.statusNote || "What's up?"}
+                      <span className="text-[11px] font-bold text-neutral-900 dark:text-white leading-tight line-clamp-2 break-words text-center">
+                        {(currentUser as any)?.statusNote ? (
+                          (currentUser as any).statusNote
+                        ) : (
+                          <span className="text-neutral-500 dark:text-neutral-400 font-medium">What's up?</span>
+                        )}
                       </span>
-                      <div className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/80 border-b border-r border-white/90 rotate-45"></div>
+                      {/* Thought Bubble Trailing Glass Dots */}
+                      <div className="absolute -bottom-1 left-5 w-2 h-2 rounded-full bg-white/85 dark:bg-neutral-900/85 backdrop-blur-xs border border-white/60 dark:border-white/20 pointer-events-none"></div>
+                      <div className="absolute -bottom-2 left-3.5 w-1 h-1 rounded-full bg-white/85 dark:bg-neutral-900/85 backdrop-blur-xs border border-white/60 dark:border-white/20 pointer-events-none"></div>
                     </div>
+
+                    {/* Colorful Circle Around Create PFP - Prominent & Enlarged */}
                     <div
                       onClick={() => {
-                        const { setSelectedCreateMode } = useAppStore.getState();
+                        const { setSelectedCreateMode, setShowReelCamera } = useAppStore.getState();
                         setSelectedCreateMode('story');
-                        pushPage('create');
+                        setShowReelCamera(true);
                       }}
-                      className="cursor-pointer transition-transform active:scale-95 relative"
+                      className="cursor-pointer transition-transform active:scale-95 relative p-[3px] rounded-full bg-gradient-to-tr from-violet-600 via-pink-500 to-amber-400"
                     >
-                      <img
-                        src={
-                          currentUser?.avatar ||
-                          `https://ui-avatars.com/api/?name=${currentUser?.name || "Me"}&background=random`
-                        }
-                        className="w-[72px] h-[72px] rounded-full object-cover"
-                        alt="Me"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute bottom-0 right-0 w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center text-white">
-                        <Plus className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+                      <div className="p-[2.5px] bg-white dark:bg-neutral-950 rounded-full">
+                        <img
+                          src={
+                            currentUser?.avatar ||
+                            `https://ui-avatars.com/api/?name=${currentUser?.name || "Me"}&background=random`
+                          }
+                          className="w-[90px] h-[90px] rounded-full object-cover"
+                          alt="Me"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      <div className="absolute bottom-0 right-0 w-7.5 h-7.5 bg-gradient-to-tr from-purple-600 via-rose-500 to-pink-500 rounded-full flex items-center justify-center text-white border-2 border-white dark:border-neutral-950 shadow-sm">
+                        <Plus className="w-4 h-4 text-white" strokeWidth={3} />
                       </div>
                     </div>
                   </div>
-                  <span className="text-[12px] font-semibold text-gray-900 mt-1 tracking-tight">
+                  <span className="text-[12.5px] font-bold text-neutral-800 dark:text-neutral-200 mt-2 tracking-tight">
                     Create
                   </span>
                 </div>
@@ -3102,68 +3921,82 @@ export default function Messages() {
                     return (
                       <div
                         key={authorId}
-                        className="flex flex-col items-center flex-shrink-0 cursor-pointer pt-3 pb-0.5 relative"
+                        className="flex flex-col items-center flex-shrink-0 cursor-pointer pt-2 pb-0.5 relative touch-manipulation select-none"
                         onClick={() => {
-                          if (hasStory) {
+                          if (hasStory && firstStory) {
                             setViewingStory(firstStory);
                             const newViewed = {
                               ...viewedInboxStories,
                               [authorId as string]: true,
                             };
                             setViewedInboxStories(newViewed);
-                            localStorage.setItem(
-                              "viewedInboxStories",
-                              JSON.stringify(newViewed),
-                            );
+                            try {
+                              localStorage.setItem(
+                                "viewedInboxStories",
+                                JSON.stringify(newViewed),
+                              );
+                            } catch (e) {}
+                          } else if (authorInfo.statusNote) {
+                            setViewingNoteUser({
+                              id: authorId,
+                              name: authorInfo.name,
+                              avatar: authorInfo.avatar,
+                              statusNote: authorInfo.statusNote,
+                              timestamp: Date.now() - 3600000,
+                            });
                           } else {
-                            // Find conversation and open chat
-                            const conv = conversations.find(
-                              (c) =>
-                                c.participantIds?.includes(
-                                  authorId as string,
-                                ) && c.participantIds?.length === 2,
-                            );
-                            if (conv) {
-                              setActiveChat(conv.id);
-                            } else if (currentUser) {
-                              import("../services/chatService").then(async ({ createConversation }) => {
-                                const newConvId = await createConversation(
-                                  [currentUser.uid, authorId],
-                                  {
-                                    [currentUser.uid]: {
-                                      name: currentUser.name || "User",
-                                      avatar: currentUser.avatar || "",
-                                    },
-                                    [authorId]: {
-                                      name: authorInfo.name || "User",
-                                      avatar: authorInfo.avatar || "",
-                                    },
-                                  },
-                                );
-                                setActiveChat(newConvId);
-                              }).catch(err => console.error(err));
-                            }
+                            setViewingUser({
+                              uid: authorId,
+                              name: authorInfo.name,
+                              avatar: authorInfo.avatar,
+                            });
+                            pushPage("profile");
                           }
                         }}
                       >
                         <div className="relative">
-                          {/* Follower Pure Glass Note Bubble overlapping top */}
+                          {/* Pure Translucent Glass Thought Bubble for other contacts */}
                           {authorInfo.statusNote && (
-                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-white/80 border border-white/90 shadow-2xs rounded-full z-20 w-auto max-w-[104px] backdrop-blur-xl">
-                              <span className="text-[10.5px] font-bold text-gray-800 leading-tight block text-center truncate max-w-[88px]">
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setViewingNoteUser({
+                                  id: authorId,
+                                  name: authorInfo.name,
+                                  avatar: authorInfo.avatar,
+                                  statusNote: authorInfo.statusNote,
+                                  timestamp: Date.now() - 3600000,
+                                });
+                              }}
+                              className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-white/85 dark:bg-neutral-900/85 backdrop-blur-md border border-white/70 dark:border-white/20 shadow-sm rounded-[18px] z-30 w-auto min-w-[82px] max-w-[136px] select-none cursor-pointer hover:scale-105 active:scale-95 transition-all flex items-center justify-center text-center group"
+                              title={`View ${authorInfo.name}'s note`}
+                            >
+                              <span className="text-[11px] font-bold text-neutral-900 dark:text-white leading-tight line-clamp-2 break-words text-center">
                                 {authorInfo.statusNote}
                               </span>
-                              <div className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/80 border-b border-r border-white/90 rotate-45"></div>
+                              {/* Thought Bubble Dots */}
+                              <div className="absolute -bottom-1 left-4 w-2 h-2 rounded-full bg-white/85 dark:bg-neutral-900/85 backdrop-blur-xs border border-white/60 dark:border-white/20 pointer-events-none"></div>
+                              <div className="absolute -bottom-2 left-2.5 w-1 h-1 rounded-full bg-white/85 dark:bg-neutral-900/85 backdrop-blur-xs border border-white/60 dark:border-white/20 pointer-events-none"></div>
                             </div>
                           )}
-                          <img
-                            src={authorInfo.avatar}
-                            alt={authorInfo.name}
-                            className="w-[72px] h-[72px] rounded-full object-cover"
-                            referrerPolicy="no-referrer"
-                          />
+                          <div className={`w-[94px] h-[94px] rounded-full transition-transform active:scale-95 flex items-center justify-center shrink-0 ${
+                            hasStory
+                              ? isViewed
+                                ? "bg-neutral-300 dark:bg-neutral-700"
+                                : "bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600"
+                              : "bg-neutral-200/80 dark:bg-neutral-800"
+                          }`}>
+                            <div className="w-[88px] h-[88px] bg-white dark:bg-black rounded-full flex items-center justify-center shrink-0">
+                              <img
+                                src={authorInfo.avatar}
+                                alt={authorInfo.name}
+                                className="w-[82px] h-[82px] rounded-full object-cover aspect-square block shrink-0"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <span className="text-[12px] font-semibold text-gray-900 mt-1 truncate w-[72px] text-center tracking-tight">
+                        <span className="text-[12.5px] font-semibold text-neutral-800 dark:text-neutral-200 mt-1.5 truncate w-[94px] text-center tracking-tight">
                           {authorInfo.name.split(" ")[0]}
                         </span>
                       </div>
@@ -3230,7 +4063,7 @@ export default function Messages() {
                         }
                         setActiveChat("activity");
                       }}
-                      className="flex items-center justify-between px-3 py-2 my-[1px] rounded-[20px] cursor-pointer hover:bg-gray-100/70 active:bg-gray-200/60 transition-colors group md:hidden"
+                      className="flex items-center justify-between px-3 py-2 my-[1px] rounded-[20px] cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.07] active:bg-black/[0.07] dark:active:bg-white/[0.12] transition-colors group md:hidden touch-manipulation select-none"
                     >
                       <div className="flex items-center space-x-3.5 min-w-0 flex-1">
                         <div className="relative flex-shrink-0">
@@ -3239,10 +4072,10 @@ export default function Messages() {
                           </div>
                         </div>
                         <div className="flex flex-col min-w-0 pr-2 space-y-0.5 flex-1">
-                          <h3 className="text-[14.5px] font-bold truncate tracking-tight leading-tight text-gray-900 group-hover:text-rose-500 transition-colors">
+                          <h3 className={`text-[14.5px] ${actUnread > 0 ? "font-semibold text-neutral-900 dark:text-white" : "font-normal text-neutral-700 dark:text-neutral-300"} truncate tracking-tight leading-tight group-hover:text-rose-500 transition-colors`}>
                             Activity
                           </h3>
-                          <p className={`truncate max-w-[190px] md:max-w-[240px] text-[11.5px] ${actUnread > 0 ? "font-bold text-gray-900" : "font-normal text-gray-500"}`}>
+                          <p className={`truncate max-w-[190px] md:max-w-[240px] text-[11.5px] ${actUnread > 0 ? "font-medium text-neutral-900 dark:text-white" : "font-normal text-neutral-500 dark:text-neutral-400"}`}>
                             {latestText}
                           </p>
                         </div>
@@ -3254,7 +4087,7 @@ export default function Messages() {
                             {actUnread > 5 ? "5+" : actUnread}
                           </div>
                         ) : (
-                          <span className="text-[13px] font-medium text-gray-400">
+                          <span className="text-[13px] font-medium text-neutral-400 dark:text-neutral-500">
                             {notifications.length > 0 ? notifications.length : ""}
                           </span>
                         )}
@@ -3268,7 +4101,7 @@ export default function Messages() {
             {conversations.length === 0 ? (
               <FacebookMessageListSkeleton count={7} />
             ) : filteredConversations.length === 0 && searchQuery.trim() ? (
-              <div className="text-center py-12 text-gray-400 text-sm">
+              <div className="text-center py-12 text-neutral-400 dark:text-neutral-500 text-sm">
                 No chats found for "{searchQuery}"
               </div>
             ) : (
@@ -3297,7 +4130,7 @@ export default function Messages() {
                       onClick={() => {
                         setActiveChat("requests");
                       }}
-                      className="flex items-center justify-between px-3.5 py-2.5 my-0.5 rounded-2xl cursor-pointer hover:bg-gray-100/70 active:bg-gray-200/60 transition-colors group"
+                      className="flex items-center justify-between px-3.5 py-2.5 my-0.5 rounded-2xl cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.07] active:bg-black/[0.07] dark:active:bg-white/[0.12] transition-colors group touch-manipulation select-none"
                     >
                       <div className="flex items-center space-x-3 min-w-0 flex-1">
                         <div className="relative flex-shrink-0">
@@ -3306,19 +4139,19 @@ export default function Messages() {
                           </div>
                         </div>
                         <div className="flex flex-col min-w-0 pr-2 space-y-0.5 flex-1">
-                          <h3 className="text-[15.5px] font-bold truncate tracking-tight leading-tight text-gray-900">
+                          <h3 className="text-[15.5px] font-bold truncate tracking-tight leading-tight text-neutral-900 dark:text-white">
                             Message Requests
                           </h3>
                           <div className="flex items-center text-[13px] leading-tight">
-                            <p className={`truncate max-w-[170px] md:max-w-[220px] text-[13px] ${pendingRequestsCount > 0 ? "font-bold text-purple-600" : "font-normal text-gray-500"}`}>
+                            <p className={`truncate max-w-[170px] md:max-w-[220px] text-[13px] ${pendingRequestsCount > 0 ? "font-bold text-purple-600 dark:text-purple-400" : "font-normal text-neutral-500 dark:text-neutral-400"}`}>
                               {pendingRequestsCount > 0
                                 ? `${pendingRequestsCount} new message request${pendingRequestsCount > 1 ? 's' : ''}`
                                 : "0 pending requests"}
                             </p>
                             {reqTimeStr && (
                               <>
-                                <span className="mx-1 text-[11.5px] text-gray-400 font-normal">·</span>
-                                <span className="whitespace-nowrap text-[11.5px] font-normal text-gray-400">
+                                <span className="mx-1 text-[11.5px] text-neutral-400 dark:text-neutral-500 font-normal">·</span>
+                                <span className="whitespace-nowrap text-[11.5px] font-normal text-neutral-400 dark:text-neutral-500">
                                   {reqTimeStr}
                                 </span>
                               </>
@@ -3428,8 +4261,10 @@ export default function Messages() {
                   Date.now() - lastMsgDate.getTime() > 5 * 24 * 60 * 60 * 1000
                 );
 
-                const hasStory =
-                  otherId && otherId !== "jarvis" && inboxStories.some((s) => s.authorId === otherId);
+                const otherStory =
+                  otherId && otherId !== "jarvis" ? inboxStories.find((s) => s.authorId === otherId) : null;
+                const hasStory = !!otherStory;
+                const isStoryViewed = hasStory && otherId ? !!viewedInboxStories[otherId] : false;
 
                 const otherMembers = isGroup
                   ? conv.participantIds.filter((id) => id !== currentUser?.uid)
@@ -3465,18 +4300,18 @@ export default function Messages() {
                         )
                       }
                       onTouchEnd={handleChatTouchEnd}
-                      onTouchMove={handleChatTouchEnd}
-                      onMouseDown={(e) =>
-                        !isJarvis &&
-                        handleChatTouchStart(
-                          e,
-                          conv.id,
-                          !isGroup ? otherId : undefined,
-                        )
-                      }
+                      onTouchMove={handleChatTouchMove}
+                      onMouseDown={(e) => {
+                        if (e.button === 0 && !isJarvis) {
+                          handleChatTouchStart(
+                            e,
+                            conv.id,
+                            !isGroup ? otherId : undefined,
+                          );
+                        }
+                      }}
                       onMouseUp={handleChatTouchEnd}
-                      onMouseMove={handleChatTouchEnd}
-                      className="flex items-center justify-between px-3 py-1.5 my-[1px] rounded-[18px] cursor-pointer hover:bg-gray-100/70 active:bg-gray-200/60 transition-colors group"
+                      className="flex items-center justify-between px-3 py-2 my-[1px] rounded-[18px] cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.07] active:bg-black/[0.07] dark:active:bg-white/[0.12] active:scale-[0.985] transition-all duration-75 group touch-manipulation select-none will-change-transform"
                     >
                       <div className="flex items-center space-x-3 min-w-0 flex-1">
                         <div
@@ -3485,6 +4320,13 @@ export default function Messages() {
                             e.stopPropagation();
                             if (isJarvis) {
                               setActiveChat("jarvis");
+                            } else if (hasStory && otherStory) {
+                              setViewingStory(otherStory);
+                              const newViewed = { ...viewedInboxStories, [otherId as string]: true };
+                              setViewedInboxStories(newViewed);
+                              try {
+                                localStorage.setItem("viewedInboxStories", JSON.stringify(newViewed));
+                              } catch (err) {}
                             } else if (isGroup) {
                               setActiveChat(conv.id);
                               setShowChatSettings(true);
@@ -3512,50 +4354,74 @@ export default function Messages() {
                                 sizeClass="w-[50px] h-[50px]"
                               />
                             </div>
-                          ) : (
-                            <div className="relative shrink-0 w-[50px] h-[50px]">
-                              <img
-                                src={avatar as string}
-                                alt={name}
-                                loading="lazy"
-                                className="w-[50px] h-[50px] rounded-full object-cover"
-                                referrerPolicy="no-referrer"
-                              />
-                              {!isJarvis && otherId && (presenceData[otherId]?.isOnline || (presenceData[otherId] as any)?.state === "online") && (
-                                <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full" />
-                              )}
-                            </div>
-                          )}
+                          ) : (() => {
+                            const isOnline = !isJarvis && !!otherId && !!(presenceData[otherId]?.isOnline || (presenceData[otherId] as any)?.state === "online" || userDataCache[otherId]?.isOnline);
+                            return (
+                              <div className={`relative shrink-0 transition-transform active:scale-95 flex items-center justify-center ${
+                                hasStory 
+                                  ? `w-[56px] h-[56px] rounded-full ${
+                                      isStoryViewed 
+                                        ? 'bg-neutral-300 dark:bg-neutral-700' 
+                                        : 'bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600'
+                                    }`
+                                  : 'w-[48px] h-[48px]'
+                              }`}>
+                                <div className={hasStory ? "w-[50px] h-[50px] bg-white dark:bg-[#16181f] rounded-full flex items-center justify-center shrink-0" : "w-full h-full rounded-full flex items-center justify-center shrink-0"}>
+                                  <img
+                                    src={avatar as string}
+                                    alt={name}
+                                    loading="lazy"
+                                    className={hasStory ? "w-[44px] h-[44px] rounded-full object-cover aspect-square block shrink-0" : "w-[48px] h-[48px] rounded-full object-cover aspect-square block shrink-0"}
+                                    referrerPolicy="no-referrer"
+                                  />
+                                </div>
+                                {!isJarvis && otherId && isOnline && (
+                                  <div 
+                                    className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-[#16181f] bg-sky-500 shadow-xs z-10"
+                                    title="Online"
+                                  />
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className="flex flex-col min-w-0 pr-2 space-y-0.5 flex-1">
-                          <h3 className={`truncate tracking-tight leading-tight ${isUnread ? "font-black text-black text-[15.5px]" : "font-semibold text-gray-800 text-[15px]"}`}>
-                            {name}
-                          </h3>
+                          <div className="flex items-center space-x-1 min-w-0">
+                            <h3 className={`truncate tracking-tight leading-tight ${isUnread ? "font-semibold text-neutral-900 dark:text-white text-[13.5px] sm:text-[14px]" : "font-medium text-neutral-800 dark:text-neutral-200 text-[13px] sm:text-[13.5px]"}`}>
+                              {name}
+                            </h3>
+                            {pinnedChatIds.includes(conv.id) && (
+                              <Pin className="w-3.5 h-3.5 text-blue-500 fill-blue-500 shrink-0 rotate-45" />
+                            )}
+                            {mutedChatIds.includes(conv.id) && (
+                              <BellOff className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                            )}
+                          </div>
                         <div className="flex items-center text-[13px] leading-tight">
                           {isOlderThan5Days ? (
-                            <p className="truncate max-w-[170px] md:max-w-[220px] text-[13px] text-gray-400 font-normal">
+                            <p className="truncate max-w-[170px] md:max-w-[220px] text-[13px] text-neutral-400 dark:text-neutral-500 font-normal">
                               {timeStr}
                             </p>
                           ) : isUnread ? (
                             unreadMessages >= 2 ? (
                               <>
-                                <p className="truncate max-w-[150px] md:max-w-[200px] text-[13px] font-bold text-gray-900">
+                                <p className="truncate max-w-[150px] md:max-w-[200px] text-[12px] sm:text-[12.5px] font-medium text-neutral-900 dark:text-white">
                                   {unreadMessages > 5
                                     ? "5+ new messages"
                                     : `${unreadMessages} new messages`}
                                 </p>
-                                <span className="mx-1 text-[11.5px] text-gray-400 font-normal">·</span>
-                                <span className="whitespace-nowrap text-[11.5px] font-normal text-gray-400">
+                                <span className="mx-1 text-[11.5px] text-neutral-400 dark:text-neutral-500 font-normal">·</span>
+                                <span className="whitespace-nowrap text-[11.5px] font-normal text-neutral-400 dark:text-neutral-500">
                                   {timeStr}
                                 </span>
                               </>
                             ) : (
                               <>
-                                <p className="truncate max-w-[150px] md:max-w-[200px] text-[13px] font-bold text-gray-900">
+                                <p className="truncate max-w-[150px] md:max-w-[200px] text-[12px] sm:text-[12.5px] font-medium text-neutral-900 dark:text-white">
                                   {conv.lastMessage || "Sent a message"}
                                 </p>
-                                <span className="mx-1 text-[11.5px] text-gray-400 font-normal">·</span>
-                                <span className="whitespace-nowrap text-[11.5px] font-normal text-gray-400">
+                                <span className="mx-1 text-[11.5px] text-neutral-400 dark:text-neutral-500 font-normal">·</span>
+                                <span className="whitespace-nowrap text-[11.5px] font-normal text-neutral-400 dark:text-neutral-500">
                                   {timeStr}
                                 </span>
                               </>
@@ -3563,17 +4429,17 @@ export default function Messages() {
                           ) : (conv as any).lastSenderId === currentUser?.uid ? (() => {
                             const isSeenByOther = otherId && conv.unreadCount && conv.unreadCount[otherId] === 0;
                             return (
-                              <p className="truncate max-w-[170px] md:max-w-[220px] text-[13px] text-gray-400 font-normal">
+                              <p className="truncate max-w-[170px] md:max-w-[220px] text-[13px] text-neutral-400 dark:text-neutral-500 font-normal">
                                 {isSeenByOther ? `Seen · ${timeStr}` : `Sent ${timeStr}`}
                               </p>
                             );
                           })() : (
                             <>
-                              <p className="truncate max-w-[150px] md:max-w-[200px] text-[13px] text-gray-500 font-normal">
+                              <p className="truncate max-w-[150px] md:max-w-[200px] text-[13px] text-neutral-500 dark:text-neutral-400 font-normal">
                                 {conv.lastMessage || "Sent a message"}
                               </p>
-                              <span className="mx-1 text-[11.5px] text-gray-400 font-normal">·</span>
-                              <span className="whitespace-nowrap text-[11.5px] font-normal text-gray-400">
+                              <span className="mx-1 text-[11.5px] text-neutral-400 dark:text-neutral-500 font-normal">·</span>
+                              <span className="whitespace-nowrap text-[11.5px] font-normal text-neutral-400 dark:text-neutral-500">
                                 {timeStr}
                               </span>
                             </>
@@ -3603,93 +4469,103 @@ export default function Messages() {
       {/* Right Chat Area */}
       <AnimatePresence>
         {activeChat ? (
-          isSpecialChat ? (
+          (activeChat === "activity" || activeChat === "followers") ? (
+            <motion.div
+              key="activity-special"
+              initial={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
+              transition={isDesktop ? { duration: 0 } : { duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-full bg-[#f2f2f7] dark:bg-black will-change-transform select-none"
+            >
+              <Notifications onBack={() => setActiveChat(null)} isModal={true} />
+            </motion.div>
+          ) : isSpecialChat ? (
             <motion.div
               key="special"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-full bg-white will-change-opacity"
+              initial={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
+              transition={isDesktop ? { duration: 0 } : { duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
+              className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-full bg-white will-change-opacity select-none"
+              onTouchStart={(e) => {
+                if (activeChat === "activity") {
+                  activityTouchStartXRef.current = e.touches[0].clientX;
+                  activityTouchStartYRef.current = e.touches[0].clientY;
+                }
+              }}
+              onTouchEnd={(e) => {
+                if (activeChat === "activity" && activityTouchStartXRef.current !== null && activityTouchStartYRef.current !== null) {
+                  const diffX = activityTouchStartXRef.current - e.changedTouches[0].clientX;
+                  const diffY = activityTouchStartYRef.current - e.changedTouches[0].clientY;
+                  if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+                    if (diffX > 0 && activityTab === "activity") {
+                      setActivityTab("followers");
+                    } else if (diffX < 0 && activityTab === "followers") {
+                      setActivityTab("activity");
+                    }
+                  }
+                  activityTouchStartXRef.current = null;
+                  activityTouchStartYRef.current = null;
+                }
+              }}
             >
-              <div className="min-h-[88px] md:min-h-[72px] px-4 pt-8 md:pt-0 pb-2 md:pb-0 border-b border-gray-100 flex items-center justify-between bg-white/90 backdrop-blur-md sticky top-0 z-20">
-                <div className="flex items-center space-x-3">
+              {/* Clean 2D Modern Activity Header with Frosted Glass */}
+              <div className="min-h-[56px] md:min-h-[60px] px-3.5 md:px-4 pt-[calc(env(safe-area-inset-top,0px)+6px)] md:pt-0 pb-1.5 md:pb-0 border-b border-neutral-100/60 flex items-center justify-between bg-white/85 backdrop-blur-xl sticky top-0 z-30 select-none">
+                <div className="flex items-center space-x-2.5">
                   <button
-                    className="md:hidden p-2 -ml-2 hover:bg-black/5 rounded-full"
+                    type="button"
+                    className="p-1.5 -ml-1 hover:bg-neutral-100 active:scale-90 rounded-full transition-all cursor-pointer border-0 bg-transparent flex items-center justify-center text-neutral-800"
                     onClick={() => setActiveChat(null)}
+                    title="Back to Chats"
                   >
-                    <ArrowLeft className="w-6 h-6 text-gray-900" />
+                    <ArrowLeft className="w-5.5 h-5.5" strokeWidth={2.4} />
                   </button>
-                  <h2 className="font-bold text-[17px] leading-tight text-gray-900">
+                  <h2 className="font-extrabold text-[18px] leading-tight text-neutral-950 tracking-tight">
                     {activeChat === "requests" ? "Message Requests" : "Activity"}
                   </h2>
                 </div>
               </div>
 
-              {activeChat === "activity" && (
-                <div className="px-4 py-2 bg-white shrink-0">
-                  <div className="flex items-center p-1 bg-gray-100/80 rounded-2xl">
-                    <button
-                      type="button"
-                      onClick={() => setActivityTab("activity")}
-                      className={`flex-1 py-1.5 text-[13px] font-semibold rounded-xl transition-all cursor-pointer ${
-                        activityTab === "activity"
-                          ? "bg-white text-gray-900 shadow-2xs"
-                          : "text-gray-500 hover:text-gray-900"
-                      }`}
-                    >
-                      Activity
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActivityTab("followers")}
-                      className={`flex-1 py-1.5 text-[13px] font-semibold rounded-xl transition-all cursor-pointer ${
-                        activityTab === "followers"
-                          ? "bg-white text-gray-900 shadow-2xs"
-                          : "text-gray-500 hover:text-gray-900"
-                      }`}
-                    >
-                      New Followers {followers.length > 0 ? `(${followers.length})` : ""}
-                    </button>
-                  </div>
-                </div>
-              )}
 
-              <div className="flex-1 overflow-y-auto p-2 md:p-4">
-                {(activeChat === "followers" || (activeChat === "activity" && activityTab === "followers")) ? (
-                  <div className="space-y-0">
-                    {followers.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-4 py-20">
-                        <UserPlus className="w-16 h-16 text-gray-200" />
-                        <p className="font-normal text-lg">
-                          No new followers yet
-                        </p>
-                      </div>
-                    ) : (
-                      followers
-                        .slice(0, 50)
-                        .map((f: any) => (
-                          <FollowerItem
-                            key={f.id}
-                            follower={f}
-                            currentUser={currentUser}
-                            onFollowBack={handleFollowBack}
-                          />
-                        ))
-                    )}
-                  </div>
-                ) : activeChat === "requests" ? (
-                  <div className="max-w-2xl mx-auto space-y-3 p-1">
-                    <div className="p-3.5 bg-purple-50/60 border border-purple-100 rounded-2xl text-[12.5px] text-purple-900/80 leading-relaxed">
+
+              {/* Viewport Content Area - Slide Between Activity & New Followers */}
+              <div 
+                className="flex-1 overflow-hidden relative flex flex-col w-full h-full bg-white touch-pan-y"
+                onTouchStart={(e) => {
+                  if (activeChat === "activity") {
+                    activityTouchStartXRef.current = e.touches[0].clientX;
+                    activityTouchStartYRef.current = e.touches[0].clientY;
+                  }
+                }}
+                onTouchEnd={(e) => {
+                  if (activeChat === "activity" && activityTouchStartXRef.current !== null && activityTouchStartYRef.current !== null) {
+                    const diffX = activityTouchStartXRef.current - e.changedTouches[0].clientX;
+                    const diffY = activityTouchStartYRef.current - e.changedTouches[0].clientY;
+                    if (Math.abs(diffX) > 35 && Math.abs(diffX) > Math.abs(diffY)) {
+                      if (diffX > 0 && activityTab === "activity") {
+                        setActivityTab("followers");
+                      } else if (diffX < 0 && activityTab === "followers") {
+                        setActivityTab("activity");
+                      }
+                    }
+                    activityTouchStartXRef.current = null;
+                    activityTouchStartYRef.current = null;
+                  }
+                }}
+              >
+                {activeChat === "requests" ? (
+                  <div className="flex-1 overflow-y-auto max-w-2xl mx-auto space-y-3 p-3 w-full">
+                    <div className="p-3.5 bg-purple-50/70 border border-purple-100 rounded-2xl text-[12.5px] text-purple-900/80 leading-relaxed">
                       Open a message request to see what was sent. The sender won&apos;t know you&apos;ve seen it until you accept. You can choose to accept or block their messages.
                     </div>
                     {pendingRequests.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-3 py-20 text-center">
-                        <div className="w-14 h-14 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center shadow-xs">
+                      <div className="flex flex-col items-center justify-center h-full text-neutral-500 space-y-3 py-20 text-center select-none">
+                        <div className="w-14 h-14 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shadow-xs">
                           <MessageCircle className="w-7 h-7" />
                         </div>
-                        <p className="font-semibold text-[16px] text-gray-900">No message requests</p>
-                        <p className="text-[13px] text-gray-400 max-w-xs">
+                        <p className="font-semibold text-[16px] text-neutral-900">No message requests</p>
+                        <p className="text-[13px] text-neutral-400 max-w-xs">
                           You have no pending message requests right now.
                         </p>
                       </div>
@@ -3703,15 +4579,15 @@ export default function Messages() {
                           <div
                             key={req.id}
                             onClick={() => setActiveChat(req.id)}
-                            className="flex items-center justify-between p-3.5 rounded-2xl bg-white hover:bg-gray-50 border border-gray-100 transition-all cursor-pointer active:scale-[0.99] shadow-xs"
+                            className="flex items-center justify-between p-3.5 rounded-2xl bg-white hover:bg-neutral-50 border border-neutral-100 transition-all cursor-pointer active:scale-[0.99] shadow-xs"
                           >
                             <div className="flex items-center space-x-3.5 min-w-0 flex-1">
-                              <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 shrink-0 border border-gray-100">
+                              <div className="w-12 h-12 rounded-full overflow-hidden bg-neutral-100 shrink-0 border border-neutral-100">
                                 <img src={otherAvatar} alt={otherName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                               </div>
                               <div className="min-w-0 flex-1">
-                                <h4 className="text-[14px] font-semibold text-gray-900 truncate">{otherName}</h4>
-                                <p className="text-[12.5px] text-gray-500 truncate mt-0.5">{req.lastMessage || "Sent a message"}</p>
+                                <h4 className="text-[14px] font-semibold text-neutral-900 truncate">{otherName}</h4>
+                                <p className="text-[12.5px] text-neutral-500 truncate mt-0.5">{req.lastMessage || "Sent a message"}</p>
                                 <div className="flex items-center space-x-2 mt-1">
                                   <span className="text-[11px] font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
                                     {count} of 2 sent
@@ -3733,7 +4609,7 @@ export default function Messages() {
                                     await declineConversationRequest(req.id);
                                   }
                                 }}
-                                className="px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-xl text-[12px] font-medium transition-colors"
+                                className="px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-xl text-[12px] font-medium transition-colors border-0 bg-transparent cursor-pointer"
                               >
                                 Block
                               </button>
@@ -3745,7 +4621,7 @@ export default function Messages() {
                                   await acceptConversationRequest(req.id);
                                   setActiveChat(req.id);
                                 }}
-                                className="px-3.5 py-1.5 bg-gray-900 hover:bg-black text-white rounded-xl text-[12px] font-semibold transition-colors shadow-xs"
+                                className="px-3.5 py-1.5 bg-neutral-900 hover:bg-black text-white rounded-xl text-[12px] font-semibold transition-colors shadow-xs border-0 cursor-pointer"
                               >
                                 Accept
                               </button>
@@ -3756,197 +4632,388 @@ export default function Messages() {
                     )}
                   </div>
                 ) : (
-                  <div
-                    className="space-y-0 p-0"
-                    onScroll={(e) => {
-                      if (
-                        e.currentTarget.scrollHeight -
-                          e.currentTarget.scrollTop <=
-                        e.currentTarget.clientHeight + 50
-                      ) {
-                        setActivityLimit((prev) => prev + 15);
-                      }
-                    }}
-                  >
-                    {notifications.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-3 py-20">
-                        <Bell className="w-14 h-14 text-gray-200 stroke-[1.5]" />
-                        <p className="font-medium text-15px text-gray-500">No activity yet</p>
-                      </div>
-                    ) : (
-                      notifications.slice(0, activityLimit || 15).map((n) => (
-                        <div
-                          key={n.id}
-                          className="flex items-center space-x-3.5 px-3.5 py-2.5 hover:bg-gray-50/80 active:bg-gray-100/70 cursor-pointer transition-colors group relative"
-                          onClick={() => {
-                            if (n.postId && n.postMedia) {
-                              const {
-                                setHighlightedCommentId,
-                                setHighlightedPostId,
-                                setShowLikesList,
-                                setTargetLikesPostId,
-                                setViewingReel,
-                                setViewingMedia,
-                              } = useAppStore.getState();
-
-                              if (n.type === "like") {
-                                setTargetLikesPostId(n.postId);
-                                setShowLikesList(true);
-                              } else if (
-                                n.type === "comment" ||
-                                n.type === "reply" ||
-                                n.type === "mention" ||
-                                n.type === "comment_like"
-                              ) {
-                                setHighlightedCommentId(n.targetId);
-                                setHighlightedPostId(n.postId);
-                              }
-
-                              const isReel =
-                                n.postMedia.includes(".mp4") ||
-                                n.postMedia.includes("video");
-                              const postAuthor = {
-                                name: n.postAuthorName || n.actorName,
-                                avatar: n.postAuthorAvatar || n.actorAvatar,
-                              };
-
-                              import("../services/postService").then(({ getPost }) => {
-                                getPost(n.postId!).then((realPost) => {
-                                  if (realPost) {
-                                    setViewingReel({ ...realPost, single: true });
-                                  } else {
-                                    setViewingReel({
-                                      id: n.postId,
-                                      authorId: n.postAuthorId || n.actorId || "",
-                                      authorName: postAuthor.name,
-                                      authorAvatar: postAuthor.avatar,
-                                      media: n.postMedia ? [n.postMedia] : [],
-                                      text: n.content || "",
-                                      type: isReel ? "reel" : "post",
-                                      likesCount: 0,
-                                      commentsCount: 0,
-                                      single: true,
-                                    });
-                                  }
-                                });
-                              });
-                            } else {
-                              setViewingUser({
-                                uid: n.actorId,
-                                name: n.actorName,
-                                avatar: n.actorAvatar,
-                              });
-                              pushPage("profile");
-                            }
-                          }}
-                        >
-                          <div
-                            className="relative flex-shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setViewingUser({
-                                uid: n.actorId,
-                                name: n.actorName,
-                                avatar: n.actorAvatar,
-                              });
-                              pushPage("profile");
-                            }}
-                          >
-                            <img
-                              src={
-                                n.actorAvatar ||
-                                `https://ui-avatars.com/api/?name=${encodeURIComponent(n.actorName || "User")}&background=random`
-                              }
-                              className="w-10 h-10 rounded-full object-cover"
-                              alt="actor"
-                              referrerPolicy="no-referrer"
-                            />
-                            <div className="absolute -bottom-0.5 -right-0.5 w-4.5 h-4.5 bg-white rounded-full flex items-center justify-center shadow-2xs border border-gray-100 scale-90">
-                              {n.type === "like" && (
-                                <Heart className="w-2.5 h-2.5 text-red-500 fill-red-500" />
-                              )}
-                              {n.type === "comment" && (
-                                <MessageCircle className="w-2.5 h-2.5 text-blue-500 fill-blue-500" />
-                              )}
-                              {n.type === "follow" && (
-                                <UserPlus className="w-2.5 h-2.5 text-purple-500" />
-                              )}
+                  /* 2-Panel Smooth Horizontal Slider Between Activity & New Followers */
+                  <div className="flex-1 w-full h-full overflow-hidden flex flex-col">
+                    <div 
+                      className="flex w-[200%] h-full transition-transform duration-300 ease-out will-change-transform transform-gpu"
+                      style={{
+                        transform: activityTab === "activity" ? "translateX(0%)" : "translateX(-50%)"
+                      }}
+                    >
+                      {/* Panel 1: Activity Notifications Feed (Flush 2D Soft List, Zero Gaps) */}
+                      <div 
+                        className="w-1/2 h-full overflow-y-auto no-scrollbar pb-28 [webkit-overflow-scrolling:touch]"
+                        onScroll={(e) => {
+                          if (
+                            e.currentTarget.scrollHeight - e.currentTarget.scrollTop <=
+                            e.currentTarget.clientHeight + 60
+                          ) {
+                            setActivityLimit((prev) => prev + 15);
+                          }
+                        }}
+                      >
+                        {notifications.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center h-full text-neutral-400 space-y-3 py-24 select-none">
+                            <div className="w-14 h-14 rounded-full bg-neutral-100 flex items-center justify-center">
+                              <Bell className="w-7 h-7 text-neutral-400 stroke-[1.8]" />
                             </div>
+                            <p className="font-semibold text-[15px] text-neutral-600">No activity yet</p>
                           </div>
-                          <div className="flex-1 min-w-0 pr-1">
-                            <p className="text-[13.5px] leading-snug">
-                              <span className="font-medium text-gray-900 group-hover:underline">
-                                {n.actorName || "User"}
-                              </span>
-                              <span className="text-gray-600 font-normal ml-1">
-                                {n.type === "like" && "liked your post."}
-                                {n.type === "comment" &&
-                                  `commented: ${n.content}`}
-                                {n.type === "follow" &&
-                                  "started following you."}
-                                {n.type === "mention" && "mentioned you."}
-                                {n.type === "favorite" && "saved your post."}
-                                {n.type === "reply" &&
-                                  `replied to your comment: ${n.content}`}
-                                {n.type === "comment_like" &&
-                                  "liked your comment."}
-                              </span>
-                            </p>
-                            <p className="text-[11px] text-gray-400 mt-0.5 font-normal tracking-tight">
-                              {(() => {
-                                const timestamp = n.createdAt;
-                                if (!timestamp) return "Just now";
-                                try {
-                                  const date = timestamp?.toDate
-                                    ? timestamp.toDate()
-                                    : timestamp instanceof Date
-                                      ? timestamp
-                                      : new Date(timestamp);
-                                  if (isNaN(date.getTime())) return "Just now";
-                                  const now = new Date();
-                                  const diff = Math.floor(
-                                    (now.getTime() - date.getTime()) / 1000,
-                                  );
-                                  if (diff < 60) return "Just now";
-                                  if (diff < 3600)
-                                    return `${Math.floor(diff / 60)}m ago`;
-                                  if (diff < 86400)
-                                    return `${Math.floor(diff / 3600)}h ago`;
-                                  return date.toLocaleDateString();
-                                } catch (e) {
-                                  return "Just now";
+                        ) : (
+                          <>
+                            {notifications.slice(0, Math.min(3, notifications.length)).map((n) => (
+                            <div
+                              key={n.id}
+                              className="flex items-center justify-between space-x-3 px-3.5 py-2.5 hover:bg-neutral-50 active:bg-neutral-100/70 cursor-pointer border-b border-neutral-100/80 transition-colors select-none"
+                              onClick={() => {
+                                if (n.postId && n.postMedia) {
+                                  const {
+                                    setHighlightedCommentId,
+                                    setHighlightedPostId,
+                                    setShowLikesList,
+                                    setTargetLikesPostId,
+                                    setViewingReel,
+                                  } = useAppStore.getState();
+
+                                  if (n.type === "like") {
+                                    setTargetLikesPostId(n.postId);
+                                    setShowLikesList(true);
+                                  } else if (
+                                    n.type === "comment" ||
+                                    n.type === "reply" ||
+                                    n.type === "mention" ||
+                                    n.type === "comment_like"
+                                  ) {
+                                    setHighlightedCommentId(n.targetId);
+                                    setHighlightedPostId(n.postId);
+                                  }
+
+                                  const isReel =
+                                    n.postMedia.includes(".mp4") ||
+                                    n.postMedia.includes("video");
+                                  const postAuthor = {
+                                    name: n.postAuthorName || n.actorName,
+                                    avatar: n.postAuthorAvatar || n.actorAvatar,
+                                  };
+
+                                  import("../services/postService").then(({ getPost }) => {
+                                    getPost(n.postId!).then((realPost) => {
+                                      if (realPost) {
+                                        setViewingReel({ ...realPost, single: true });
+                                      } else {
+                                        setViewingReel({
+                                          id: n.postId,
+                                          authorId: n.postAuthorId || n.actorId || "",
+                                          authorName: postAuthor.name,
+                                          authorAvatar: postAuthor.avatar,
+                                          media: n.postMedia ? [n.postMedia] : [],
+                                          text: n.content || "",
+                                          type: isReel ? "reel" : "post",
+                                          likesCount: 0,
+                                          commentsCount: 0,
+                                          single: true,
+                                        });
+                                      }
+                                    });
+                                  });
+                                } else {
+                                  setViewingUser({
+                                    uid: n.actorId,
+                                    name: n.actorName,
+                                    avatar: n.actorAvatar,
+                                  });
+                                  pushPage("profile");
                                 }
-                              })()}
-                            </p>
-                          </div>
-                          {n.postMedia && (
-                            <div className="w-11 h-14 rounded-lg overflow-hidden flex-shrink-0 border border-gray-100 shadow-2xs group-hover:scale-105 transition-transform bg-gray-900 relative">
-                              {n.postMedia.includes(".mp4") ||
-                              n.postMedia.includes("video") ? (
-                                <div className="relative w-full h-full">
-                                  <video
-                                    src={`${n.postMedia}#t=0.001`}
-                                    className="w-full h-full object-cover"
-                                    preload="metadata"
-                                    muted
-                                    playsInline
+                              }}
+                            >
+                              {/* Avatar with Crisp 2D Badge */}
+                              <div className="flex items-center space-x-3 min-w-0 flex-1">
+                                <div
+                                  className="relative shrink-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setViewingUser({
+                                      uid: n.actorId,
+                                      name: n.actorName,
+                                      avatar: n.actorAvatar,
+                                    });
+                                    pushPage("profile");
+                                  }}
+                                >
+                                  <img
+                                    src={
+                                      n.actorAvatar ||
+                                      `https://ui-avatars.com/api/?name=${encodeURIComponent(n.actorName || "User")}&background=random`
+                                    }
+                                    className="w-11 h-11 rounded-full object-cover border border-neutral-100/90 shrink-0"
+                                    alt="actor"
+                                    referrerPolicy="no-referrer"
+                                    loading="lazy"
                                   />
-                                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                                    <Play className="w-3.5 h-3.5 text-white fill-white drop-shadow-xs" />
+                                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-white rounded-full flex items-center justify-center border border-neutral-100 shadow-2xs">
+                                    {n.type === "like" && (
+                                      <Heart className="w-2.5 h-2.5 text-red-500 fill-red-500" />
+                                    )}
+                                    {n.type === "comment" && (
+                                      <MessageCircle className="w-2.5 h-2.5 text-blue-500 fill-blue-500" />
+                                    )}
+                                    {n.type === "follow" && (
+                                      <UserPlus className="w-2.5 h-2.5 text-purple-600" />
+                                    )}
                                   </div>
                                 </div>
-                              ) : (
-                                <img
-                                  src={n.postMedia}
-                                  className="w-full h-full object-cover"
-                                  alt="thumb"
-                                  referrerPolicy="no-referrer"
-                                />
-                              )}
+
+                                <div className="flex-1 min-w-0 pr-2">
+                                  <p className="text-[13.5px] leading-snug">
+                                    <span className="font-bold text-neutral-900 hover:underline">
+                                      {n.actorName || "User"}
+                                    </span>
+                                    <span className="text-neutral-600 font-normal ml-1">
+                                      {n.type === "like" && "liked your post."}
+                                      {n.type === "comment" && `commented: ${n.content}`}
+                                      {n.type === "follow" && "started following you."}
+                                      {n.type === "mention" && "mentioned you."}
+                                      {n.type === "favorite" && "saved your post."}
+                                      {n.type === "reply" && `replied to your comment: ${n.content}`}
+                                      {n.type === "comment_like" && "liked your comment."}
+                                    </span>
+                                  </p>
+                                  <p className="text-[11.5px] text-neutral-400 mt-0.5 font-normal tracking-tight">
+                                    {(() => {
+                                      const timestamp = n.createdAt;
+                                      if (!timestamp) return "Just now";
+                                      try {
+                                        const date = timestamp?.toDate
+                                          ? timestamp.toDate()
+                                          : timestamp instanceof Date
+                                            ? timestamp
+                                            : new Date(timestamp);
+                                        if (isNaN(date.getTime())) return "Just now";
+                                        const now = new Date();
+                                        const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+                                        if (diff < 60) return "Just now";
+                                        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+                                        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+                                        return date.toLocaleDateString();
+                                      } catch (e) {
+                                        return "Just now";
+                                      }
+                                    })()}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Right Action: Follow back or Clean 2D Lag-free Media Preview Box */}
+                              {n.type === 'follow' ? (
+                                <button
+                                  type="button"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    const isF = (followingIds || []).includes(n.actorId);
+                                    const prevF = [...(followingIds || [])];
+                                    const willFollow = !isF;
+
+                                    if (willFollow) {
+                                      setFollowingIds([...prevF, n.actorId]);
+                                    } else {
+                                      setFollowingIds(prevF.filter(id => id !== n.actorId));
+                                    }
+
+                                    try {
+                                      const { followUser, unfollowUser } = await import("../services/followService");
+                                      if (willFollow) {
+                                        if (currentUser) {
+                                          await followUser(currentUser, { uid: n.actorId, name: n.actorName, avatar: n.actorAvatar });
+                                        }
+                                      } else {
+                                        if (currentUser?.uid) {
+                                          await unfollowUser(currentUser.uid, n.actorId);
+                                        }
+                                      }
+                                    } catch (err) {
+                                      setFollowingIds(prevF);
+                                    }
+                                  }}
+                                  className={`px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-all active:scale-95 border-0 shrink-0 cursor-pointer ${
+                                    (followingIds || []).includes(n.actorId) && (followerIds || []).includes(n.actorId)
+                                      ? 'bg-neutral-100 text-neutral-800 hover:bg-neutral-200'
+                                      : (followingIds || []).includes(n.actorId)
+                                        ? 'bg-neutral-100 text-neutral-800 hover:bg-neutral-200'
+                                        : 'bg-[#fe2c55] text-white hover:brightness-105 shadow-none'
+                                  }`}
+                                >
+                                  {(followingIds || []).includes(n.actorId) && (followerIds || []).includes(n.actorId)
+                                    ? 'Friends'
+                                    : (followingIds || []).includes(n.actorId)
+                                      ? 'Following'
+                                      : 'Follow back'}
+                                </button>
+                              ) : (n.postMedia || n.postId) ? (
+                                <div className="w-11 h-14 rounded-xl overflow-hidden shrink-0 border border-neutral-200/90 bg-neutral-900 relative shadow-none select-none">
+                                  {n.postMedia && (n.postMedia.includes(".mp4") || n.postMedia.includes("video")) ? (
+                                    <div className="relative w-full h-full bg-neutral-950 flex items-center justify-center">
+                                      <video
+                                        src={`${n.postMedia}#t=0.001`}
+                                        className="w-full h-full object-cover pointer-events-none opacity-85"
+                                        preload="metadata"
+                                        muted
+                                        playsInline
+                                      />
+                                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                        <Play className="w-3.5 h-3.5 text-white fill-white" />
+                                      </div>
+                                    </div>
+                                  ) : n.postMedia ? (
+                                    <img
+                                      src={n.postMedia}
+                                      className="w-full h-full object-cover pointer-events-none"
+                                      alt="thumb"
+                                      referrerPolicy="no-referrer"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-neutral-100 flex items-center justify-center">
+                                      <Play className="w-3 h-3 text-neutral-400" />
+                                    </div>
+                                  )}
+                                </div>
+                              ) : null}
                             </div>
+                          ))}
+
+                          {/* Draggable Stack View for Earlier Activities */}
+                          {notifications.length > 3 && (
+                            <ActivityStackView
+                              items={notifications.slice(3)}
+                              onItemClick={(n) => {
+                                if (n.postId && n.postMedia) {
+                                  const {
+                                    setHighlightedCommentId,
+                                    setHighlightedPostId,
+                                    setShowLikesList,
+                                    setTargetLikesPostId,
+                                    setViewingReel,
+                                  } = useAppStore.getState();
+
+                                  if (n.type === "like") {
+                                    setTargetLikesPostId(n.postId);
+                                    setShowLikesList(true);
+                                  } else if (
+                                    n.type === "comment" ||
+                                    n.type === "reply" ||
+                                    n.type === "mention" ||
+                                    n.type === "comment_like"
+                                  ) {
+                                    setHighlightedCommentId(n.targetId);
+                                    setHighlightedPostId(n.postId);
+                                  }
+
+                                  import("../services/postService").then(({ getPost }) => {
+                                    getPost(n.postId!).then((realPost) => {
+                                      if (realPost) {
+                                        setViewingReel({ ...realPost, single: true });
+                                      }
+                                    });
+                                  });
+                                } else {
+                                  setViewingUser({ uid: n.actorId, name: n.actorName, avatar: n.actorAvatar });
+                                  pushPage("profile");
+                                }
+                              }}
+                              onProfileClick={(actorId, actorName, actorAvatar) => {
+                                setViewingUser({ uid: actorId, name: actorName, avatar: actorAvatar });
+                                pushPage("profile");
+                              }}
+                              followingIds={followingIds}
+                              followerIds={followerIds}
+                              onFollowToggle={handleFollowBack}
+                            />
                           )}
+                        </>
+                      )}
+                    </div>
+
+                      {/* Panel 2: New Followers Feed (Flush 2D Soft List + Draggable Stack View for Earlier Followers) */}
+                      <div className="w-1/2 h-full overflow-y-auto no-scrollbar pb-28 [webkit-overflow-scrolling:touch]">
+                        {followers.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center h-full text-neutral-400 space-y-3 py-24 select-none">
+                            <div className="w-14 h-14 rounded-full bg-neutral-100 flex items-center justify-center">
+                              <UserPlus className="w-7 h-7 text-neutral-400 stroke-[1.8]" />
+                            </div>
+                            <p className="font-semibold text-[15px] text-neutral-600">No new followers yet</p>
+                          </div>
+                        ) : (
+                          <>
+                            {followers.slice(0, Math.min(3, followers.length)).map((f: any) => (
+                              <FollowerItem
+                                key={f.id}
+                                follower={f}
+                                currentUser={currentUser}
+                                onFollowBack={handleFollowBack}
+                              />
+                            ))}
+
+                            {/* Draggable Stack View for Earlier Followers */}
+                            {followers.length > 3 && (
+                              <FollowerStackView
+                                followers={followers.slice(3)}
+                                onProfileClick={(uid, name, avatar) => {
+                                  setViewingUser({ uid, name, avatar });
+                                  pushPage("profile");
+                                }}
+                                followingIds={followingIds}
+                                followerIds={followerIds}
+                                onFollowToggle={handleFollowBack}
+                              />
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Modern Floating Bottom Navigation Bar ("nice navigetion er moto activity or follower button") */}
+                    {activeChat === "activity" && (
+                      <div className="absolute bottom-5 inset-x-0 z-30 flex justify-center pointer-events-none select-none">
+                        <div className="pointer-events-auto flex items-center p-1.5 rounded-full bg-white/85 dark:bg-neutral-900/85 backdrop-blur-xl border border-neutral-200/80 dark:border-neutral-700 shadow-[0_8px_30px_rgb(0,0,0,0.12)] space-x-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setActivityTab("activity")}
+                            className={`px-4.5 py-2 text-[13px] font-extrabold rounded-full transition-all cursor-pointer flex items-center space-x-1.5 active:scale-95 border-0 ${
+                              activityTab === "activity"
+                                ? "bg-neutral-950 text-white shadow-xs"
+                                : "bg-transparent text-neutral-600 hover:text-neutral-950"
+                            }`}
+                          >
+                            <Sparkles className={`w-3.5 h-3.5 ${activityTab === "activity" ? "text-rose-400 fill-rose-400" : "text-neutral-400"}`} />
+                            <span>Activity</span>
+                            {notifications.filter((n) => !n.isRead).length > 0 && (
+                              <span className="bg-rose-500 text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded-full">
+                                {notifications.filter((n) => !n.isRead).length}
+                              </span>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setActivityTab("followers")}
+                            className={`px-4.5 py-2 text-[13px] font-extrabold rounded-full transition-all cursor-pointer flex items-center space-x-1.5 active:scale-95 border-0 ${
+                              activityTab === "followers"
+                                ? "bg-neutral-950 text-white shadow-xs"
+                                : "bg-transparent text-neutral-600 hover:text-neutral-950"
+                            }`}
+                          >
+                            <UserPlus className={`w-3.5 h-3.5 ${activityTab === "followers" ? "text-purple-300" : "text-neutral-400"}`} />
+                            <span>New Followers</span>
+                            {followers.length > 0 && (
+                              <span className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full ${
+                                activityTab === "followers" ? "bg-white/20 text-white" : "bg-neutral-100 text-neutral-700"
+                              }`}>
+                                {followers.length}
+                              </span>
+                            )}
+                          </button>
                         </div>
-                      ))
+                      </div>
                     )}
                   </div>
                 )}
@@ -3957,11 +5024,11 @@ export default function Messages() {
               key={`chat-${activeChat}`}
               initial={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "-100%", opacity: 0.98 }}
-              transition={isDesktop ? { duration: 0 } : { duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
-              className="chat-view-container fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-full overflow-hidden bg-white"
+              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
+              transition={isDesktop ? { duration: 0 } : { duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+              className="chat-view-container fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-white dark:bg-black select-none will-change-transform"
             >
-              {/* Chat Background Layer - Mobile Image Wallpaper & PC Clean Solid Color */}
+              {/* Chat Background Layer - Mobile & Desktop Theme Wallpaper */}
               {(() => {
                 const isImage = 
                   activeConvTheme === 'bg-image' || 
@@ -3975,176 +5042,226 @@ export default function Messages() {
 
                 return (
                   <>
-                    {/* Mobile Background Image Layer */}
-                    <img
-                      src={isImage ? activeConvTheme : offlineWallpaperUrl}
-                      alt=""
-                      loading="eager"
-                      decoding="sync"
-                      fetchPriority="high"
-                      className="absolute top-0 left-0 right-0 w-full pointer-events-none z-0 select-none object-cover object-top md:hidden"
-                      style={{ 
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        width: '100%',
-                        height: `${unzoomedCssHeight}px`,
-                        minHeight: `${unzoomedCssHeight}px`,
-                        maxHeight: `${unzoomedCssHeight}px`,
-                        objectFit: 'cover',
-                        objectPosition: 'center top',
-                        transform: 'translate3d(0, 0, 0)',
-                        WebkitTransform: 'translate3d(0, 0, 0)',
-                        backfaceVisibility: 'hidden',
-                        pointerEvents: 'none'
-                      }}
-                    />
-
-                    {/* Desktop/PC Background - Pure Clean Soft Color, No Image Wallpaper */}
-                    <div 
-                      className="hidden md:block absolute inset-0 pointer-events-none z-0 select-none bg-slate-50/70 border-l border-gray-100"
-                    />
+                    {/* Background Layer: Image Wallpaper or Gradient Theme */}
+                    {isImage ? (
+                      <img
+                        src={activeConvTheme === 'bg-image' ? '/chat-background.png' : activeConvTheme}
+                        alt=""
+                        loading="eager"
+                        decoding="sync"
+                        fetchPriority="high"
+                        className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none object-cover object-top transition-all duration-300"
+                        style={{
+                          filter: activeConvThemeBlur ? `blur(18px) brightness(${activeConvThemeBrightness})` : `brightness(${activeConvThemeBrightness})`,
+                          transform: activeConvThemeBlur ? 'scale(1.10)' : 'scale(1)',
+                        }}
+                      />
+                    ) : (activeConvTheme.startsWith('bg-') || activeConvTheme.startsWith('#')) ? (
+                      <div 
+                        className={`absolute inset-0 pointer-events-none z-0 select-none transition-all duration-300 ${activeConvTheme.startsWith('bg-') ? activeConvTheme : ''}`}
+                        style={{ 
+                          backgroundColor: activeConvTheme.startsWith('#') ? activeConvTheme : undefined,
+                          filter: `brightness(${activeConvThemeBrightness})` 
+                        }}
+                      />
+                    ) : (
+                      <div className="absolute inset-0 pointer-events-none z-0 select-none bg-slate-50/70 dark:bg-black" />
+                    )}
                   </>
                 );
               })()}
 
-              {/* Chat Header - Perfect Full-Width Desktop Bar on PC, Floating Island on Mobile */}
-              <div
-                className="absolute top-0 inset-x-0 z-30 pointer-events-none px-3 pt-[max(28px,calc(env(safe-area-inset-top,0px)+20px))] pb-2.5 flex items-center justify-between gap-2 md:relative md:top-auto md:inset-x-auto md:pointer-events-auto md:bg-white md:border-b md:border-gray-100 md:px-6 md:py-3.5 md:pt-3.5 md:shadow-none md:shrink-0"
-              >
-                {/* Left: Back button + Friend Profile Island */}
-                <div className="pointer-events-auto flex items-center space-x-2.5 min-w-0 flex-1 max-w-[calc(100%-145px)] sm:max-w-none">
-                  <button
-                    className="md:hidden w-9.5 h-9.5 sm:w-10 sm:h-10 rounded-full bg-white/75 hover:bg-white/95 active:scale-90 transition-all text-gray-900 border border-white/90 shadow-[0_2px_10px_rgba(0,0,0,0.04)] shrink-0 flex items-center justify-center backdrop-blur-lg cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveChat(null);
-                    }}
-                    title="Back to inbox"
-                  >
-                    <ArrowLeft
-                      className="w-5 h-5 text-gray-800"
-                      strokeWidth={2.4}
-                    />
-                  </button>
+              {/* Chat Header - Crisp, Crystal Clear, NOT BLURRED, Seamlessly blended with theme */}
+              {(() => {
+                const isThemeImage = 
+                  activeConvTheme === 'bg-image' || 
+                  activeConvTheme === '/chat-background.png' ||
+                  activeConvTheme.startsWith('http') || 
+                  activeConvTheme.startsWith('/') || 
+                  activeConvTheme.startsWith('data:') ||
+                  activeConvTheme.includes('.png') ||
+                  activeConvTheme.includes('.jpg') ||
+                  activeConvTheme.includes('.webp') ||
+                  activeConvTheme.includes('background') ||
+                  activeConvTheme.includes('wallpaper');
+                const wallpaperImgSrc = isThemeImage 
+                  ? (activeConvTheme === 'bg-image' ? '/chat-background.png' : activeConvTheme) 
+                  : offlineWallpaperUrl;
 
+                return (
                   <div
-                    className="flex items-center space-x-3 cursor-pointer group bg-white/80 backdrop-blur-xl border border-white/90 shadow-[0_2px_12px_rgba(0,0,0,0.04)] md:shadow-none md:border-none md:bg-transparent md:backdrop-blur-none rounded-full md:rounded-none pl-1.5 sm:pl-2 md:pl-0 pr-4 md:pr-0 py-1.5 md:py-0 transition-all hover:bg-white/95 md:hover:bg-transparent active:scale-[0.985] md:active:scale-100 min-w-0 flex-1 justify-between md:justify-start"
-                    onClick={() => setShowChatSettings(true)}
+                    className="sticky top-0 z-40 shrink-0 w-full relative overflow-hidden px-3 md:px-5 pt-[max(10px,calc(env(safe-area-inset-top,0px)+8px))] pb-2.5 flex items-center justify-between gap-2 select-none border-b-0 shadow-none touch-manipulation"
                   >
-                    <div className="relative shrink-0">
-                      {activeContact?.isGroup && !activeContact.avatar ? (
-                        <div className="cursor-pointer group-hover:opacity-90 transition-opacity">
-                          <GroupAvatar
-                            members={
-                              activeConversation?.participantIds
-                                ?.filter((id) => id !== currentUser?.uid)
-                                .slice(0, 3)
-                                .map(
-                                  (id) =>
-                                    userDataCache[id]?.avatar ||
-                                    (activeConversation?.participantAvatars || {})[id] ||
-                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(userDataCache[id]?.name || (activeConversation?.participantNames || {})[id] || "User")}&background=random`,
-                                ) || []
-                            }
-                            sizeClass="w-9 h-9 sm:w-10 sm:h-10"
-                          />
-                        </div>
-                      ) : (
+                    {/* Header Theme Background Layer - Sharp and crystal clear, NOT BLURRED */}
+                    {isThemeImage ? (
+                      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
                         <img
-                          src={activeContact?.avatar as string}
-                          alt="Avatar"
-                          className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover"
+                          src={wallpaperImgSrc}
+                          alt=""
+                          className="w-full h-[100dvh] object-cover object-top absolute top-0 left-0 transition-all duration-300"
+                          style={{
+                            filter: `brightness(${activeConvThemeBrightness})`,
+                            transform: 'scale(1)',
+                          }}
                         />
-                      )}
+                        {/* Clean translucent sheen that melts into chat background without blur */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-white/15 via-white/5 to-transparent" />
+                      </div>
+                    ) : (activeConvTheme.startsWith('bg-') || activeConvTheme.startsWith('#')) ? (
+                      <div 
+                        className={`absolute inset-0 pointer-events-none z-0 ${activeConvTheme.startsWith('bg-') ? activeConvTheme : ''} opacity-95`}
+                        style={{
+                          backgroundColor: activeConvTheme.startsWith('#') ? activeConvTheme : undefined,
+                        }}
+                      />
+                    ) : (
+                      <div className="absolute inset-0 pointer-events-none z-0 bg-white/95 dark:bg-[#0C0C0E]/95 border-b border-neutral-200/60 dark:border-white/10 backdrop-blur-md" />
+                    )}
+
+                    {/* Left: Back button + Friend Profile Info */}
+                    <div className="relative z-10 flex items-center space-x-2 min-w-0 flex-1">
+                      <button
+                        className="md:hidden w-9.5 h-9.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 active:scale-90 transition-all text-neutral-800 dark:text-neutral-100 shrink-0 flex items-center justify-center cursor-pointer border-0 shadow-none touch-manipulation"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveChat(null);
+                        }}
+                        title="Back to inbox"
+                      >
+                        <ArrowLeft
+                          className="w-5 h-5 text-neutral-800 dark:text-neutral-100"
+                          strokeWidth={2.4}
+                        />
+                      </button>
+
+                      <div
+                        className="flex items-center space-x-2.5 cursor-pointer min-w-0 flex-1 group"
+                        onClick={() => setShowChatSettings(true)}
+                      >
+                        <div className="relative shrink-0">
+                          {activeContact?.isGroup && !activeContact.avatar ? (
+                            <div className="cursor-pointer group-hover:scale-105 transition-transform">
+                              <GroupAvatar
+                                members={
+                                  activeConversation?.participantIds
+                                    ?.filter((id) => id !== currentUser?.uid)
+                                    .slice(0, 3)
+                                    .map(
+                                      (id) =>
+                                        userDataCache[id]?.avatar ||
+                                        (activeConversation?.participantAvatars || {})[id] ||
+                                        `https://ui-avatars.com/api/?name=${encodeURIComponent(userDataCache[id]?.name || (activeConversation?.participantNames || {})[id] || "User")}&background=random`,
+                                    ) || []
+                                }
+                                sizeClass="w-10 h-10 rounded-full"
+                              />
+                            </div>
+                          ) : (
+                            <div className="relative w-10 h-10 shrink-0 group-hover:scale-105 transition-all flex items-center justify-center">
+                              <img
+                                src={activeContact?.avatar as string}
+                                alt="Avatar"
+                                className="w-full h-full rounded-full object-cover"
+                              />
+                              {activeContact?.online && (
+                                <span 
+                                  className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-neutral-900 bg-sky-500 shadow-xs z-10" 
+                                  title="Online"
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Friend name */}
+                        <div className="min-w-0 flex-1 flex flex-col justify-center pl-1">
+                          <div className="flex items-center space-x-2">
+                            <h2
+                              className="font-bold text-[17px] sm:text-[18px] text-neutral-900 dark:text-white truncate tracking-tight text-left leading-tight"
+                            >
+                              {activeContact?.name}
+                            </h2>
+                          </div>
+                          {(typingUsers.length > 0 || isJarvisTyping) && (
+                            <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1 mt-0.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                              typing...
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Friend name aligned left with online status indicator */}
-                    <div className="min-w-0 flex-1 flex flex-col justify-center pl-1 md:pl-0">
-                      <div className="flex items-center space-x-2">
-                        <h2
-                          className="font-bold text-[16px] sm:text-[17px] text-gray-900 truncate tracking-tight text-left"
+                    {/* Right: Audio Call, Video Call, Details (Clean Soft 2D Buttons) */}
+                    <div className="relative z-10 flex items-center space-x-1 shrink-0">
+                      {activeChat === "jarvis" ? (
+                        <button
+                          onClick={() => {
+                            const welcome = [{
+                              id: "jarvis-welcome-1",
+                              senderId: "jarvis",
+                              type: "text",
+                              content: `কিরে বন্ধু ${currentUser?.name ? currentUser.name : ""}! কী খবর তোর? আমি তোর বেস্ট ফ্রেন্ড এনভো জার্ভিস! আজকে কী করতে চাস বল?`,
+                              createdAt: 0,
+                              status: "sent"
+                            }];
+                            setJarvisMessages(welcome);
+                            try { localStorage.setItem("jarvis_chat_history", JSON.stringify(welcome)); } catch(e){}
+                          }}
+                          className="px-3.5 py-1.5 bg-white/90 dark:bg-neutral-800 hover:bg-white dark:hover:bg-neutral-700 active:scale-95 text-purple-700 dark:text-purple-300 text-xs font-semibold rounded-full border-0 transition-all cursor-pointer shadow-none touch-manipulation"
                         >
-                          {activeContact?.name}
-                        </h2>
-                        {activeContact?.online ? (
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" title="Online" />
-                        ) : (
-                          <span className="w-2.5 h-2.5 rounded-full bg-gray-300 shrink-0" title="Offline" />
-                        )}
-                      </div>
-                      <span className="text-[11.5px] font-normal text-gray-400 text-left hidden md:block">
-                        {activeContact?.online ? "Online" : "Offline"}
-                      </span>
+                          Reset Chat
+                        </button>
+                      ) : activeContact && !activeContact.isGroup ? (
+                        <>
+                          <button
+                            onClick={() => handleStartCall('audio')}
+                            title="Audio Call"
+                            className="w-9.5 h-9.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 active:scale-90 text-neutral-700 dark:text-neutral-200 hover:text-black dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer border-0 shadow-none transition-all touch-manipulation"
+                          >
+                            <Phone className="w-5 h-5" strokeWidth={2.1} />
+                          </button>
+                          <button
+                            onClick={() => handleStartCall('video')}
+                            title="Video Call"
+                            className="w-9.5 h-9.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 active:scale-90 text-neutral-700 dark:text-neutral-200 hover:text-black dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer border-0 shadow-none transition-all touch-manipulation"
+                          >
+                            <Video className="w-5 h-5" strokeWidth={2.1} />
+                          </button>
+                        </>
+                      ) : null}
+                      <button
+                        onClick={() => setShowChatSettings(true)}
+                        title="Chat Details"
+                        className="w-9.5 h-9.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 active:scale-90 text-neutral-700 dark:text-neutral-200 hover:text-black dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer border-0 shadow-none transition-all touch-manipulation"
+                      >
+                        <Info
+                          className="w-5 h-5"
+                          strokeWidth={2.1}
+                        />
+                      </button>
                     </div>
                   </div>
-                </div>
+                );
+              })()}
 
-                {/* Right: Distinct Action Buttons */}
-                <div className="pointer-events-auto flex items-center space-x-1 sm:space-x-2 shrink-0">
-                  {activeChat === "jarvis" ? (
-                    <button
-                      onClick={() => {
-                        const welcome = [{
-                          id: "jarvis-welcome-1",
-                          senderId: "jarvis",
-                          type: "text",
-                          content: `কিরে বন্ধু ${currentUser?.name ? currentUser.name : ""}! কী খবর তোর? আমি তোর বেস্ট ফ্রেন্ড এনভো জার্ভিস! আজকে কী করতে চাস বল?`,
-                          createdAt: 0,
-                          status: "sent"
-                        }];
-                        setJarvisMessages(welcome);
-                        try { localStorage.setItem("jarvis_chat_history", JSON.stringify(welcome)); } catch(e){}
-                      }}
-                      className="px-3.5 py-1.5 bg-white/75 hover:bg-white/95 active:scale-95 text-purple-700 text-xs font-semibold rounded-full border border-white/90 shadow-[0_2px_10px_rgba(0,0,0,0.04)] md:shadow-none md:border-none md:bg-gray-100 md:hover:bg-gray-200 transition-all backdrop-blur-lg cursor-pointer"
-                    >
-                      Reset Chat
-                    </button>
-                  ) : activeContact && !activeContact.isGroup ? (
-                    <>
-                      <button
-                        onClick={() => handleStartCall('audio')}
-                        title="Audio Call"
-                        className="w-9.5 h-9.5 sm:w-10 sm:h-10 bg-white/75 hover:bg-white/95 active:scale-90 rounded-full transition-all text-[#007AFF] border border-white/90 shadow-[0_2px_10px_rgba(0,0,0,0.04)] md:shadow-none md:border-none md:bg-gray-100/80 md:hover:bg-gray-200/80 flex items-center justify-center shrink-0 backdrop-blur-lg cursor-pointer"
-                      >
-                        <Phone className="w-5 h-5 text-[#007AFF]" strokeWidth={2.3} />
-                      </button>
-                      <button
-                        onClick={() => handleStartCall('video')}
-                        title="Video Call"
-                        className="w-9.5 h-9.5 sm:w-10 sm:h-10 bg-white/75 hover:bg-white/95 active:scale-90 rounded-full transition-all text-[#007AFF] border border-white/90 shadow-[0_2px_10px_rgba(0,0,0,0.04)] md:shadow-none md:border-none md:bg-gray-100/80 md:hover:bg-gray-200/80 flex items-center justify-center shrink-0 backdrop-blur-lg cursor-pointer"
-                      >
-                        <Video className="w-5 h-5 text-[#007AFF]" strokeWidth={2.3} />
-                      </button>
-                    </>
-                  ) : null}
-                  <button
-                    onClick={() => setShowChatSettings(true)}
-                    title="Chat Details"
-                    className="w-9.5 h-9.5 sm:w-10 sm:h-10 bg-white/75 hover:bg-white/95 active:scale-90 rounded-full transition-all text-gray-800 border border-white/90 shadow-[0_2px_10px_rgba(0,0,0,0.04)] md:shadow-none md:border-none md:bg-gray-100/80 md:hover:bg-gray-200/80 flex items-center justify-center shrink-0 backdrop-blur-lg cursor-pointer"
-                  >
-                    <Info
-                      className="w-5 h-5 text-gray-700"
-                      strokeWidth={2.3}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              {/* Messages & Floating Input Overlay Container */}
+              {/* Messages & Input Container */}
               <div className="flex-1 relative w-full h-full overflow-hidden">
-                {/* Messages Area */}
+                {/* Messages Area - Scrolls Cleanly Below Fixed Header */}
                 <div
                   ref={messagesContainerRef}
-                  className="absolute inset-0 overflow-y-auto px-4 pt-[max(84px,calc(env(safe-area-inset-top,0px)+80px))] md:pt-4 space-y-0.5 scrollbar-hide flex flex-col justify-start z-10 overscroll-contain transform-gpu [webkit-overflow-scrolling:touch]"
-                  style={{ paddingBottom: `${(showStickerModal ? 420 : 110) + (viewportBottomOffset > 0 ? viewportBottomOffset : 0)}px` }}
+                  className="absolute inset-0 overflow-y-auto px-1 sm:px-2 md:px-3 py-2 space-y-0.5 scrollbar-hide flex flex-col justify-start z-10 overscroll-contain transform-gpu [webkit-overflow-scrolling:touch] touch-pan-y [overflow-anchor:none] will-change-scroll"
+                  style={{ paddingBottom: `${((showStickerModal && !isDesktop) ? 360 : 76) + (viewportBottomOffset > 0 ? viewportBottomOffset : 0)}px` }}
                   onScroll={(e) => {
-                    if (e.currentTarget.scrollTop < 20) {
+                    const target = e.currentTarget;
+                    if (target.scrollTop < 60 && !isPagingRef.current) {
+                      isPagingRef.current = true;
                       setMessageLimit((prev: number) => prev + 20);
+                      setTimeout(() => {
+                        isPagingRef.current = false;
+                      }, 600);
                     }
-                    const { scrollTop, scrollHeight, clientHeight } =
-                      e.currentTarget;
+                    const { scrollTop, scrollHeight, clientHeight } = target;
                     shouldAutoScrollRef.current =
                       scrollHeight - scrollTop - clientHeight < 200;
                   }}
@@ -4231,57 +5348,22 @@ export default function Messages() {
                   <div ref={messagesEndRef} />
                 </div>
 
+                {/* Soft Bottom Ambient Glow & Fade Mask - messages vanish into this glow when scrolling near input box */}
+                <div 
+                  className="absolute inset-x-0 bottom-0 h-28 pointer-events-none z-20 bg-gradient-to-t from-white via-white/80 to-transparent dark:from-black dark:via-black/80 dark:to-transparent backdrop-blur-[1.5px] [mask-image:linear-gradient(to_top,black_25%,transparent)]"
+                />
+
                 {/* Floating Input Area */}
                 <div
-                  className={`absolute inset-x-0 z-30 pb-2.5 md:pb-3.5 pt-1 px-3 md:px-6 w-full flex flex-col justify-end pointer-events-none bg-gradient-to-t from-black/[0.02] via-transparent to-transparent transform-gpu ${
-                    showStickerModal ? 'bottom-[340px] md:bottom-[360px]' : 'bottom-2.5 md:bottom-3.5'
+                  className={`absolute inset-x-0 z-30 pb-2 md:pb-2.5 pt-1 px-2 sm:px-3 md:px-5 w-full flex flex-col justify-end pointer-events-none transform-gpu ${
+                    showStickerModal ? 'bottom-[340px] md:bottom-2.5' : 'bottom-2 md:bottom-2.5'
                   }`}
                   style={{
                     transform: viewportBottomOffset > 0 ? `translate3d(0, -${viewportBottomOffset}px, 0)` : 'translate3d(0, 0, 0)',
-                    transition: showStickerModal ? 'bottom 0.24s cubic-bezier(0.33, 1, 0.68, 1)' : 'none',
+                    transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), bottom 0.22s ease',
                     willChange: 'transform'
                   }}
                 >
-                {/* Smart Sticker Suggestions (shown above input bar when typing keywords/emojis) */}
-                {stickerSuggestions.length > 0 && !isRecording && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                    transition={{ duration: 0.18 }}
-                    className="pointer-events-auto flex items-center space-x-3 px-3.5 py-2 mx-auto mb-2 max-w-3xl w-full ultra-glass-reply-box overflow-x-auto no-scrollbar shadow-lg rounded-2xl border border-white/90 bg-white/80 backdrop-blur-xl"
-                  >
-                    <div className="flex items-center space-x-3 py-0.5">
-                      {stickerSuggestions.map((stk) => (
-                        <button
-                          key={stk.id}
-                          type="button"
-                          onClick={() => handleSendStickerDirect(stk.url, stk.type)}
-                          className="shrink-0 p-1.5 bg-white/90 hover:bg-white active:scale-95 rounded-2xl border border-white/90 shadow-xs hover:shadow-md transition-all flex items-center justify-center group"
-                          title={`Send "${stk.name}"`}
-                        >
-                          {stk.type === "video" ? (
-                            <video
-                              src={stk.url}
-                              autoPlay
-                              loop
-                              muted
-                              playsInline
-                              className="w-13 h-13 md:w-15 md:h-15 object-contain rounded-xl pointer-events-none"
-                            />
-                          ) : (
-                            <img
-                              src={stk.url}
-                              alt={stk.name}
-                              referrerPolicy="no-referrer"
-                              className="w-13 h-13 md:w-15 md:h-15 object-contain pointer-events-none group-hover:scale-110 transition-transform"
-                            />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
 
                 {selectedMediaItems.length > 0 && (
                   <div className="pointer-events-auto flex flex-col bg-white/95 backdrop-blur-xl border border-gray-200/90 rounded-2xl p-2.5 mx-auto mb-2 max-w-3xl w-full shadow-lg relative transition-all">
@@ -4483,204 +5565,346 @@ export default function Messages() {
                       </div>
                     )}
 
-                    <form
-                      onSubmit={handleSend}
-                      className="pointer-events-auto flex items-end space-x-2 w-full max-w-2xl mx-auto bg-white/60 backdrop-blur-md border border-white/40 shadow-xs px-3 py-1.5 rounded-[28px] transform-gpu transition-all focus-within:border-white/70 focus-within:bg-white/70"
-                    >
-                      <div className="relative shrink-0 self-end mb-[1px]">
-                        <button
-                          type="button"
-                          onClick={() => setShowAttachMenu((prev) => !prev)}
-                          className={`w-9 h-9 text-gray-800 bg-white/70 hover:bg-white/90 active:scale-95 rounded-full transition-all shrink-0 border border-white/50 shadow-2xs flex items-center justify-center cursor-pointer ${showAttachMenu ? 'rotate-45 bg-white/90' : ''}`}
-                          title="Attach files"
-                        >
-                          <Plus className="w-5 h-5 stroke-[2.2] text-gray-800 transition-transform duration-200" />
-                        </button>
-
-                        <AnimatePresence>
-                          {showAttachMenu && (
-                            <>
-                              <div
-                                className="fixed inset-0 z-[120]"
-                                onClick={() => setShowAttachMenu(false)}
+                    {/* Smart Sticker Suggestions (placed directly above input box, tight, transparent, rounded, smooth scroll) */}
+                    {stickerSuggestions.length > 0 && !isRecording && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 4 }}
+                        transition={{ duration: 0.12 }}
+                        className="pointer-events-auto flex items-center space-x-2 px-2.5 py-0.5 mx-auto mb-1 max-w-3xl w-full overflow-x-auto no-scrollbar touch-pan-x overscroll-contain select-none bg-transparent border-0 shadow-none"
+                      >
+                        {stickerSuggestions.map((stk) => (
+                          <button
+                            key={stk.id}
+                            type="button"
+                            onClick={() => handleSendStickerDirect(stk.url, stk.type)}
+                            className="shrink-0 p-1 rounded-2xl bg-white/60 dark:bg-neutral-800/60 hover:bg-white dark:hover:bg-neutral-800 border border-neutral-200/50 dark:border-neutral-700/50 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-2xs group"
+                            title={stk.title || "Send Sticker"}
+                          >
+                            {stk.type === "video" ? (
+                              <video
+                                src={stk.url}
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                className="w-13 h-13 md:w-15 md:h-15 object-contain rounded-xl pointer-events-none group-hover:scale-105 transition-transform"
                               />
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.88, y: 10 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.88, y: 10 }}
-                                transition={{ type: 'spring', damping: 25, stiffness: 380 }}
-                                className="absolute bottom-12 left-0 z-[130] bg-white/98 backdrop-blur-2xl border border-gray-200/90 shadow-[0_12px_36px_rgba(0,0,0,0.18)] rounded-2xl p-1.5 min-w-[160px] flex flex-col space-y-1 select-none"
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setShowAttachMenu(false);
-                                    fileInputRef.current?.click();
-                                  }}
-                                  className="flex items-center space-x-2.5 px-3 py-2 rounded-xl hover:bg-gray-100/90 active:scale-98 transition-all text-left group cursor-pointer"
-                                >
-                                  <div className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                    <ImageIcon className="w-3.5 h-3.5" />
-                                  </div>
-                                  <span className="text-xs font-bold text-gray-900">Photos</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setShowAttachMenu(false);
-                                    docInputRef.current?.click();
-                                  }}
-                                  className="flex items-center space-x-2.5 px-3 py-2 rounded-xl hover:bg-purple-50/80 active:scale-98 transition-all text-left group cursor-pointer"
-                                >
-                                  <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                    <FileText className="w-3.5 h-3.5" />
-                                  </div>
-                                  <span className="text-xs font-bold text-gray-900">Document</span>
-                                </button>
-                              </motion.div>
-                            </>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                      <input
-                        type="file"
-                        className="hidden"
-                        ref={fileInputRef}
-                        onChange={handleImageSelect}
-                        accept="image/*,video/*"
-                        multiple
-                      />
-                      <input
-                        type="file"
-                        className="hidden"
-                        ref={docInputRef}
-                        onChange={handleDocumentSelect}
-                        accept="*/*"
-                        multiple
-                      />
-
-                      {isRecording ? (
-                        <div className="flex-1 flex items-center justify-between bg-red-500/10 backdrop-blur-xl border border-red-500/30 rounded-[22px] px-3.5 py-1.5 my-0.5 min-w-0">
-                          {/* Recording Dot & Time */}
-                          <div className="flex items-center space-x-2 shrink-0">
-                            <span className="relative flex h-3 w-3">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
-                            </span>
-                            <span className="text-red-600 text-[13.5px] font-mono font-bold tabular-nums tracking-tight">
-                              {Math.floor(recordingDuration / 60)}:
-                              {(recordingDuration % 60).toString().padStart(2, "0")}
-                            </span>
-                          </div>
-
-                          {/* Android Multi-Bar Waveform Audio Visualizer */}
-                          <div className="flex items-center space-x-[3px] px-2 overflow-hidden flex-1 justify-center max-w-[210px]">
-                            {[35, 75, 45, 95, 60, 100, 50, 85, 40, 90, 65, 80, 55, 35, 75, 50, 85, 40, 90, 60].map((h, idx) => (
-                              <div
-                                key={idx}
-                                className="w-[3px] bg-gradient-to-t from-red-500 via-pink-500 to-rose-400 rounded-full animate-pulse"
-                                style={{
-                                  height: `${Math.max(6, Math.min(28, h * 0.28))}px`,
-                                  animationDuration: `${0.35 + (idx % 6) * 0.12}s`,
-                                  animationDelay: `${idx * 35}ms`
+                            ) : (
+                              <img
+                                src={stk.url}
+                                alt={stk.title || "Sticker"}
+                                referrerPolicy="no-referrer"
+                                loading="lazy"
+                                className="w-13 h-13 md:w-15 md:h-15 object-contain pointer-events-none rounded-xl group-hover:scale-105 transition-transform"
+                                onError={(e) => {
+                                  const el = e.currentTarget;
+                                  if (stk.url.includes('/uploads/') && !el.dataset.retried) {
+                                    el.dataset.retried = 'true';
+                                    el.src = `/uploads/${stk.url.split('/uploads/')[1]}`;
+                                  }
                                 }}
                               />
-                            ))}
-                          </div>
+                            )}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
 
-                          {/* Actions: Cancel (Trash) & Send Voice */}
-                          <div className="flex items-center space-x-2 shrink-0">
+                    {/* Modern Clean Chat Input Form - Compact, Soft, Perfect Concentric Circles */}
+                    <form
+                      onSubmit={handleSend}
+                      className="pointer-events-auto flex items-center w-full max-w-3xl mx-auto px-2 py-1 select-none"
+                    >
+                      {/* Main Clean Pill Container - Sleek, not elongated, no bloated box */}
+                      <div className="w-full bg-white/95 dark:bg-[#18191d]/95 backdrop-blur-md border border-neutral-200/90 dark:border-white/10 rounded-full px-1.5 py-1 flex items-center space-x-1.5 transition-all min-w-0 min-h-[44px] shadow-xs self-center">
+                        
+                        {/* Hidden File Inputs */}
+                        <input
+                          type="file"
+                          className="hidden"
+                          ref={fileInputRef}
+                          onChange={handleImageSelect}
+                          accept="image/*,video/*"
+                          multiple
+                        />
+                        <input
+                          type="file"
+                          className="hidden"
+                          ref={docInputRef}
+                          onChange={handleDocumentSelect}
+                          accept="*/*"
+                          multiple
+                        />
+
+                        {/* LEFT CIRCLE BUTTON: Cancel when recording, Sky Blur file share when idle */}
+                        {isRecording ? (
+                          <button
+                            type="button"
+                            onClick={cancelRecording}
+                            className="w-9 h-9 rounded-full bg-rose-500/15 dark:bg-rose-500/25 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 border border-rose-400/30 flex items-center justify-center shrink-0 cursor-pointer active:scale-90 transition-all touch-manipulation shadow-none"
+                            title="Cancel Voice Recording"
+                          >
+                            <X className="w-4.5 h-4.5 stroke-[2.2]" />
+                          </button>
+                        ) : (
+                          <div className="relative shrink-0 flex items-center">
                             <button
                               type="button"
-                              onClick={cancelRecording}
-                              className="w-8.5 h-8.5 bg-white/90 hover:bg-red-100 text-red-600 border border-red-200/80 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-2xs cursor-pointer"
-                              title="Cancel Voice Message"
+                              onClick={() => setShowAttachMenu((prev) => !prev)}
+                              className={`w-9 h-9 rounded-full bg-sky-500/15 dark:bg-sky-400/20 backdrop-blur-md text-sky-600 dark:text-sky-300 border border-sky-400/30 hover:bg-sky-500/25 active:scale-90 flex items-center justify-center shrink-0 cursor-pointer transition-all touch-manipulation shadow-xs ${showAttachMenu ? 'rotate-45' : ''}`}
+                              title="Share File / Media"
                             >
-                              <Trash2 className="w-4 h-4 text-red-500" />
+                              <Paperclip className="w-4 h-4 stroke-[2.2]" />
                             </button>
+
+                            <AnimatePresence>
+                              {showAttachMenu && (
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-[120]"
+                                    onClick={() => setShowAttachMenu(false)}
+                                  />
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.9, y: 8 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.9, y: 8 }}
+                                    transition={{ duration: 0.15 }}
+                                    className="absolute bottom-12 left-0 z-[130] bg-white dark:bg-neutral-900 border border-neutral-200/90 dark:border-neutral-700 shadow-xl rounded-2xl p-1.5 min-w-[160px] flex flex-col space-y-1 select-none"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowAttachMenu(false);
+                                        fileInputRef.current?.click();
+                                      }}
+                                      className="flex items-center space-x-2.5 px-3 py-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-98 transition-all text-left cursor-pointer border-0 touch-manipulation"
+                                    >
+                                      <div className="w-7.5 h-7.5 rounded-full bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 flex items-center justify-center shrink-0">
+                                        <ImageIcon className="w-4 h-4" />
+                                      </div>
+                                      <span className="text-xs font-bold text-neutral-900 dark:text-white">Photos & Videos</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowAttachMenu(false);
+                                        docInputRef.current?.click();
+                                      }}
+                                      className="flex items-center space-x-2.5 px-3 py-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-98 transition-all text-left cursor-pointer border-0 touch-manipulation"
+                                    >
+                                      <div className="w-7.5 h-7.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 flex items-center justify-center shrink-0">
+                                        <FileText className="w-4 h-4" />
+                                      </div>
+                                      <span className="text-xs font-bold text-neutral-900 dark:text-white">Document</span>
+                                    </button>
+                                  </motion.div>
+                                </>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        )}
+
+                        {/* CENTER AREA: Real Sound Visualizer & Timer when recording, or Textarea when idle */}
+                        {isRecording ? (
+                          <div className="flex-1 flex items-center justify-between px-2 min-w-0 select-none">
+                            {/* Live recording indicator + Timer */}
+                            <div className="flex items-center space-x-2 shrink-0">
+                              <span className="relative flex h-2.5 w-2.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600"></span>
+                              </span>
+                              <span className="text-neutral-900 dark:text-white text-[13px] font-mono font-bold tabular-nums">
+                                {Math.floor(recordingDuration / 60)}:
+                                {(recordingDuration % 60).toString().padStart(2, "0")}
+                              </span>
+                            </div>
+
+                            {/* Real Microphone Sound Visualizer Bars */}
+                            <div className="flex items-center space-x-[2.5px] px-2 overflow-hidden flex-1 justify-center max-w-[210px] h-6">
+                              {liveVolumeLevels.map((lvl, idx) => (
+                                <div
+                                  key={idx}
+                                  className="w-[2.5px] bg-gradient-to-t from-sky-500 to-blue-500 dark:from-sky-400 dark:to-blue-400 rounded-full transition-all duration-75"
+                                  style={{
+                                    height: `${lvl}px`,
+                                    opacity: 0.8 + (idx % 3) * 0.1,
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="relative flex-1 min-w-0 flex items-center self-center">
+                              <textarea
+                                ref={textareaRef}
+                                rows={1}
+                                value={inputText}
+                                onChange={(e) => {
+                                  handleTyping(e);
+                                  e.target.style.height = 'auto';
+                                  e.target.style.height = `${Math.min(e.target.scrollHeight, 84)}px`;
+                                }}
+                                onFocus={() => {
+                                  if (messagesContainerRef.current) {
+                                    requestAnimationFrame(() => {
+                                      messagesContainerRef.current?.scrollTo({
+                                        top: messagesContainerRef.current.scrollHeight,
+                                        behavior: 'smooth'
+                                      });
+                                    });
+                                  }
+                                }}
+                                onClick={() => {
+                                  if (messagesContainerRef.current) {
+                                    requestAnimationFrame(() => {
+                                      messagesContainerRef.current?.scrollTo({
+                                        top: messagesContainerRef.current.scrollHeight,
+                                        behavior: 'smooth'
+                                      });
+                                    });
+                                  }
+                                }}
+                                onTouchStart={() => {
+                                  if (messagesContainerRef.current) {
+                                    requestAnimationFrame(() => {
+                                      messagesContainerRef.current?.scrollTo({
+                                        top: messagesContainerRef.current.scrollHeight,
+                                        behavior: 'smooth'
+                                      });
+                                    });
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSend(e as any);
+                                    e.currentTarget.style.height = 'auto';
+                                  }
+                                }}
+                                placeholder="Message..."
+                                className="w-full bg-transparent py-1.5 px-2 border-0 outline-none focus:outline-none focus:ring-0 focus:border-0 text-[14px] font-normal text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 min-w-0 resize-none h-[34px] max-h-[84px] overflow-y-auto no-scrollbar leading-5 flex items-center self-center"
+                              />
+                            </div>
+
+                            {/* Cute 2D Soft Sticker Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (document.activeElement instanceof HTMLElement) {
+                                  document.activeElement.blur();
+                                }
+                                setShowStickerModal((prev) => !prev);
+                              }}
+                              className="w-8 h-8 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-neutral-700/60 active:scale-90 rounded-full transition-all shrink-0 flex items-center justify-center cursor-pointer border-0 shadow-none bg-transparent touch-manipulation"
+                              title="Stickers"
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="w-4.5 h-4.5 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-colors"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7Z" />
+                                <path d="M14 2v6a1 1 0 0 0 1 1h6" />
+                                <circle cx="9" cy="13" r="1" fill="currentColor" />
+                                <circle cx="15" cy="13" r="1" fill="currentColor" />
+                                <path d="M10 16.5c1 .8 3 .8 4 0" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+
+                        {/* RIGHT ACTION BUTTON: Concentric 36x36 Circle (Voice / Send) */}
+                        <div className="shrink-0 relative w-9 h-9 flex items-center justify-center">
+                          {isRecording ? (
+                            /* When recording: Send button appears right here to finish & send voice note */
                             <button
                               type="button"
                               onClick={stopRecording}
-                              className="w-8.5 h-8.5 bg-gradient-to-tr from-[#FE2C55] to-pink-600 hover:from-[#E60045] hover:to-pink-700 active:scale-90 text-white rounded-full transition-transform shadow-[0_3px_10px_rgba(254,44,85,0.35)] flex items-center justify-center cursor-pointer border border-white/40"
+                              className="w-9 h-9 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 active:scale-90 text-white rounded-full flex items-center justify-center cursor-pointer shadow-xs border-0 shrink-0 touch-manipulation transition-all"
                               title="Send Voice Message"
                             >
-                              <Send className="w-4 h-4 ml-0.5" strokeWidth={2.4} />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <textarea
-                          ref={textareaRef}
-                          rows={1}
-                          value={inputText}
-                          onChange={(e) => {
-                            handleTyping(e);
-                            e.target.style.height = 'auto';
-                            e.target.style.height = `${Math.min(e.target.scrollHeight, 80)}px`;
-                          }}
-                          onFocus={() => {
-                            if (messagesContainerRef.current) {
-                              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-                            }
-                          }}
-                          onTouchStart={() => {
-                            if (messagesContainerRef.current) {
-                              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              handleSend(e as any);
-                              e.currentTarget.style.height = 'auto';
-                            }
-                          }}
-                          placeholder="Message..."
-                          className="flex-1 bg-transparent py-1.5 px-2 focus:outline-none focus:ring-0 focus:border-transparent text-[15px] font-normal text-gray-900 placeholder:text-gray-400 placeholder:font-normal min-w-0 resize-none max-h-[80px] overflow-y-auto no-scrollbar leading-snug my-0.5"
-                        />
-                      )}
-
-                      {!isRecording && (
-                        <div className="flex items-center space-x-1.5 shrink-0 self-end mb-[1px]">
-                          {/* STICKER BUTTON ON RIGHT SIDE */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (document.activeElement instanceof HTMLElement) {
-                                document.activeElement.blur();
-                              }
-                              setShowStickerModal((prev) => !prev);
-                            }}
-                            className="w-9 h-9 bg-white/70 hover:bg-white/90 text-gray-700 active:scale-95 rounded-full transition-all shrink-0 border border-white/50 shadow-2xs flex items-center justify-center group cursor-pointer"
-                            title="Stickers, Emojis & Creator"
-                          >
-                            <StickerIcon className="w-4.5 h-4.5 text-gray-700 transform group-hover:rotate-12 transition-transform" strokeWidth={2.2} />
-                          </button>
-
-                          <div className="w-9 h-9 flex items-center justify-center shrink-0">
-                            {(inputText.trim() || selectedImagePreview) ? (
-                              <motion.button
-                                type="submit"
-                                whileTap={{ scale: 0.88 }}
-                                whileHover={{ scale: 1.05 }}
-                                className="w-9 h-9 bg-gradient-to-tr from-[#FE2C55] via-rose-500 to-pink-500 hover:from-[#E60045] hover:to-pink-600 text-white rounded-full transition-all duration-150 flex items-center justify-center shadow-xs border border-white/50 cursor-pointer"
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="w-4.5 h-4.5 text-white"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
                               >
-                                <SendHorizontal className="w-4 h-4 ml-0.5" strokeWidth={2.4} />
-                              </motion.button>
-                            ) : (
+                                <path
+                                  d="M7.4 6.32L15.89 3.49C19.7 2.22 21.77 4.3 20.51 8.11L17.68 16.6C15.78 22.31 12.66 22.31 10.76 16.6L9.92 14.08L7.4 13.24C1.69 11.34 1.69 8.23 7.4 6.32Z"
+                                  stroke="currentColor"
+                                  strokeWidth="2.2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                                <path
+                                  d="M10.11 13.65L13.69 10.06"
+                                  stroke="currentColor"
+                                  strokeWidth="2.2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            </button>
+                          ) : (
+                            <>
+                              {/* Send Button: Exactly concentric, icon perfectly centered without right-shift, color matching message bubble */}
+                              <button
+                                type="submit"
+                                className={`absolute inset-0 w-9 h-9 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 active:scale-90 text-white rounded-full flex items-center justify-center shadow-xs border-0 cursor-pointer touch-manipulation transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] transform-gpu ${
+                                  (inputText.trim() || selectedImagePreview || selectedMediaItems.length > 0)
+                                    ? "opacity-100 scale-100 pointer-events-auto"
+                                    : "opacity-0 scale-50 pointer-events-none"
+                                }`}
+                                title="Send Message"
+                              >
+                                <svg
+                                  viewBox="0 0 24 24"
+                                  className="w-4.5 h-4.5 text-white"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    d="M7.4 6.32L15.89 3.49C19.7 2.22 21.77 4.3 20.51 8.11L17.68 16.6C15.78 22.31 12.66 22.31 10.76 16.6L9.92 14.08L7.4 13.24C1.69 11.34 1.69 8.23 7.4 6.32Z"
+                                    stroke="currentColor"
+                                    strokeWidth="2.2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                  <path
+                                    d="M10.11 13.65L13.69 10.06"
+                                    stroke="currentColor"
+                                    strokeWidth="2.2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              </button>
+
+                              {/* Voice Mic Button: Same circle dimensions & sky-blur style as File button */}
                               <button
                                 type="button"
                                 onClick={startRecording}
-                                className="w-9 h-9 text-gray-700 bg-white/70 hover:bg-white/90 active:scale-95 rounded-full transition-all shrink-0 border border-white/50 shadow-2xs flex items-center justify-center cursor-pointer"
+                                className={`absolute inset-0 w-9 h-9 rounded-full bg-sky-500/15 dark:bg-sky-400/20 backdrop-blur-md text-sky-600 dark:text-sky-300 border border-sky-400/30 hover:bg-sky-500/25 active:scale-90 flex items-center justify-center cursor-pointer shadow-xs touch-manipulation transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] transform-gpu ${
+                                  !(inputText.trim() || selectedImagePreview || selectedMediaItems.length > 0)
+                                    ? "opacity-100 scale-100 pointer-events-auto"
+                                    : "opacity-0 scale-50 pointer-events-none"
+                                }`}
                                 title="Voice Message"
                               >
-                                <Mic className="w-4.5 h-4.5 stroke-[2.2] text-gray-700" />
+                                <Mic className="w-4.5 h-4.5 stroke-[2.2]" />
                               </button>
-                            )}
-                          </div>
+                            </>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </form>
                   </>
                 )}
@@ -4701,18 +5925,18 @@ export default function Messages() {
                       }}
                     ></div>
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.92, y: 4 }}
+                      initial={{ opacity: 0, scale: 0.94, y: 4 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.92, y: 4 }}
+                      exit={{ opacity: 0, scale: 0.94, y: 4 }}
                       transition={{ duration: 0.12, ease: "easeOut" }}
-                      className="fixed ultra-glass-popup rounded-[26px] p-2.5 w-72 z-[250] overflow-hidden shadow-[0_20px_48px_-6px_rgba(0,0,0,0.18)]"
+                      className="fixed bg-white border border-neutral-200/90 rounded-2xl p-2 w-64 md:w-72 z-[250] overflow-hidden shadow-lg select-none"
                       style={{
                         top: Math.max(70, Math.min(contextMenu.y, (window.innerHeight || 800) - 270)),
                         left: Math.max(16, Math.min(contextMenu.x, (window.innerWidth || 400) - 280)),
                       }}
                     >
-                      {/* Unique Expressive Reaction Emojis Bar */}
-                      <div className="flex items-center justify-between px-2 py-1.5 bg-white/70 backdrop-blur-xl rounded-2xl mb-2 border border-white/90 shadow-2xs overflow-x-auto no-scrollbar">
+                      {/* Clean 2D Reaction Emojis Bar */}
+                      <div className="flex items-center justify-between px-1.5 py-1 bg-neutral-100 rounded-xl mb-1.5 border border-neutral-200/60 overflow-x-auto no-scrollbar">
                         {["💖", "🔥", "😮", "😭", "⚡", "🚀", "💯", "👍", "📌"].map((emoji) => (
                           <button
                             key={emoji}
@@ -4721,6 +5945,8 @@ export default function Messages() {
                                 try {
                                   const { updateDoc, doc } =
                                     await import("firebase/firestore");
+                                  const targetMsg = messages.find((m) => m.id === contextMenu.msgId);
+                                  const isSame = (targetMsg as any)?.reaction === emoji;
                                   await updateDoc(
                                     doc(
                                       db,
@@ -4730,7 +5956,7 @@ export default function Messages() {
                                       contextMenu.msgId,
                                     ),
                                     {
-                                      reaction: emoji,
+                                      reaction: isSame ? null : emoji,
                                     },
                                   );
                                 } catch (e) {
@@ -4739,14 +5965,14 @@ export default function Messages() {
                               }
                               closeContextMenu();
                             }}
-                            className="text-[20px] hover:scale-125 active:scale-90 transition-transform p-1 shrink-0 drop-shadow-2xs cursor-pointer"
+                            className="text-[19px] hover:scale-120 active:scale-90 transition-transform p-1 shrink-0 cursor-pointer"
                           >
                             {emoji}
                           </button>
                         ))}
                       </div>
 
-                      {/* Action Items */}
+                      {/* Action Items - Clean 2D */}
                       <div className="space-y-0.5 font-sans">
                         {(() => {
                           const targetMsg = messages.find((m) => m.id === contextMenu.msgId);
@@ -4768,10 +5994,10 @@ export default function Messages() {
                                     });
                                     closeContextMenu();
                                   }}
-                                  className="w-full text-left px-3 py-2 hover:bg-purple-50/80 active:bg-purple-100/80 rounded-xl flex items-center space-x-3 transition-colors text-purple-700 cursor-pointer"
+                                  className="w-full text-left px-3 py-2 hover:bg-neutral-100 active:bg-neutral-200/80 rounded-xl flex items-center space-x-2.5 transition-colors text-purple-700 cursor-pointer"
                                 >
                                   <Bookmark className={`w-4 h-4 ${isAlreadySaved ? "fill-purple-600" : ""}`} />
-                                  <span className="font-medium text-[13.5px]">
+                                  <span className="font-medium text-[13px]">
                                     {isAlreadySaved ? "Remove from Saved Stickers" : "Save to My Stickers"}
                                   </span>
                                 </button>
@@ -4787,10 +6013,10 @@ export default function Messages() {
                                   }
                                   closeContextMenu();
                                 }}
-                                className="w-full text-left px-3 py-2 hover:bg-gray-100/80 active:bg-gray-200/80 rounded-xl flex items-center space-x-3 transition-colors text-gray-800 cursor-pointer"
+                                className="w-full text-left px-3 py-2 hover:bg-neutral-100 active:bg-neutral-200/80 rounded-xl flex items-center space-x-2.5 transition-colors text-neutral-800 cursor-pointer"
                               >
                                 <Reply className="w-4 h-4 text-purple-600" />
-                                <span className="font-medium text-[13.5px]">Reply to message</span>
+                                <span className="font-medium text-[13px]">Reply to message</span>
                               </button>
 
                               {isSticker && stkUrl && (
@@ -4799,10 +6025,10 @@ export default function Messages() {
                                     navigator.clipboard.writeText(stkUrl);
                                     closeContextMenu();
                                   }}
-                                  className="w-full text-left px-3 py-2 hover:bg-gray-100/80 active:bg-gray-200/80 rounded-xl flex items-center space-x-3 transition-colors text-gray-800 cursor-pointer"
+                                  className="w-full text-left px-3 py-2 hover:bg-neutral-100 active:bg-neutral-200/80 rounded-xl flex items-center space-x-2.5 transition-colors text-neutral-800 cursor-pointer"
                                 >
-                                  <Share2 className="w-4 h-4 text-gray-600" />
-                                  <span className="font-medium text-[13.5px]">Share / Copy Link</span>
+                                  <Share2 className="w-4 h-4 text-neutral-600" />
+                                  <span className="font-medium text-[13px]">Share / Copy Link</span>
                                 </button>
                               )}
 
@@ -4814,58 +6040,68 @@ export default function Messages() {
                                     }
                                     closeContextMenu();
                                   }}
-                                  className="w-full text-left px-3 py-2 hover:bg-gray-100/80 active:bg-gray-200/80 rounded-xl flex items-center space-x-3 transition-colors text-gray-800 cursor-pointer"
+                                  className="w-full text-left px-3 py-2 hover:bg-neutral-100 active:bg-neutral-200/80 rounded-xl flex items-center space-x-2.5 transition-colors text-neutral-800 cursor-pointer"
                                 >
-                                  <Copy className="w-4 h-4 text-gray-600" />
-                                  <span className="font-medium text-[13.5px]">Copy text</span>
+                                  <Copy className="w-4 h-4 text-neutral-600" />
+                                  <span className="font-medium text-[13px]">Copy text</span>
                                 </button>
                               )}
                             </>
                           );
                         })()}
 
-                        <div className="h-px bg-gray-200/60 my-1"></div>
+                        <div className="h-px bg-neutral-100 my-1"></div>
 
                         <button
-                          onClick={async () => {
+                          onClick={() => {
                             if (activeChat) {
-                              try {
-                                const targetMsgId = contextMenu.msgId;
-                                const { deleteDoc, doc, updateDoc, getDocs, collection, query, orderBy, limit } =
-                                  await import("firebase/firestore");
-                                await deleteDoc(
-                                  doc(
-                                    db,
-                                    "conversations",
-                                    activeChat,
-                                    "messages",
-                                    targetMsgId,
-                                  ),
-                                );
+                              const targetMsgId = contextMenu.msgId;
+                              closeContextMenu();
+                              // 1. Instant 0ms optimistic local deletion
+                              setMessagesCache((prev) => ({
+                                ...prev,
+                                [activeChat]: (prev[activeChat] || []).filter((m: any) => m.id !== targetMsgId && m.tempId !== targetMsgId)
+                              }));
 
-                                // Fetch remaining latest message to update conversation preview
-                                const q = query(
-                                  collection(db, "conversations", activeChat, "messages"),
-                                  orderBy("createdAt", "desc"),
-                                  limit(1)
-                                );
-                                const snap = await getDocs(q);
-                                let newLastMsg = "";
-                                if (!snap.empty) {
-                                  const latestData = snap.docs[0].data();
-                                  newLastMsg = latestData.content || (latestData.type === "image" ? "Sent a photo" : "Sent a message");
+                              // 2. Background Firestore delete
+                              (async () => {
+                                try {
+                                  const { deleteDoc, doc, updateDoc, getDocs, collection, query, orderBy, limit } =
+                                    await import("firebase/firestore");
+                                  await deleteDoc(
+                                    doc(
+                                      db,
+                                      "conversations",
+                                      activeChat,
+                                      "messages",
+                                      targetMsgId,
+                                    ),
+                                  );
+
+                                  const q = query(
+                                    collection(db, "conversations", activeChat, "messages"),
+                                    orderBy("createdAt", "desc"),
+                                    limit(1)
+                                  );
+                                  const snap = await getDocs(q);
+                                  let newLastMsg = "";
+                                  if (!snap.empty) {
+                                    const latestData = snap.docs[0].data();
+                                    newLastMsg = latestData.content || (latestData.type === "image" ? "Sent a photo" : "Sent a message");
+                                  }
+                                  await updateDoc(doc(db, "conversations", activeChat), { lastMessage: newLastMsg });
+                                } catch (err) {
+                                  console.error("Failed to unsend message", err);
                                 }
-                                await updateDoc(doc(db, "conversations", activeChat), { lastMessage: newLastMsg });
-                              } catch (err) {
-                                console.error("Failed to unsend message", err);
-                              }
+                              })();
+                            } else {
+                              closeContextMenu();
                             }
-                            closeContextMenu();
                           }}
-                          className="w-full text-left px-3 py-2 hover:bg-red-50/90 active:bg-red-100/90 rounded-xl flex items-center space-x-3 transition-colors text-red-600 cursor-pointer"
+                          className="w-full text-left px-3 py-2 hover:bg-rose-50 active:bg-rose-100/90 rounded-xl flex items-center space-x-2.5 transition-colors text-rose-600 font-semibold cursor-pointer"
                         >
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                          <span className="font-medium text-[13.5px]">
+                          <Trash2 className="w-4 h-4 text-rose-500" />
+                          <span className="font-semibold text-[13px]">
                             {messages.find((m) => m.id === contextMenu.msgId)
                               ?.senderId === currentUser?.uid
                               ? "Unsend message"
@@ -4881,37 +6117,25 @@ export default function Messages() {
           )
         ) : (
           <div 
-            className="hidden md:flex flex-1 flex-col items-center justify-center relative overflow-hidden h-full select-none"
-            style={{
-              background: 'linear-gradient(135deg, #f1f5f9 0%, #eef2ff 35%, #faf5ff 70%, #fdf4ff 100%)',
-            }}
+            className="hidden md:flex flex-1 flex-col items-center justify-center relative overflow-hidden h-full select-none bg-white dark:bg-black transition-colors"
           >
-            {/* Ambient artwork floating orbs */}
-            <div className="absolute -top-28 -right-28 w-[480px] h-[480px] rounded-full bg-gradient-to-br from-indigo-200/40 via-purple-200/30 to-pink-200/20 blur-3xl pointer-events-none" />
-            <div className="absolute top-1/2 -left-32 w-[420px] h-[420px] rounded-full bg-gradient-to-tr from-blue-200/35 via-cyan-100/25 to-purple-200/20 blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 right-1/4 w-[440px] h-[440px] rounded-full bg-gradient-to-t from-purple-200/30 via-pink-100/30 to-amber-100/20 blur-3xl pointer-events-none" />
-            <div 
-              className="absolute inset-0 opacity-[0.035] pointer-events-none" 
-              style={{
-                backgroundImage: `radial-gradient(#4f46e5 1px, transparent 1px), radial-gradient(#9333ea 1px, #f8fafc 1px)`,
-                backgroundSize: '28px 28px',
-                backgroundPosition: '0 0, 14px 14px',
-              }}
-            />
+            {/* Ambient Lighting Glow at Top (Identical to Notifications Page) */}
+            <div className="act-ambient-glow pointer-events-none" />
 
-            <div className="relative z-10 flex flex-col items-center text-center max-w-sm px-8 py-10 rounded-3xl bg-white/75 backdrop-blur-2xl border border-white/90 shadow-xl shadow-purple-500/5">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-purple-500/25 mb-4 text-white">
-                <Send className="w-7 h-7 -rotate-12 translate-x-0.5" />
+            <div className="relative z-10 flex flex-col items-center text-center max-w-sm px-8 py-10 rounded-3xl bg-neutral-50/80 dark:bg-neutral-900/60 border border-neutral-200/80 dark:border-white/10 shadow-xs">
+              <div className="w-14 h-14 rounded-2xl bg-neutral-900 dark:bg-white text-white dark:text-black flex items-center justify-center mb-3.5 shadow-none">
+                <Send className="w-6 h-6 -rotate-12 translate-x-0.5" />
               </div>
-              <h3 className="text-xl font-normal text-gray-900 mb-1.5">
+              <h3 className="text-[19px] font-bold text-neutral-950 dark:text-white mb-1.5 tracking-tight">
                 Your Messages
               </h3>
-              <p className="text-sm text-gray-500 leading-relaxed font-normal mb-5">
+              <p className="text-[13px] text-neutral-500 dark:text-neutral-400 leading-relaxed font-normal mb-5">
                 Send private messages, share reels, and connect seamlessly with friends.
               </p>
               <button 
+                type="button"
                 onClick={() => setShowCreateGroup(true)}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-normal px-6 py-2.5 rounded-xl transition-all shadow-sm active:scale-95 text-sm"
+                className="bg-neutral-900 hover:bg-black dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-black font-semibold px-5.5 py-2 rounded-full transition-all shadow-none active:scale-95 text-[13px] cursor-pointer"
               >
                 Start Conversation
               </button>
@@ -4920,83 +6144,339 @@ export default function Messages() {
         )}
       </AnimatePresence>
 
-      {/* Chat Context Menu */}
+      {/* Ultra Clean & Lag-Free Modern Chat Context Menu (Centered, NOT from bottom) */}
       <AnimatePresence>
-        {chatContextMenu && (
-          <>
-            <div
-              className="fixed inset-0 z-[340]"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeContextMenu();
-              }}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                closeContextMenu();
-              }}
-            ></div>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, x: "-50%", y: "-50%" }}
-              animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
-              exit={{ opacity: 0, scale: 0.95, x: "-50%", y: "-50%" }}
-              className="fixed bg-white rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.2)] border border-gray-100 py-2 w-64 z-[350] overflow-hidden left-1/2 top-1/2"
-            >
-              <button
-                onClick={async () => {
-                  try {
-                    const { deleteDoc, doc } =
-                      await import("firebase/firestore");
-                    await deleteDoc(
-                      doc(db, "conversations", chatContextMenu.convId),
-                    );
-                    setChatContextMenu(null);
-                    if (activeChat === chatContextMenu.convId)
-                      setActiveChat(null);
-                    setConversations((c) =>
-                      c.filter((x) => x.id !== chatContextMenu.convId),
-                    );
-                  } catch (e) {
-                    console.error("Error deleting chat", e);
-                  }
+        {chatContextMenu && (() => {
+          const conv = conversations.find((c) => c.id === chatContextMenu.convId);
+          const isJarvis = chatContextMenu.convId === "jarvis";
+          const isGroup = !isJarvis && (
+            (conv as any)?.isGroup || 
+            !!(conv as any)?.groupName || 
+            (conv?.participantIds ? conv.participantIds.length > 2 : false)
+          );
+          const otherUid = chatContextMenu.otherUid || (!isGroup ? conv?.participantIds?.find((id) => id !== currentUser?.uid) : undefined);
+          const friendUser = otherUid ? userDataCache[otherUid] : null;
+          const friendName = isJarvis 
+            ? "Ennvo Jarvis" 
+            : isGroup 
+            ? (conv as any)?.groupName || "Group Chat"
+            : friendUser?.name || (conv?.participantNames || {})[otherUid || ""] || "Friend";
+          const rawAvatar = isJarvis
+            ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80"
+            : isGroup
+            ? (conv as any)?.groupAvatar
+            : friendUser?.avatar || (conv?.participantAvatars || {})[otherUid || ""];
+          const friendAvatar = rawAvatar && rawAvatar.trim().length > 0 && !rawAvatar.includes('ui-avatars.com')
+            ? rawAvatar
+            : `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(friendName)}&backgroundColor=f1f5f9`;
+          const friendUsername = (friendUser as any)?.username || (friendUser as any)?.email?.split('@')[0] || (friendName && friendName !== 'Friend' ? friendName.toLowerCase().replace(/[^a-z0-9]/g, '_') : "");
+          const isUserOnline = otherUid ? (presenceData[otherUid]?.isOnline || false) : false;
+          const isPinned = pinnedChatIds.includes(chatContextMenu.convId);
+          const isMuted = mutedChatIds.includes(chatContextMenu.convId);
+
+          return (
+            <>
+              {/* Soft Dimmed Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.14 }}
+                className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[500] touch-manipulation"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeContextMenu();
                 }}
-                className="w-full text-left px-4 py-2 hover:bg-red-50 flex items-center space-x-3 transition-colors text-red-600"
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  closeContextMenu();
+                }}
+              />
+
+              {/* Centered Modal (Never slides from bottom) */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.93, y: 6 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.93, y: 6 }}
+                transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[92%] max-w-[360px] z-[510] select-none flex flex-col space-y-2.5 will-change-transform transform-gpu pointer-events-auto"
+                onClick={(e) => e.stopPropagation()}
               >
-                <Trash2 className="w-5 h-5" />
-                <span className="font-normal text-[14px]">Delete Chat</span>
-              </button>
-              {chatContextMenu.otherUid && (
-                <button
-                  onClick={async () => {
-                    try {
-                      if (!currentUser) return;
-                      const { unfollowUser } =
-                        await import("../services/followService");
-                      await unfollowUser(
-                        currentUser.uid,
-                        chatContextMenu.otherUid!,
-                      );
-                      const { deleteDoc, doc } =
-                        await import("firebase/firestore");
-                      await deleteDoc(
-                        doc(db, "conversations", chatContextMenu.convId),
-                      );
+                {/* 1. TOP ROUNDED CARD: Friend Identity */}
+                <div className="w-full bg-white dark:bg-[#16171b] rounded-[26px] p-4 shadow-[0_16px_45px_rgba(0,0,0,0.35)] border border-neutral-200/80 dark:border-white/10 flex items-center space-x-3.5 relative overflow-hidden backdrop-blur-xl">
+                  {/* Subtle ambient accent glow */}
+                  <div className="absolute top-0 right-0 w-28 h-28 bg-purple-500/10 dark:bg-purple-500/15 rounded-full blur-2xl pointer-events-none" />
+
+                  {/* Friend Avatar */}
+                  <div className="relative shrink-0">
+                    <img 
+                      src={friendAvatar} 
+                      alt={friendName} 
+                      className="w-13 h-13 rounded-full object-cover ring-2 ring-purple-500/30 dark:ring-purple-400/40"
+                      referrerPolicy="no-referrer"
+                    />
+                    {isUserOnline && (
+                      <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-sky-500 rounded-full border-2 border-white dark:border-[#16171b]" />
+                    )}
+                  </div>
+
+                  {/* Identity Details */}
+                  <div className="flex-1 min-w-0 pr-6">
+                    <div className="flex items-center space-x-1.5">
+                      <h2 className="text-[15.5px] font-bold text-neutral-900 dark:text-white truncate">
+                        {friendName}
+                      </h2>
+                      {isPinned && (
+                        <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-[9.5px] font-bold rounded-md shrink-0">
+                          Pinned
+                        </span>
+                      )}
+                      {isMuted && (
+                        <span className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 text-[9.5px] font-bold rounded-md shrink-0">
+                          Muted
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Clean Friend Username */}
+                    {friendUsername && (
+                      <div className="flex items-center space-x-1.5 mt-0.5 truncate">
+                        <span className="text-[12.5px] font-semibold text-purple-600 dark:text-purple-400 truncate">
+                          @{friendUsername}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Online status */}
+                    <p className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5 truncate flex items-center space-x-1">
+                      {isUserOnline ? (
+                        <span className="text-emerald-500 font-semibold">● Active now</span>
+                      ) : isGroup ? (
+                        <span>Group conversation</span>
+                      ) : (
+                        <span>Direct friend</span>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* Close button */}
+                  <button 
+                    type="button" 
+                    onClick={closeContextMenu}
+                    className="absolute top-3.5 right-3.5 w-7 h-7 rounded-full bg-neutral-100 hover:bg-neutral-200 dark:bg-white/10 dark:hover:bg-white/15 flex items-center justify-center text-neutral-500 dark:text-neutral-300 transition-colors cursor-pointer active:scale-90"
+                    title="Close"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* 2. LOWER ROUNDED BOX: Pin, Mute, Clear Chat, Delete Friend */}
+                <div className="w-full bg-white dark:bg-[#16171b] rounded-[26px] p-2 shadow-[0_16px_45px_rgba(0,0,0,0.35)] border border-neutral-200/80 dark:border-white/10 flex flex-col space-y-1 backdrop-blur-xl">
+                  {/* Pin / Unpin */}
+                  <button
+                    type="button"
+                    onClick={() => togglePinChat(chatContextMenu.convId)}
+                    className="w-full text-left px-3.5 py-2.5 hover:bg-neutral-100 dark:hover:bg-white/[0.06] rounded-[20px] flex items-center space-x-3.5 transition-colors text-neutral-800 dark:text-neutral-100 cursor-pointer active:scale-[0.985]"
+                  >
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isPinned ? 'bg-blue-500 text-white shadow-xs' : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400'}`}>
+                      <Pin className="w-4.5 h-4.5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-[13.5px] leading-tight">
+                        {isPinned ? "Unpin Chat" : "Pin"}
+                      </div>
+                      <div className="text-[11px] text-neutral-400 dark:text-neutral-500 truncate mt-0.5">
+                        {isPinned ? "Remove from pinned top" : "Keep conversation pinned at top"}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Mute Notification / Unmute Notification */}
+                  <button
+                    type="button"
+                    onClick={() => toggleMuteChat(chatContextMenu.convId)}
+                    className="w-full text-left px-3.5 py-2.5 hover:bg-neutral-100 dark:hover:bg-white/[0.06] rounded-[20px] flex items-center space-x-3.5 transition-colors text-neutral-800 dark:text-neutral-100 cursor-pointer active:scale-[0.985]"
+                  >
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isMuted ? 'bg-amber-500 text-white shadow-xs' : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'}`}>
+                      {isMuted ? <Bell className="w-4.5 h-4.5" /> : <BellOff className="w-4.5 h-4.5" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-[13.5px] leading-tight">
+                        {isMuted ? "Unmute Notification" : "Mute Notification"}
+                      </div>
+                      <div className="text-[11px] text-neutral-400 dark:text-neutral-500 truncate mt-0.5">
+                        {isMuted ? "Turn message alerts back on" : "Silence notifications and alerts"}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Clear Chat History */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmAction({
+                        type: 'clear_chat',
+                        convId: chatContextMenu.convId,
+                        otherUid,
+                        friendName,
+                      });
                       setChatContextMenu(null);
-                      if (activeChat === chatContextMenu.convId)
-                        setActiveChat(null);
-                      setConversations((c) =>
-                        c.filter((x) => x.id !== chatContextMenu.convId),
-                      );
-                    } catch (e) {
-                      console.error("Error deleting friend", e);
+                    }}
+                    className="w-full text-left px-3.5 py-2.5 hover:bg-orange-50 dark:hover:bg-orange-950/20 rounded-[20px] flex items-center space-x-3.5 transition-colors text-neutral-800 dark:text-neutral-100 cursor-pointer active:scale-[0.985] group"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+                      <Layers className="w-4.5 h-4.5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-[13.5px] leading-tight group-hover:text-orange-600 dark:group-hover:text-orange-400">
+                        Clear Chat History
+                      </div>
+                      <div className="text-[11px] text-neutral-400 dark:text-neutral-500 truncate mt-0.5">
+                        Delete all messages in this conversation
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Delete Friend */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmAction({
+                        type: otherUid ? 'delete_friend' : 'delete_chat',
+                        convId: chatContextMenu.convId,
+                        otherUid,
+                        friendName,
+                      });
+                      setChatContextMenu(null);
+                    }}
+                    className="w-full text-left px-3.5 py-2.5 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-[20px] flex items-center space-x-3.5 transition-colors text-rose-600 dark:text-rose-400 cursor-pointer active:scale-[0.985]"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 flex items-center justify-center shrink-0">
+                      <UserX className="w-4.5 h-4.5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-[13.5px] leading-tight">
+                        {otherUid ? "Delete Friend" : "Delete Chat"}
+                      </div>
+                      <div className="text-[11px] text-rose-500/80 dark:text-rose-400/70 truncate mt-0.5">
+                        {otherUid ? `Unfriend ${friendName} and delete conversation` : "Permanently remove conversation"}
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          );
+        })()}
+      </AnimatePresence>
+
+      {/* Lag-Free Custom In-App Confirmation Modal (Clear History & Delete Friend) */}
+      <AnimatePresence>
+        {confirmAction && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[520] touch-manipulation"
+              onClick={() => setConfirmAction(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 10 }}
+              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[88%] max-w-[340px] bg-white dark:bg-[#16171b] rounded-[28px] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.5)] border border-neutral-200/80 dark:border-white/10 z-[530] select-none flex flex-col items-center text-center will-change-transform transform-gpu pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Action Icon Badge */}
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3.5 shadow-sm ${
+                confirmAction.type === 'clear_chat'
+                  ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20'
+                  : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+              }`}>
+                {confirmAction.type === 'clear_chat' ? (
+                  <Layers className="w-7 h-7" strokeWidth={2.2} />
+                ) : (
+                  <Trash2 className="w-7 h-7" strokeWidth={2.2} />
+                )}
+              </div>
+
+              {/* Title */}
+              <h3 className="text-[17px] font-bold text-neutral-900 dark:text-white tracking-tight">
+                {confirmAction.type === 'clear_chat'
+                  ? 'Clear Chat History?'
+                  : confirmAction.type === 'delete_friend'
+                  ? 'Delete Friend?'
+                  : 'Delete Conversation?'}
+              </h3>
+
+              {/* Description */}
+              <p className="text-[13px] text-neutral-500 dark:text-neutral-400 mt-2 leading-relaxed max-w-[270px]">
+                {confirmAction.type === 'clear_chat'
+                  ? `All messages with ${confirmAction.friendName} will be cleared permanently.`
+                  : confirmAction.type === 'delete_friend'
+                  ? `Are you sure you want to remove ${confirmAction.friendName} from your friends? This chat will also be deleted.`
+                  : `Are you sure you want to delete this conversation with ${confirmAction.friendName}?`}
+              </p>
+
+              {/* Action Buttons (Confirm & Cancel) */}
+              <div className="flex items-center space-x-2.5 w-full mt-6">
+                <button
+                  type="button"
+                  onClick={() => setConfirmAction(null)}
+                  className="flex-1 py-3 rounded-2xl bg-neutral-100 hover:bg-neutral-200 dark:bg-white/10 dark:hover:bg-white/15 text-neutral-700 dark:text-neutral-200 font-semibold text-[13.5px] transition-all cursor-pointer active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const action = confirmAction;
+                    setConfirmAction(null);
+                    if (action.type === 'clear_chat') {
+                      try {
+                        const { clearConversationMessages } = await import("../services/chatService");
+                        await clearConversationMessages(action.convId);
+                        setMessagesCache((prev) => ({ ...prev, [action.convId]: [] }));
+                      } catch (err) {
+                        console.error("Error clearing chat messages:", err);
+                      }
+                    } else if (action.type === 'delete_friend') {
+                      try {
+                        if (currentUser && action.otherUid) {
+                          const { unfollowUser } = await import("../services/followService");
+                          await unfollowUser(currentUser.uid, action.otherUid);
+                        }
+                        const { deleteDoc, doc } = await import("firebase/firestore");
+                        await deleteDoc(doc(db, "conversations", action.convId));
+                        if (activeChat === action.convId) setActiveChat(null);
+                        setConversations((c) => c.filter((x) => x.id !== action.convId));
+                      } catch (err) {
+                        console.error("Error deleting friend:", err);
+                      }
+                    } else if (action.type === 'delete_chat') {
+                      try {
+                        const { deleteDoc, doc } = await import("firebase/firestore");
+                        await deleteDoc(doc(db, "conversations", action.convId));
+                        if (activeChat === action.convId) setActiveChat(null);
+                        setConversations((c) => c.filter((x) => x.id !== action.convId));
+                      } catch (err) {
+                        console.error("Error deleting chat:", err);
+                      }
                     }
                   }}
-                  className="w-full text-left px-4 py-2 hover:bg-red-50 flex items-center space-x-3 transition-colors text-red-600"
+                  className={`flex-1 py-3 rounded-2xl text-white font-bold text-[13.5px] transition-all cursor-pointer active:scale-95 shadow-md ${
+                    confirmAction.type === 'clear_chat'
+                      ? 'bg-orange-600 hover:bg-orange-500 shadow-orange-600/30'
+                      : 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/30'
+                  }`}
                 >
-                  <UserX className="w-5 h-5" />
-                  <span className="font-normal text-[14px]">Delete Friend</span>
+                  Confirm
                 </button>
-              )}
+              </div>
             </motion.div>
           </>
         )}
@@ -5891,173 +7371,17 @@ export default function Messages() {
         )}
       </AnimatePresence>
 
-      {/* Create Group Modal */}
-      <AnimatePresence>
-        {showCreateGroup && (
-          <motion.div 
-            initial={{ y: "100%", opacity: 1 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: "100%", opacity: 1 }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-0 z-[999] flex flex-col bg-white h-[100dvh] w-full"
-          >
-            <input
-              type="file"
-              ref={groupPfpInputRef}
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                  const img = new Image();
-                  img.onload = () => {
-                    const canvas = document.createElement("canvas");
-                    const MAX_WIDTH = 500;
-                    const scaleSize = MAX_WIDTH / img.width;
-                    canvas.width = MAX_WIDTH;
-                    canvas.height = img.height * scaleSize;
-                    const ctx = canvas.getContext("2d");
-                    ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    setNewGroupAvatar(canvas.toDataURL("image/jpeg", 0.8));
-                  };
-                  img.src = event.target?.result as string;
-                };
-                reader.readAsDataURL(file);
-              }}
-            />
-
-            <div className="px-4 py-3.5 border-b border-gray-100 flex items-center justify-between pt-8 md:pt-4 bg-white shrink-0 z-10">
-              <div className="flex items-center">
-                <button
-                  onClick={() => {
-                    setShowCreateGroup(false);
-                    setNewGroupAvatar(null);
-                  }}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors active:scale-95"
-                >
-                  <ArrowLeft className="w-6 h-6 text-gray-900" />
-                </button>
-                <h3 className="font-normal text-gray-900 text-[19px] ml-2 tracking-tight">
-                  New Group
-                </h3>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col no-scrollbar">
-              <div className="flex justify-center mt-2 mb-4 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => groupPfpInputRef.current?.click()}
-                  className="w-20 h-20 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center relative shadow-sm hover:opacity-90 active:scale-95 transition-all overflow-visible group"
-                >
-                  {newGroupAvatar ? (
-                    <img src={newGroupAvatar} className="w-full h-full rounded-full object-cover" alt="Group PFP" />
-                  ) : (
-                    <UserPlus className="w-8 h-8 text-blue-500" strokeWidth={1.5} />
-                  )}
-                  <div className="absolute bottom-0 right-0 w-7 h-7 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center shadow-sm group-hover:bg-blue-600 transition-colors">
-                    <Plus className="w-4 h-4 text-white" strokeWidth={2.5} />
-                  </div>
-                </button>
-              </div>
-
-              <input
-                type="text"
-                placeholder="Group Name"
-                className="w-full text-2xl font-normal text-center outline-none border-none placeholder-gray-300 pb-3 mb-4 bg-transparent shrink-0"
-                id="groupNameInput"
-                autoFocus
-              />
-
-              <div className="w-full h-[1px] bg-gray-100 mb-3 shrink-0"></div>
-
-              <h4 className="font-normal text-[13px] text-gray-500 mb-2 uppercase tracking-wider px-2 shrink-0">
-                Select Members
-              </h4>
-
-              <div className="flex-1 space-y-1.5 overflow-y-auto min-h-[220px] pb-4">
-                {followers.map((f) => (
-                  <label
-                    key={f.id}
-                    className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-2xl cursor-pointer transition-colors group active:scale-[0.98]"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <img
-                        src={
-                          f.avatar ||
-                          `https://ui-avatars.com/api/?name=${f.name}&background=random`
-                        }
-                        className="w-[46px] h-[46px] rounded-full object-cover shadow-sm border border-gray-100"
-                        alt="Avatar"
-                      />
-                      <span className="font-normal text-[16px] text-gray-900">
-                        {f.name}
-                      </span>
-                    </div>
-                    <div className="relative flex-shrink-0">
-                      <input
-                        type="checkbox"
-                        value={f.id}
-                        className="peer sr-only group-checkbox"
-                      />
-                      <div className="w-6 h-6 rounded-full border-[1.5px] border-gray-300 peer-checked:bg-blue-500 peer-checked:border-blue-500 flex items-center justify-center transition-all shadow-sm">
-                        <Check
-                          className="w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 scale-50 peer-checked:scale-100 transition-all duration-200"
-                          strokeWidth={3}
-                        />
-                      </div>
-                    </div>
-                  </label>
-                ))}
-                {followers.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-10 text-gray-400 space-y-3">
-                    <UserPlus className="w-8 h-8 opacity-50" />
-                    <p className="text-sm font-normal">
-                      You need friends to create a group!
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="shrink-0 px-6 py-4 border-t border-gray-100 bg-white z-20 pb-[max(env(safe-area-inset-bottom),16px)]">
-              <button
-                onClick={async () => {
-                  const groupNameInput = document.getElementById(
-                    "groupNameInput",
-                  ) as HTMLInputElement;
-                  const checkboxes = document.querySelectorAll(
-                    ".group-checkbox:checked",
-                  ) as NodeListOf<HTMLInputElement>;
-                  const selectedIds = Array.from(checkboxes).map(
-                    (c) => c.value,
-                  );
-                  if (selectedIds.length > 0 && currentUser) {
-                    try {
-                      const { createGroupConversation } =
-                        await import("../services/chatService");
-                      const newChatId = await createGroupConversation(
-                        currentUser.uid,
-                        selectedIds,
-                        groupNameInput.value || "New Group",
-                        newGroupAvatar || undefined,
-                      );
-                      setActiveChat(newChatId);
-                      setShowCreateGroup(false);
-                      setNewGroupAvatar(null);
-                    } catch (err) {}
-                  }
-                }}
-                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3.5 rounded-2xl transition-all active:scale-98 shadow-lg shadow-purple-500/20 flex items-center justify-center text-[16px]"
-              >
-                Create Group Chat
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Create Group Full-Screen Page Modal */}
+      <CreateGroupModal
+        isOpen={showCreateGroup}
+        onClose={() => setShowCreateGroup(false)}
+        currentUser={currentUser}
+        availableCandidates={availableGroupCandidates}
+        onCreated={(chatId) => {
+          setActiveChat(chatId);
+          setShowCreateGroup(false);
+        }}
+      />
 
       {/* Inbox Privacy Sheet */}
       <AnimatePresence>
@@ -6067,34 +7391,36 @@ export default function Messages() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/40 z-[200]"
+              className="fixed inset-0 bg-black/50 backdrop-blur-xs z-[200]"
               onClick={() => setShowPrivacySheet(false)}
             />
             <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[210] px-6 pt-5 pb-10 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] border-t border-purple-100 animate-in slide-in-from-bottom"
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 30, stiffness: 320 }}
+              className="fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:-translate-y-1/2 max-w-md mx-auto bg-white dark:bg-[#18181B] rounded-t-[32px] md:rounded-[28px] z-[210] px-6 pt-5 pb-8 shadow-[0_-8px_30px_rgb(0,0,0,0.15)] md:shadow-2xl border-t md:border border-neutral-200/80 dark:border-white/10"
             >
-              <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6"></div>
+              <div className="w-12 h-1.5 bg-neutral-200 dark:bg-neutral-700 rounded-full mx-auto mb-5 md:hidden"></div>
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-[19px] font-normal text-gray-950 tracking-tight">
+                <h3 className="text-[19px] font-extrabold text-neutral-950 dark:text-white tracking-tight">
                   Activity Status
                 </h3>
                 <button
+                  type="button"
                   onClick={() => setShowPrivacySheet(false)}
-                  className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+                  className="w-8 h-8 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 flex items-center justify-center transition-colors border-0 cursor-pointer"
                 >
-                  <X className="w-5 h-5 text-gray-500" />
+                  <X className="w-4.5 h-4.5" strokeWidth={2.4} />
                 </button>
               </div>
-              <p className="text-[13px] font-normal text-gray-500 mb-6 leading-relaxed">
-                Choose who can see when you're active on the app.
+              <p className="text-[13px] font-normal text-neutral-500 dark:text-neutral-400 mb-5 leading-relaxed">
+                Choose who can see when you are active on the app.
               </p>
               
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <button
+                  type="button"
                   onClick={async () => {
                     setPrivacyMode("public");
                     setShowPrivacySheet(false);
@@ -6112,25 +7438,26 @@ export default function Messages() {
                       } catch (e) {}
                     }
                   }}
-                  className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${privacyMode === "public" ? "border-purple-200 bg-purple-50/40" : "border-gray-100 hover:border-gray-200 bg-white"}`}
+                  className={`w-full flex items-center justify-between p-3.5 rounded-2xl border transition-all text-left cursor-pointer ${privacyMode === "public" ? "border-purple-500/40 bg-purple-50/60 dark:bg-purple-950/30" : "border-neutral-200/80 dark:border-white/10 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 bg-transparent"}`}
                 >
                   <div className="flex items-center space-x-3.5">
-                    <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
-                      <div className="w-3.5 h-3.5 rounded-full bg-green-500 shadow-sm shadow-green-500/50"></div>
+                    <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center shrink-0">
+                      <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"></div>
                     </div>
                     <div>
-                      <span className="font-normal text-[15px] text-gray-900 block leading-none mb-1">Public (Active)</span>
-                      <span className="text-[12px] text-gray-500 font-light block leading-tight">Everyone can see when you are online</span>
+                      <span className="font-bold text-[15px] text-neutral-900 dark:text-white block leading-none mb-1">Public (Online)</span>
+                      <span className="text-[12px] text-neutral-500 dark:text-neutral-400 font-normal block leading-tight">Everyone can see when you are online</span>
                     </div>
                   </div>
                   {privacyMode === "public" && (
-                    <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center shrink-0">
-                      <Check className="w-4 h-4 text-white" strokeWidth={3} />
+                    <div className="w-6 h-6 rounded-full bg-purple-600 text-white flex items-center justify-center shrink-0">
+                      <Check className="w-3.5 h-3.5" strokeWidth={3} />
                     </div>
                   )}
                 </button>
 
                 <button
+                  type="button"
                   onClick={async () => {
                     setPrivacyMode("private");
                     setShowPrivacySheet(false);
@@ -6148,20 +7475,20 @@ export default function Messages() {
                       } catch (e) {}
                     }
                   }}
-                  className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${privacyMode === "private" ? "border-purple-200 bg-purple-50/40" : "border-gray-100 hover:border-gray-200 bg-white"}`}
+                  className={`w-full flex items-center justify-between p-3.5 rounded-2xl border transition-all text-left cursor-pointer ${privacyMode === "private" ? "border-purple-500/40 bg-purple-50/60 dark:bg-purple-950/30" : "border-neutral-200/80 dark:border-white/10 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 bg-transparent"}`}
                 >
                   <div className="flex items-center space-x-3.5">
-                    <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
-                      <EyeOff className="w-5 h-5 text-gray-500" />
+                    <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center shrink-0">
+                      <EyeOff className="w-5 h-5 text-neutral-600 dark:text-neutral-300" strokeWidth={2.2} />
                     </div>
                     <div>
-                      <span className="font-normal text-[15px] text-gray-900 block leading-none mb-1">Private (Hidden)</span>
-                      <span className="text-[12px] text-gray-500 font-light block leading-tight">Hide your online status from everyone</span>
+                      <span className="font-bold text-[15px] text-neutral-900 dark:text-white block leading-none mb-1">Private (Offline)</span>
+                      <span className="text-[12px] text-neutral-500 dark:text-neutral-400 font-normal block leading-tight">Hide your online status from everyone</span>
                     </div>
                   </div>
                   {privacyMode === "private" && (
-                    <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center shrink-0">
-                      <Check className="w-4 h-4 text-white" strokeWidth={3} />
+                    <div className="w-6 h-6 rounded-full bg-purple-600 text-white flex items-center justify-center shrink-0">
+                      <Check className="w-3.5 h-3.5" strokeWidth={3} />
                     </div>
                   )}
                 </button>
@@ -6171,148 +7498,57 @@ export default function Messages() {
         )}
       </AnimatePresence>
 
-      {/* Status Input Modal */}
-      <AnimatePresence>
-        {showStatusInput && (
-          <motion.div 
-            initial={{ opacity: 0, y: "100%" }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 220 }}
-            className="fixed inset-0 z-[200] flex flex-col bg-gradient-to-b from-[#faf5ff] via-white to-white p-6 font-sans"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between pt-8 pb-4 border-b border-purple-50/50">
-              <button
-                onClick={() => setShowStatusInput(false)}
-                className="p-2.5 hover:bg-purple-50 rounded-full transition-colors active:scale-90"
-              >
-                <ArrowLeft className="w-6 h-6 text-gray-900" />
-              </button>
-              <h2 className="text-xl font-normal text-gray-950 tracking-tight">Create a Note</h2>
-              <div className="w-11"></div> {/* Spacer for symmetry */}
-            </div>
+      {/* Full-Screen Status Note Modal */}
+      <StatusNoteModal
+        isOpen={showStatusInput}
+        onClose={() => setShowStatusInput(false)}
+        currentUser={currentUser}
+        currentNote={(currentUser as any)?.statusNote || ""}
+        mode={statusNoteMode}
+        onNoteUpdated={(newNote) => {
+          if (currentUser) {
+            (currentUser as any).statusNote = newNote;
+            useAppStore.getState().setCurrentUser({ ...currentUser, statusNote: newNote } as any);
+          }
+          setStatusNoteText(newNote);
+        }}
+      />
 
-            {/* Content Body */}
-            <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col items-center py-8">
-              {/* Note Live Preview over Avatar */}
-              <div className="relative mb-10 flex flex-col items-center pt-8">
-                <div className="relative">
-                  {/* Note Bubble Preview */}
-                  <div className="absolute top-[-10px] left-1/2 -translate-x-1/2 px-3 py-1.5 bg-white border border-purple-100 shadow-[0_4px_16px_rgba(168,85,247,0.18)] rounded-full z-20 w-auto max-w-[120px] transition-all duration-300">
-                    <span className="text-[11px] font-semibold text-purple-700 leading-tight block text-center truncate max-w-[100px]">
-                      {statusNoteText || "Share a thought..."}
-                    </span>
-                    <div className="absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white border-b border-r border-purple-100 rotate-45"></div>
-                  </div>
-
-                  <img
-                    src={
-                      currentUser?.avatar ||
-                      `https://ui-avatars.com/api/?name=${currentUser?.name || "Me"}&background=random`
-                    }
-                    className="w-[100px] h-[100px] rounded-full object-cover border-2 border-white shadow-md"
-                    alt="Me"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-                <span className="text-sm font-normal text-gray-500 mt-4">
-                  Your note will appear above your picture
-                </span>
-              </div>
-
-              {/* Input Area */}
-              <div className="w-full max-w-sm px-4">
-                <input
-                  type="text"
-                  placeholder="What's on your mind?"
-                  value={statusNoteText}
-                  onChange={(e) => setStatusNoteText(e.target.value)}
-                  maxLength={60}
-                  className="w-full text-center text-xl font-normal outline-none border-b-2 border-purple-100 focus:border-purple-500 pb-3 transition-colors placeholder:text-gray-300 bg-transparent text-gray-950"
-                  autoFocus
-                  onKeyDown={async (e) => {
-                    if (e.key === "Enter" && currentUser) {
-                      const newNote = statusNoteText.trim();
-                      (currentUser as any).statusNote = newNote;
-                      useAppStore.getState().setCurrentUser({ ...currentUser, statusNote: newNote } as any);
-                      try { localStorage.setItem(`status_note_${currentUser.uid}`, newNote); } catch (err) {}
-                      setShowStatusInput(false);
-                      try {
-                        const { updateDoc, doc } = await import("firebase/firestore");
-                        updateDoc(doc(db, "users", currentUser.uid), { statusNote: newNote }).catch(() => {});
-                      } catch (err) {}
-                    }
-                  }}
-                />
-                
-                {/* Character Counter */}
-                <div className="flex justify-end mt-2 text-xs text-gray-400 font-light">
-                  {statusNoteText.length} / 60
-                </div>
-
-                {/* Status Suggestions */}
-                <div className="mt-8">
-                  <p className="text-xs font-semibold text-purple-600/80 uppercase tracking-widest text-center mb-4">
-                    Quick suggestions
-                  </p>
-                  <div className="flex flex-wrap justify-center gap-2.5">
-                    {["☕ Chillin", "✍️ Studying", "🎮 Gaming", "🎧 Music", "😴 Sleepy", "✈️ Travel", "✨ Happy", "🔥 Hustling"].map((sug) => (
-                      <button
-                        key={sug}
-                        onClick={() => setStatusNoteText(sug)}
-                        className="px-3.5 py-1.5 bg-purple-50/80 hover:bg-purple-100 text-purple-700 rounded-full text-xs font-medium transition-all active:scale-95 border border-purple-100/30 shadow-sm cursor-pointer"
-                      >
-                        {sug}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom Actions sticky to bottom */}
-            <div className="sticky bottom-0 pt-4 pb-[max(env(safe-area-inset-bottom),24px)] w-full max-w-sm mx-auto flex flex-col space-y-3 shrink-0 z-20 bg-white/90 backdrop-blur-lg px-2">
-              <button
-                onClick={() => {
-                  if (currentUser) {
-                    const newNote = statusNoteText.trim();
-                    (currentUser as any).statusNote = newNote;
-                    useAppStore.getState().setCurrentUser({ ...currentUser, statusNote: newNote } as any);
-                    try { localStorage.setItem(`status_note_${currentUser.uid}`, newNote); } catch (err) {}
-                    setShowStatusInput(false);
-                    import("firebase/firestore").then(({ updateDoc, doc }) => {
-                      updateDoc(doc(db, "users", currentUser.uid), { statusNote: newNote }).catch(() => {});
-                    }).catch(() => {});
-                  }
-                }}
-                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3.5 rounded-2xl transition-all shadow-lg shadow-purple-500/20 active:scale-98 text-center cursor-pointer"
-              >
-                Share Note
-              </button>
-              {(currentUser as any)?.statusNote && (
-                <button
-                  onClick={() => {
-                    if (currentUser) {
-                      (currentUser as any).statusNote = "";
-                      useAppStore.getState().setCurrentUser({ ...currentUser, statusNote: "" } as any);
-                      try { localStorage.removeItem(`status_note_${currentUser.uid}`); } catch (err) {}
-                      setStatusNoteText("");
-                      setShowStatusInput(false);
-                      import("firebase/firestore").then(({ updateDoc, doc, deleteField }) => {
-                        updateDoc(doc(db, "users", currentUser.uid), { statusNote: deleteField() }).catch(() => {});
-                      }).catch(() => {});
-                    }
-                  }}
-                  className="w-full bg-red-50 hover:bg-red-100 text-red-500 font-medium py-3 rounded-2xl transition-all active:scale-98 text-center text-xs cursor-pointer"
-                >
-                  Delete Status Note
-                </button>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Story-Style Full-Screen Note Viewer Modal */}
+      <StoryNoteViewerModal
+        isOpen={!!viewingNoteUser}
+        onClose={() => setViewingNoteUser(null)}
+        noteUser={viewingNoteUser}
+        currentUserId={currentUser?.uid}
+        onReply={handleNoteReply}
+        onSendReaction={handleNoteReaction}
+        onDeleteMyNote={() => {
+          if (currentUser) {
+            (currentUser as any).statusNote = "";
+            useAppStore.getState().setCurrentUser({ ...currentUser, statusNote: "" } as any);
+            try { localStorage.removeItem(`status_note_${currentUser.uid}`); } catch (err) {}
+            setStatusNoteText("");
+            import("firebase/firestore").then(({ updateDoc, doc, deleteField }) => {
+              updateDoc(doc(db, "users", currentUser.uid), { statusNote: deleteField() }).catch(() => {});
+            }).catch(() => {});
+          }
+        }}
+        onNewNote={() => {
+          setStatusNoteMode("create");
+          setStatusNoteText("");
+          setShowStatusInput(true);
+        }}
+        onEditNote={() => {
+          setStatusNoteMode("edit");
+          setStatusNoteText((currentUser as any)?.statusNote || "");
+          setShowStatusInput(true);
+        }}
+        onEditMyNote={() => {
+          setStatusNoteMode("edit");
+          setStatusNoteText((currentUser as any)?.statusNote || "");
+          setShowStatusInput(true);
+        }}
+      />
 
       {/* Full-Page Chat Theme Studio Modal (Root Level Overlay) */}
       <ChatThemeStudioModal
@@ -6322,15 +7558,37 @@ export default function Messages() {
         partnerName={activeContact?.name || "Friend"}
         partnerAvatar={activeContact?.avatar || ""}
         isGroup={!!activeContact?.isGroup}
-        onApplyTheme={async (newTheme) => {
+        initialBlur={activeConvThemeBlur}
+        initialBrightness={activeConvThemeBrightness}
+        onApplyTheme={async (newTheme, options) => {
           setChatTheme(newTheme);
+          const blurVal = options?.blur ?? false;
+          const brightVal = typeof options?.brightness === 'number' ? options.brightness : 1;
+
+          if (activeChat) {
+            setConversationThemeOverrides((prev) => {
+              const updated = {
+                ...prev,
+                [activeChat]: {
+                  theme: newTheme,
+                  blur: blurVal,
+                  brightness: brightVal,
+                }
+              };
+              try { localStorage.setItem('chat_theme_overrides', JSON.stringify(updated)); } catch(e) {}
+              return updated;
+            });
+          }
+
           if (activeConversation?.id) {
             try {
               await updateConversationTheme(
                 activeConversation.id,
                 newTheme,
                 currentUser?.name,
-                currentUser?.uid
+                currentUser?.uid,
+                blurVal,
+                brightVal
               );
             } catch (err) {
               console.error("Theme update error:", err);
@@ -6343,20 +7601,31 @@ export default function Messages() {
         }}
       />
 
-      {/* Sticker, GIF & Emoji Picker Modal */}
+      {/* Sticker Picker Modal (For You, My Stickers, Saved) */}
       <StickerPickerModal
         isOpen={showStickerModal}
         onClose={() => setShowStickerModal(false)}
         onSelectSticker={(url, type) => {
           handleSendStickerDirect(url, type);
         }}
-        onSelectEmoji={(emoji) => {
-          setInputText((prev) => prev + emoji);
-          if (textareaRef.current) {
-            textareaRef.current.focus();
-          }
-        }}
         currentUser={currentUser}
+      />
+
+      {/* Global Sticker Click Viewer Modal (Enlarged preview in rounded box with 2 clean buttons: Save Sticker & Share to Chat) */}
+      <StickerViewerModal
+        isOpen={Boolean(viewingStickerUrl)}
+        onClose={() => setViewingStickerUrl(null)}
+        stickerUrl={viewingStickerUrl}
+        stickerType={viewingStickerType}
+        currentUserId={currentUser?.uid}
+        onShareToChat={(url, type) => {
+          handleSendStickerDirect(url, type);
+          setViewingStickerUrl(null);
+        }}
+        onDeleteSticker={(url) => {
+          setCommunityStickersCache((prev) => prev.filter((s) => s.url !== url));
+          setViewingStickerUrl(null);
+        }}
       />
     </div>
   );

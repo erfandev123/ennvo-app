@@ -5,10 +5,11 @@ import {
   Check, ChevronRight, ArrowLeft, CheckCircle2, AlertTriangle, Loader2, 
   KeyRound, ShieldCheck, Mail, EyeOff, Fingerprint, BadgeCheck, 
   ShieldAlert, Info, QrCode, Copy, FileText, RefreshCw, Film, Sparkles,
-  Palette, UserCheck, Play
+  Palette, UserCheck, Play, Headphones, Bell, BellOff
 } from 'lucide-react';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { native, NotifMode } from '../native';
 import { useAppStore } from '../store';
 import { PrivacyPolicyModal } from '../components/PrivacyPolicyModal';
 import { AccountVerificationModal } from '../components/settings/AccountVerificationModal';
@@ -20,6 +21,7 @@ import { VerificationScreen } from '../components/settings/VerificationScreen';
 import { BlockedAccountsScreen } from '../components/settings/BlockedAccountsScreen';
 import { changeUserPassword, sendPasswordReset, setUserPassword, logout } from '../services/authService';
 import { saveAccount } from '../services/accountService';
+import { shareUserProfile } from '../services/deepLinkService';
 
 type SettingsScreen = 
   | 'main'                    // Settings and privacy
@@ -30,6 +32,7 @@ type SettingsScreen =
   | 'security_overview'       // Security overview (No security issues found)
   | 'manage_devices'          // Manage devices
   | 'private_account'         // Private account settings
+  | 'notifications'           // Push notification privacy (On / Off / Secret)
   | 'comments'                // Comments settings
   | 'mentions'                // Mentions settings
   | 'direct_messages'         // Direct messages settings
@@ -44,7 +47,7 @@ type SettingsScreen =
 
 export default function Settings() {
   const [currentScreen, setCurrentScreen] = useState<SettingsScreen>('main');
-  const { setIsAuthenticated, currentUser, setCurrentUser, popPage, setShowAccountSwitcherModal, navStyle, setNavStyle, profileStyle, setProfileStyle, reelsStyle, setReelsStyle, appTheme, setAppTheme } = useAppStore();
+  const { setIsAuthenticated, currentUser, setCurrentUser, popPage, pushPage, setShowAccountSwitcherModal, navStyle, setNavStyle, profileStyle, setProfileStyle, reelsStyle, setReelsStyle, appTheme, setAppTheme } = useAppStore();
 
   const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
 
@@ -56,21 +59,28 @@ export default function Settings() {
 
   const effectiveScreen: SettingsScreen = isDesktop && currentScreen === 'main' ? 'account' : currentScreen;
 
-  const handleLogout = async () => {
-    if (window.confirm('Are you sure you want to log out of Ennvo? Your account will be saved on this device for quick login.')) {
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const handleLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = async () => {
+    setShowLogoutModal(false);
+    try {
       if (currentUser) {
         saveAccount(currentUser);
       }
-      try {
-        localStorage.removeItem('ennvo_last_active_user_v1');
-      } catch (e) {}
-      try {
-        await logout();
-      } catch (e) {}
-      setCurrentUser(null);
-      setIsAuthenticated(false);
-      setShowAccountSwitcherModal(true);
-    }
+    } catch (e) {}
+    try {
+      localStorage.removeItem('ennvo_last_active_user_v1');
+    } catch (e) {}
+    try {
+      await logout();
+    } catch (e) {}
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    setShowAccountSwitcherModal(false);
   };
 
   const handleSwitchAccount = () => {
@@ -268,6 +278,31 @@ export default function Settings() {
       });
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const [notifMode, setNotifModeState] = useState<NotifMode>(() => {
+    return (currentUser?.notifMode as NotifMode) || native.getNotifMode() || 'on';
+  });
+
+  const handleSelectNotifMode = async (mode: NotifMode) => {
+    setNotifModeState(mode);
+    native.setNotifMode(mode);
+    if (currentUser?.uid) {
+      setCurrentUser({
+        ...currentUser,
+        notifMode: mode
+      });
+      try {
+        await updateDoc(doc(db, 'users', currentUser.uid), { notifMode: mode });
+        fetch('/api/native/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: currentUser.uid, notifMode: mode })
+        }).catch(() => {});
+      } catch (e) {
+        console.warn('Failed saving notifMode to profile:', e);
+      }
     }
   };
 
@@ -572,7 +607,18 @@ export default function Settings() {
       items: [
         { id: 'private_account', label: 'Private Account', icon: Lock, badge: userSettings.isPrivate ? 'On' : 'Off' },
         { id: 'blocked_accounts', label: 'Blocked Accounts', icon: UserX },
-        { id: 'share_profile', label: 'Share Profile', icon: Share2, action: () => setShowShareModal(true) }
+        { 
+          id: 'share_profile', 
+          label: 'Share Profile', 
+          icon: Share2, 
+          action: () => {
+            if (currentUser?.username) {
+              shareUserProfile(currentUser.username);
+            } else {
+              setShowShareModal(true);
+            }
+          } 
+        }
       ]
     },
     {
@@ -589,12 +635,39 @@ export default function Settings() {
     {
       title: 'Preferences',
       items: [
+        { id: 'notifications', label: 'Push Notifications & Privacy', icon: Bell, badge: notifMode === 'secret' ? 'Secret' : (notifMode === 'off' ? 'Off' : 'On') },
         { id: 'ui_customize', label: 'UI Customization', icon: Palette, badge: navStyle === 'glass' ? 'Glass' : 'Classic' },
         { id: 'display_theme', label: 'Display & Theme', icon: Sun, badge: userSettings.appTheme === 'dark' ? 'Dark' : 'Light' },
         { id: 'free_up_space', label: 'Free Up Space & Cache', icon: Trash2 }
       ]
+    },
+    {
+      title: 'Customer Care & Help Center',
+      items: [
+        {
+          id: 'help_center',
+          label: '24/7 Customer Care & Help Desk',
+          icon: Headphones,
+          badge: '24/7',
+          action: () => {
+            alert('📞 Ennvo Official Customer Care\nHotline: +880 1700-000000\nEmail: support@ennvo.com\n\nFor Verified Blue Badge inquiries, review responses are delivered within 24 hours. Our support staff is online 24/7.');
+          }
+        }
+      ]
+    },
+    {
+      title: 'Administration',
+      items: [
+        {
+          id: 'admin_panel',
+          label: 'Company Admin Panel',
+          icon: ShieldAlert,
+          badge: 'Staff',
+          action: () => pushPage('admin')
+        }
+      ]
     }
-  ], [devices.length, userSettings.isPrivate, userSettings.appTheme, navStyle]);
+  ], [devices.length, userSettings.isPrivate, userSettings.appTheme, navStyle, notifMode, currentUser?.username, pushPage]);
 
   return (
     <div className="h-full w-full overflow-y-auto overscroll-y-contain bg-[#F8F9FA] text-gray-900 font-sans antialiased md:pl-24 flex flex-col items-center">
@@ -746,7 +819,13 @@ export default function Settings() {
                   </button>
 
                   <button 
-                    onClick={() => setShowShareModal(true)}
+                    onClick={() => {
+                      if (currentUser?.username) {
+                        shareUserProfile(currentUser.username);
+                      } else {
+                        setShowShareModal(true);
+                      }
+                    }}
                     className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
@@ -954,6 +1033,22 @@ export default function Settings() {
                       }`} />
                     </button>
                   </div>
+                  <button 
+                    onClick={() => setCurrentScreen('notifications')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Bell className="w-5 h-5 text-gray-700 shrink-0" />
+                      <div>
+                        <span className="text-[15px] font-medium text-gray-900 block">Push Notifications & Privacy</span>
+                        <span className="text-[12px] text-gray-500 block">On, Secret mode, or Off</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <span className="text-[13px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full capitalize">{notifMode}</span>
+                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    </div>
+                  </button>
 
                   <button 
                     onClick={() => setCurrentScreen('ui_customize')}
@@ -1002,10 +1097,24 @@ export default function Settings() {
                 </div>
               </div>
 
-              {/* --- 5. Support & About --- */}
+              {/* --- 5. Support, Admin & Log out --- */}
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">About & Log out</p>
+                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">About, Staff & Log out</p>
                 <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                  <button 
+                    onClick={() => pushPage('admin')}
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-purple-50/50 transition-colors text-left"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <ShieldAlert className="w-5 h-5 text-purple-600 shrink-0" />
+                      <div>
+                        <span className="text-[15px] font-semibold text-gray-900 block">Company Admin Panel</span>
+                        <span className="text-[11px] text-purple-600 font-medium">Staff & Operations Dashboard</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-purple-600 shrink-0" />
+                  </button>
+
                   <button 
                     onClick={() => setShowPrivacyModal(true)}
                     className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
@@ -1971,6 +2080,171 @@ export default function Settings() {
         )}
 
         {/* ========================================================= */}
+        {/* SUB-SCREEN: Push Notifications & Privacy (On/Off/Secret)  */}
+        {/* ========================================================= */}
+        {effectiveScreen === 'notifications' && (
+          <div className="flex-1 flex flex-col pb-16">
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+              <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600 cursor-pointer">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-base font-bold text-gray-900 tracking-tight text-center flex-1 pr-5">
+                Push Notifications
+              </h1>
+            </div>
+
+            <div className="px-4 py-5 space-y-6">
+              {/* Informational banner */}
+              <div className="bg-purple-50/70 border border-purple-200/80 rounded-2xl p-4 flex items-start space-x-3">
+                <ShieldCheck className="w-5 h-5 text-purple-700 shrink-0 mt-0.5" />
+                <div className="text-xs text-purple-900 space-y-1">
+                  <p className="font-bold">Message Push Notification Modes</p>
+                  <p className="text-purple-800 leading-relaxed font-normal">
+                    Choose how message notifications appear on your phone. <strong className="font-bold">Calls are never affected</strong> and will continue to ring in every mode.
+                  </p>
+                </div>
+              </div>
+
+              {/* 3-Way Notification Options */}
+              <div className="space-y-3">
+                <p className="text-[13px] font-bold text-gray-500 uppercase tracking-wider px-1">
+                  Notification Mode
+                </p>
+
+                {/* Option 1: ON */}
+                <button
+                  type="button"
+                  onClick={() => handleSelectNotifMode('on')}
+                  className={`w-full p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-start justify-between ${
+                    notifMode === 'on'
+                      ? 'bg-purple-50/80 border-purple-400 shadow-xs'
+                      : 'bg-white border-gray-200/80 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-start space-x-3.5">
+                    <div className={`p-2.5 rounded-xl shrink-0 ${
+                      notifMode === 'on' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      <Bell className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-[15px] font-bold text-gray-900">On (Normal Notifications)</h4>
+                      <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                        Show standard notifications with sender name, message preview text, and profile picture.
+                      </p>
+                    </div>
+                  </div>
+                  {notifMode === 'on' ? (
+                    <Check className="w-5 h-5 text-purple-600 shrink-0 ml-3 mt-1" />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-3 mt-1" />
+                  )}
+                </button>
+
+                {/* Option 2: SECRET (Requested by user) */}
+                <button
+                  type="button"
+                  onClick={() => handleSelectNotifMode('secret')}
+                  className={`w-full p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-start justify-between ${
+                    notifMode === 'secret'
+                      ? 'bg-purple-50/80 border-purple-400 shadow-xs'
+                      : 'bg-white border-gray-200/80 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-start space-x-3.5">
+                    <div className={`p-2.5 rounded-xl shrink-0 ${
+                      notifMode === 'secret' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      <Lock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <h4 className="text-[15px] font-bold text-gray-900">Secret Mode (Private)</h4>
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-200 text-purple-900 px-2 py-0.5 rounded-full">
+                          Confidential
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                        The phone shows strictly the app name <strong className="text-gray-900 font-semibold">"Ennvo"</strong> and <strong className="text-gray-900 font-semibold">"New notification"</strong>. Sender name, text message, and profile photo are completely hidden from lock screen for total privacy.
+                      </p>
+                    </div>
+                  </div>
+                  {notifMode === 'secret' ? (
+                    <Check className="w-5 h-5 text-purple-600 shrink-0 ml-3 mt-1" />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-3 mt-1" />
+                  )}
+                </button>
+
+                {/* Option 3: OFF */}
+                <button
+                  type="button"
+                  onClick={() => handleSelectNotifMode('off')}
+                  className={`w-full p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-start justify-between ${
+                    notifMode === 'off'
+                      ? 'bg-purple-50/80 border-purple-400 shadow-xs'
+                      : 'bg-white border-gray-200/80 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-start space-x-3.5">
+                    <div className={`p-2.5 rounded-xl shrink-0 ${
+                      notifMode === 'off' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      <BellOff className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-[15px] font-bold text-gray-900">Off (Disable Message Notifications)</h4>
+                      <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                        Mute all incoming message notifications. (Incoming audio and video calls will still ring in every mode).
+                      </p>
+                    </div>
+                  </div>
+                  {notifMode === 'off' ? (
+                    <Check className="w-5 h-5 text-purple-600 shrink-0 ml-3 mt-1" />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-3 mt-1" />
+                  )}
+                </button>
+              </div>
+
+              {/* Android Background Reliability Settings */}
+              <div className="pt-2 space-y-3">
+                <p className="text-[13px] font-bold text-gray-500 uppercase tracking-wider px-1">
+                  Background Reliability & System Settings
+                </p>
+
+                <div className="bg-white rounded-2xl border border-gray-200/80 p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-900">Background Battery Exemption</h4>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Prevents strict battery savers (Xiaomi, Oppo, Vivo, Samsung) from killing notifications when the app is closed.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => native.requestBatteryExemption()}
+                      className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl active:scale-95 transition-all cursor-pointer shadow-xs"
+                    >
+                      Allow Background Messages & Calls
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => native.openNotificationSettings()}
+                      className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl active:scale-95 transition-all cursor-pointer"
+                    >
+                      System Notification Settings
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
         {/* SUB-SCREEN: Display Theme                                 */}
         {/* ========================================================= */}
         {effectiveScreen === 'display_theme' && (
@@ -2414,6 +2688,45 @@ export default function Settings() {
         isOpen={showPrivacyModal}
         onClose={() => setShowPrivacyModal(false)}
       />
+
+      {/* Modern In-App Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div 
+          className="fixed inset-0 z-[600] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+          onClick={() => setShowLogoutModal(false)}
+        >
+          <div 
+            className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4 border border-gray-100 text-center animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+              <UserX className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Log out of Ennvo?</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                You can always log back in anytime. Your account is saved on this device.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowLogoutModal(false)}
+                className="py-3 px-4 rounded-xl text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmLogout}
+                className="py-3 px-4 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition-colors shadow-md shadow-red-500/20"
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

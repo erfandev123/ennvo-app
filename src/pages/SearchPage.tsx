@@ -3,50 +3,66 @@ import {
   Search as SearchIcon, 
   Image as ImageIcon, 
   Play, 
-  User, 
-  Hash, 
   ArrowLeft, 
   X, 
   Clock, 
   TrendingUp, 
   Sparkles, 
-  ChevronRight,
-  UserCheck,
-  UserPlus,
-  MapPin,
-  Compass,
-  Navigation,
-  Radio
+  UserCheck, 
+  UserPlus, 
+  MapPin, 
+  Compass, 
+  Navigation, 
+  Radio, 
+  Sun, 
+  Moon,
+  Heart,
+  Video
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../store';
-import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { followUser, unfollowUser } from '../services/followService';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { FacebookSearchSkeleton } from '../components/Skeletons';
 
+// Light haptic feedback helper
+const triggerHaptic = (ms = 12) => {
+  if (typeof window !== 'undefined' && window.navigator?.vibrate) {
+    try {
+      window.navigator.vibrate(ms);
+    } catch (_) {}
+  }
+};
+
 const POPULAR_TRENDS = [
-  '#funny', '#music', '#dance', '#tech', 
-  '#lifestyle', '#art', '#nature', '#viral', 
-  '#travel', '#photography', '#gaming', '#reels'
+  '#viral', '#reels', '#music', '#tech', 
+  '#lifestyle', '#art', '#funny', '#dance', 
+  '#photography', '#nature', '#gaming', '#travel'
 ];
 
 const SUGGESTED_KEYWORDS = [
-  'trending videos', 'funny moments', 'tech news', 
-  'dance reels', 'best music', 'travel vlog', 
-  'art & design', 'fitness tips', 'photography'
+  'trending reels', 'best music', 'funny moments', 
+  'tech news', 'dance videos', 'travel vlog', 
+  'art & design', 'fitness tips', 'street photography'
 ];
 
+// In-memory cache for instant lag-free search results
 const searchCacheMap = new Map<string, { users: any[]; posts: any[] }>();
 
-// Skeleton Loader Component for fast visual feedback
-const SearchSkeleton = () => (
-  <FacebookSearchSkeleton />
-);
-
-// Memoized User Card
-const SearchUserCard = React.memo(({ user, onUserClick, currentUser, isFollowing }: { user: any; onUserClick: (u: any) => void; currentUser: any; isFollowing: boolean }) => {
+// 1. Notification-Style Account Card (Squircle, Lag-Free, Soft Tap Feedback)
+const NotificationStyleUserCard = React.memo(({ 
+  user, 
+  onUserClick, 
+  currentUser, 
+  isFollowing 
+}: { 
+  user: any; 
+  onUserClick: (u: any) => void; 
+  currentUser: any; 
+  isFollowing: boolean;
+}) => {
   const [following, setFollowing] = useState(isFollowing);
   const [loading, setLoading] = useState(false);
 
@@ -57,6 +73,7 @@ const SearchUserCard = React.memo(({ user, onUserClick, currentUser, isFollowing
   const handleFollowToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!currentUser || loading) return;
+    triggerHaptic(18);
     setLoading(true);
     const nextState = !following;
     setFollowing(nextState);
@@ -75,83 +92,87 @@ const SearchUserCard = React.memo(({ user, onUserClick, currentUser, isFollowing
     }
   };
 
+  const username = user.username || (user.name ? user.name.toLowerCase().replace(/\s+/g, '') : 'user');
+
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      transition={{ duration: 0.15 }}
-      className="bg-white p-3.5 rounded-2xl shadow-2xs border border-gray-100/90 flex items-center justify-between hover:border-gray-200 transition-all cursor-pointer active:scale-[0.995]"
-      onClick={() => onUserClick(user)}
+    <div 
+      className="act-card-item select-none cursor-pointer group"
+      onClick={() => {
+        triggerHaptic(8);
+        onUserClick(user);
+      }}
     >
-      <div className="flex items-center space-x-3.5 min-w-0 flex-1 pr-2">
+      <div className="relative w-12 h-12 shrink-0">
         <img 
           src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random`} 
-          className="w-12 h-12 rounded-full object-cover border border-gray-100 shadow-2xs shrink-0" 
+          className="w-full h-full rounded-full object-cover shadow-[0_4px_14px_rgba(0,0,0,0.16)]" 
           alt={user.name || 'User'} 
           referrerPolicy="no-referrer" 
           loading="lazy"
         />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center space-x-1.5 truncate">
-            <h4 className="font-semibold text-gray-900 text-[14.5px] truncate">{user.name || 'User'}</h4>
-            {user.isVerified && <VerifiedBadge />}
-          </div>
-          <p className="text-gray-500 text-xs truncate">@{user.username || (user.name ? user.name.toLowerCase().replace(/\s+/g, '') : 'user')}</p>
-        </div>
       </div>
+
+      <div className="flex-1 min-w-0 pr-1">
+        <div className="flex items-center space-x-1.5 truncate">
+          <h4 className="font-bold text-[0.92rem] text-neutral-950 dark:text-white truncate leading-tight group-hover:underline">
+            {user.name || 'User'}
+          </h4>
+          {user.isVerified && <VerifiedBadge className="w-3.5 h-3.5 shrink-0" />}
+        </div>
+        <p className="text-[0.74rem] text-neutral-500 dark:text-neutral-400 font-medium truncate mt-0.5">
+          @{username}
+        </p>
+      </div>
+
       {currentUser?.uid !== user.uid && (
         <button 
+          type="button"
           onClick={handleFollowToggle}
           disabled={loading}
-          className={`px-4 py-1.5 rounded-xl font-medium text-xs transition-all active:scale-95 shadow-2xs flex items-center space-x-1 shrink-0 ${
-            following 
-              ? 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200' 
-              : 'bg-[#0095f6] hover:bg-blue-600 text-white shadow-blue-500/10'
+          className={`act-btn-pill shrink-0 ${
+            following ? 'act-btn-following' : 'act-btn-follow-back'
           }`}
         >
-          {following ? (
-            <>
-              <UserCheck className="w-3.5 h-3.5" />
-              <span>Following</span>
-            </>
-          ) : (
-            <>
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>Follow</span>
-            </>
-          )}
+          {following ? 'Following' : 'Follow'}
         </button>
       )}
-    </motion.div>
+    </div>
   );
 });
 
-// Memoized Media Grid Item
-const GridMediaCard = React.memo(({ item, onClick }: { item: any; onClick: () => void }) => {
+// 2. Uniform Aspect Ratio Media Card (Both Post and Reel have the EXACT SAME BOX SIZE)
+const UniformMediaCard = React.memo(({ 
+  item, 
+  onClick 
+}: { 
+  item: any; 
+  onClick: () => void; 
+}) => {
   const isReel = item.type === 'reel';
   const mediaUrl = item.media?.[0] || '';
   const thumbnail = item.thumbnailUrl || item.thumbnail || (mediaUrl && !mediaUrl.includes('.mp4') && !mediaUrl.includes('video') ? mediaUrl : null);
 
   return (
-    <motion.div 
-      onClick={onClick}
-      whileTap={{ scale: 0.96 }}
-      className={`bg-gray-100 rounded-xl shadow-2xs border border-gray-200/60 overflow-hidden relative group cursor-pointer transition-all ${isReel ? 'aspect-[9/16]' : 'aspect-square'}`}
+    <div 
+      onClick={() => {
+        triggerHaptic(10);
+        onClick();
+      }}
+      className="aspect-[4/5] bg-white dark:bg-black rounded-2xl sm:rounded-3xl border border-gray-200/90 dark:border dark:border-white/20 overflow-hidden relative group cursor-pointer transition-transform duration-200 active:scale-[0.97] select-none shadow-[0_4px_16px_rgba(0,0,0,0.04)]"
     >
       {mediaUrl || thumbnail ? (
-        <div className="w-full h-full relative bg-gray-950">
+        <div className="w-full h-full relative bg-neutral-900 dark:bg-black overflow-hidden">
           {thumbnail ? (
             <img 
               src={thumbnail} 
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-              alt="media thumbnail" 
+              alt="thumbnail" 
               referrerPolicy="no-referrer" 
               loading="lazy"
             />
           ) : isReel ? (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-black">
-              <Play className="w-7 h-7 text-white/80 fill-white/80" />
+            <div className="w-full h-full flex items-center justify-center bg-neutral-950">
+              <Play className="w-8 h-8 text-white fill-white opacity-85" />
             </div>
           ) : (
             <img 
@@ -163,32 +184,81 @@ const GridMediaCard = React.memo(({ item, onClick }: { item: any; onClick: () =>
             />
           )}
 
-          {isReel && (
-            <>
-              <div className="absolute inset-0 bg-black/15 flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity">
-                <div className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-xs flex items-center justify-center border border-white/20">
-                  <Play className="w-4 h-4 text-white fill-white ml-0.5" />
-                </div>
-              </div>
-              <div className="absolute bottom-2 left-2 flex items-center space-x-1 text-white z-10 drop-shadow-md">
-                <Play className="w-3 h-3 fill-white" />
-                <span className="text-[10px] font-semibold">{item.viewsCount || 0}</span>
-              </div>
-              <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
-            </>
-          )}
+          {/* Type Badge on Top-Right */}
+          <div className="absolute top-2.5 right-2.5 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/20 flex items-center space-x-1 text-white text-[10px] font-bold z-10 select-none">
+            {isReel ? (
+              <>
+                <Video className="w-3 h-3 text-rose-400" />
+                <span>Reel</span>
+              </>
+            ) : (
+              <>
+                <ImageIcon className="w-3 h-3 text-emerald-400" />
+                <span>Post</span>
+              </>
+            )}
+          </div>
+
+          {/* Hover Play Button Overlay */}
+          <div className="absolute inset-0 bg-black/25 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            <div className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/30 text-white">
+              <Play className="w-4.5 h-4.5 fill-white ml-0.5" />
+            </div>
+          </div>
+
+          {/* Bottom Info Gradient */}
+          <div className="absolute inset-x-0 bottom-0 pt-8 pb-2.5 px-3 bg-gradient-to-t from-black/85 via-black/50 to-transparent z-10 flex flex-col justify-end text-white">
+            <div className="flex items-center space-x-1.5 min-w-0">
+              <img 
+                src={item.authorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.authorName || 'User')}&background=random`} 
+                alt={item.authorName || 'Author'} 
+                className="w-5 h-5 rounded-full object-cover border border-white/30 shrink-0" 
+                loading="lazy" 
+              />
+              <span className="text-[11px] font-semibold truncate leading-tight">
+                {item.authorName || 'User'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] text-white/80 mt-1 font-medium">
+              {isReel ? (
+                <span className="flex items-center space-x-1">
+                  <Play className="w-2.5 h-2.5 fill-white" />
+                  <span>{item.viewsCount || item.views || 0}</span>
+                </span>
+              ) : (
+                <span className="flex items-center space-x-1">
+                  <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" />
+                  <span>{item.likesCount || item.likes || 0}</span>
+                </span>
+              )}
+              {item.text && (
+                <span className="truncate max-w-[65%] text-[9.5px] opacity-75">
+                  {item.text}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       ) : (
-        <div className="w-full h-full bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 p-3 flex items-center justify-center">
-          <p className="text-white text-[11px] font-medium text-center line-clamp-4 leading-tight">{item.text}</p>
+        <div className="w-full h-full bg-gradient-to-br from-blue-600 to-indigo-700 p-4 flex flex-col items-center justify-center text-center text-white">
+          <p className="text-[13px] font-bold line-clamp-4 leading-relaxed">{item.text}</p>
+          <div className="flex items-center space-x-1.5 mt-2">
+            <img 
+              src={item.authorAvatar || `https://ui-avatars.com/api/?name=User&background=random`} 
+              alt="author" 
+              className="w-5 h-5 rounded-full object-cover" 
+            />
+            <span className="text-[11px] font-medium opacity-90">{item.authorName}</span>
+          </div>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 });
 
 export default function SearchPage() {
-  const [activeTab, setActiveTab] = useState('All');
+  const [activeTab, setActiveTab] = useState<'All' | 'Accounts' | 'Posts' | 'Videos' | 'Nearby'>('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
@@ -196,46 +266,14 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   
+  // Lazy loading pagination for discovery items
+  const [visibleCount, setVisibleCount] = useState(18);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const tabs = ['All', 'Accounts', 'People Nearby', 'Posts', 'Videos'];
 
-  const [userGeoLocation, setUserGeoLocation] = useState<{ lat: number; lng: number; locationName: string } | null>(() => {
-    try {
-      const saved = localStorage.getItem('user_geo_loc');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
-  const [geoLoading, setGeoLoading] = useState(false);
-
-  const requestUserLocation = () => {
-    setGeoLoading(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const loc = {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            locationName: 'Brahmanbaria, Bijoynagar'
-          };
-          setUserGeoLocation(loc);
-          try { localStorage.setItem('user_geo_loc', JSON.stringify(loc)); } catch {}
-          setGeoLoading(false);
-        },
-        (err) => {
-          console.warn('Geolocation fallback:', err);
-          const fallback = { lat: 23.95, lng: 91.11, locationName: 'Brahmanbaria, Bijoynagar' };
-          setUserGeoLocation(fallback);
-          try { localStorage.setItem('user_geo_loc', JSON.stringify(fallback)); } catch {}
-          setGeoLoading(false);
-        },
-        { timeout: 8000, enableHighAccuracy: true }
-      );
-    } else {
-      const fallback = { lat: 23.95, lng: 91.11, locationName: 'Brahmanbaria, Bijoynagar' };
-      setUserGeoLocation(fallback);
-      setGeoLoading(false);
-    }
-  };
+  const tabs: ('All' | 'Accounts' | 'Posts' | 'Videos' | 'Nearby')[] = [
+    'All', 'Accounts', 'Posts', 'Videos', 'Nearby'
+  ];
 
   const { 
     setViewingMedia, 
@@ -247,19 +285,24 @@ export default function SearchPage() {
     currentUser,
     cachedDiscovery,
     setCachedDiscovery,
-    followingIds
+    followingIds,
+    appTheme,
+    setAppTheme
   } = useAppStore();
+
+  const toggleTheme = () => {
+    triggerHaptic(12);
+    setAppTheme(appTheme === 'dark' ? 'light' : 'dark');
+  };
 
   const followingSet = useMemo(() => new Set(followingIds), [followingIds]);
 
-  // Load Recent Searches from localStorage
+  // Load Recent Searches
   useEffect(() => {
     try {
       const saved = localStorage.getItem('recent_searches');
-      if (saved) {
-        setRecentSearches(JSON.parse(saved));
-      }
-    } catch (e) {}
+      if (saved) setRecentSearches(JSON.parse(saved));
+    } catch (_) {}
   }, []);
 
   const saveRecentSearch = useCallback((term: string) => {
@@ -270,7 +313,7 @@ export default function SearchPage() {
       const updated = [cleanTerm, ...filtered].slice(0, 8);
       try {
         localStorage.setItem('recent_searches', JSON.stringify(updated));
-      } catch (e) {}
+      } catch (_) {}
       return updated;
     });
   }, []);
@@ -281,136 +324,46 @@ export default function SearchPage() {
       const updated = prev.filter((item) => item !== termToRemove);
       try {
         localStorage.setItem('recent_searches', JSON.stringify(updated));
-      } catch (e) {}
+      } catch (_) {}
       return updated;
     });
   }, []);
 
-  const clearAllRecentSearches = useCallback(() => {
-    setRecentSearches([]);
-    try {
-      localStorage.removeItem('recent_searches');
-    } catch (e) {}
-  }, []);
-
-  // Compute live auto-complete / text suggestions for Search Engine using real database data
-  const autoSuggestions = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return [];
-
-    const list: { 
-      type: 'tag' | 'user' | 'post' | 'keyword'; 
-      text: string; 
-      sub?: string; 
-      avatar?: string; 
-      rawUser?: any;
-      rawPost?: any;
-    }[] = [];
-
-    // 1. Real User Suggestions from database
-    users.forEach((u) => {
-      const nameMatch = u.name && u.name.toLowerCase().includes(term);
-      const userMatch = u.username && u.username.toLowerCase().includes(term);
-      if (nameMatch || userMatch) {
-        list.push({
-          type: 'user',
-          text: u.name || u.username,
-          sub: `@${u.username || 'user'} • Account`,
-          avatar: u.avatar,
-          rawUser: u
-        });
-      }
-    });
-
-    // 2. Real Post Titles & Captions from real database posts
-    const combinedPosts = [...postsResults, ...cachedDiscovery];
-    const seenPostTexts = new Set<string>();
-
-    combinedPosts.forEach((post) => {
-      if (!post.text) return;
-      const textLower = post.text.toLowerCase();
-      if (textLower.includes(term)) {
-        const textSnippet = post.text.length > 55 ? post.text.slice(0, 55) + '...' : post.text;
-        if (!seenPostTexts.has(textSnippet.toLowerCase())) {
-          seenPostTexts.add(textSnippet.toLowerCase());
-          list.push({
-            type: 'post',
-            text: textSnippet,
-            sub: `${post.type === 'reel' ? 'Reel Video' : 'Post'} • ${post.authorName || 'Creator'}`,
-            avatar: post.authorAvatar || post.media?.[0],
-            rawPost: post
-          });
-        }
-      }
-    });
-
-    // 3. Real Hashtags from Posts & Trends
-    const extractedTags = new Set<string>();
-    combinedPosts.forEach((post) => {
-      if (!post.text) return;
-      const matches = post.text.match(/#[a-zA-Z0-9_]+/g);
-      if (matches) {
-        matches.forEach((t: string) => extractedTags.add(t));
-      }
-    });
-    POPULAR_TRENDS.forEach((t) => extractedTags.add(t));
-
-    extractedTags.forEach((tag) => {
-      const cleanTag = tag.replace('#', '');
-      if (tag.toLowerCase().includes(term) || cleanTag.toLowerCase().includes(term)) {
-        if (!list.some((i) => i.text.toLowerCase() === tag.toLowerCase())) {
-          list.push({ type: 'tag', text: tag, sub: 'Trending Hashtag' });
-        }
-      }
-    });
-
-    // 4. Topic Keyword Auto-completes
-    SUGGESTED_KEYWORDS.forEach((kw) => {
-      if (kw.toLowerCase().includes(term) && !list.some((i) => i.text.toLowerCase() === kw.toLowerCase())) {
-        list.push({ type: 'keyword', text: kw, sub: 'Search Topic' });
-      }
-    });
-
-    // Fallback keyword item if term doesn't match predefined list
-    if (!list.some((i) => i.text.toLowerCase() === term)) {
-      list.unshift({ type: 'keyword', text: term, sub: 'Search keyword' });
-    }
-
-    return list.slice(0, 8);
-  }, [searchTerm, users, postsResults, cachedDiscovery]);
-
-  // Load discovery content with caching
+  // Fetch initial explore discovery items
   useEffect(() => {
-    if (searchTerm.trim()) return;
-
-    if (cachedDiscovery.length === 0) {
-      setLoading(true);
-    }
-
+    if (cachedDiscovery.length > 0) return;
     const fetchDiscovery = async () => {
       try {
-        let q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(30));
-        
-        if (activeTab === 'Posts') {
-          q = query(collection(db, 'posts'), where('type', '==', 'post'), orderBy('createdAt', 'desc'), limit(30));
-        } else if (activeTab === 'Videos') {
-          q = query(collection(db, 'posts'), where('type', '==', 'reel'), orderBy('createdAt', 'desc'), limit(30));
+        const { getFeed } = await import('../services/postService');
+        const feed = await getFeed();
+        if (feed && feed.posts) {
+          setCachedDiscovery(feed.posts);
         }
-
-        const snap = await getDocs(q);
-        const items = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setCachedDiscovery(items);
-      } catch (err) {
-        console.error("Discovery fetch error:", err);
-      } finally {
-        setLoading(false);
+      } catch (e) {
+        console.error('Error fetching discovery feed:', e);
       }
     };
-
     fetchDiscovery();
-  }, [searchTerm, activeTab, setCachedDiscovery, cachedDiscovery.length]);
+  }, [cachedDiscovery.length, setCachedDiscovery]);
 
-  // Debounced search with client-side cache & Firestore index search
+  // Infinite Scroll Observer for lazy loading
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading) {
+          setVisibleCount((prev) => prev + 12);
+        }
+      },
+      { rootMargin: '240px' }
+    );
+
+    if (sentinelRef.current) {
+      observer.observe(sentinelRef.current);
+    }
+    return () => observer.disconnect();
+  }, [loading]);
+
+  // Live Debounced High-Speed Search Engine
   useEffect(() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) {
@@ -436,21 +389,21 @@ export default function SearchPage() {
           collection(db, 'users'),
           where('name', '>=', searchTerm),
           where('name', '<=', searchTerm + '\uf8ff'),
-          limit(10)
+          limit(12)
         );
         
         const usersUsernameQ = query(
           collection(db, 'users'),
           where('username', '>=', term),
           where('username', '<=', term + '\uf8ff'),
-          limit(10)
+          limit(12)
         );
 
         const postsQ = query(
           collection(db, 'posts'),
           where('text', '>=', term),
           where('text', '<=', term + '\uf8ff'),
-          limit(20)
+          limit(24)
         );
 
         const [nameSnap, usernameSnap, postsSnap] = await Promise.all([
@@ -463,7 +416,18 @@ export default function SearchPage() {
         nameSnap.docs.forEach((doc: any) => userMap.set(doc.id, { uid: doc.id, ...doc.data() }));
         usernameSnap.docs.forEach((doc: any) => userMap.set(doc.id, { uid: doc.id, ...doc.data() }));
         
-        const userResults = Array.from(userMap.values());
+        let userResults = Array.from(userMap.values());
+        if (currentUser?.uid) {
+          try {
+            const { getBlockedUsers } = await import('../services/followService');
+            const myBlocked = await getBlockedUsers(currentUser.uid);
+            userResults = userResults.filter((u: any) => 
+              u.uid !== currentUser.uid && !myBlocked.includes(u.uid) && !myBlocked.includes(u.id)
+            );
+          } catch (_) {
+            userResults = userResults.filter((u: any) => u.uid !== currentUser.uid);
+          }
+        }
         const rawPostResults = postsSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
         
         searchCacheMap.set(term, { users: userResults, posts: rawPostResults });
@@ -475,7 +439,7 @@ export default function SearchPage() {
       } finally {
         setLoading(false);
       }
-    }, 220);
+    }, 120);
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
@@ -499,272 +463,271 @@ export default function SearchPage() {
     return postsResults;
   }, [postsResults, activeTab]);
 
-  return (
-    <div className="h-full w-full overflow-y-auto bg-[#f8f9fa] flex flex-col items-center pb-24 no-scrollbar md:pl-24">
-      
-      {/* Sticky Top Header - Android App Bar Style */}
-      <div className="w-full sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100/80 shadow-xs flex flex-col items-center">
-        <div className="w-full max-w-[750px] px-3.5 pt-10 sm:pt-4 pb-2.5 flex items-center space-x-2.5">
-          <button 
-            onClick={() => popPage()} 
-            className="p-2 -ml-1 hover:bg-gray-100/80 rounded-full transition-colors active:scale-95 shrink-0"
-            title="Back"
-          >
-            <ArrowLeft className="w-5.5 h-5.5 text-gray-800" />
-          </button>
+  const visibleDiscovery = useMemo(() => {
+    if (activeTab === 'Videos') return cachedDiscovery.filter(p => p.type === 'reel').slice(0, visibleCount);
+    if (activeTab === 'Posts') return cachedDiscovery.filter(p => p.type !== 'reel').slice(0, visibleCount);
+    return cachedDiscovery.slice(0, visibleCount);
+  }, [cachedDiscovery, visibleCount, activeTab]);
 
-          {/* Android Rounded Pill Input Bar */}
-          <div className="relative flex-1">
-            <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4.5 h-4.5 pointer-events-none" />
-            <input 
-              ref={searchInputRef}
-              type="text" 
-              value={searchTerm}
-              onFocus={() => setIsInputFocused(true)}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  triggerSearchSelect(searchTerm);
-                }
-              }}
-              placeholder="Search people, tags, or topics..." 
-              className="w-full bg-gray-100/90 border border-transparent rounded-full pl-10 pr-9 py-2.5 text-[14.5px] font-normal text-gray-900 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-2xs" 
-            />
-            {searchTerm && (
-              <button 
-                onClick={() => {
-                  setSearchTerm('');
-                  searchInputRef.current?.focus();
-                }} 
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-gray-200/80 hover:bg-gray-300/80 text-gray-600 rounded-full transition-colors active:scale-90"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+  // People Nearby GPS State
+  const [userGeoLocation, setUserGeoLocation] = useState<{ lat: number; lng: number; locationName: string } | null>(() => {
+    try {
+      const saved = localStorage.getItem('user_geo_loc');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+  const [geoLoading, setGeoLoading] = useState(false);
+
+  const requestUserLocation = () => {
+    setGeoLoading(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const loc = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            locationName: 'Brahmanbaria, Bijoynagar'
+          };
+          setUserGeoLocation(loc);
+          try { localStorage.setItem('user_geo_loc', JSON.stringify(loc)); } catch {}
+          setGeoLoading(false);
+        },
+        () => {
+          const fallback = { lat: 23.95, lng: 91.11, locationName: 'Brahmanbaria, Bijoynagar' };
+          setUserGeoLocation(fallback);
+          try { localStorage.setItem('user_geo_loc', JSON.stringify(fallback)); } catch {}
+          setGeoLoading(false);
+        },
+        { timeout: 8000, enableHighAccuracy: true }
+      );
+    } else {
+      const fallback = { lat: 23.95, lng: 91.11, locationName: 'Brahmanbaria, Bijoynagar' };
+      setUserGeoLocation(fallback);
+      setGeoLoading(false);
+    }
+  };
+
+  return (
+    <div className="h-[100dvh] w-full overflow-hidden bg-[#f2f2f7] dark:bg-black text-black dark:text-white flex flex-col md:pl-28 lg:pl-32 select-none relative transition-colors duration-400 font-sans">
+      
+      {/* Ambient Soft Lighting Glow at Top (Identical to Notifications Page) */}
+      <div className="act-ambient-glow" />
+
+      {/* Header with Squircle Back, Notification-Style Search Pill & Theme Toggle */}
+      <header className="h-[56px] px-4 pt-2.5 flex items-center justify-between z-50 shrink-0 gap-2.5">
+        <button 
+          type="button"
+          onClick={() => {
+            triggerHaptic(10);
+            popPage();
+          }}
+          className="act-header-btn shrink-0 md:hidden" 
+          title="Back"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+
+        {/* Squircle Search Input Container */}
+        <div className="flex-1 relative flex items-center max-w-[560px]">
+          <SearchIcon className="absolute left-3.5 text-neutral-400 dark:text-neutral-500 w-4 h-4 pointer-events-none" />
+          <input 
+            ref={searchInputRef}
+            type="text" 
+            value={searchTerm}
+            onFocus={() => setIsInputFocused(true)}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                triggerSearchSelect(searchTerm);
+              }
+            }}
+            placeholder="Search accounts, posts, reels..." 
+            className="w-full bg-white dark:bg-black border border-gray-200/90 dark:border dark:border-white/30 rounded-full pl-9 pr-9 py-2 text-[13.5px] text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-white/40 shadow-xs transition-all antialiased" 
+          />
+          {searchTerm && (
+            <button 
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                searchInputRef.current?.focus();
+              }} 
+              className="absolute right-3 p-1 bg-neutral-200/80 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/20 text-neutral-600 dark:text-neutral-300 rounded-full transition-colors active:scale-90 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
-        {/* Category Tabs Pill Bar */}
-        <div className="w-full max-w-[750px] px-3.5 pb-2 flex space-x-2 overflow-x-auto no-scrollbar">
-          {tabs.map((tab) => (
-            <button 
-              key={tab} 
-              onClick={() => setActiveTab(tab)} 
-              className={`px-4 py-1.5 rounded-full font-medium text-[13px] transition-all whitespace-nowrap active:scale-95 ${
-                activeTab === tab 
-                  ? 'bg-gray-900 text-white shadow-2xs' 
-                  : 'bg-gray-100/80 text-gray-600 hover:bg-gray-200/70'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+        {/* Theme Toggle Button (Identical to Notifications Page) */}
+        <button 
+          type="button"
+          onClick={toggleTheme}
+          className="act-header-btn shrink-0" 
+          title="Toggle Theme"
+        >
+          {appTheme === 'dark' ? (
+            <Sun className="w-[18px] h-[18px] text-amber-400 stroke-[2.2]" />
+          ) : (
+            <Moon className="w-[18px] h-[18px] text-neutral-800 stroke-[2.2]" />
+          )}
+        </button>
+      </header>
+
+      {/* Segmented Category Pill Tabs */}
+      <div className="w-full max-w-[620px] mx-auto px-4 py-2 z-40 shrink-0">
+        <div className="flex space-x-1.5 overflow-x-auto no-scrollbar py-0.5">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab;
+            return (
+              <button 
+                key={tab} 
+                onClick={() => {
+                  triggerHaptic(8);
+                  setActiveTab(tab);
+                }} 
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 cursor-pointer active:scale-95 ${
+                  isActive 
+                    ? 'bg-neutral-950 dark:bg-white text-white dark:text-black shadow-xs' 
+                    : 'bg-white/80 dark:bg-black text-neutral-600 dark:text-neutral-300 border border-gray-200/90 dark:border-white/20 hover:bg-gray-100 dark:hover:bg-white/10'
+                }`}
+              >
+                {tab === 'Videos' ? 'Reels' : tab}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Main Content Body */}
-      <div className="w-full max-w-[750px] px-3.5 pt-3 relative">
-        
-        {/* Interactive Search Engine Suggestions & History Dropdown Overlay */}
-        <AnimatePresence>
-          {isInputFocused && (
-            <>
-              {/* Overlay Backdrop to close suggestions */}
-              <div 
-                className="fixed inset-0 z-20 bg-black/10 backdrop-blur-[1px]"
-                onClick={() => setIsInputFocused(false)}
-              />
-              
-              <motion.div 
-                initial={{ opacity: 0, y: -8, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
-                className="absolute left-3.5 right-3.5 top-1 z-30 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden max-h-[75vh] overflow-y-auto no-scrollbar"
-              >
-                {/* 1. Live Text Auto-Complete Suggestions */}
-                {searchTerm.trim().length > 0 && autoSuggestions.length > 0 && (
-                  <div className="p-2">
-                    <div className="px-3 py-1.5 text-[11px] font-semibold tracking-wider text-gray-400 uppercase flex items-center justify-between">
-                      <span className="flex items-center space-x-1">
-                        <Sparkles className="w-3 h-3 text-blue-500" />
-                        <span>Search Engine Suggestions</span>
-                      </span>
-                    </div>
+      {/* Main Scrollable Viewport */}
+      <div className="flex-1 w-full overflow-y-auto overflow-x-hidden no-scrollbar px-3.5 pt-1 pb-28 relative z-10 overscroll-y-contain">
+        <div className="max-w-[620px] mx-auto relative">
 
-                    {autoSuggestions.map((item, idx) => (
-                      <div 
-                        key={idx}
-                        onClick={() => {
-                          if (item.type === 'user' && item.rawUser) {
-                            handleUserClick(item.rawUser);
-                          } else if (item.type === 'post' && item.rawPost) {
-                            if (item.rawPost.type === 'reel') {
-                              setViewingReel({ ...item.rawPost, single: true });
-                            } else {
-                              setViewingMedia({
-                                type: 'post',
-                                url: item.rawPost.media?.[0],
-                                user: { name: item.rawPost.authorName, avatar: item.rawPost.authorAvatar },
-                                likes: item.rawPost.likesCount,
-                                comments: item.rawPost.commentsCount
-                              });
-                            }
-                            setIsInputFocused(false);
-                          } else {
-                            triggerSearchSelect(item.text);
-                          }
-                        }}
-                        className="flex items-center justify-between px-3 py-2.5 hover:bg-blue-50/60 rounded-xl cursor-pointer transition-colors group"
-                      >
-                        <div className="flex items-center space-x-3 min-w-0 flex-1 pr-2">
-                          {item.type === 'user' ? (
-                            <img 
-                              src={item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.text)}&background=random`} 
-                              className="w-8 h-8 rounded-full object-cover shrink-0 border border-gray-100" 
-                              alt="User avatar" 
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : item.type === 'post' ? (
-                            <div className="w-8 h-8 rounded-lg bg-gray-100 overflow-hidden shrink-0 border border-gray-200 flex items-center justify-center">
-                              {item.avatar && (item.avatar.startsWith('http') || item.avatar.startsWith('data')) ? (
-                                <img src={item.avatar} className="w-full h-full object-cover" alt="post thumb" referrerPolicy="no-referrer" />
-                              ) : (
-                                <ImageIcon className="w-4 h-4 text-gray-500" />
-                              )}
-                            </div>
-                          ) : item.type === 'tag' ? (
-                            <div className="w-8 h-8 rounded-full bg-blue-100/70 text-blue-600 flex items-center justify-center shrink-0">
-                              <Hash className="w-4 h-4" />
-                            </div>
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center shrink-0">
-                              <SearchIcon className="w-4 h-4" />
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[14px] font-medium text-gray-900 group-hover:text-blue-600 truncate">{item.text}</p>
-                            {item.sub && <p className="text-[11px] text-gray-400 truncate">{item.sub}</p>}
-                          </div>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+          {/* Interactive Suggestions & Recent Searches Dropdown */}
+          <AnimatePresence>
+            {isInputFocused && (
+              <>
+                <div 
+                  className="fixed inset-0 z-30 bg-black/25 backdrop-blur-2xs"
+                  onClick={() => setIsInputFocused(false)}
+                />
+                
+                <motion.div 
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.16 }}
+                  className="absolute left-0 right-0 top-0 z-40 bg-white dark:bg-black rounded-3xl shadow-2xl border border-gray-200/90 dark:border dark:border-white/30 overflow-hidden max-h-[70vh] overflow-y-auto no-scrollbar select-none"
+                >
+                  {/* Recent Searches */}
+                  {recentSearches.length > 0 && (
+                    <div className="p-3 border-b border-gray-100 dark:border-white/10">
+                      <div className="flex items-center justify-between px-1 mb-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 flex items-center space-x-1">
+                          <Clock className="w-3 h-3" />
+                          <span>Recent Searches</span>
+                        </span>
+                        <button 
+                          onClick={() => {
+                            setRecentSearches([]);
+                            localStorage.removeItem('recent_searches');
+                          }}
+                          className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                        >
+                          Clear all
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                )}
 
-                {/* 2. Recent Search History */}
-                {!searchTerm.trim() && recentSearches.length > 0 && (
-                  <div className="p-2 border-b border-gray-100/80">
-                    <div className="px-3 py-1.5 text-[11px] font-semibold tracking-wider text-gray-400 uppercase flex items-center justify-between">
-                      <span className="flex items-center space-x-1.5">
-                        <Clock className="w-3 h-3 text-gray-500" />
-                        <span>Recent Searches</span>
-                      </span>
-                      <button 
-                        onClick={clearAllRecentSearches} 
-                        className="text-blue-500 hover:text-blue-700 text-xs font-medium lowercase tracking-normal"
-                      >
-                        Clear all
-                      </button>
-                    </div>
-
-                    <div className="space-y-0.5 mt-1">
-                      {recentSearches.map((term, idx) => (
-                        <div 
-                          key={idx}
-                          onClick={() => triggerSearchSelect(term)}
-                          className="flex items-center justify-between px-3 py-2 hover:bg-gray-100/70 rounded-xl cursor-pointer transition-colors group"
-                        >
-                          <div className="flex items-center space-x-3 truncate">
-                            <Clock className="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
-                            <span className="text-[14px] font-normal text-gray-800 truncate">{term}</span>
-                          </div>
-                          <button 
-                            onClick={(e) => removeRecentSearch(term, e)}
-                            className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 rounded-full transition-colors"
-                            title="Remove"
+                      <div className="space-y-1">
+                        {recentSearches.map((term, i) => (
+                          <div 
+                            key={i}
+                            onClick={() => triggerSearchSelect(term)}
+                            className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-2xl cursor-pointer transition-colors"
                           >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
+                            <span className="text-[13px] font-semibold text-neutral-800 dark:text-white truncate">
+                              {term}
+                            </span>
+                            <button 
+                              onClick={(e) => removeRecentSearch(term, e)}
+                              className="p-1 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full text-neutral-400 hover:text-rose-500 transition-colors"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* 3. Popular Trending Topics Chips */}
-                {!searchTerm.trim() && (
-                  <div className="p-3 bg-gray-50/60">
-                    <div className="px-1 mb-2 text-[11px] font-semibold tracking-wider text-gray-400 uppercase flex items-center space-x-1">
-                      <TrendingUp className="w-3 h-3 text-rose-500" />
-                      <span>Trending Topics</span>
-                    </div>
+                  {/* Suggested Keywords */}
+                  <div className="p-3">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 flex items-center space-x-1 mb-2 px-1">
+                      <Sparkles className="w-3 h-3 text-amber-500" />
+                      <span>Suggested Topics</span>
+                    </span>
                     <div className="flex flex-wrap gap-1.5">
-                      {POPULAR_TRENDS.map((tag) => (
-                        <button
-                          key={tag}
-                          onClick={() => triggerSearchSelect(tag)}
-                          className="px-3 py-1 bg-white hover:bg-blue-50 text-gray-800 hover:text-blue-600 rounded-xl text-xs font-medium border border-gray-200/80 shadow-2xs transition-all active:scale-95 flex items-center space-x-1"
+                      {SUGGESTED_KEYWORDS.map((kw, idx) => (
+                        <button 
+                          key={idx}
+                          onClick={() => triggerSearchSelect(kw)}
+                          className="px-3 py-1.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-full text-xs font-medium text-neutral-800 dark:text-white transition-colors cursor-pointer"
                         >
-                          <Hash className="w-3 h-3 text-blue-500" />
-                          <span>{tag.replace('#', '')}</span>
+                          {kw}
                         </button>
                       ))}
                     </div>
                   </div>
-                )}
-              </motion.div>
-            </>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+
+          {/* Popular Trending Tags Bar */}
+          {!searchTerm && activeTab !== 'Nearby' && (
+            <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-2 mb-3">
+              <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider shrink-0 flex items-center space-x-1 pr-1">
+                <TrendingUp className="w-3 h-3 text-rose-500" />
+                <span>Trends</span>
+              </span>
+              {POPULAR_TRENDS.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => triggerSearchSelect(tag)}
+                  className="px-3 py-1 bg-white dark:bg-black hover:bg-gray-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 rounded-full text-xs font-bold border border-gray-200/90 dark:border-white/20 transition-all shrink-0 active:scale-95 cursor-pointer shadow-none"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
           )}
-        </AnimatePresence>
 
-        {/* Popular Trending Tags Bar (when not searching) */}
-        {!searchTerm && (
-          <div className="mb-3.5 flex items-center space-x-2 overflow-x-auto no-scrollbar py-0.5">
-            <span className="text-[11px] font-semibold uppercase text-gray-400 shrink-0 flex items-center space-x-1 pl-1">
-              <TrendingUp className="w-3 h-3 text-rose-500" />
-              <span>Trending</span>
-            </span>
-            {POPULAR_TRENDS.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => triggerSearchSelect(tag)}
-                className="flex items-center space-x-1 px-3 py-1 bg-white hover:bg-blue-50 text-gray-700 rounded-full text-xs font-medium border border-gray-200/70 shadow-2xs transition-all shrink-0 active:scale-95"
-              >
-                <Hash className="w-3 h-3 text-blue-500" />
-                <span>{tag.replace('#', '')}</span>
-              </button>
-            ))}
-          </div>
-        )}
+          {/* Search Query Loading Skeleton */}
+          {loading && <FacebookSearchSkeleton />}
 
-        {/* Search Results / Discovery Area */}
-        <div className="w-full">
-          {loading && <SearchSkeleton />}
-
-          {/* Empty search results */}
+          {/* Empty Search Results Notice */}
           {!loading && searchTerm && users.length === 0 && filteredPosts.length === 0 && (
-            <div className="text-center py-16 bg-white rounded-3xl border border-gray-100 shadow-2xs my-2">
-              <SearchIcon className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-              <h4 className="font-semibold text-gray-800 text-base">No results found</h4>
-              <p className="text-gray-400 text-xs mt-1">We couldn't find matches for "{searchTerm}"</p>
+            <div className="text-center py-16 bg-white dark:bg-black rounded-3xl border border-gray-200/90 dark:border dark:border-white/20 my-4 select-none">
+              <SearchIcon className="w-10 h-10 mx-auto mb-2 text-neutral-300 dark:text-neutral-600" />
+              <h4 className="font-bold text-neutral-800 dark:text-white text-base">No results found</h4>
+              <p className="text-neutral-400 text-xs mt-1">We couldn't find matches for "{searchTerm}"</p>
             </div>
           )}
 
           {/* Search Results Display */}
           {searchTerm && (
             <div className="space-y-5">
-              {/* Users Results */}
+              {/* Accounts in Notification Card Style */}
               {(activeTab === 'All' || activeTab === 'Accounts') && users.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   <div className="flex items-center justify-between px-1">
-                    <h3 className="font-semibold text-gray-900 text-sm tracking-tight">Accounts</h3>
-                    <span className="text-xs text-gray-400 font-medium">{users.length} found</span>
+                    <h3 className="font-bold text-neutral-900 dark:text-white text-sm tracking-tight">Accounts</h3>
+                    <span className="text-xs text-neutral-400 font-medium">{users.length} found</span>
                   </div>
                   <div className="space-y-2">
                     {users.map((user) => (
-                      <SearchUserCard 
+                      <NotificationStyleUserCard 
                         key={user.uid} 
                         user={user} 
                         onUserClick={handleUserClick} 
@@ -776,16 +739,16 @@ export default function SearchPage() {
                 </div>
               )}
 
-              {/* Posts & Reels Results */}
+              {/* Posts & Reels Results in Uniform Aspect-Ratio Grid */}
               {(activeTab === 'All' || activeTab === 'Posts' || activeTab === 'Videos') && filteredPosts.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   <div className="flex items-center justify-between px-1">
-                    <h3 className="font-semibold text-gray-900 text-sm tracking-tight">Posts & Reels</h3>
-                    <span className="text-xs text-gray-400 font-medium">{filteredPosts.length} items</span>
+                    <h3 className="font-bold text-neutral-900 dark:text-white text-sm tracking-tight">Posts & Reels</h3>
+                    <span className="text-xs text-neutral-400 font-medium">{filteredPosts.length} items</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3.5">
                     {filteredPosts.map((post) => (
-                      <GridMediaCard 
+                      <UniformMediaCard 
                         key={post.id} 
                         item={post} 
                         onClick={() => {
@@ -794,7 +757,13 @@ export default function SearchPage() {
                             setViewingReelList(searchReels.length > 0 ? searchReels : [post]);
                             setViewingReel(post);
                           } else {
-                            setViewingMedia({ type: 'post', url: post.media?.[0], user: { name: post.authorName, avatar: post.authorAvatar }, likes: post.likesCount, comments: post.commentsCount });
+                            setViewingMedia({ 
+                              type: 'post', 
+                              url: post.media?.[0], 
+                              user: { name: post.authorName, avatar: post.authorAvatar }, 
+                              likes: post.likesCount, 
+                              comments: post.commentsCount 
+                            });
                           }
                         }}
                       />
@@ -806,52 +775,45 @@ export default function SearchPage() {
           )}
 
           {/* People Nearby Tab View */}
-          {activeTab === 'People Nearby' && !searchTerm && (
+          {activeTab === 'Nearby' && !searchTerm && (
             <div className="space-y-4 py-2">
-              <div className="bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 text-white p-5 rounded-3xl shadow-xl relative overflow-hidden">
-                <div className="absolute right-0 top-0 bottom-0 opacity-15 pointer-events-none flex items-center pr-4">
-                  <Radio className="w-40 h-40 text-purple-300 animate-pulse" />
-                </div>
-
-                <div className="relative z-10 space-y-3">
+              <div className="bg-white dark:bg-black text-neutral-900 dark:text-white p-5 rounded-3xl border border-gray-200/90 dark:border dark:border-white/20 select-none shadow-none">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="p-2 bg-purple-500/30 backdrop-blur-md rounded-2xl text-purple-300 border border-purple-400/30">
+                    <div className="flex items-center space-x-2.5">
+                      <span className="p-2.5 bg-blue-50 dark:bg-white/10 rounded-2xl text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-white/10">
                         <Compass className="w-5 h-5" />
                       </span>
                       <div>
-                        <h3 className="font-bold text-base tracking-tight text-white">People Nearby</h3>
-                        <p className="text-xs text-purple-200">Connect with nearby friends in real time</p>
+                        <h3 className="font-bold text-base tracking-tight text-neutral-900 dark:text-white">People Nearby</h3>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400">Discover and connect with friends in your area</p>
                       </div>
                     </div>
 
                     <button
                       onClick={requestUserLocation}
                       disabled={geoLoading}
-                      className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-xs font-semibold rounded-full border border-white/20 flex items-center space-x-1.5 transition-all cursor-pointer"
+                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-xs font-bold text-white rounded-full flex items-center space-x-1.5 transition-all cursor-pointer shrink-0"
                     >
-                      <MapPin className="w-3.5 h-3.5 text-pink-400" />
-                      <span>{userGeoLocation ? 'Refresh GPS' : 'Enable GPS'}</span>
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>{userGeoLocation ? 'Refresh' : 'Enable'}</span>
                     </button>
                   </div>
 
-                  {userGeoLocation ? (
-                    <div className="flex items-center space-x-2 text-xs text-purple-200/90 bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 w-fit">
-                      <Radio className="w-3.5 h-3.5 text-green-400 animate-ping" />
+                  {userGeoLocation && (
+                    <div className="flex items-center space-x-2 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-white/5 px-3 py-1.5 rounded-xl border border-emerald-100 dark:border-white/10 w-fit">
+                      <Radio className="w-3.5 h-3.5 animate-pulse" />
                       <span>Location Active: {userGeoLocation.locationName}</span>
                     </div>
-                  ) : (
-                    <p className="text-xs text-purple-200/80">
-                      Tap Enable GPS to discover friends nearby, like Facebook People Nearby.
-                    </p>
                   )}
                 </div>
               </div>
 
-              <div className="space-y-2.5">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 px-1 flex items-center space-x-1">
-                  <Navigation className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>Friends Within Your Distance</span>
+              {/* Nearby Users list styled in Notification Card squircle */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 px-1 flex items-center space-x-1">
+                  <Navigation className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  <span>Nearby Friends</span>
                 </h4>
 
                 {users.length > 0 ? (
@@ -860,53 +822,52 @@ export default function SearchPage() {
                     return (
                       <div
                         key={user.uid}
-                        className="bg-white p-3.5 rounded-2xl shadow-2xs border border-gray-100 flex items-center justify-between hover:border-purple-200 transition-all cursor-pointer"
+                        className="act-card-item select-none cursor-pointer"
                         onClick={() => handleUserClick(user)}
                       >
-                        <div className="flex items-center space-x-3 min-w-0 flex-1 pr-2">
-                          <div className="relative">
-                            <img
-                              src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random`}
-                              className="w-12 h-12 rounded-full object-cover border-2 border-purple-100 shadow-2xs"
-                              alt={user.name}
-                            />
-                            <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h4 className="text-sm font-semibold text-gray-900 truncate">{user.name}</h4>
-                            <div className="flex items-center space-x-2 text-xs text-gray-500 mt-0.5">
-                              <span className="flex items-center text-purple-600 font-medium">
-                                <MapPin className="w-3 h-3 mr-0.5 text-purple-500" />
-                                {distanceKm} km away
-                              </span>
-                              <span>•</span>
-                              <span className="truncate">Brahmanbaria</span>
-                            </div>
+                        <div className="relative w-12 h-12 shrink-0">
+                          <img
+                            src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random`}
+                            className="w-full h-full rounded-full object-cover shadow-[0_4px_14px_rgba(0,0,0,0.16)]"
+                            alt={user.name}
+                          />
+                          <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-black rounded-full" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-sm font-bold text-neutral-900 dark:text-white truncate">{user.name}</h4>
+                          <div className="flex items-center space-x-2 text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                            <span className="flex items-center text-blue-600 dark:text-blue-400 font-semibold">
+                              <MapPin className="w-3 h-3 mr-0.5" />
+                              {distanceKm} km away
+                            </span>
+                            <span>•</span>
+                            <span className="truncate">Nearby</span>
                           </div>
                         </div>
 
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleUserClick(user);
                           }}
-                          className="px-4 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95 text-white font-medium text-xs rounded-full shadow-md shadow-purple-200 transition-all cursor-pointer"
+                          className="act-btn-pill act-btn-follow-back"
                         >
-                          Connect
+                          View
                         </button>
                       </div>
                     );
                   })
                 ) : (
-                  <div className="text-center py-10 bg-white rounded-2xl border border-gray-100 p-6 space-y-3">
-                    <MapPin className="w-10 h-10 text-purple-400 mx-auto animate-bounce" />
-                    <h4 className="font-semibold text-gray-800 text-sm">Discover Friends Around You</h4>
-                    <p className="text-xs text-gray-500 max-w-xs mx-auto">
-                      Enable location access or search for friends to connect nearby.
+                  <div className="text-center py-10 bg-white dark:bg-black rounded-3xl border border-gray-200/90 dark:border-white/20 p-6 space-y-3 select-none">
+                    <MapPin className="w-9 h-9 text-blue-500 mx-auto" />
+                    <h4 className="font-bold text-neutral-800 dark:text-white text-sm">Discover Friends Around You</h4>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 max-w-xs mx-auto">
+                      Enable GPS to locate friends nearby in your location.
                     </p>
                     <button
                       onClick={requestUserLocation}
-                      className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs rounded-full shadow-md transition-all active:scale-95 cursor-pointer"
+                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-full transition-all active:scale-95 cursor-pointer"
                     >
                       Locate Nearby Friends
                     </button>
@@ -916,18 +877,19 @@ export default function SearchPage() {
             </div>
           )}
 
-          {/* Default Discovery Grid (when no active search term) */}
-          {!searchTerm && cachedDiscovery.length > 0 && (
-            <div className="space-y-2">
+          {/* Default Discovery Grid (Uniform Aspect Ratio for both Posts & Reels) */}
+          {!searchTerm && activeTab !== 'Nearby' && visibleDiscovery.length > 0 && (
+            <div className="space-y-3">
               <div className="flex items-center justify-between px-1">
-                <span className="text-xs font-semibold uppercase text-gray-400 flex items-center space-x-1">
-                  <Sparkles className="w-3 h-3 text-amber-500" />
-                  <span>Explore Discovery</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center space-x-1">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Explore Feed</span>
                 </span>
+                <span className="text-xs text-neutral-400 font-medium">{visibleDiscovery.length} items</span>
               </div>
-              <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
-                {cachedDiscovery.map((item) => (
-                  <GridMediaCard 
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3.5">
+                {visibleDiscovery.map((item) => (
+                  <UniformMediaCard 
                     key={item.id} 
                     item={item} 
                     onClick={() => {
@@ -936,18 +898,32 @@ export default function SearchPage() {
                         setViewingReelList(discReels.length > 0 ? discReels : [item]);
                         setViewingReel(item);
                       } else {
-                        setViewingMedia({ type: 'post', url: item.media?.[0], user: { name: item.authorName, avatar: item.authorAvatar }, likes: item.likesCount, comments: item.commentsCount });
+                        setViewingMedia({ 
+                          type: 'post', 
+                          url: item.media?.[0], 
+                          user: { name: item.authorName, avatar: item.authorAvatar }, 
+                          likes: item.likesCount, 
+                          comments: item.commentsCount 
+                        });
                       }
                     }}
                   />
                 ))}
               </div>
+
+              {/* Sentinel element for infinite scroll lazy loading */}
+              {visibleCount < cachedDiscovery.length && (
+                <div ref={sentinelRef} className="py-6 flex justify-center">
+                  <div className="w-6 h-6 border-2 border-gray-300 dark:border-white/20 border-t-blue-600 rounded-full animate-spin" />
+                </div>
+              )}
             </div>
           )}
 
-          {!loading && !searchTerm && cachedDiscovery.length === 0 && (
-            <div className="py-20 text-center text-gray-400 bg-white rounded-3xl border border-gray-100 shadow-2xs">
-              <ImageIcon className="w-10 h-10 mx-auto mb-2 opacity-20" />
+          {/* Fallback empty discovery state */}
+          {!loading && !searchTerm && activeTab !== 'Nearby' && cachedDiscovery.length === 0 && (
+            <div className="py-20 text-center text-neutral-400 bg-white dark:bg-black rounded-3xl border border-gray-200/90 dark:border-white/20 select-none">
+              <ImageIcon className="w-10 h-10 mx-auto mb-2 opacity-30" />
               <p className="text-sm font-medium">No discovery content yet</p>
             </div>
           )}
@@ -956,4 +932,3 @@ export default function SearchPage() {
     </div>
   );
 }
-

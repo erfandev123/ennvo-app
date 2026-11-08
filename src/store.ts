@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { User as AppUser } from './types';
 
-export type PageType = 'home' | 'search' | 'reels' | 'messages' | 'notifications' | 'create' | 'profile' | 'settings' | 'edit-profile';
+export type PageType = 'home' | 'search' | 'reels' | 'messages' | 'notifications' | 'create' | 'profile' | 'settings' | 'edit-profile' | 'admin';
 
 export type Media = {
   type: 'post' | 'reel' | 'image' | 'video' | 'album';
@@ -48,6 +48,8 @@ type AppState = {
   setActiveChat: (chatId: string | null) => void;
   showCreatePost: boolean;
   setShowCreatePost: (show: boolean) => void;
+  showReelCamera: boolean;
+  setShowReelCamera: (show: boolean) => void;
   isAuthenticated: boolean;
   setIsAuthenticated: (val: boolean) => void;
   isAuthLoading: boolean;
@@ -105,6 +107,8 @@ type AppState = {
   setCachedDiscovery: (items: any[]) => void;
   followingIds: string[];
   setFollowingIds: (ids: string[]) => void;
+  followerIds: string[];
+  setFollowerIds: (ids: string[]) => void;
   isBottomNavHidden: boolean;
   setIsBottomNavHidden: (val: boolean) => void;
   isReelsCleanZoom: boolean;
@@ -135,6 +139,8 @@ type AppState = {
   setShowAccountSwitcherModal: (show: boolean) => void;
   appTheme: 'light' | 'dark';
   setAppTheme: (theme: 'light' | 'dark') => void;
+  newUserWelcomeName: string | null;
+  setNewUserWelcomeName: (name: string | null) => void;
 };
 
 const getInitialPage = (): PageType => {
@@ -188,13 +194,67 @@ const getInitialConversations = (): any[] => {
   }
 };
 
+const getInitialFollowingIds = (): string[] => {
+  try {
+    const raw = localStorage.getItem('followingIds');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const getInitialFollowerIds = (): string[] => {
+  try {
+    const raw = localStorage.getItem('followerIds');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const getInitialCurrentUser = (): AppUser | null => {
+  try {
+    const raw = localStorage.getItem('ennvo_last_active_user_v1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.uid && parsed?.name) return parsed as AppUser;
+    }
+  } catch {}
+  return null;
+};
+
+const syncUrl = (page: PageType, user?: any, chat?: string | null) => {
+  if (typeof window === 'undefined') return;
+  try {
+    let target = '/home';
+    if (page === 'profile') {
+      const u = user?.username || user?.uid;
+      target = u ? `/user/${encodeURIComponent(u)}` : '/profile';
+    } else if (page === 'messages') {
+      target = chat ? `/messages/${encodeURIComponent(chat)}` : '/messages';
+    } else if (page === 'reels') {
+      target = '/feed';
+    } else if (page === 'home') {
+      target = '/home';
+    } else {
+      target = `/${page}`;
+    }
+    if (window.location.pathname !== target) {
+      window.history.pushState({ page, user: user?.uid, chat }, '', target);
+    }
+  } catch (e) {}
+};
+
 export const useAppStore = create<AppState>((set) => ({
   currentPage: getInitialPage(),
   setCurrentPage: (page) => {
     sessionStorage.setItem('lastVisitedPage', page);
-    set({ currentPage: page });
+    set((state) => {
+      syncUrl(page, state.viewingUser, state.activeChat);
+      return { currentPage: page };
+    });
   },
-  currentUser: null,
+  currentUser: getInitialCurrentUser(),
   setCurrentUser: (user) => set((state) => {
     let nextCache = state.userCache;
     if (user && user.uid) {
@@ -242,6 +302,9 @@ export const useAppStore = create<AppState>((set) => ({
       try {
         localStorage.setItem('userCache', JSON.stringify(nextCache));
       } catch (e) {}
+      if (state.currentPage === 'profile') {
+        syncUrl('profile', user, null);
+      }
     }
     return { viewingUser: user, userCache: nextCache };
   }),
@@ -276,7 +339,7 @@ export const useAppStore = create<AppState>((set) => ({
   setViewingReelContext: (ctx) => set({ viewingReelContext: ctx }),
   activeChat: null,
   setActiveChat: (chatId) => {
-    if (chatId) try { window.history.pushState({ chat: chatId }, ''); } catch (e) {}
+    if (chatId) syncUrl('messages', null, chatId);
     set({ activeChat: chatId });
   },
   showCreatePost: false,
@@ -284,33 +347,35 @@ export const useAppStore = create<AppState>((set) => ({
     if (show) try { window.history.pushState({ modal: 'create' }, ''); } catch (e) {}
     set({ showCreatePost: show });
   },
-  isAuthenticated: false,
+  showReelCamera: false,
+  setShowReelCamera: (show) => {
+    if (show) try { window.history.pushState({ modal: 'reel-camera' }, ''); } catch (e) {}
+    set({ showReelCamera: show });
+  },
+  isAuthenticated: !!getInitialCurrentUser(),
   setIsAuthenticated: (val) => set({ isAuthenticated: val }),
-  isAuthLoading: true,
+  isAuthLoading: false,
   setIsAuthLoading: (val) => set({ isAuthLoading: val }),
   navigationStack: ['home'],
   pushPage: (page) => set((state) => {
     sessionStorage.setItem('lastVisitedPage', page);
     if (state.currentPage === page) return state;
-    try { window.history.pushState({ page }, ''); } catch (e) {}
+    syncUrl(page, state.viewingUser, state.activeChat);
+    const newStack: PageType[] = page === 'home' ? ['home'] : ['home', page];
     return { 
       currentPage: page, 
-      navigationStack: [...state.navigationStack, page] 
+      navigationStack: newStack 
     };
   }),
   popPage: () => set((state) => {
-    if (state.navigationStack.length <= 1) {
-      sessionStorage.setItem('lastVisitedPage', 'home');
-      return { currentPage: 'home', navigationStack: ['home'] };
+    if (state.currentPage === 'edit-profile') {
+      sessionStorage.setItem('lastVisitedPage', 'profile');
+      syncUrl('profile', state.viewingUser, null);
+      return { currentPage: 'profile', navigationStack: ['home', 'profile'] as PageType[] };
     }
-    const newStack = [...state.navigationStack];
-    newStack.pop();
-    const prevPage = newStack[newStack.length - 1];
-    sessionStorage.setItem('lastVisitedPage', prevPage);
-    return { 
-      currentPage: prevPage, 
-      navigationStack: newStack 
-    };
+    sessionStorage.setItem('lastVisitedPage', 'home');
+    syncUrl('home', null, null);
+    return { currentPage: 'home', navigationStack: ['home'] as PageType[] };
   }),
   highlightedCommentId: null,
   setHighlightedCommentId: (id) => set({ highlightedCommentId: id }),
@@ -392,8 +457,16 @@ export const useAppStore = create<AppState>((set) => ({
   setCachedNotifications: (notifs) => set({ cachedNotifications: notifs }),
   cachedDiscovery: [],
   setCachedDiscovery: (items) => set({ cachedDiscovery: items }),
-  followingIds: [],
-  setFollowingIds: (ids) => set({ followingIds: ids }),
+  followingIds: getInitialFollowingIds(),
+  setFollowingIds: (ids) => {
+    try { localStorage.setItem('followingIds', JSON.stringify(ids)); } catch (e) {}
+    set({ followingIds: ids });
+  },
+  followerIds: getInitialFollowerIds(),
+  setFollowerIds: (ids) => {
+    try { localStorage.setItem('followerIds', JSON.stringify(ids)); } catch (e) {}
+    set({ followerIds: ids });
+  },
   isBottomNavHidden: false,
   setIsBottomNavHidden: (val) => set({ isBottomNavHidden: val }),
   isReelsCleanZoom: false,
@@ -432,6 +505,14 @@ export const useAppStore = create<AppState>((set) => ({
       }
     } catch (e) {}
     set({ appTheme: theme });
+  },
+  newUserWelcomeName: typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('ennvo_new_user_welcome') : null,
+  setNewUserWelcomeName: (name) => {
+    try {
+      if (name) sessionStorage.setItem('ennvo_new_user_welcome', name);
+      else sessionStorage.removeItem('ennvo_new_user_welcome');
+    } catch (e) {}
+    set({ newUserWelcomeName: name });
   },
 }));
 

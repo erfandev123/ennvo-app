@@ -1,69 +1,17 @@
 import axios from 'axios';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebase';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-
-// Cloudflare R2 Credentials & Public CDN configurations
-const R2_CONFIG = {
-  endpoint: 'https://f45c8ffc24470718062d4b2eab12c2cd.r2.cloudflarestorage.com',
-  accessKeyId: 'b907a6aad2fb1bd63ab552c6e0ea67c0',
-  secretAccessKey: '8b19ea3cf08bc63917e1fdc9f94c357afe5efc07a1c22353687340b75a4543a7',
-  bucket: 'ennvo-storage',
-  publicDomain: 'https://pub-320091ef45b945e6a22b05cf96d6b9b9.r2.dev',
-};
-
-// Lazy client for direct R2 client-side upload (failsafe for Android WebViews, Capacitor, and remote embeds)
-let clientR2: S3Client | null = null;
-function getClientR2(): S3Client {
-  if (!clientR2) {
-    clientR2 = new S3Client({
-      region: 'auto',
-      endpoint: R2_CONFIG.endpoint,
-      credentials: {
-        accessKeyId: R2_CONFIG.accessKeyId,
-        secretAccessKey: R2_CONFIG.secretAccessKey,
-      },
-    });
-  }
-  return clientR2;
-}
-
-// Generate candidate API endpoints (local relative + live Cloud Run backend for WebViews)
-const getCandidateApiEndpoints = (endpointPath: string): string[] => {
-  const endpoints: string[] = [];
-  const isCapacitorOrLocal = typeof window !== 'undefined' && (
-    (window as any).Capacitor?.isNativePlatform?.() ||
-    window.location.protocol === 'capacitor:' ||
-    (window.location.hostname === 'localhost' && window.location.port !== '3000') ||
-    window.location.protocol === 'file:'
-  );
-
-  // In standard browser environment, try relative endpoint first
-  if (!isCapacitorOrLocal) {
-    endpoints.push(endpointPath);
-  }
-
-  // Deployed Cloud Run live API base URLs (crucial for Android WebView, Capacitor APKs, and external viewers)
-  const remoteBaseUrls = [
-    'https://ais-pre-bqejfrjeghyo7rnrdlrosm-663053662809.asia-southeast1.run.app',
-    'https://ais-dev-bqejfrjeghyo7rnrdlrosm-663053662809.asia-southeast1.run.app'
-  ];
-
-  for (const base of remoteBaseUrls) {
-    endpoints.push(`${base}${endpointPath}`);
-  }
-
-  if (!endpoints.includes(endpointPath)) {
-    endpoints.push(endpointPath);
-  }
-
-  return endpoints;
-};
+import { getApiEndpoint, formatMediaUrl } from '../utils';
+import { uploadDirectToR2 } from './r2Client';
 
 /**
  * Ultra-Fast Direct Storage Upload Service
- * 100% untouched raw original video and photo uploads to Cloudflare R2 / Firebase
- * Zero compression, zero lag, full original audio/video quality
+ * 1. Primary: Direct High-Speed Cloudflare R2 Upload (S3 Protocol directly to R2 edge)
+ *    - Works 100% natively on Android APK / WebView, Mobile Browser, and Desktop Web.
+ *    - Bypasses Cloud Run proxies, session cookies, and local timeout restrictions.
+ * 2. Secondary: Server-side proxy (/api/upload-r2)
+ * 3. Resilient fallback: Firebase Storage
+ * 4. Image-only fallback: Compressed Base64 Data URL (<1MB)
  */
 export const uploadMedia = async (
   fileOrBlob: File | Blob,
@@ -71,143 +19,165 @@ export const uploadMedia = async (
   onProgress?: (percent: number) => void
 ): Promise<string> => {
   const fileToUpload: File | Blob = fileOrBlob;
-  const extension = (fileToUpload as File).name?.split('.').pop() || fileToUpload.type.split('/')[1] || 'bin';
+  let extension = (fileToUpload as File).name?.split('.').pop() || fileToUpload.type.split('/')[1] || 'bin';
+  if (extension === 'quicktime') extension = 'mov';
+  if (extension.includes(';')) extension = extension.split(';')[0];
+  
   const targetKey = `${pathPrefix}/${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
 
-  // 1. Try Cloudflare R2 Upload via backend API (testing available candidate endpoints including remote Cloud Run for WebViews)
-  const candidateEndpoints = getCandidateApiEndpoints('/api/upload-r2');
-  for (const apiEndpoint of candidateEndpoints) {
+  if (onProgress) onProgress(15);
+
+  // 1. PRIMARY: Direct Edge Cloudflare R2 Upload (Fastest, zero-proxy, works on Android APK)
+  try {
+    const directR2Url = await uploadDirectToR2(
+      fileToUpload,
+      targetKey,
+      fileToUpload.type,
+      onProgress
+    );
+    if (directR2Url) {
+      if (onProgress) onProgress(100);
+      return directR2Url;
+    }
+  } catch (r2DirectErr: any) {
+    console.warn('[Storage] Direct R2 edge upload attempt warning:', r2DirectErr?.message || r2DirectErr);
+  }
+
+  // 2. SECONDARY: Server-side API endpoint (/api/upload-r2)
+  const fileObj = fileToUpload as File;
+  const fileName = fileObj.name || `${pathPrefix}_${Date.now()}.${extension}`;
+
+  const primaryEndpoint = getApiEndpoint('/api/upload-r2');
+  const endpointsToTry: string[] = [primaryEndpoint];
+  if (primaryEndpoint !== '/api/upload-r2') {
+    endpointsToTry.push('/api/upload-r2');
+  }
+
+  for (const endpoint of endpointsToTry) {
     try {
       const formData = new FormData();
-      formData.append('file', fileToUpload);
+      formData.append('file', fileToUpload, fileName);
       formData.append('pathPrefix', pathPrefix);
 
-      const response = await axios.post(apiEndpoint, formData, {
-        timeout: 90000,
+      const response = await axios.post(endpoint, formData, {
+        timeout: 180000,
         onUploadProgress: (progressEvent) => {
           if (onProgress && progressEvent.total) {
             const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            onProgress(percentCompleted);
+            onProgress(Math.min(94, Math.max(20, percentCompleted)));
           }
         },
       });
 
       if (response.data && response.data.url) {
-        let finalUrl = response.data.url;
-        if (finalUrl.startsWith('/')) {
-          const origin = apiEndpoint.startsWith('http') 
-            ? new URL(apiEndpoint).origin 
-            : window.location.origin;
-          finalUrl = `${origin}${finalUrl}`;
-        }
-        console.log('Successfully uploaded media via R2 API:', finalUrl);
+        let finalUrl = String(response.data.url);
+        finalUrl = formatMediaUrl(finalUrl);
         if (onProgress) onProgress(100);
         return finalUrl;
       }
-    } catch (r2Err: any) {
-      console.warn(`Upload attempt failed on endpoint ${apiEndpoint}:`, r2Err?.response?.data || r2Err.message);
+    } catch (e: any) {
+      console.warn(`[Storage] Upload attempt to ${endpoint} notice:`, e?.message);
     }
   }
 
-  // 2. Direct Cloudflare R2 Client-Side Upload (Direct AWS S3Client PUT to R2 Bucket with CORS)
-  // This completely solves the WebView problem where local /api routes do not exist
+  // 3. Fallback: Firebase Storage
   try {
-    const s3 = getClientR2();
-    const arrayBuffer = await fileToUpload.arrayBuffer();
-    const putCmd = new PutObjectCommand({
-      Bucket: R2_CONFIG.bucket,
-      Key: targetKey,
-      Body: new Uint8Array(arrayBuffer),
-      ContentType: fileToUpload.type || 'application/octet-stream',
-    });
+    const storageRef = ref(storage, targetKey);
+    const uploadTask = uploadBytesResumable(storageRef, fileToUpload);
 
-    await s3.send(putCmd);
-    const directUrl = `${R2_CONFIG.publicDomain}/${targetKey}`;
-    console.log('Successfully uploaded directly to Cloudflare R2:', directUrl);
+    const downloadUrl = await Promise.race([
+      new Promise<string>((resolve, reject) => {
+        uploadTask.on(
+          'state_changed',
+          (snapshot) => {
+            if (snapshot.totalBytes > 0 && onProgress) {
+              const p = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+              onProgress(Math.min(95, Math.max(30, p)));
+            }
+          },
+          (error) => reject(error),
+          async () => {
+            try {
+              const url = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve(url);
+            } catch (e) {
+              reject(e);
+            }
+          }
+        );
+      }),
+      new Promise<string>((_, reject) =>
+        setTimeout(() => reject(new Error('Firebase Storage timeout after 60s')), 60000)
+      )
+    ]);
+
     if (onProgress) onProgress(100);
-    return directUrl;
-  } catch (directErr: any) {
-    console.warn('Direct Cloudflare R2 upload fallback error:', directErr?.message || directErr);
+    return downloadUrl;
+  } catch (firebaseErr: any) {
+    console.warn('[Storage] Firebase direct upload fallback passed:', firebaseErr?.message);
   }
 
-  // 3. Fallback to Firebase Storage CDN (if configured)
-  if (storage) {
-    try {
-      const storageRef = ref(storage, targetKey);
-      const snapshot = await uploadBytes(storageRef, fileToUpload, {
-        contentType: fileToUpload.type || 'application/octet-stream'
-      });
-      const downloadUrl = await getDownloadURL(snapshot.ref);
-      if (onProgress) onProgress(100);
-      return downloadUrl;
-    } catch (firebaseErr) {
-      console.warn("Firebase storage upload fallback failed:", firebaseErr);
-    }
-  }
-
-  // 4. Instant local Data URL fallback (as absolute last resort for offline/local view)
-  return new Promise((resolve, reject) => {
-    try {
+  // 4. Fallback: Compact Base64 Data URL (Only for images, resized to fit Firestore < 1MB limit)
+  if (fileToUpload.type.startsWith('image/')) {
+    return new Promise<string>((resolve) => {
+      const img = new Image();
       const reader = new FileReader();
-      reader.onload = () => {
-        if (onProgress) onProgress(100);
-        resolve(reader.result as string);
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+        img.onload = () => {
+          const maxDim = 1080;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, w, h);
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+            if (onProgress) onProgress(100);
+            resolve(compressedBase64);
+            return;
+          }
+          resolve(e.target?.result as string);
+        };
+        img.onerror = () => resolve(e.target?.result as string);
       };
-      reader.onerror = (err) => reject(err);
+      reader.onerror = () => resolve('');
       reader.readAsDataURL(fileToUpload);
-    } catch (err) {
-      reject(err);
-    }
-  });
+    });
+  }
+
+  // For video or audio files, never generate oversized base64 strings that crash Firestore
+  throw new Error('Video upload failed. Please verify your network connection and try again.');
 };
 
-export const deleteMedia = async (url: string): Promise<void> => {
-  if (!url || typeof url !== 'string' || url.startsWith('data:')) return;
-
-  // 1. Try deleting from Cloudflare R2 (API endpoints first)
-  if (url.includes('r2.dev') || url.includes('cloudflarestorage.com')) {
-    const candidateEndpoints = getCandidateApiEndpoints('/api/delete-r2');
-    let deletedViaApi = false;
-    for (const ep of candidateEndpoints) {
-      try {
-        await axios.post(ep, { url }, { timeout: 10000 });
-        deletedViaApi = true;
-        console.log(`Deleted media via ${ep}:`, url);
-        break;
-      } catch (err: any) {
-        // try next endpoint
-      }
+/**
+ * Delete media file
+ */
+export const deleteMedia = async (urlOrPath: string): Promise<boolean> => {
+  try {
+    if (!urlOrPath) return false;
+    if (urlOrPath.includes('firebasestorage.googleapis.com')) {
+      const { ref, deleteObject } = await import('firebase/storage');
+      const storageRef = ref(storage, urlOrPath);
+      await deleteObject(storageRef);
+      return true;
     }
-
-    // Direct S3 client delete fallback
-    if (!deletedViaApi) {
-      try {
-        const s3 = getClientR2();
-        let targetKey = url;
-        try {
-          const urlObj = new URL(url);
-          targetKey = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
-        } catch (e) {}
-        
-        await s3.send(new DeleteObjectCommand({
-          Bucket: R2_CONFIG.bucket,
-          Key: targetKey,
-        }));
-        console.log('Directly deleted media from Cloudflare R2:', targetKey);
-      } catch (dirErr: any) {
-        console.warn('Direct R2 delete error:', dirErr?.message || dirErr);
-      }
-    }
-  } 
-  // 2. Try deleting from Firebase storage if applicable
-  else if (url.includes('firebasestorage.googleapis.com') && storage) {
-    try {
-      const { ref: storageRef, deleteObject } = await import('firebase/storage');
-      const fileRef = storageRef(storage, url);
-      await deleteObject(fileRef);
-      console.log('Deleted media from Firebase storage:', url);
-    } catch (fbErr) {
-      console.warn('Firebase storage delete error:', fbErr);
-    }
+    const endpoint = getApiEndpoint('/api/delete-media');
+    await axios.post(endpoint, { url: urlOrPath }).catch(() => {});
+    return true;
+  } catch (err) {
+    console.warn('[Storage] Failed to delete media:', err);
+    return false;
   }
 };

@@ -1,6 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { initializeFirestore, memoryLocalCache } from 'firebase/firestore';
+import { 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentSingleTabManager, 
+  memoryLocalCache 
+} from 'firebase/firestore';
 import { getDatabase } from 'firebase/database';
 import { getStorage } from 'firebase/storage';
 
@@ -18,21 +23,25 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Enable robust memory cache so Firestore target view assertions don't fail during hot-reloads or multi-tab preview sessions
-let localCacheSetting;
+// Use persistent disk cache (IndexedDB) for instant offline startup and zero-delay loads on low-end devices, with fallback to memory
+let localCacheSetting: any;
 try {
-  localCacheSetting = memoryLocalCache();
+  localCacheSetting = persistentLocalCache({
+    tabManager: persistentSingleTabManager({})
+  });
 } catch (e) {
-  console.warn('Memory cache fallback:', e);
+  console.warn('[Firebase] Persistent cache init fallback to memory:', e);
+  localCacheSetting = memoryLocalCache();
 }
 
 export const db = initializeFirestore(app, {
   localCache: localCacheSetting,
-  experimentalAutoDetectLongPolling: true,
   ignoreUndefinedProperties: true,
 });
+
 export const rtdb = getDatabase(app);
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
-
+import { FacebookAuthProvider } from 'firebase/auth';
+export const facebookProvider = new FacebookAuthProvider();
