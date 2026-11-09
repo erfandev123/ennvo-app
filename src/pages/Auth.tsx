@@ -581,9 +581,15 @@ export default function Auth() {
                 <span aria-hidden="true"> · </span>
                 <a href="/about" className="hover:text-slate-600 hover:underline">About Ennvo &amp; team</a>
                 <span aria-hidden="true"> · </span>
-                <a href="/blog" className="hover:text-slate-600 hover:underline">Blog</a>
+                <a href="/blog" className="hover:text-slate-600 hover:underline">Journal</a>
                 <span aria-hidden="true"> · </span>
                 <a href="/help" className="hover:text-slate-600 hover:underline">Help</a>
+                <span aria-hidden="true"> · </span>
+                <a href="/support" className="hover:text-slate-600 hover:underline">Support</a>
+                <span aria-hidden="true"> · </span>
+                <a href="/privacy" className="hover:text-slate-600 hover:underline">Privacy</a>
+                <span aria-hidden="true"> · </span>
+                <a href="/terms" className="hover:text-slate-600 hover:underline">Terms</a>
               </div>
             </div>
 

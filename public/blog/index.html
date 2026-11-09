@@ -3,35 +3,47 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Ennvo Blog – Social Media Tips, Reels &amp; Video Calling Guides</title>
+    <title>Ennvo Journal – Social Media Guides, Reels &amp; Video Calling</title>
     <meta
       name="description"
-      content="Practical guides for Ennvo, the official social media app by Erfan Sarker and Rita Akter. Learn about reels, stories, messaging, video calls, and account basics."
+      content="Original guides and ideas from Ennvo, the independent social platform by Erfan Sarker and Rita Akter. Learn about reels, stories, messaging, video calls, privacy, and account basics."
     />
     <meta
       name="keywords"
-      content="Ennvo blog, Ennvo app, Ennvo guide, Ennvo reels, Ennvo video calls, Ennvo help, Erfan Sarker, Rita Akter, social media app Bangladesh"
+      content="Ennvo blog, Ennvo journal, Ennvo app, Ennvo guide, Ennvo reels, Ennvo video calls, Ennvo help, Erfan Sarker, Rita Akter, social media app Bangladesh"
     />
     <link rel="canonical" href="https://ennvo.vercel.app/blog" />
+    <link rel="alternate" type="application/rss+xml" title="Ennvo Journal RSS" href="/blog/feed.xml" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="author" content="Erfan Sarker" />
+    <meta name="publisher" content="Ennvo" />
+    <meta name="application-name" content="Ennvo" />
     <meta name="theme-color" content="#0ea5e9" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/icon-96.png" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/icon-96.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icon-192.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    />
     <link rel="stylesheet" href="/static-pages.css" />
     <link rel="author" href="https://ennvo.vercel.app/about" />
+    <link rel="alternate" type="application/json" href="/company.json" title="Ennvo company profile" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Ennvo" />
     <meta property="og:title" content="Ennvo Blog – Guides for Reels, Chat &amp; Video Calls" />
     <meta
       property="og:description"
-      content="Learn how to use Ennvo, the official social media app by Erfan Sarker and Rita Akter. Guides for reels, stories, messaging, and HD video calls."
+      content="Learn how to use Ennvo, the independent social platform by Erfan Sarker and Rita Akter. Guides for reels, stories, messaging, and HD video calls."
     />
     <meta property="og:url" content="https://ennvo.vercel.app/blog" />
     <meta property="og:image" content="https://ennvo.vercel.app/og-image.jpg" />
-    <meta property="og:image:alt" content="Ennvo official social media app blog" />
+    <meta property="og:image:alt" content="Ennvo Journal — guides for the independent Ennvo platform" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Ennvo Blog – Social Media Guides" />
     <meta
@@ -39,7 +51,7 @@
       content="Practical Ennvo guides for reels, stories, messaging, and HD audio and video calls."
     />
     <meta name="twitter:image" content="https://ennvo.vercel.app/og-image.jpg" />
-    <meta name="twitter:image:alt" content="Ennvo official social media app blog" />
+    <meta name="twitter:image:alt" content="Ennvo Journal — guides for the independent Ennvo platform" />
 
     <script type="application/ld+json">
     {
@@ -53,28 +65,48 @@
           "logo": {
             "@type": "ImageObject",
             "@id": "https://ennvo.vercel.app/#logo",
-            "url": "https://ennvo.vercel.app/Ennvo.png",
+            "url": "https://ennvo.vercel.app/icon-512.png",
+            "width": 512,
+            "height": 512,
             "caption": "Ennvo Official Logo"
           },
           "founder": {
             "@type": "Person",
             "@id": "https://ennvo.vercel.app/#erfan-sarker",
-            "name": "Erfan Sarker"
+            "name": "Erfan Sarker",
+            "image": "https://ennvo.vercel.app/images/erfan.avif"
           },
           "employee": [
             {
               "@type": "Person",
               "@id": "https://ennvo.vercel.app/#erfan-sarker",
               "name": "Erfan Sarker",
-              "jobTitle": "Founder & Software Engineer"
+              "jobTitle": "Founder & Software Engineer",
+              "image": "https://ennvo.vercel.app/images/erfan.avif"
             },
             {
               "@type": "Person",
               "@id": "https://ennvo.vercel.app/#rita-akter",
               "name": "Rita Akter",
-              "jobTitle": "Co-Developer & Partner"
+              "jobTitle": "Co-Developer & Partner",
+              "image": "https://ennvo.vercel.app/images/rita.jpg"
             }
-          ]
+          ],
+          "sameAs": ["https://www.facebook.com/erfanbnp123"],
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "Bijoynagar",
+            "addressRegion": "Brahmanbaria",
+            "addressCountry": "Bangladesh"
+          },
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "customer support",
+            "email": "support@ennvo.com",
+            "url": "https://ennvo.vercel.app/support",
+            "availableLanguage": ["English", "Bengali"]
+          },
+          "foundingDate": "2026"
         },
         {
           "@type": "WebSite",
@@ -88,8 +120,8 @@
           "@type": "Blog",
           "@id": "https://ennvo.vercel.app/blog#blog",
           "url": "https://ennvo.vercel.app/blog",
-          "name": "Ennvo Blog",
-          "description": "Guides and updates for Ennvo, the official social media app by Erfan Sarker and Rita Akter.",
+          "name": "Ennvo Journal",
+          "description": "Practical guides and updates for Ennvo, the independent social platform by Erfan Sarker and Rita Akter.",
           "publisher": { "@id": "https://ennvo.vercel.app/#organization" },
           "isPartOf": { "@id": "https://ennvo.vercel.app/#website" },
           "inLanguage": "en"
@@ -98,8 +130,8 @@
           "@type": "CollectionPage",
           "@id": "https://ennvo.vercel.app/blog#webpage",
           "url": "https://ennvo.vercel.app/blog",
-          "name": "Ennvo Blog – Social Media Tips, Reels & Video Calling Guides",
-          "description": "Practical guides for Ennvo, the official social media app by Erfan Sarker and Rita Akter.",
+          "name": "Ennvo Journal – Social Media Tips, Reels & Video Calling Guides",
+          "description": "Practical guides for Ennvo, the independent social platform by Erfan Sarker and Rita Akter.",
           "isPartOf": { "@id": "https://ennvo.vercel.app/#website" },
           "about": { "@id": "https://ennvo.vercel.app/#organization" },
           "mainEntity": { "@id": "https://ennvo.vercel.app/blog#blog" },
@@ -123,6 +155,26 @@
               "@type": "ListItem",
               "position": 3,
               "url": "https://ennvo.vercel.app/blog/ennvo-video-calling-guide"
+            },
+            {
+              "@type": "ListItem",
+              "position": 4,
+              "url": "https://ennvo.vercel.app/blog/ennvo-stories-guide"
+            },
+            {
+              "@type": "ListItem",
+              "position": 5,
+              "url": "https://ennvo.vercel.app/blog/ennvo-privacy-safety-guide"
+            },
+            {
+              "@type": "ListItem",
+              "position": 6,
+              "url": "https://ennvo.vercel.app/blog/ennvo-account-setup-guide"
+            },
+            {
+              "@type": "ListItem",
+              "position": 7,
+              "url": "https://ennvo.vercel.app/blog/ennvo-community-guidelines-explained"
             }
           ]
         }
@@ -137,68 +189,145 @@
           <img src="/icon-96.png" alt="Ennvo logo" width="38" height="38" />
           <span>Ennvo</span>
         </a>
-        <nav class="nav-links" aria-label="Main navigation">
+        <nav class="nav-links" id="primary-nav" data-nav-links aria-label="Main navigation">
           <a href="/">Home</a>
-          <a href="/blog">Blog</a>
+          <a href="/blog">Journal</a>
           <a href="/help">Help</a>
           <a href="/about">About</a>
+          <a href="/support">Support</a>
           <a class="nav-cta" href="/">Open Ennvo</a>
         </nav>
+        <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation" aria-expanded="false" aria-controls="primary-nav">
+          <span aria-hidden="true"></span>
+        </button>
       </div>
     </header>
 
     <main>
-      <section class="wrap hero">
-        <span class="eyebrow">Ennvo Blog</span>
-        <h1>Guides for a faster, simpler social experience.</h1>
-        <p>
-          Learn how to use Ennvo, the official social media app by Erfan Sarker and
-          co-developer Rita Akter. These guides cover reels, stories, messaging,
-          video calls, and the basics of getting started.
-        </p>
-        <div class="actions">
-          <a class="btn btn-primary" href="/">Open Ennvo</a>
-          <a class="btn btn-secondary" href="/help">Visit Help Center</a>
+      <section class="hero-rich" aria-labelledby="blog-heading">
+        <div class="wrap hero-inner">
+          <span class="eyebrow">Ennvo Journal</span>
+          <h1 id="blog-heading">Ideas for a better <span class="text-gradient">social web.</span></h1>
+          <p class="hero-sub">
+            Original guides from the Ennvo team — practical advice for reels, stories,
+            messaging, calls, privacy, and building a healthier relationship with social media.
+          </p>
+          <div class="actions">
+            <a class="btn btn-primary" href="/">Open Ennvo</a>
+            <a class="btn btn-secondary" href="/help">Visit Help Center</a>
+          </div>
+          <div class="hero-proof">
+            <span class="faces">
+              <img src="/images/erfan.avif" alt="Erfan Sarker" width="30" height="30" />
+              <img src="/images/rita.jpg" alt="Rita Akter" width="30" height="30" />
+            </span>
+            <span>Written by <strong>Erfan Sarker</strong> and the Ennvo team</span>
+          </div>
         </div>
       </section>
 
       <section class="wrap section" aria-labelledby="latest-guides">
-        <div class="section-head">
-          <p class="kicker">Latest guides</p>
+        <div class="section-head reveal">
+          <p class="kicker">Latest articles</p>
           <h2 id="latest-guides">Start with the basics.</h2>
           <p class="lead">
-            Short, practical articles for people who want to share, connect, and
-            get more from Ennvo.
+            Short, practical articles for people who want to share, connect, and get more from
+            Ennvo without the noise.
           </p>
         </div>
         <div class="card-grid">
-          <article class="card">
-            <p class="article-meta">Guide · November 8, 2026</p>
-            <h2><a href="/blog/what-is-ennvo">What is Ennvo? The official app explained</a></h2>
+          <article class="card reveal">
+            <p class="article-meta">Getting started · November 8, 2026</p>
+            <h2><a href="/blog/what-is-ennvo">What is Ennvo? The official platform explained</a></h2>
             <p>
-              A plain-language introduction to Ennvo, who builds it, what you can
-              do, and how to get started.
+              A plain-language introduction to Ennvo, who builds it, what you can do, and how to
+              get started.
             </p>
-            <a class="read-more" href="/blog/what-is-ennvo">Read the guide →</a>
+            <a class="read-more" href="/blog/what-is-ennvo">Read the article →</a>
           </article>
-          <article class="card">
-            <p class="article-meta">Guide · November 8, 2026</p>
+          <article class="card reveal reveal-delay-1">
+            <p class="article-meta">Reels · November 8, 2026</p>
             <h2><a href="/blog/ennvo-reels-guide">How to create and share reels on Ennvo</a></h2>
             <p>
-              A simple walkthrough for recording or uploading a reel, adding the
-              finishing touches, and sharing it.
+              A simple walkthrough for recording or uploading a reel, adding the finishing touches,
+              and sharing it.
             </p>
-            <a class="read-more" href="/blog/ennvo-reels-guide">Read the guide →</a>
+            <a class="read-more" href="/blog/ennvo-reels-guide">Read the article →</a>
           </article>
-          <article class="card">
-            <p class="article-meta">Guide · November 8, 2026</p>
+          <article class="card reveal reveal-delay-2">
+            <p class="article-meta">Calls · November 8, 2026</p>
             <h2><a href="/blog/ennvo-video-calling-guide">Ennvo video calling guide</a></h2>
             <p>
-              Make HD audio and video calls, fix common permission problems, and
-              keep your conversations clear.
+              Make HD audio and video calls, fix common permission problems, and keep your
+              conversations clear.
             </p>
-            <a class="read-more" href="/blog/ennvo-video-calling-guide">Read the guide →</a>
+            <a class="read-more" href="/blog/ennvo-video-calling-guide">Read the article →</a>
           </article>
+          <article class="card reveal">
+            <p class="article-meta">Stories · November 9, 2026</p>
+            <h2><a href="/blog/ennvo-stories-guide">How to use Stories on Ennvo</a></h2>
+            <p>
+              Share everyday moments that disappear after 24 hours — and understand who can see
+              them.
+            </p>
+            <a class="read-more" href="/blog/ennvo-stories-guide">Read the article →</a>
+          </article>
+          <article class="card reveal reveal-delay-1">
+            <p class="article-meta">Privacy · November 9, 2026</p>
+            <h2><a href="/blog/ennvo-privacy-safety-guide">Privacy and safety on Ennvo</a></h2>
+            <p>
+              A practical guide to profile privacy, blocking, reporting, account security, and
+              safer sharing.
+            </p>
+            <a class="read-more" href="/blog/ennvo-privacy-safety-guide">Read the article →</a>
+          </article>
+          <article class="card reveal reveal-delay-2">
+            <p class="article-meta">Account · November 9, 2026</p>
+            <h2><a href="/blog/ennvo-account-setup-guide">Create your Ennvo account the right way</a></h2>
+            <p>
+              Set up your account, profile photo, bio, and security basics in a few careful steps.
+            </p>
+            <a class="read-more" href="/blog/ennvo-account-setup-guide">Read the article →</a>
+          </article>
+          <article class="card reveal">
+            <p class="article-meta">Community · November 9, 2026</p>
+            <h2><a href="/blog/ennvo-community-guidelines-explained">Ennvo community guidelines, explained</a></h2>
+            <p>
+              What respectful participation looks like, how reporting works, and what happens after
+              a report.
+            </p>
+            <a class="read-more" href="/blog/ennvo-community-guidelines-explained">Read the article →</a>
+          </article>
+        </div>
+      </section>
+
+      <section class="wrap section" aria-labelledby="blog-authors">
+        <div class="split-feature">
+          <div class="panel reveal">
+            <p class="kicker">Who writes here</p>
+            <h2 id="blog-authors">Notes from the people building Ennvo.</h2>
+            <p>
+              The Ennvo Journal is written by founder <strong>Erfan Sarker</strong> and
+              co-developer <strong>Rita Akter</strong>. Every article is original, practical, and
+              based on how the platform actually works.
+            </p>
+            <p>
+              If you spot something that needs updating, send a note through the
+              <a href="/support">Support Center</a>.
+            </p>
+            <div class="actions" style="justify-content:flex-start;">
+              <a class="btn btn-primary" href="/about#team">Meet the team</a>
+              <a class="btn btn-secondary" href="/help">Browse the Help Center</a>
+            </div>
+          </div>
+          <div class="author-card reveal reveal-delay-1">
+            <img src="/images/erfan.avif" alt="Erfan Sarker, founder of Ennvo" width="54" height="54" loading="lazy" />
+            <div>
+              <strong>Erfan Sarker</strong>
+              <span>Founder &amp; Software Engineer, Ennvo</span>
+              <span style="margin-top:4px;"><a href="https://www.facebook.com/erfanbnp123" rel="me noopener" target="_blank">Facebook profile</a></span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -213,22 +342,57 @@
           </p>
           <div class="actions">
             <a class="btn btn-primary" href="/help">Open Help Center</a>
-            <a class="btn btn-secondary" href="/about">Meet the team</a>
+            <a class="btn btn-secondary" href="/support">Create a support ticket</a>
           </div>
         </div>
       </section>
     </main>
 
     <footer>
-      <div class="wrap footer-row">
-        <p>&copy; 2026 Ennvo. Founded by Erfan Sarker. Co-developed by Rita Akter.</p>
-        <nav aria-label="Footer navigation">
-          <a href="/">Home</a> &nbsp;·&nbsp;
-          <a href="/blog">Blog</a> &nbsp;·&nbsp;
-          <a href="/help">Help</a> &nbsp;·&nbsp;
-          <a href="/about">About</a>
-        </nav>
+      <div class="wrap">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <a class="brand" href="/" aria-label="Ennvo home">
+              <img src="/icon-96.png" alt="Ennvo logo" width="38" height="38" />
+              <span>Ennvo</span>
+            </a>
+            <p>An independent social platform for reels, stories, messaging, and HD calls. Founded by Erfan Sarker and co-developed by Rita Akter.</p>
+          </div>
+          <div class="footer-col">
+            <h4>Product</h4>
+            <a href="/">Open Ennvo</a>
+            <a href="/feed">Reels</a>
+            <a href="/search">Discover</a>
+            <a href="/help">Help Center</a>
+          </div>
+          <div class="footer-col">
+            <h4>Company</h4>
+            <a href="/about">About</a>
+            <a href="/about#team">Team</a>
+            <a href="/press">Press</a>
+            <a href="/blog">Journal</a>
+          </div>
+          <div class="footer-col">
+            <h4>Trust</h4>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms of Service</a>
+            <a href="/trust">Trust &amp; Safety</a>
+            <a href="/contact">Contact</a>
+          </div>
+          <div class="footer-col">
+            <h4>Support</h4>
+            <a href="/support">Support ticket</a>
+            <a href="/support#feedback">Feedback</a>
+            <a href="/help#faq">FAQs</a>
+            <a href="mailto:support@ennvo.com">support@ennvo.com</a>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>&copy; <span data-year>2026</span> Ennvo. All rights reserved.</span>
+          <span>Founded by Erfan Sarker · Co-developed by Rita Akter · Built in Bangladesh</span>
+        </div>
       </div>
     </footer>
+    <script src="/site.js" defer></script>
   </body>
 </html>

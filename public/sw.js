@@ -1,7 +1,7 @@
 // Ennvo Background Service Worker for Real-Time Push & Desktop Notifications
 // Also caches the app shell so repeat opens are instant on slow networks.
-const STATIC_CACHE = 'ennvo-static-v9';
-const RUNTIME_CACHE = 'ennvo-runtime-v9';
+const STATIC_CACHE = 'ennvo-static-v10';
+const RUNTIME_CACHE = 'ennvo-runtime-v10';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -45,11 +45,27 @@ self.addEventListener('fetch', (event) => {
     url.pathname === '/about.html' ||
     url.pathname === '/help' ||
     url.pathname === '/help.html' ||
+    url.pathname === '/support' ||
+    url.pathname === '/support.html' ||
+    url.pathname === '/contact' ||
+    url.pathname === '/contact.html' ||
+    url.pathname === '/privacy' ||
+    url.pathname === '/privacy.html' ||
+    url.pathname === '/terms' ||
+    url.pathname === '/terms.html' ||
+    url.pathname === '/trust' ||
+    url.pathname === '/trust.html' ||
+    url.pathname === '/press' ||
+    url.pathname === '/press.html' ||
     url.pathname === '/landing' ||
     url.pathname === '/landing.html' ||
     url.pathname === '/blog' ||
     url.pathname === '/blog/' ||
-    url.pathname.startsWith('/blog/');
+    url.pathname.startsWith('/blog/') ||
+    url.pathname === '/company.json' ||
+    url.pathname === '/llms.txt' ||
+    url.pathname === '/sitemap.xml' ||
+    url.pathname === '/robots.txt';
   if (isStaticSeoPage) return;
 
   // App navigation: serve the cached shell instantly, refresh it in background.
@@ -80,7 +96,7 @@ self.addEventListener('fetch', (event) => {
 
   // Hashed assets and small same-origin images: cache-first.
   const isAsset = url.pathname.startsWith('/assets/');
-  const isImage = /\.(?:png|jpg|jpeg|webp|gif|svg|ico)$/i.test(url.pathname);
+  const isImage = /\.(?:png|jpg|jpeg|webp|avif|gif|svg|ico)$/i.test(url.pathname);
   if (!isAsset && !isImage) return;
 
   event.respondWith((async () => {

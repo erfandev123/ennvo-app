@@ -13,14 +13,27 @@
       content="What is Ennvo, Ennvo app, Ennvo official, Ennvo social media, Ennvo features, Erfan Sarker, Rita Akter, Ennvo Bangladesh"
     />
     <link rel="canonical" href="https://ennvo.vercel.app/blog/what-is-ennvo" />
+    <link rel="alternate" type="application/rss+xml" title="Ennvo Journal RSS" href="/blog/feed.xml" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="author" content="Erfan Sarker" />
+    <meta name="publisher" content="Ennvo" />
+    <meta name="application-name" content="Ennvo" />
+    <meta name="apple-mobile-web-app-title" content="Ennvo" />
     <meta name="theme-color" content="#0ea5e9" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/icon-96.png" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/icon-96.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icon-192.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    />
     <link rel="stylesheet" href="/static-pages.css" />
     <link rel="author" href="https://ennvo.vercel.app/about" />
+    <link rel="alternate" type="application/json" href="/company.json" title="Ennvo company profile" />
 
     <meta property="og:type" content="article" />
     <meta property="og:site_name" content="Ennvo" />
@@ -56,7 +69,7 @@
           "logo": {
             "@type": "ImageObject",
             "@id": "https://ennvo.vercel.app/#logo",
-            "url": "https://ennvo.vercel.app/Ennvo.png",
+            "url": "https://ennvo.vercel.app/icon-512.png",
             "caption": "Ennvo Official Logo"
           },
           "founder": { "@id": "https://ennvo.vercel.app/#erfan-sarker" },
@@ -78,6 +91,7 @@
           "@id": "https://ennvo.vercel.app/#erfan-sarker",
           "name": "Erfan Sarker",
           "jobTitle": "Founder & Software Engineer",
+          "image": "https://ennvo.vercel.app/images/erfan.avif",
           "url": "https://ennvo.vercel.app/about",
           "sameAs": ["https://www.facebook.com/erfanbnp123"],
           "worksFor": { "@id": "https://ennvo.vercel.app/#organization" }
@@ -87,6 +101,7 @@
           "@id": "https://ennvo.vercel.app/#rita-akter",
           "name": "Rita Akter",
           "jobTitle": "Co-Developer & Partner",
+          "image": "https://ennvo.vercel.app/images/rita.jpg",
           "url": "https://ennvo.vercel.app/about#team",
           "worksFor": { "@id": "https://ennvo.vercel.app/#organization" }
         },
@@ -94,7 +109,7 @@
           "@type": "Blog",
           "@id": "https://ennvo.vercel.app/blog#blog",
           "url": "https://ennvo.vercel.app/blog",
-          "name": "Ennvo Blog",
+          "name": "Ennvo Journal",
           "publisher": { "@id": "https://ennvo.vercel.app/#organization" },
           "isPartOf": { "@id": "https://ennvo.vercel.app/#website" },
           "inLanguage": "en"
@@ -151,20 +166,24 @@
           <img src="/icon-96.png" alt="Ennvo logo" width="38" height="38" />
           <span>Ennvo</span>
         </a>
-        <nav class="nav-links" aria-label="Main navigation">
+        <nav class="nav-links" id="primary-nav" data-nav-links aria-label="Main navigation">
           <a href="/">Home</a>
-          <a href="/blog">Blog</a>
+          <a href="/blog">Journal</a>
           <a href="/help">Help</a>
           <a href="/about">About</a>
+          <a href="/support">Support</a>
           <a class="nav-cta" href="/">Open Ennvo</a>
         </nav>
+        <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation" aria-expanded="false" aria-controls="primary-nav">
+          <span aria-hidden="true"></span>
+        </button>
       </div>
     </header>
 
     <main>
       <div class="wrap">
         <nav class="breadcrumbs" aria-label="Breadcrumb">
-          <a href="/">Home</a> / <a href="/blog">Blog</a> / What is Ennvo?
+          <a href="/">Home</a> / <a href="/blog">Journal</a> / What is Ennvo?
         </nav>
       </div>
 
@@ -214,8 +233,8 @@
             </p>
             <p>
               The platform is built with a focus on speed, simple social
-              sharing, and real-time communication. Because the team is small,
-              feedback from users can directly shape what gets improved next.
+              sharing, and real-time communication. User feedback is reviewed
+              continuously and helps shape what gets improved next.
             </p>
 
             <h2>Is Ennvo free to use?</h2>
@@ -255,15 +274,50 @@
     </main>
 
     <footer>
-      <div class="wrap footer-row">
-        <p>&copy; 2026 Ennvo. Founded by Erfan Sarker. Co-developed by Rita Akter.</p>
-        <nav aria-label="Footer navigation">
-          <a href="/">Home</a> &nbsp;·&nbsp;
-          <a href="/blog">Blog</a> &nbsp;·&nbsp;
-          <a href="/help">Help</a> &nbsp;·&nbsp;
-          <a href="/about">About</a>
-        </nav>
+      <div class="wrap">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <a class="brand" href="/" aria-label="Ennvo home">
+              <img src="/icon-96.png" alt="Ennvo logo" width="38" height="38" />
+              <span>Ennvo</span>
+            </a>
+            <p>An independent social platform for reels, stories, messaging, and HD calls. Founded by Erfan Sarker and co-developed by Rita Akter.</p>
+          </div>
+          <div class="footer-col">
+            <h4>Product</h4>
+            <a href="/">Open Ennvo</a>
+            <a href="/feed">Reels</a>
+            <a href="/search">Discover</a>
+            <a href="/help">Help Center</a>
+          </div>
+          <div class="footer-col">
+            <h4>Company</h4>
+            <a href="/about">About</a>
+            <a href="/about#team">Team</a>
+            <a href="/press">Press</a>
+            <a href="/blog">Journal</a>
+          </div>
+          <div class="footer-col">
+            <h4>Trust</h4>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms of Service</a>
+            <a href="/trust">Trust &amp; Safety</a>
+            <a href="/contact">Contact</a>
+          </div>
+          <div class="footer-col">
+            <h4>Support</h4>
+            <a href="/support">Support ticket</a>
+            <a href="/support#feedback">Feedback</a>
+            <a href="/help#faq">FAQs</a>
+            <a href="mailto:support@ennvo.com">support@ennvo.com</a>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>&copy; <span data-year>2026</span> Ennvo. All rights reserved.</span>
+          <span>Founded by Erfan Sarker · Co-developed by Rita Akter · Built in Bangladesh</span>
+        </div>
       </div>
     </footer>
+    <script src="/site.js" defer></script>
   </body>
 </html>

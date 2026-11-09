@@ -1,7 +1,7 @@
 {
-  "name": "Ennvo - Official Social Media & Video Calling",
+  "name": "Ennvo - Official Social Platform",
   "short_name": "Ennvo",
-  "description": "Discover Ennvo, the official ultra-fast social media platform with short reels, stories, and real-time HD audio/video calls.",
+  "description": "Ennvo is an independent social platform by Erfan Sarker and Rita Akter, with short reels, stories, real-time messaging, and HD audio/video calls.",
   "start_url": "/",
   "scope": "/",
   "id": "https://ennvo.vercel.app/",
@@ -9,6 +9,9 @@
   "background_color": "#0b0f19",
   "theme_color": "#7c3aed",
   "orientation": "any",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["social", "communication"],
   "icons": [
     {
       "src": "/icon-96.png",
@@ -27,6 +30,26 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Help Center",
+      "short_name": "Help",
+      "url": "/help",
+      "description": "Search Ennvo help articles and answers."
+    },
+    {
+      "name": "Support",
+      "short_name": "Support",
+      "url": "/support",
+      "description": "Create an Ennvo support ticket or send feedback."
+    },
+    {
+      "name": "Ennvo Journal",
+      "short_name": "Journal",
+      "url": "/blog",
+      "description": "Read original guides from the Ennvo team."
     }
   ]
 }

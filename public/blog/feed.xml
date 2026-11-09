@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Ennvo Journal</title>
+    <link>https://ennvo.vercel.app/blog</link>
+    <description>Original guides and updates from the Ennvo team: reels, stories, messaging, calls, privacy, safety, and account help.</description>
+    <language>en</language>
+    <lastBuildDate>Mon, 09 Nov 2026 00:00:00 GMT</lastBuildDate>
+    <atom:link href="https://ennvo.vercel.app/blog/feed.xml" rel="self" type="application/rss+xml" />
+    <image>
+      <url>https://ennvo.vercel.app/icon-512.png</url>
+      <title>Ennvo Journal</title>
+      <link>https://ennvo.vercel.app/blog</link>
+    </image>
+    <item>
+      <title>How to use Stories on Ennvo: a simple guide</title>
+      <link>https://ennvo.vercel.app/blog/ennvo-stories-guide</link>
+      <guid isPermaLink="true">https://ennvo.vercel.app/blog/ennvo-stories-guide</guid>
+      <pubDate>Mon, 09 Nov 2026 00:00:00 GMT</pubDate>
+      <category>Stories</category>
+      <description>Learn how stories work on Ennvo, how to post one, who can see it, and how to share comfortably.</description>
+    </item>
+    <item>
+      <title>Privacy and safety on Ennvo: a practical guide</title>
+      <link>https://ennvo.vercel.app/blog/ennvo-privacy-safety-guide</link>
+      <guid isPermaLink="true">https://ennvo.vercel.app/blog/ennvo-privacy-safety-guide</guid>
+      <pubDate>Mon, 09 Nov 2026 00:00:00 GMT</pubDate>
+      <category>Privacy</category>
+      <description>Practical steps for account security, privacy settings, blocking, reporting, and safer sharing on Ennvo.</description>
+    </item>
+    <item>
+      <title>Create your Ennvo account the right way</title>
+      <link>https://ennvo.vercel.app/blog/ennvo-account-setup-guide</link>
+      <guid isPermaLink="true">https://ennvo.vercel.app/blog/ennvo-account-setup-guide</guid>
+      <pubDate>Mon, 09 Nov 2026 00:00:00 GMT</pubDate>
+      <category>Account</category>
+      <description>A step-by-step guide to creating an Ennvo account, setting up your profile, and reviewing privacy settings.</description>
+    </item>
+    <item>
+      <title>Ennvo community guidelines, explained</title>
+      <link>https://ennvo.vercel.app/blog/ennvo-community-guidelines-explained</link>
+      <guid isPermaLink="true">https://ennvo.vercel.app/blog/ennvo-community-guidelines-explained</guid>
+      <pubDate>Mon, 09 Nov 2026 00:00:00 GMT</pubDate>
+      <category>Community</category>
+      <description>What respectful participation looks like on Ennvo, which content is not allowed, and how reporting works.</description>
+    </item>
+    <item>
+      <title>What is Ennvo? The official platform explained</title>
+      <link>https://ennvo.vercel.app/blog/what-is-ennvo</link>
+      <guid isPermaLink="true">https://ennvo.vercel.app/blog/what-is-ennvo</guid>
+      <pubDate>Sun, 08 Nov 2026 00:00:00 GMT</pubDate>
+      <category>Getting started</category>
+      <description>A plain-language introduction to Ennvo, its features, founders, and how to get started.</description>
+    </item>
+    <item>
+      <title>How to create and share reels on Ennvo</title>
+      <link>https://ennvo.vercel.app/blog/ennvo-reels-guide</link>
+      <guid isPermaLink="true">https://ennvo.vercel.app/blog/ennvo-reels-guide</guid>
+      <pubDate>Sun, 08 Nov 2026 00:00:00 GMT</pubDate>
+      <category>Reels</category>
+      <description>Record, trim, caption, and publish a short video on Ennvo with confidence.</description>
+    </item>
+    <item>
+      <title>Ennvo video calling guide</title>
+      <link>https://ennvo.vercel.app/blog/ennvo-video-calling-guide</link>
+      <guid isPermaLink="true">https://ennvo.vercel.app/blog/ennvo-video-calling-guide</guid>
+      <pubDate>Sun, 08 Nov 2026 00:00:00 GMT</pubDate>
+      <category>Calls</category>
+      <description>Make HD audio and video calls on Ennvo, fix permission problems, and keep conversations clear.</description>
+    </item>
+  </channel>
+</rss>

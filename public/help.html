@@ -3,31 +3,42 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Ennvo Help Center – Getting Started, Reels, Chat &amp; Calls</title>
+    <title>Ennvo Help Center – Accounts, Reels, Chat, Calls &amp; Safety</title>
     <meta
       name="description"
-      content="Get help with Ennvo. Find answers about creating an account, reels, stories, messages, HD audio and video calls, privacy, and troubleshooting."
+      content="Search the Ennvo Help Center for answers about accounts, reels, stories, messages, HD audio and video calls, privacy, safety, and troubleshooting."
     />
     <meta
       name="keywords"
-      content="Ennvo help, Ennvo help center, Ennvo support, Ennvo reels help, Ennvo video call help, Ennvo account, Erfan Sarker, Rita Akter"
+      content="Ennvo help, Ennvo help center, Ennvo support, Ennvo knowledge base, Ennvo reels help, Ennvo video call help, Ennvo account, Ennvo privacy, Erfan Sarker, Rita Akter"
     />
     <link rel="canonical" href="https://ennvo.vercel.app/help" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="author" content="Erfan Sarker" />
+    <meta name="publisher" content="Ennvo" />
+    <meta name="application-name" content="Ennvo" />
     <meta name="theme-color" content="#0ea5e9" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/icon-96.png" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/icon-96.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icon-192.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    />
     <link rel="stylesheet" href="/static-pages.css" />
     <link rel="author" href="https://ennvo.vercel.app/about" />
+    <link rel="alternate" type="application/json" href="/company.json" title="Ennvo company profile" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Ennvo" />
-    <meta property="og:title" content="Ennvo Help Center – Getting Started, Reels, Chat &amp; Calls" />
+    <meta property="og:title" content="Ennvo Help Center – Accounts, Reels, Chat, Calls &amp; Safety" />
     <meta
       property="og:description"
-      content="Find answers about Ennvo accounts, reels, stories, messages, video calls, privacy, and troubleshooting."
+      content="Search the Ennvo Help Center for answers about accounts, reels, stories, messages, video calls, privacy, safety, and troubleshooting."
     />
     <meta property="og:url" content="https://ennvo.vercel.app/help" />
     <meta property="og:image" content="https://ennvo.vercel.app/og-image.jpg" />
@@ -36,7 +47,7 @@
     <meta name="twitter:title" content="Ennvo Help Center" />
     <meta
       name="twitter:description"
-      content="Answers about Ennvo accounts, reels, chat, video calls, privacy, and troubleshooting."
+      content="Answers about Ennvo accounts, reels, chat, video calls, privacy, safety, and troubleshooting."
     />
     <meta name="twitter:image" content="https://ennvo.vercel.app/og-image.jpg" />
     <meta name="twitter:image:alt" content="Ennvo Help Center" />
@@ -49,18 +60,55 @@
           "@type": "Organization",
           "@id": "https://ennvo.vercel.app/#organization",
           "name": "Ennvo",
+          "alternateName": ["Ennvo App", "Ennvoapp", "Ennvo Social"],
           "url": "https://ennvo.vercel.app/",
           "logo": {
             "@type": "ImageObject",
             "@id": "https://ennvo.vercel.app/#logo",
-            "url": "https://ennvo.vercel.app/Ennvo.png",
+            "url": "https://ennvo.vercel.app/icon-512.png",
+            "width": 512,
+            "height": 512,
             "caption": "Ennvo Official Logo"
           },
+          "description": "Ennvo is an independent social platform founded by Erfan Sarker and co-developed by Rita Akter.",
           "founder": { "@id": "https://ennvo.vercel.app/#erfan-sarker" },
           "employee": [
             { "@id": "https://ennvo.vercel.app/#erfan-sarker" },
             { "@id": "https://ennvo.vercel.app/#rita-akter" }
-          ]
+          ],
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "customer support",
+            "email": "support@ennvo.com",
+            "url": "https://ennvo.vercel.app/support",
+            "availableLanguage": ["English", "Bengali"]
+          },
+          "sameAs": ["https://www.facebook.com/erfanbnp123"],
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "Bijoynagar",
+            "addressRegion": "Brahmanbaria",
+            "addressCountry": "Bangladesh"
+          }
+        },
+        {
+          "@type": "Person",
+          "@id": "https://ennvo.vercel.app/#erfan-sarker",
+          "name": "Erfan Sarker",
+          "jobTitle": "Founder & Software Engineer",
+          "image": "https://ennvo.vercel.app/images/erfan.avif",
+          "url": "https://ennvo.vercel.app/about",
+          "sameAs": ["https://www.facebook.com/erfanbnp123"],
+          "worksFor": { "@id": "https://ennvo.vercel.app/#organization" }
+        },
+        {
+          "@type": "Person",
+          "@id": "https://ennvo.vercel.app/#rita-akter",
+          "name": "Rita Akter",
+          "jobTitle": "Co-Developer & Partner",
+          "image": "https://ennvo.vercel.app/images/rita.jpg",
+          "url": "https://ennvo.vercel.app/about#team",
+          "worksFor": { "@id": "https://ennvo.vercel.app/#organization" }
         },
         {
           "@type": "WebSite",
@@ -68,95 +116,18 @@
           "url": "https://ennvo.vercel.app/",
           "name": "Ennvo",
           "publisher": { "@id": "https://ennvo.vercel.app/#organization" },
-          "inLanguage": "en"
+          "inLanguage": ["en", "bn"]
         },
         {
           "@type": "WebPage",
           "@id": "https://ennvo.vercel.app/help#webpage",
           "url": "https://ennvo.vercel.app/help",
-          "name": "Ennvo Help Center – Getting Started, Reels, Chat & Calls",
-          "description": "Get help with Ennvo. Find answers about creating an account, reels, stories, messages, HD audio and video calls, privacy, and troubleshooting.",
+          "name": "Ennvo Help Center – Accounts, Reels, Chat, Calls & Safety",
+          "description": "Search the Ennvo Help Center for answers about accounts, reels, stories, messages, HD audio and video calls, privacy, safety, and troubleshooting.",
           "isPartOf": { "@id": "https://ennvo.vercel.app/#website" },
           "about": { "@id": "https://ennvo.vercel.app/#organization" },
-          "inLanguage": "en"
-        },
-        {
-          "@type": "FAQPage",
-          "@id": "https://ennvo.vercel.app/help#faq",
-          "mainEntity": [
-            {
-              "@type": "Question",
-              "name": "What is Ennvo?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Ennvo is the official social media app by Erfan Sarker and co-developer Rita Akter. You can watch and share reels, post stories, chat, and make HD audio and video calls."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "How do I create an Ennvo account?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Open https://ennvo.vercel.app/ and choose the sign-up option. Follow the prompts to create your account, then add a profile photo and bio."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "Is Ennvo free to use?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Yes. Ennvo is free to use. Your internet provider may charge for data when you watch videos or make calls."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "How do I create a reel on Ennvo?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Open Ennvo, go to the create option, record or upload a short video, trim it, add any available effects, write a caption, and publish."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "How do I make an audio or video call on Ennvo?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Open a conversation with the person you want to call, then use the audio or video call button. Allow microphone and camera access when prompted."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "How do I update my Ennvo profile?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Open your profile or account settings, edit your name, photo, and bio, then save your changes."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "Who is behind Ennvo?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Ennvo was founded by Erfan Sarker, a software engineer from Bangladesh, with co-developer and partner Rita Akter. Learn more on the About page."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "Why is Ennvo not loading or working properly?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Check your internet connection, refresh the page, try a modern browser, and clear the browser cache if needed. If the problem continues, contact Ennvo support with details about your device and the error."
-              }
-            },
-            {
-              "@type": "Question",
-              "name": "How do I contact Ennvo support?",
-              "acceptedAnswer": {
-                "@type": "Answer",
-                "text": "Use the Customer Care & Help Center in the app's Settings. You can also email support@ennvo.com with details about the problem."
-              }
-            }
-          ]
+          "inLanguage": "en",
+          "breadcrumb": { "@id": "https://ennvo.vercel.app/help#breadcrumb" }
         },
         {
           "@type": "BreadcrumbList",
@@ -175,6 +146,156 @@
               "item": "https://ennvo.vercel.app/help"
             }
           ]
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://ennvo.vercel.app/help#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "What is Ennvo?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Ennvo is an independent social platform founded by Erfan Sarker and co-developed by Rita Akter. You can watch and share reels, post stories, chat, and make HD audio and video calls."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I create an Ennvo account?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Open https://ennvo.vercel.app/ and choose the sign-up option. Follow the prompts, then add a profile photo and a short bio."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is Ennvo free to use?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. Ennvo is free to use. Your internet provider may charge for data when you watch videos or make calls."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I create a reel on Ennvo?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Open Ennvo, choose the create option, record or upload a short video, trim it, add any available effects, write a caption, and publish."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I post a story on Ennvo?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Use the story option in the app, capture or choose a photo or short video, add any available text or effects, and share it. Stories disappear after 24 hours."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I make an audio or video call on Ennvo?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Open a conversation with the person you want to call, then use the audio or video call button. Allow microphone and camera access when prompted."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Why is my microphone or camera not working?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Check that the browser or app has microphone and camera permission for Ennvo. Close other apps that may be using the camera, refresh the page, and try again."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I update my Ennvo profile?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Open your profile or account settings, edit your name, photo, and bio, then save your changes."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I reset my password?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Use the password reset option on the Ennvo sign-in screen if it is available for your account. If you cannot reset it, contact support and do not share your password or verification codes."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I block or report someone?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Open the account or content menu and choose block or report. Reports are reviewed by the Ennvo team. Blocking stops that account from interacting with you."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I delete my Ennvo account?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Look for account deletion in Settings where it is available. If you cannot find it, contact support from the email address linked to your account and request deletion."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Who can see my Ennvo content?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Visibility depends on your privacy settings and the type of content. Review your profile and privacy controls, and remember that stories and public posts can be seen by a wider audience."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Why is Ennvo not loading or working properly?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Check your internet connection, refresh the page, try a modern browser, and clear the browser cache if needed. If the problem continues, contact support with your device and browser details."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Which browsers does Ennvo support?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Ennvo works best in current versions of Chrome, Edge, Safari, and Firefox on mobile and desktop."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I contact Ennvo support?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Open a ticket at https://ennvo.vercel.app/support or email support@ennvo.com. Include your device, browser, and a short description of the problem."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Does Ennvo work offline?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Ennvo needs an internet connection for feeds, messages, uploads, and calls. Some previously loaded app assets may remain available, but live features require a connection."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How is my data handled?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Read the Ennvo Privacy Policy for details about the information collected, how it is used, and the controls available to you."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I report a security issue?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Contact support@ennvo.com with a clear description and steps to reproduce the issue. Do not include other people's private data. Do not test an issue on accounts you do not own."
+              }
+            }
+          ]
         }
       ]
     }
@@ -187,64 +308,99 @@
           <img src="/icon-96.png" alt="Ennvo logo" width="38" height="38" />
           <span>Ennvo</span>
         </a>
-        <nav class="nav-links" aria-label="Main navigation">
+        <nav class="nav-links" id="primary-nav" data-nav-links aria-label="Main navigation">
           <a href="/">Home</a>
-          <a href="/blog">Blog</a>
+          <a href="/blog">Journal</a>
           <a href="/help">Help</a>
           <a href="/about">About</a>
+          <a href="/support">Support</a>
           <a class="nav-cta" href="/">Open Ennvo</a>
         </nav>
+        <button class="nav-toggle" type="button" data-nav-toggle aria-label="Open navigation" aria-expanded="false" aria-controls="primary-nav">
+          <span aria-hidden="true"></span>
+        </button>
       </div>
     </header>
 
     <main>
-      <section class="wrap hero">
-        <span class="eyebrow">Ennvo Help Center</span>
-        <h1>How can we help?</h1>
-        <p>
-          Find quick answers about your account, reels, stories, messages, HD
-          audio and video calls, privacy, and common problems.
-        </p>
-        <div class="actions">
-          <a class="btn btn-primary" href="https://ennvo.vercel.app/">Open Ennvo</a>
-          <a class="btn btn-secondary" href="#faq">Browse FAQs</a>
+      <section class="hero-rich" aria-labelledby="help-heading">
+        <div class="wrap hero-inner">
+          <span class="eyebrow">Ennvo Help Center</span>
+          <h1 id="help-heading">Answers, without the <span class="text-gradient">wait.</span></h1>
+          <p class="hero-sub">
+            Search the knowledge base for clear answers about your account, reels, stories,
+            messages, HD calls, privacy, safety, and common problems.
+          </p>
+          <div class="search-box" role="search">
+            <label class="sr-only" for="kb-search" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">Search the Ennvo knowledge base</label>
+            <input
+              id="kb-search"
+              type="search"
+              placeholder="Search help articles and answers…"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          </div>
+          <p class="search-meta" id="search-count" role="status" aria-live="polite">18 answers · 6 knowledge base topics</p>
+          <div class="chip-row" id="help-filters" aria-label="Filter help by category">
+            <button class="chip is-active" type="button" data-filter="all">All</button>
+            <button class="chip" type="button" data-filter="getting-started">Getting started</button>
+            <button class="chip" type="button" data-filter="reels">Reels &amp; stories</button>
+            <button class="chip" type="button" data-filter="messages">Messages &amp; calls</button>
+            <button class="chip" type="button" data-filter="account">Account &amp; privacy</button>
+            <button class="chip" type="button" data-filter="safety">Safety</button>
+            <button class="chip" type="button" data-filter="troubleshooting">Troubleshooting</button>
+          </div>
         </div>
       </section>
 
       <section class="wrap section" aria-labelledby="quick-help">
-        <div class="section-head">
+        <div class="section-head reveal">
           <p class="kicker">Quick help</p>
           <h2 id="quick-help">Choose a topic.</h2>
         </div>
-        <div class="help-grid">
-          <div class="help-card">
-            <h3><a href="#getting-started">Getting started</a></h3>
-            <p>Create an account, sign in, and set up your profile.</p>
-          </div>
-          <div class="help-card">
-            <h3><a href="#reels-stories">Reels &amp; stories</a></h3>
-            <p>Create short videos, share moments, and manage your posts.</p>
-          </div>
-          <div class="help-card">
-            <h3><a href="#messages-calls">Messages &amp; calls</a></h3>
-            <p>Chat with friends and make HD audio and video calls.</p>
-          </div>
-          <div class="help-card">
-            <h3><a href="#account-privacy">Account &amp; privacy</a></h3>
-            <p>Update your profile, review settings, and stay safe.</p>
-          </div>
-          <div class="help-card">
-            <h3><a href="#troubleshooting">Troubleshooting</a></h3>
-            <p>Fix common loading, upload, microphone, and camera issues.</p>
-          </div>
-          <div class="help-card">
-            <h3><a href="#contact">Contact support</a></h3>
-            <p>Send the right details so the team can help you faster.</p>
-          </div>
+        <div class="kb-grid">
+          <a class="kb-card reveal" href="#getting-started" data-category="getting-started">
+            <span class="kb-tag">Start here</span>
+            <h3>Getting started</h3>
+            <p>Create an account, sign in, set up your profile, and install the web app.</p>
+            <span class="kb-arrow">Open topic →</span>
+          </a>
+          <a class="kb-card reveal reveal-delay-1" href="#reels-stories" data-category="reels">
+            <span class="kb-tag">Create</span>
+            <h3>Reels &amp; stories</h3>
+            <p>Record short videos, share moments, and understand how long content stays visible.</p>
+            <span class="kb-arrow">Open topic →</span>
+          </a>
+          <a class="kb-card reveal reveal-delay-2" href="#messages-calls" data-category="messages">
+            <span class="kb-tag">Connect</span>
+            <h3>Messages &amp; calls</h3>
+            <p>Start a conversation, fix microphone permissions, and make HD audio or video calls.</p>
+            <span class="kb-arrow">Open topic →</span>
+          </a>
+          <a class="kb-card reveal" href="#account-privacy" data-category="account">
+            <span class="kb-tag">Control</span>
+            <h3>Account &amp; privacy</h3>
+            <p>Update your profile, review privacy settings, change your password, or delete your account.</p>
+            <span class="kb-arrow">Open topic →</span>
+          </a>
+          <a class="kb-card reveal reveal-delay-1" href="#safety" data-category="safety">
+            <span class="kb-tag">Stay safe</span>
+            <h3>Safety &amp; reporting</h3>
+            <p>Block or report an account, recognize scams, and find the right way to raise a concern.</p>
+            <span class="kb-arrow">Open topic →</span>
+          </a>
+          <a class="kb-card reveal reveal-delay-2" href="#troubleshooting" data-category="troubleshooting">
+            <span class="kb-tag">Fix it</span>
+            <h3>Troubleshooting</h3>
+            <p>Fix loading, upload, notification, microphone, and camera problems.</p>
+            <span class="kb-arrow">Open topic →</span>
+          </a>
         </div>
       </section>
 
-      <section class="wrap section" id="getting-started" aria-labelledby="getting-started-heading">
+      <section class="wrap section" id="getting-started" aria-labelledby="getting-started-heading" data-category="getting-started">
         <div class="section-head">
           <p class="kicker">Getting started</p>
           <h2 id="getting-started-heading">Create your account and profile.</h2>
@@ -252,26 +408,31 @@
         <div class="article-shell">
           <div class="prose">
             <p>
-              Open <a href="https://ennvo.vercel.app/">ennvo.vercel.app</a> in a
-              modern browser. Choose the sign-up option and follow the prompts.
-              If you already have an account, sign in with the option you used
-              before.
+              Open <a href="https://ennvo.vercel.app/">ennvo.vercel.app</a> in a modern browser.
+              Choose the sign-up option and follow the prompts. If you already have an account,
+              sign in with the option you used before.
             </p>
             <p>
-              After signing in, add a profile photo, your name, and a short bio.
-              A complete profile makes it easier for friends to recognize you
-              and helps people find the right account.
+              After signing in, add a profile photo, your name, and a short bio. A complete profile
+              makes it easier for friends to recognize you and helps people find the right account.
             </p>
             <p>
-              Ennvo works in the browser. For quick access, you can use your
-              browser's install or add-to-home-screen option if it is
-              available.
+              Ennvo works in the browser. For quick access, use your browser's install or
+              add-to-home-screen option if it is available. On Android, you can also use the
+              Ennvo app.
             </p>
+            <h3>Set up your profile in four steps</h3>
+            <ol>
+              <li>Open your profile or account settings.</li>
+              <li>Add a clear profile photo.</li>
+              <li>Write a short bio that tells people who you are.</li>
+              <li>Review your privacy settings before posting.</li>
+            </ol>
           </div>
         </div>
       </section>
 
-      <section class="wrap section" id="reels-stories" aria-labelledby="reels-stories-heading">
+      <section class="wrap section" id="reels-stories" aria-labelledby="reels-stories-heading" data-category="reels">
         <div class="section-head">
           <p class="kicker">Reels &amp; stories</p>
           <h2 id="reels-stories-heading">Share short videos and everyday moments.</h2>
@@ -279,30 +440,29 @@
         <div class="article-shell">
           <div class="prose">
             <p>
-              To create a reel, open the create option in Ennvo, record a new
-              video or upload one from your device, trim the clip, add any
-              available effects, write a caption, and publish. The exact editing
-              tools can change as the app is updated.
+              To create a reel, open the create option in Ennvo, record a new video or upload one
+              from your device, trim the clip, add any available effects, write a caption, and
+              publish. The exact editing tools can change as the app is updated.
             </p>
             <p>
-              Stories are for short-lived updates. Use them for quick moments,
-              behind-the-scenes posts, or a simple update without creating a
-              permanent post.
+              Stories are for short-lived updates. Use them for quick moments, behind-the-scenes
+              posts, or a simple update without creating a permanent post. Stories disappear after
+              24 hours.
             </p>
             <p>
-              Only upload content you have the right to share. Ask for
-              permission before filming other people or using someone else's
-              music or video.
+              Only upload content you have the right to share. Ask for permission before filming
+              other people or using someone else's music or video.
             </p>
             <p>
-              For a detailed walkthrough, read the
-              <a href="/blog/ennvo-reels-guide">Ennvo reels guide</a>.
+              For detailed walkthroughs, read the
+              <a href="/blog/ennvo-reels-guide">Ennvo reels guide</a> and the
+              <a href="/blog/ennvo-stories-guide">Ennvo Stories guide</a>.
             </p>
           </div>
         </div>
       </section>
 
-      <section class="wrap section" id="messages-calls" aria-labelledby="messages-calls-heading">
+      <section class="wrap section" id="messages-calls" aria-labelledby="messages-calls-heading" data-category="messages">
         <div class="section-head">
           <p class="kicker">Messages &amp; calls</p>
           <h2 id="messages-calls-heading">Chat and call from one place.</h2>
@@ -310,25 +470,32 @@
         <div class="article-shell">
           <div class="prose">
             <p>
-              Open your messages to find your conversations. Tap a conversation
-              to read and send messages. To start an audio or video call, open
-              the conversation and use the call button.
+              Open your messages to find your conversations. Tap a conversation to read and send
+              messages. To start an audio or video call, open the conversation and use the call
+              button.
             </p>
             <p>
-              The first time you make a call, your browser may ask for
-              microphone and camera access. Allow access if you want the call to
-              work. If you change your mind later, update the permissions in
-              your browser or device settings.
+              The first time you make a call, your browser may ask for microphone and camera
+              access. Allow access if you want the call to work. If you change your mind later,
+              update the permissions in your browser or device settings.
             </p>
+            <h3>If a call does not connect</h3>
+            <ul>
+              <li>Check your internet connection.</li>
+              <li>Allow microphone and camera permissions for Ennvo.</li>
+              <li>Close other apps that may be using the camera or microphone.</li>
+              <li>Refresh the page and try the call again.</li>
+              <li>Try a different browser if the problem continues.</li>
+            </ul>
             <p>
-              For call troubleshooting, read the
+              For more, read the
               <a href="/blog/ennvo-video-calling-guide">Ennvo video calling guide</a>.
             </p>
           </div>
         </div>
       </section>
 
-      <section class="wrap section" id="account-privacy" aria-labelledby="account-privacy-heading">
+      <section class="wrap section" id="account-privacy" aria-labelledby="account-privacy-heading" data-category="account">
         <div class="section-head">
           <p class="kicker">Account &amp; privacy</p>
           <h2 id="account-privacy-heading">Keep your account under your control.</h2>
@@ -336,26 +503,54 @@
         <div class="article-shell">
           <div class="prose">
             <p>
-              Update your name, photo, bio, and other profile details from your
-              profile or account settings. Save your changes before leaving the
-              screen.
+              Update your name, photo, bio, and other profile details from your profile or account
+              settings. Save your changes before leaving the screen.
             </p>
             <p>
-              Use a strong password and never share it with anyone. Ennvo will
-              not ask you for your password in a public comment or an unexpected
-              message. If you receive a suspicious request, do not reply with
-              personal information.
+              Use a strong password and never share it with anyone. Ennvo will not ask you for your
+              password in a public comment or an unexpected message. If you receive a suspicious
+              request, do not reply with personal information.
             </p>
             <p>
-              Review your privacy settings and choose who can see your posts and
-              contact you. Be careful about sharing your location, phone number,
-              or other sensitive details in public posts.
+              Review your privacy settings and choose who can see your posts and contact you. Be
+              careful about sharing your location, phone number, or other sensitive details in
+              public posts. Read the <a href="/privacy">Privacy Policy</a> for the full picture.
+            </p>
+            <p>
+              To request account deletion, look for the option in Settings where available. If you
+              cannot find it, contact support from the email address linked to your account.
             </p>
           </div>
         </div>
       </section>
 
-      <section class="wrap section" id="troubleshooting" aria-labelledby="troubleshooting-heading">
+      <section class="wrap section" id="safety" aria-labelledby="safety-heading" data-category="safety">
+        <div class="section-head">
+          <p class="kicker">Safety</p>
+          <h2 id="safety-heading">Block, report, and protect yourself.</h2>
+        </div>
+        <div class="article-shell">
+          <div class="prose">
+            <p>
+              If an account or post makes you uncomfortable, use the block or report option in the
+              account or content menu. Blocking stops that account from interacting with you.
+              Reports are reviewed by the Ennvo team.
+            </p>
+            <p>
+              Never send money, gift cards, passwords, or verification codes to someone you met
+              online. Be careful with links that ask you to sign in from an unexpected message.
+              Open Ennvo directly instead of using a link from a stranger.
+            </p>
+            <p>
+              If you believe someone is in immediate danger, contact local emergency services. For
+              platform safety issues, use the <a href="/trust">Trust &amp; Safety page</a> or
+              <a href="/support">open a support ticket</a>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap section" id="troubleshooting" aria-labelledby="troubleshooting-heading" data-category="troubleshooting">
         <div class="section-head">
           <p class="kicker">Troubleshooting</p>
           <h2 id="troubleshooting-heading">Try these steps first.</h2>
@@ -371,10 +566,13 @@
               <li>Try a smaller video file if an upload keeps failing.</li>
             </ul>
             <p>
-              If the problem continues, note the device, browser, and exact
-              error message. That information makes it much easier for support
-              to investigate.
+              If the problem continues, note the device, browser, and exact error message. That
+              information makes it much easier for support to investigate.
             </p>
+            <div class="actions" style="justify-content:flex-start;">
+              <a class="btn btn-primary" href="/support">Open a support ticket</a>
+              <a class="btn btn-secondary" href="/contact">Contact options</a>
+            </div>
           </div>
         </div>
       </section>
@@ -383,100 +581,102 @@
         <div class="section-head">
           <p class="kicker">Frequently asked questions</p>
           <h2 id="faq-heading">Quick answers about Ennvo.</h2>
+          <p class="lead">Search above or filter by topic to narrow the list.</p>
         </div>
-        <div class="faq">
-          <details>
+        <div class="faq" id="faq-list">
+          <details data-category="getting-started">
             <summary>What is Ennvo?</summary>
-            <p>
-              Ennvo is the official social media app by Erfan Sarker and
-              co-developer Rita Akter. You can watch and share reels, post
-              stories, chat, and make HD audio and video calls.
-            </p>
+            <p>Ennvo is an independent social platform founded by Erfan Sarker and co-developed by Rita Akter. You can watch and share reels, post stories, chat, and make HD audio and video calls.</p>
           </details>
-          <details>
+          <details data-category="getting-started">
             <summary>How do I create an Ennvo account?</summary>
-            <p>
-              Open https://ennvo.vercel.app/ and choose the sign-up option.
-              Follow the prompts to create your account, then add a profile
-              photo and bio.
-            </p>
+            <p>Open <a href="https://ennvo.vercel.app/">ennvo.vercel.app</a> and choose the sign-up option. Follow the prompts, then add a profile photo and a short bio.</p>
           </details>
-          <details>
+          <details data-category="getting-started">
             <summary>Is Ennvo free to use?</summary>
-            <p>
-              Yes. Ennvo is free to use. Your internet provider may charge for
-              data when you watch videos or make calls.
-            </p>
+            <p>Yes. Ennvo is free to use. Your internet provider may charge for data when you watch videos or make calls.</p>
           </details>
-          <details>
+          <details data-category="reels">
             <summary>How do I create a reel on Ennvo?</summary>
-            <p>
-              Open Ennvo, go to the create option, record or upload a short
-              video, trim it, add any available effects, write a caption, and
-              publish.
-            </p>
+            <p>Open Ennvo, choose the create option, record or upload a short video, trim it, add any available effects, write a caption, and publish.</p>
           </details>
-          <details>
+          <details data-category="reels">
+            <summary>How do I post a story on Ennvo?</summary>
+            <p>Use the story option in the app, capture or choose a photo or short video, add any available text or effects, and share it. Stories disappear after 24 hours.</p>
+          </details>
+          <details data-category="messages">
             <summary>How do I make an audio or video call on Ennvo?</summary>
-            <p>
-              Open a conversation with the person you want to call, then use the
-              audio or video call button. Allow microphone and camera access
-              when prompted.
-            </p>
+            <p>Open a conversation with the person you want to call, then use the audio or video call button. Allow microphone and camera access when prompted.</p>
           </details>
-          <details>
+          <details data-category="messages">
+            <summary>Why is my microphone or camera not working?</summary>
+            <p>Check that the browser or app has microphone and camera permission for Ennvo. Close other apps that may be using the camera, refresh the page, and try again.</p>
+          </details>
+          <details data-category="account">
             <summary>How do I update my Ennvo profile?</summary>
-            <p>
-              Open your profile or account settings, edit your name, photo, and
-              bio, then save your changes.
-            </p>
+            <p>Open your profile or account settings, edit your name, photo, and bio, then save your changes.</p>
           </details>
-          <details>
-            <summary>Who is behind Ennvo?</summary>
-            <p>
-              Ennvo was founded by Erfan Sarker, a software engineer from
-              Bangladesh, with co-developer and partner Rita Akter. Learn more
-              on the <a href="/about">About page</a>.
-            </p>
+          <details data-category="account">
+            <summary>How do I reset my password?</summary>
+            <p>Use the password reset option on the Ennvo sign-in screen if it is available for your account. If you cannot reset it, contact support and do not share your password or verification codes.</p>
           </details>
-          <details>
+          <details data-category="safety">
+            <summary>How do I block or report someone?</summary>
+            <p>Open the account or content menu and choose block or report. Reports are reviewed by the Ennvo team. Blocking stops that account from interacting with you.</p>
+          </details>
+          <details data-category="account">
+            <summary>How do I delete my Ennvo account?</summary>
+            <p>Look for account deletion in Settings where it is available. If you cannot find it, contact support from the email address linked to your account and request deletion.</p>
+          </details>
+          <details data-category="account">
+            <summary>Who can see my Ennvo content?</summary>
+            <p>Visibility depends on your privacy settings and the type of content. Review your profile and privacy controls, and remember that stories and public posts can be seen by a wider audience.</p>
+          </details>
+          <details data-category="troubleshooting">
             <summary>Why is Ennvo not loading or working properly?</summary>
-            <p>
-              Check your internet connection, refresh the page, try a modern
-              browser, and clear the browser cache if needed. If the problem
-              continues, contact Ennvo support with details about your device and
-              the error.
-            </p>
+            <p>Check your internet connection, refresh the page, try a modern browser, and clear the browser cache if needed. If the problem continues, contact support with your device and browser details.</p>
           </details>
-          <details>
+          <details data-category="troubleshooting">
+            <summary>Which browsers does Ennvo support?</summary>
+            <p>Ennvo works best in current versions of Chrome, Edge, Safari, and Firefox on mobile and desktop.</p>
+          </details>
+          <details data-category="getting-started">
             <summary>How do I contact Ennvo support?</summary>
-            <p>
-              Use the Customer Care &amp; Help Center in the app's Settings. You
-              can also email
-              <a href="mailto:support@ennvo.com">support@ennvo.com</a> with
-              details about the problem.
-            </p>
+            <p>Open a ticket at <a href="/support">ennvo.vercel.app/support</a> or email <a href="mailto:support@ennvo.com">support@ennvo.com</a>. Include your device, browser, and a short description of the problem.</p>
           </details>
+          <details data-category="troubleshooting">
+            <summary>Does Ennvo work offline?</summary>
+            <p>Ennvo needs an internet connection for feeds, messages, uploads, and calls. Some previously loaded app assets may remain available, but live features require a connection.</p>
+          </details>
+          <details data-category="safety">
+            <summary>How is my data handled?</summary>
+            <p>Read the <a href="/privacy">Ennvo Privacy Policy</a> for details about the information collected, how it is used, and the controls available to you.</p>
+          </details>
+          <details data-category="safety">
+            <summary>How do I report a security issue?</summary>
+            <p>Contact <a href="mailto:support@ennvo.com">support@ennvo.com</a> with a clear description and steps to reproduce the issue. Do not include other people's private data. Do not test an issue on accounts you do not own.</p>
+          </details>
+        </div>
+        <div class="search-empty" id="search-empty" role="status" aria-live="polite">
+          No matching answers yet. Try a shorter keyword, or <a href="/support">open a support ticket</a>.
         </div>
       </section>
 
       <section class="wrap section" id="contact" aria-labelledby="contact-heading">
         <div class="callout">
           <p class="kicker">Still stuck?</p>
-          <h2 id="contact-heading">Contact Ennvo support.</h2>
+          <h2 id="contact-heading">Talk to the Ennvo team.</h2>
           <p>
-            Use the Customer Care &amp; Help Center in the app's Settings for
-            account-specific help. You can also email
+            Create a support ticket with the details we need to investigate. You can also email
             <a href="mailto:support@ennvo.com">support@ennvo.com</a>.
           </p>
           <p>
-            Include your device, browser, a short description of the problem,
-            and any error message. Do not send your password or verification
-            codes.
+            Include your device, browser, a short description of the problem, and any error
+            message. Do not send your password or verification codes.
           </p>
           <div class="actions">
-            <a class="btn btn-primary" href="https://ennvo.vercel.app/">Open Ennvo</a>
-            <a class="btn btn-secondary" href="/blog">Read the blog</a>
+            <a class="btn btn-primary" href="/support">Create a support ticket</a>
+            <a class="btn btn-secondary" href="/contact">Contact options</a>
             <a class="btn btn-secondary" href="/about">Meet the team</a>
           </div>
         </div>
@@ -484,15 +684,115 @@
     </main>
 
     <footer>
-      <div class="wrap footer-row">
-        <p>&copy; 2026 Ennvo. Founded by Erfan Sarker. Co-developed by Rita Akter.</p>
-        <nav aria-label="Footer navigation">
-          <a href="/">Home</a> &nbsp;·&nbsp;
-          <a href="/blog">Blog</a> &nbsp;·&nbsp;
-          <a href="/help">Help</a> &nbsp;·&nbsp;
-          <a href="/about">About</a>
-        </nav>
+      <div class="wrap">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <a class="brand" href="/" aria-label="Ennvo home">
+              <img src="/icon-96.png" alt="Ennvo logo" width="38" height="38" />
+              <span>Ennvo</span>
+            </a>
+            <p>An independent social platform for reels, stories, messaging, and HD calls. Founded by Erfan Sarker and co-developed by Rita Akter.</p>
+          </div>
+          <div class="footer-col">
+            <h4>Product</h4>
+            <a href="/">Open Ennvo</a>
+            <a href="/feed">Reels</a>
+            <a href="/search">Discover</a>
+            <a href="/help">Help Center</a>
+          </div>
+          <div class="footer-col">
+            <h4>Company</h4>
+            <a href="/about">About</a>
+            <a href="/about#team">Team</a>
+            <a href="/press">Press</a>
+            <a href="/blog">Journal</a>
+          </div>
+          <div class="footer-col">
+            <h4>Trust</h4>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms of Service</a>
+            <a href="/trust">Trust &amp; Safety</a>
+            <a href="/contact">Contact</a>
+          </div>
+          <div class="footer-col">
+            <h4>Support</h4>
+            <a href="/support">Support ticket</a>
+            <a href="/support#feedback">Feedback</a>
+            <a href="/help#faq">FAQs</a>
+            <a href="mailto:support@ennvo.com">support@ennvo.com</a>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>&copy; <span data-year>2026</span> Ennvo. All rights reserved.</span>
+          <span>Founded by Erfan Sarker · Co-developed by Rita Akter · Built in Bangladesh</span>
+        </div>
       </div>
     </footer>
+
+    <script src="/site.js" defer></script>
+    <script>
+      (function () {
+        var input = document.getElementById('kb-search');
+        var faqDetails = Array.prototype.slice.call(document.querySelectorAll('#faq-list details'));
+        var cards = Array.prototype.slice.call(document.querySelectorAll('.kb-card'));
+        var chips = Array.prototype.slice.call(document.querySelectorAll('#help-filters .chip'));
+        var count = document.getElementById('search-count');
+        var empty = document.getElementById('search-empty');
+        if (!input) return;
+        var activeFilter = 'all';
+
+        function apply() {
+          var query = input.value.trim().toLowerCase();
+          var visible = 0;
+          faqDetails.forEach(function (item) {
+            var category = item.getAttribute('data-category') || '';
+            var categoryMatch = activeFilter === 'all' || category === activeFilter;
+            var textMatch = !query || item.textContent.toLowerCase().indexOf(query) !== -1;
+            var show = categoryMatch && textMatch;
+            item.hidden = !show;
+            if (show) visible += 1;
+          });
+          var visibleCards = 0;
+          cards.forEach(function (card) {
+            var category = card.getAttribute('data-category') || '';
+            var categoryMatch = activeFilter === 'all' || category === activeFilter;
+            var textMatch = !query || card.textContent.toLowerCase().indexOf(query) !== -1;
+            var show = categoryMatch && textMatch;
+            card.hidden = !show;
+            card.style.display = show ? '' : 'none';
+            if (show) visibleCards += 1;
+          });
+          if (query || activeFilter !== 'all') {
+            count.textContent = visible + ' answer' + (visible === 1 ? '' : 's') + ' found';
+          } else {
+            count.textContent = faqDetails.length + ' answers · 6 knowledge base topics';
+          }
+          empty.classList.toggle('is-visible', visible === 0 && visibleCards === 0);
+        }
+
+        input.addEventListener('input', apply);
+        input.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape') {
+            input.value = '';
+            apply();
+            input.blur();
+          }
+        });
+        chips.forEach(function (chip) {
+          chip.addEventListener('click', function () {
+            chips.forEach(function (other) { other.classList.remove('is-active'); });
+            chip.classList.add('is-active');
+            activeFilter = chip.getAttribute('data-filter') || 'all';
+            apply();
+          });
+        });
+        document.addEventListener('keydown', function (event) {
+          if (event.key === '/' && document.activeElement !== input) {
+            event.preventDefault();
+            input.focus();
+          }
+        });
+      })();
+    </script>
   </body>
 </html>

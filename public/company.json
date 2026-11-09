@@ -1,0 +1,110 @@
+{
+  "name": "Ennvo",
+  "alternateName": ["Ennvo App", "Ennvoapp", "Ennvo Social", "Ennvo Platform"],
+  "url": "https://ennvo.vercel.app/",
+  "logo": "https://ennvo.vercel.app/icon-512.png",
+  "description": "Ennvo is an independent social platform founded by Erfan Sarker and co-developed by Rita Akter. It brings short video reels, stories, instant messaging, and HD audio and video calls into one fast, simple experience.",
+  "slogan": "Social, without the noise.",
+  "foundingDate": "2026",
+  "foundingLocation": "Bijoynagar, Brahmanbaria, Bangladesh",
+  "founders": [
+    {
+      "name": "Erfan Sarker",
+      "role": "Founder & Software Engineer",
+      "image": "https://ennvo.vercel.app/images/erfan.avif",
+      "url": "https://ennvo.vercel.app/about",
+      "sameAs": ["https://www.facebook.com/erfanbnp123"]
+    },
+    {
+      "name": "Rita Akter",
+      "role": "Co-Developer & Partner",
+      "image": "https://ennvo.vercel.app/images/rita.jpg",
+      "url": "https://ennvo.vercel.app/about#team"
+    }
+  ],
+  "contact": {
+    "supportEmail": "support@ennvo.com",
+    "supportPage": "https://ennvo.vercel.app/support",
+    "contactPage": "https://ennvo.vercel.app/contact"
+  },
+  "address": {
+    "addressLocality": "Bijoynagar",
+    "addressRegion": "Brahmanbaria",
+    "addressCountry": "Bangladesh"
+  },
+  "platforms": ["Web", "Android"],
+  "price": "Free to use; standard data charges may apply",
+  "features": [
+    "Short video reels",
+    "Stories",
+    "Real-time messaging",
+    "HD audio calls",
+    "HD video calls",
+    "Creator discovery",
+    "User profiles",
+    "Notifications",
+    "Search",
+    "Follow and followers",
+    "Media upload",
+    "Privacy controls",
+    "Block and report",
+    "Bookmarks",
+    "Trending content",
+    "Web app"
+  ],
+  "pages": {
+    "home": "https://ennvo.vercel.app/",
+    "landing": "https://ennvo.vercel.app/landing",
+    "about": "https://ennvo.vercel.app/about",
+    "team": "https://ennvo.vercel.app/about#team",
+    "blog": "https://ennvo.vercel.app/blog",
+    "help": "https://ennvo.vercel.app/help",
+    "support": "https://ennvo.vercel.app/support",
+    "contact": "https://ennvo.vercel.app/contact",
+    "privacy": "https://ennvo.vercel.app/privacy",
+    "terms": "https://ennvo.vercel.app/terms",
+    "trust": "https://ennvo.vercel.app/trust",
+    "press": "https://ennvo.vercel.app/press",
+    "companyProfile": "https://ennvo.vercel.app/company.json",
+    "sitemap": "https://ennvo.vercel.app/sitemap.xml",
+    "llms": "https://ennvo.vercel.app/llms.txt"
+  },
+  "articles": [
+    {
+      "title": "What is Ennvo? The official platform explained",
+      "url": "https://ennvo.vercel.app/blog/what-is-ennvo",
+      "datePublished": "2026-11-08"
+    },
+    {
+      "title": "How to create and share reels on Ennvo",
+      "url": "https://ennvo.vercel.app/blog/ennvo-reels-guide",
+      "datePublished": "2026-11-08"
+    },
+    {
+      "title": "Ennvo video calling guide",
+      "url": "https://ennvo.vercel.app/blog/ennvo-video-calling-guide",
+      "datePublished": "2026-11-08"
+    },
+    {
+      "title": "How to use Stories on Ennvo: a simple guide",
+      "url": "https://ennvo.vercel.app/blog/ennvo-stories-guide",
+      "datePublished": "2026-11-09"
+    },
+    {
+      "title": "Privacy and safety on Ennvo: a practical guide",
+      "url": "https://ennvo.vercel.app/blog/ennvo-privacy-safety-guide",
+      "datePublished": "2026-11-09"
+    },
+    {
+      "title": "Create your Ennvo account the right way",
+      "url": "https://ennvo.vercel.app/blog/ennvo-account-setup-guide",
+      "datePublished": "2026-11-09"
+    },
+    {
+      "title": "Ennvo community guidelines, explained",
+      "url": "https://ennvo.vercel.app/blog/ennvo-community-guidelines-explained",
+      "datePublished": "2026-11-09"
+    }
+  ],
+  "sameAs": ["https://www.facebook.com/erfanbnp123"]
+}
