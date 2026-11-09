@@ -1,5 +1,5 @@
-{
-  "name": "Ennvo",
+﻿{
+  "name": "Ennvo App",
   "alternateName": ["Ennvo App", "Ennvoapp", "Ennvo Social", "Ennvo Platform"],
   "url": "https://ennvo.vercel.app/",
   "logo": "https://ennvo.vercel.app/icon-512.png",
@@ -23,7 +23,7 @@
     }
   ],
   "contact": {
-    "supportEmail": "support@ennvo.com",
+    "supportEmail": "ennvoapp@gmail.com",
     "supportPage": "https://ennvo.vercel.app/support",
     "contactPage": "https://ennvo.vercel.app/contact"
   },
@@ -108,3 +108,4 @@
   ],
   "sameAs": ["https://www.facebook.com/erfanbnp123"]
 }
+

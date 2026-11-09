@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
   MessageSquare, 
@@ -126,7 +126,7 @@ const DEFAULT_TICKETS: SupportTicket[] = [
     message: 'When connecting with audio and video, audio works but video stutters occasionally on weak network. Please optimize low bandwidth adaptive bitrate.',
     status: 'open',
     priority: 'high',
-    deviceInfo: 'Samsung Galaxy A53 • Android 14 • App v1.1.0',
+    deviceInfo: 'Samsung Galaxy A53 â€¢ Android 14 â€¢ App v1.1.0',
     date: '15m ago'
   },
   {
@@ -139,7 +139,7 @@ const DEFAULT_TICKETS: SupportTicket[] = [
     message: 'I tapped download on my own reel but cannot find it in Google Photos gallery immediately.',
     status: 'in_progress',
     priority: 'normal',
-    deviceInfo: 'Xiaomi Redmi Note 12 • Android 13 • App v1.1.0',
+    deviceInfo: 'Xiaomi Redmi Note 12 â€¢ Android 13 â€¢ App v1.1.0',
     adminReply: 'Hello Farzana! Videos are saved under Internal Storage / Download / EnnvoMedia. Please grant storage permissions in Settings.',
     date: '1h ago'
   },
@@ -152,7 +152,7 @@ const DEFAULT_TICKETS: SupportTicket[] = [
     message: 'We submitted trade license and website domain ownership proofs. Please review and verify our account.',
     status: 'open',
     priority: 'urgent',
-    deviceInfo: 'iPhone 15 Pro • iOS 17.5 • Web App',
+    deviceInfo: 'iPhone 15 Pro â€¢ iOS 17.5 â€¢ Web App',
     date: '3h ago'
   },
   {
@@ -164,7 +164,7 @@ const DEFAULT_TICKETS: SupportTicket[] = [
     message: 'I forgot my secondary privacy lock pin. Need temporary authorization link.',
     status: 'resolved',
     priority: 'normal',
-    deviceInfo: 'OnePlus 11 • Android 14',
+    deviceInfo: 'OnePlus 11 â€¢ Android 14',
     adminReply: 'Passcode recovery link sent to registered email address.',
     date: '1d ago'
   }
@@ -193,7 +193,7 @@ const DEFAULT_FAQS: FAQItem[] = [
     id: 'faq_4',
     category: 'Customer Care',
     question: 'How can users contact official 24/7 Ennvo Customer Support?',
-    answer: 'Users can submit a support ticket via Settings > Help Center, or email support@ennvo.com or hotline +880 1700-000000.'
+    answer: 'Users can submit a support ticket via Settings > Help Center, or email ennvoapp@gmail.com or hotline +880 1700-000000.'
   }
 ];
 
@@ -255,7 +255,7 @@ export const VerificationSupportPage: React.FC<{ lang: Language }> = ({ lang }) 
     try {
       await verifyUserAction(applicant.uid, true, `Approved verification request (${applicant.id}) for ${applicant.name}`);
       setApplicants(prev => prev.map(a => a.id === applicant.id ? { ...a, status: 'approved' } : a));
-      alert(`🎉 Official Blue Verified Badge granted to @${applicant.username}!`);
+      alert(`ðŸŽ‰ Official Blue Verified Badge granted to @${applicant.username}!`);
     } catch (e: any) {
       alert(`Error approving verification: ${e.message}`);
     }
@@ -681,7 +681,7 @@ export const VerificationSupportPage: React.FC<{ lang: Language }> = ({ lang }) 
             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl text-sm font-mono font-bold text-emerald-600">
               +880 1700-000000
             </div>
-            <span className="text-[11px] text-gray-400 block">Available 24 Hours • 7 Days a Week</span>
+            <span className="text-[11px] text-gray-400 block">Available 24 Hours â€¢ 7 Days a Week</span>
           </div>
 
           <div className="bg-white dark:bg-gray-900 p-6 rounded-[28px] border border-gray-100 dark:border-white/5 shadow-xs space-y-3">
@@ -691,7 +691,7 @@ export const VerificationSupportPage: React.FC<{ lang: Language }> = ({ lang }) 
             <h3 className="font-black text-lg text-gray-900 dark:text-white">Help Desk Email Dispatch</h3>
             <p className="text-xs text-gray-500">Automated ticket routing for security, billing, and bugs.</p>
             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl text-sm font-mono font-bold text-purple-600">
-              support@ennvo.com
+              ennvoapp@gmail.com
             </div>
             <span className="text-[11px] text-gray-400 block">Average response SLA: under 15 minutes</span>
           </div>
@@ -717,7 +717,7 @@ export const VerificationSupportPage: React.FC<{ lang: Language }> = ({ lang }) 
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/5 pb-3">
               <div>
                 <span className="text-[10px] font-mono font-bold text-purple-600 uppercase">
-                  {selectedTicket.id} • {selectedTicket.category}
+                  {selectedTicket.id} â€¢ {selectedTicket.category}
                 </span>
                 <h3 className="font-black text-lg text-gray-900 dark:text-white">
                   {selectedTicket.subject}
@@ -905,3 +905,4 @@ export const VerificationSupportPage: React.FC<{ lang: Language }> = ({ lang }) 
     </div>
   );
 };
+

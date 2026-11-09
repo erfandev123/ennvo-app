@@ -1071,3 +1071,18 @@ html.has-cursor select { cursor: auto; }
   .reveal { opacity: 1; transform: none; }
   .hero-rich::before { animation: none; }
 }
+
+/* ========================================================================= */
+/* Rounded site icon / logo – perfect rounded corners everywhere             */
+/* ========================================================================= */
+.site-icon,
+.icon-rounded,
+.brand img,
+header img[src*="icon"],
+footer img[src*="icon"],
+[class*="logo"] img,
+img[alt*="logo" i],
+img[alt*="Logo" i] {
+  border-radius: 14px !important;
+  object-fit: cover;
+}

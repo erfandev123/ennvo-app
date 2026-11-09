@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { 
   User, Shield, Share2, Lock, UserX, MessageSquare, AtSign, Send,
   Link, Download, Users, Heart, Eye, Moon, Sun, Trash2, Smartphone, 
@@ -650,7 +650,7 @@ export default function Settings() {
           icon: Headphones,
           badge: '24/7',
           action: () => {
-            alert('📞 Ennvo Official Customer Care\nHotline: +880 1700-000000\nEmail: support@ennvo.com\n\nFor Verified Blue Badge inquiries, review responses are delivered within 24 hours. Our support staff is online 24/7.');
+            alert('ðŸ“ž Ennvo Official Customer Care\nHotline: +880 1700-000000\nEmail: ennvoapp@gmail.com\n\nFor Verified Blue Badge inquiries, review responses are delivered within 24 hours. Our support staff is online 24/7.');
           }
         }
       ]
@@ -1206,7 +1206,7 @@ export default function Settings() {
                   </div>
                   {isPasskeyEnabled && (
                     <span className="text-[11px] text-emerald-600 font-semibold block mt-1">
-                      ✓ Active on {detectedDevice.os}
+                      âœ“ Active on {detectedDevice.os}
                     </span>
                   )}
                   <p className="text-[12px] text-gray-500 font-normal leading-relaxed mt-1 pr-6">
@@ -2559,13 +2559,13 @@ export default function Settings() {
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
               <h3 className="text-base font-bold text-gray-900">Verified Business Account</h3>
               <button onClick={() => setShowBusinessModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">
-                ✕
+                âœ•
               </button>
             </div>
 
             {businessUpgradeSuccess ? (
               <div className="p-4 bg-emerald-50 rounded-2xl text-emerald-800 text-center font-bold text-sm">
-                🎉 Congratulations! Your account has been upgraded to a Verified Business Account.
+                ðŸŽ‰ Congratulations! Your account has been upgraded to a Verified Business Account.
               </div>
             ) : (
               <form onSubmit={handleUpgradeToBusiness} className="space-y-3.5">
@@ -2623,7 +2623,7 @@ export default function Settings() {
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
               <h3 className="text-base font-bold text-gray-900">Account legacy</h3>
               <button onClick={() => setShowLegacyModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">
-                ✕
+                âœ•
               </button>
             </div>
 
@@ -2730,3 +2730,4 @@ export default function Settings() {
     </div>
   );
 }
+
