@@ -3,26 +3,14 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 
-// Split the bundle so a returning user only downloads what actually changed.
-// Everything below is cached forever by the browser / service worker.
-const chunkGroups: Array<[string, RegExp]> = [
-  ['react-vendor', /[\\/]node_modules[\\/](react|react-dom|scheduler|use-sync-external-store)[\\/]/],
-  ['firebase-auth', /[\\/]node_modules[\\/]@firebase[\\/]auth[\\/]/],
-  ['firebase-firestore', /[\\/]node_modules[\\/]@firebase[\\/](firestore|firestore-compat|webchannel)[\\/]/],
-  ['firebase-database', /[\\/]node_modules[\\/]@firebase[\\/]database[\\/]/],
-  ['firebase-storage', /[\\/]node_modules[\\/]@firebase[\\/]storage[\\/]/],
-  ['firebase-vendor', /[\\/]node_modules[\\/](firebase|@firebase)[\\/]/],
-  ['motion-vendor', /[\\/]node_modules[\\/](motion|framer-motion|motion-dom|motion-utils)[\\/]/],
-  ['icons-vendor', /[\\/]node_modules[\\/]lucide-react[\\/]/],
-  ['capacitor-vendor', /[\\/]node_modules[\\/]@capacitor[\\/]/],
-];
-
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   const isProd = mode === 'production';
 
   return {
     plugins: [react(), tailwindcss()],
+    // NOTE: never force process.env.NODE_ENV here. React and the JSX runtime must
+    // agree; a mismatch throws "n.jsxDEV is not a function" and blanks the page.
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
@@ -46,9 +34,19 @@ export default defineConfig(({mode}) => {
         output: {
           manualChunks(id) {
             if (!id.includes('node_modules')) return undefined;
-            for (const [name, test] of chunkGroups) {
-              if (test.test(id)) return name;
-            }
+
+            // Every Firebase package MUST stay in one chunk. Splitting firebase/app
+            // away from firebase/firestore creates a circular import between the
+            // chunks and the app dies at boot with
+            //   "ReferenceError: Cannot access 'X' before initialization"
+            // which shows up as a completely white screen.
+            if (/[\\/]node_modules[\\/](firebase|@firebase)[\\/]/.test(id)) return 'firebase-vendor';
+
+            if (/[\\/]node_modules[\\/](react|react-dom|scheduler|use-sync-external-store)[\\/]/.test(id)) return 'react-vendor';
+            if (/[\\/]node_modules[\\/](motion|framer-motion|motion-dom|motion-utils)[\\/]/.test(id)) return 'motion-vendor';
+            if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(id)) return 'icons-vendor';
+            if (/[\\/]node_modules[\\/]@capacitor[\\/]/.test(id)) return 'capacitor-vendor';
+
             return undefined;
           },
           // Stable, readable names keep the long-term cache warm across builds.

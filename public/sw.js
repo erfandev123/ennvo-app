@@ -1,7 +1,7 @@
 // Ennvo Background Service Worker for Real-Time Push & Desktop Notifications
 // Also caches the app shell so repeat opens are instant on slow networks.
-const STATIC_CACHE = 'ennvo-static-v13';
-const RUNTIME_CACHE = 'ennvo-runtime-v13';
+const STATIC_CACHE = 'ennvo-static-v14';
+const RUNTIME_CACHE = 'ennvo-runtime-v14';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -68,23 +68,36 @@ self.addEventListener('fetch', (event) => {
     url.pathname === '/robots.txt';
   if (isStaticSeoPage) return;
 
-  // App navigation: serve the cached shell instantly, refresh it in background.
+  // App navigation: NETWORK FIRST, cache only as the offline fallback.
+  // Cache-first navigation is what turns a normal deploy into a white screen:
+  // the stale HTML points at asset names that no longer exist.
+  // A slow network still gets the cached shell after USE_CACHE_MS.
+  const USE_CACHE_MS = 4000;
   if (request.mode === 'navigate') {
-    const networkPromise = fetch(request)
-      .then(async (response) => {
-        if (response && response.ok) {
-          const cache = await caches.open(STATIC_CACHE);
-          await cache.put('/', response.clone());
-        }
-        return response;
-      })
-      .catch(() => null);
-
-    event.waitUntil(networkPromise);
     event.respondWith((async () => {
       const cache = await caches.open(STATIC_CACHE);
+
+      const networkPromise = fetch(request)
+        .then(async (response) => {
+          if (response && response.ok) {
+            await cache.put('/', response.clone());
+          }
+          return response;
+        })
+        .catch(() => null);
+
+      const timeout = new Promise((resolve) => setTimeout(() => resolve('timeout'), USE_CACHE_MS));
+      const first = await Promise.race([networkPromise, timeout]);
+
+      if (first && first !== 'timeout') return first;
+
       const cached = await cache.match('/');
-      if (cached) return cached;
+      if (cached) {
+        // Refresh in the background for the next visit.
+        event.waitUntil(networkPromise);
+        return cached;
+      }
+
       const fresh = await networkPromise;
       return fresh || new Response('You are offline. Please reconnect.', {
         status: 503,
