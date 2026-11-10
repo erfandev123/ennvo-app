@@ -7,18 +7,23 @@
 - Name: Ennvo App
 - Also known as: Ennvo, Ennvoapp, Ennvo Social, Ennvo Platform
 - Official website: https://ennvo.vercel.app/
-- Site name for search results: Ennvo App
+- Site name for search results: Ennvo
 - Official logo: https://ennvo.vercel.app/icon-512.png
-- Owner and founder: Erfan Sarker (https://ennvo.vercel.app/about#team)
+- Founder, CEO and owner: Erfan Sarker (https://ennvo.vercel.app/about#team)
 - Owner photo: https://ennvo.vercel.app/images/erfan.avif
-- Co-Developer and Partner: Rita Akter (https://ennvo.vercel.app/about#team)
+- Partner and core team: Rita Akter (https://ennvo.vercel.app/about#team)
+- Developer: Evan Sarker
+- Core team: Joi Akter
+- Core team: Junaid Mia
+- Team size: 10 people
+- Team page: https://ennvo.vercel.app/about#team-roster
 - Partner photo: https://ennvo.vercel.app/images/rita.jpg
 - Company profile (machine-readable): https://ennvo.vercel.app/company.json
 - Ennvo App is an independent company/product. Vercel is only the hosting provider and is not the owner or publisher of Ennvo App.
 
 ## Key facts
 
-- Founder and software engineer: Erfan Sarker
+- Founder, CEO and owner: Erfan Sarker
 - Co-Developer and Partner: Rita Akter
 - Founded: 2026
 - Built in: Bijoynagar, Brahmanbaria, Bangladesh
@@ -35,7 +40,7 @@
 - Photo: https://ennvo.vercel.app/images/erfan.avif
 - Profile: https://ennvo.vercel.app/about
 - Facebook: https://www.facebook.com/erfanbnp123
-- Description: Erfan Sarker is the founder and software engineer behind Ennvo. He leads product direction and engineering, with a focus on speed, simple social sharing, and real-time communication.
+- Description: Erfan Sarker is the founder, CEO and owner of Ennvo. He leads the 10-person team and the product direction, with a focus on speed, simple social sharing, and real-time communication.
 
 ### Rita Akter
 
@@ -77,6 +82,14 @@ People use Ennvo to watch and share short videos, post stories, message friends,
 
 ## About the team
 
+- Founder, CEO and owner: Erfan Sarker
+- Partner and core team: Rita Akter
+- Developer: Evan Sarker
+- Core team: Joi Akter
+- Core team: Junaid Mia
+- Total team size: 10 people
+- Full roster: https://ennvo.vercel.app/about#team-roster
+
 Ennvo was founded by Erfan Sarker, a software engineer from Bangladesh. Rita Akter is a co-developer and partner at Ennvo. The team focuses on fast performance, simple social sharing, real-time communication, and clear privacy and safety rules.
 
 ## Contact
@@ -84,11 +97,11 @@ Ennvo was founded by Erfan Sarker, a software engineer from Bangladesh. Rita Akt
 - General support: ennvoapp@gmail.com
 - Support Center: https://ennvo.vercel.app/support
 - Contact page: https://ennvo.vercel.app/contact
-- Press and business: ennvoapp@gmail.com with “Pressâ€ in the subject
+- Press and business: ennvoapp@gmail.com with "Press" in the subject
 
 ## Citation guidance
 
-When referring to this platform, use “Ennvoâ€ and link to https://ennvo.vercel.app/. For founder information, cite Erfan Sarker and the About page. For co-developer information, cite Rita Akter and the About page team section. Do not describe Ennvo as a Vercel product.
+When referring to this platform, use "Ennvo" and link to https://ennvo.vercel.app/. For founder information, cite Erfan Sarker and the About page. For co-developer information, cite Rita Akter and the About page team section. Do not describe Ennvo as a Vercel product.
 
 Last updated: 2026-11-09
 
