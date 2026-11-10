@@ -192,7 +192,7 @@ function DraggableActivityCard({
               e.stopPropagation();
               onFollowToggle?.(notif.actorId, notif.actorName, notif.actorAvatar);
             }}
-            className={`px-3.5 py-1.5 rounded-full text-[12px] font-bold tracking-tight transition-all shrink-0 cursor-pointer active:scale-95 ${
+            className={`px-3.5 py-1.5 rounded-full text-[12px] font-bold tracking-tight transition-all shrink-0 cursor-pointer  ${
               isFriend
                 ? 'bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-700'
                 : isFollowing
@@ -226,7 +226,7 @@ function DraggableActivityCard({
             ) : (
               <img
                 src={notif.postMedia}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                className="w-full h-full object-cover transition-transform"
                 alt="thumb"
                 referrerPolicy="no-referrer"
                 loading="lazy"
@@ -302,7 +302,7 @@ export function ActivityStackView({
               e.stopPropagation();
               onUnpackMore();
             }}
-            className="px-3 py-1.5 rounded-full text-[12px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-700 flex items-center space-x-1 transition-all active:scale-95 border-0 cursor-pointer"
+            className="px-3 py-1.5 rounded-full text-[12px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-700 flex items-center space-x-1 transition-all border-0 cursor-pointer"
           >
             <ArrowDownCircle className="w-3.5 h-3.5 text-purple-500" />
             <span>Load More</span>
@@ -407,7 +407,7 @@ export function FollowerStackView({
               e.stopPropagation();
               onUnpackMore();
             }}
-            className="px-3 py-1.5 rounded-full text-[12px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-700 flex items-center space-x-1 transition-all active:scale-95 border-0 cursor-pointer"
+            className="px-3 py-1.5 rounded-full text-[12px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-700 flex items-center space-x-1 transition-all border-0 cursor-pointer"
           >
             <ArrowDownCircle className="w-3.5 h-3.5 text-blue-500" />
             <span>Load More</span>
@@ -491,7 +491,7 @@ export function FollowerStackView({
                       e.stopPropagation();
                       onFollowToggle?.(f.id, f.name, f.avatar);
                     }}
-                    className={`px-4 py-1.5 rounded-full text-[12px] font-bold tracking-tight transition-all shrink-0 cursor-pointer active:scale-95 ${
+                    className={`px-4 py-1.5 rounded-full text-[12px] font-bold tracking-tight transition-all shrink-0 cursor-pointer  ${
                       isFriend
                         ? 'bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-700'
                         : isFollowing

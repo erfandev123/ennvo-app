@@ -218,7 +218,7 @@ export default function StoryNoteViewerModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 active:scale-90 transition-all flex items-center justify-center text-white cursor-pointer border-0"
+            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 transition-all flex items-center justify-center text-white cursor-pointer border-0"
             title="Close"
           >
             <X className="w-5 h-5" strokeWidth={2.4} />
@@ -300,7 +300,7 @@ export default function StoryNoteViewerModal({
                     if (onNewNote) onNewNote();
                     else onEditMyNote?.();
                   }}
-                  className="w-12 h-12 rounded-full bg-gradient-to-tr from-sky-400 to-blue-600 hover:from-sky-500 hover:to-blue-700 active:scale-90 text-white transition-all flex items-center justify-center cursor-pointer shadow-lg border border-white/20"
+                  className="w-12 h-12 rounded-full bg-gradient-to-tr from-sky-400 to-blue-600 hover:from-sky-500 hover:to-blue-700 text-white transition-all flex items-center justify-center cursor-pointer shadow-lg border border-white/20"
                   title="New note"
                 >
                   <Plus className="w-6 h-6" strokeWidth={2.6} />
@@ -314,7 +314,7 @@ export default function StoryNoteViewerModal({
                     if (onEditNote) onEditNote();
                     else onEditMyNote?.();
                   }}
-                  className="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 active:scale-90 text-white transition-all flex items-center justify-center cursor-pointer border border-white/20 shadow-md"
+                  className="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all flex items-center justify-center cursor-pointer border border-white/20 shadow-md"
                   title="Edit note"
                 >
                   <Edit3 className="w-5 h-5" strokeWidth={2.2} />
@@ -327,7 +327,7 @@ export default function StoryNoteViewerModal({
                     onDeleteMyNote?.();
                     onClose();
                   }}
-                  className="w-12 h-12 rounded-full bg-red-500/20 hover:bg-red-500/30 active:scale-90 text-red-300 transition-all flex items-center justify-center cursor-pointer border border-red-500/30 shadow-md"
+                  className="w-12 h-12 rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-300 transition-all flex items-center justify-center cursor-pointer border border-red-500/30 shadow-md"
                   title="Delete note"
                 >
                   <Trash2 className="w-5 h-5" strokeWidth={2.2} />
@@ -347,7 +347,7 @@ export default function StoryNoteViewerModal({
                     key={emoji}
                     type="button"
                     onClick={() => handleSendReaction(emoji)}
-                    className="text-[22px] sm:text-[24px] hover:scale-130 active:scale-90 transition-transform p-1 cursor-pointer"
+                    className="text-[22px] sm:text-[24px] transition-transform p-1 cursor-pointer"
                     title={`React ${emoji}`}
                   >
                     {emoji}
@@ -375,7 +375,7 @@ export default function StoryNoteViewerModal({
                 <button
                   type="submit"
                   disabled={!replyText.trim() || isSending}
-                  className="w-8 h-8 rounded-full bg-sky-500 hover:bg-sky-400 text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-all border-0 cursor-pointer shrink-0"
+                  className="w-8 h-8 rounded-full bg-sky-500 hover:bg-sky-400 text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-all border-0 cursor-pointer shrink-0"
                   title="Send reply"
                 >
                   <Send className="w-4 h-4 translate-x-0.5" strokeWidth={2.2} />

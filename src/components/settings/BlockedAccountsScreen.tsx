@@ -206,7 +206,7 @@ export const BlockedAccountsScreen: React.FC<BlockedAccountsScreenProps> = ({ on
             <button
               type="submit"
               disabled={isBlocking || !blockInput.trim()}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-40 flex items-center space-x-1 shrink-0 active:scale-95"
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-40 flex items-center space-x-1 shrink-0"
             >
               {isBlocking ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -271,7 +271,7 @@ export const BlockedAccountsScreen: React.FC<BlockedAccountsScreenProps> = ({ on
                 <button
                   type="button"
                   onClick={() => handleUnblock(item.uid, item.name || item.username)}
-                  className="px-3.5 py-1.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-100 font-semibold text-xs transition-colors shrink-0 active:scale-95"
+                  className="px-3.5 py-1.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-100 font-semibold text-xs transition-colors shrink-0"
                 >
                   Unblock
                 </button>

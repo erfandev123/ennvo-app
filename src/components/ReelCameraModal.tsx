@@ -723,7 +723,7 @@ export const ReelCameraModal: React.FC = () => {
                 onClick={() => galleryInputRef.current?.click()}
                 className="w-full max-w-xl p-10 rounded-[32px] bg-white/[0.04] hover:bg-white/[0.07] border-2 border-dashed border-white/20 hover:border-sky-400/80 transition-all cursor-pointer flex flex-col items-center justify-center text-center group shadow-2xl relative overflow-hidden"
               >
-                <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-sky-500/20 via-blue-600/20 to-indigo-600/20 text-sky-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform shadow-inner">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-sky-500/20 via-blue-600/20 to-indigo-600/20 text-sky-400 flex items-center justify-center mb-5 transition-transform shadow-inner">
                   <Film className="w-10 h-10 stroke-[1.8]" />
                 </div>
 
@@ -740,7 +740,7 @@ export const ReelCameraModal: React.FC = () => {
                     e.stopPropagation();
                     galleryInputRef.current?.click();
                   }}
-                  className="px-8 py-3.5 rounded-full bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-semibold text-sm shadow-lg shadow-sky-500/25 active:scale-95 transition-all flex items-center space-x-2.5 cursor-pointer"
+                  className="px-8 py-3.5 rounded-full bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-semibold text-sm shadow-lg shadow-sky-500/25 transition-all flex items-center space-x-2.5 cursor-pointer"
                 >
                   <ImageIcon className="w-4 h-4" />
                   <span>Select from Computer</span>
@@ -777,7 +777,7 @@ export const ReelCameraModal: React.FC = () => {
               <button
                 type="button"
                 onClick={handleClose}
-                className="w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white flex items-center justify-center transition-all active:scale-95 cursor-pointer border-0 shadow-md"
+                className="w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-md"
                 title="Close studio"
               >
                 <X className="w-5 h-5 stroke-[2.4]" />
@@ -788,7 +788,7 @@ export const ReelCameraModal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowMusicModal(true)}
-                  className="px-3.5 py-1.5 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-md text-white text-xs font-semibold flex items-center space-x-1.5 transition-all active:scale-95 cursor-pointer border border-white/10 shadow-md max-w-[210px]"
+                  className="px-3.5 py-1.5 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-md text-white text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer border border-white/10 shadow-md max-w-[210px]"
                 >
                   <Music className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                   <span className="truncate">{selectedSong ? selectedSong.title : 'Add Sound'}</span>
@@ -817,7 +817,7 @@ export const ReelCameraModal: React.FC = () => {
               <button
                 type="button"
                 onClick={handleToggleTorch}
-                className={`w-10 h-10 rounded-full backdrop-blur-md flex items-center justify-center transition-all active:scale-90 cursor-pointer border border-white/10 shadow-md ${
+                className={`w-10 h-10 rounded-full backdrop-blur-md flex items-center justify-center transition-all  cursor-pointer border border-white/10 shadow-md ${
                   torchOn ? 'bg-amber-400 text-black' : 'bg-black/45 text-white hover:bg-black/65'
                 }`}
                 title="Toggle Flashlight"
@@ -829,7 +829,7 @@ export const ReelCameraModal: React.FC = () => {
               <button
                 type="button"
                 onClick={handleFlipCamera}
-                className="w-10 h-10 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-md text-white flex items-center justify-center transition-all active:scale-90 cursor-pointer border border-white/10 shadow-md"
+                className="w-10 h-10 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-md text-white flex items-center justify-center transition-all cursor-pointer border border-white/10 shadow-md"
                 title="Flip Camera"
               >
                 <SwitchCamera className="w-4.5 h-4.5" />
@@ -839,7 +839,7 @@ export const ReelCameraModal: React.FC = () => {
               <button
                 type="button"
                 onClick={handleFilterClick}
-                className="w-10 h-10 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-md text-white flex items-center justify-center transition-all active:scale-90 cursor-pointer border border-white/10 shadow-md"
+                className="w-10 h-10 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-md text-white flex items-center justify-center transition-all cursor-pointer border border-white/10 shadow-md"
                 title="Filters (Coming Soon)"
               >
                 <Sparkles className="w-4.5 h-4.5 text-purple-300" />
@@ -849,7 +849,7 @@ export const ReelCameraModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsMuted(prev => !prev)}
-                className={`w-10 h-10 rounded-full backdrop-blur-md flex items-center justify-center transition-all active:scale-90 cursor-pointer border border-white/10 shadow-md ${
+                className={`w-10 h-10 rounded-full backdrop-blur-md flex items-center justify-center transition-all  cursor-pointer border border-white/10 shadow-md ${
                   isMuted ? 'bg-rose-600/80 text-white' : 'bg-black/45 text-white hover:bg-black/65'
                 }`}
                 title={isMuted ? 'Mic Muted' : 'Mic Active'}
@@ -875,7 +875,7 @@ export const ReelCameraModal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => galleryInputRef.current?.click()}
-                  className="w-12 h-12 rounded-[20px] bg-white/15 hover:bg-white/25 backdrop-blur-md flex flex-col items-center justify-center text-white transition-all active:scale-90 cursor-pointer border border-white/20 shadow-md group"
+                  className="w-12 h-12 rounded-[20px] bg-white/15 hover:bg-white/25 backdrop-blur-md flex flex-col items-center justify-center text-white transition-all cursor-pointer border border-white/20 shadow-md group"
                   title="Choose from gallery"
                 >
                   <ImageIcon className="w-6 h-6 stroke-[2]" />
@@ -911,14 +911,14 @@ export const ReelCameraModal: React.FC = () => {
                   <button
                     type="button"
                     onClick={isRecording ? stopRecording : startRecording}
-                    className="relative z-10 w-17 h-17 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer border-0 shadow-xl"
+                    className="relative z-10 w-17 h-17 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer border-0 shadow-xl"
                     title={isRecording ? 'Stop Recording' : 'Record'}
                   >
                     <div
                       className={`transition-all duration-300 ${
                         isRecording
                           ? 'w-7 h-7 rounded-lg bg-red-600 animate-pulse shadow-md shadow-red-500/50'
-                          : 'w-15 h-15 rounded-full bg-white hover:scale-105 shadow-md shadow-white/20'
+                          : 'w-15 h-15 rounded-full bg-white  shadow-md shadow-white/20'
                       }`}
                     />
                   </button>
@@ -1031,7 +1031,7 @@ export const ReelCameraModal: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setActivePhotoIndex(prev => prev - 1)}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/55 hover:bg-black/80 backdrop-blur-md text-white flex items-center justify-center transition-all active:scale-90 cursor-pointer border border-white/10 shadow-md z-20"
+                          className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/55 hover:bg-black/80 backdrop-blur-md text-white flex items-center justify-center transition-all cursor-pointer border border-white/10 shadow-md z-20"
                           title="Previous photo"
                         >
                           <ChevronLeft className="w-5 h-5" />
@@ -1041,7 +1041,7 @@ export const ReelCameraModal: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setActivePhotoIndex(prev => prev + 1)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/55 hover:bg-black/80 backdrop-blur-md text-white flex items-center justify-center transition-all active:scale-90 cursor-pointer border border-white/10 shadow-md z-20"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/55 hover:bg-black/80 backdrop-blur-md text-white flex items-center justify-center transition-all cursor-pointer border border-white/10 shadow-md z-20"
                           title="Next photo"
                         >
                           <ChevronRight className="w-5 h-5" />
@@ -1078,7 +1078,7 @@ export const ReelCameraModal: React.FC = () => {
               <button
                 type="button"
                 onClick={handleRetake}
-                className="w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white flex items-center justify-center transition-all active:scale-95 cursor-pointer border border-white/10 shadow-md"
+                className="w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white flex items-center justify-center transition-all cursor-pointer border border-white/10 shadow-md"
                 title="Retake"
               >
                 <RotateCcw className="w-4.5 h-4.5 stroke-[2.2]" />
@@ -1089,7 +1089,7 @@ export const ReelCameraModal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowMusicModal(true)}
-                  className="px-3.5 py-1.5 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-md text-white text-xs font-semibold flex items-center space-x-1.5 transition-all active:scale-95 cursor-pointer border border-white/10 shadow-md max-w-[200px]"
+                  className="px-3.5 py-1.5 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-md text-white text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer border border-white/10 shadow-md max-w-[200px]"
                 >
                   <Music className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                   <span className="truncate">{selectedSong ? selectedSong.title : 'Add Sound'}</span>
@@ -1114,7 +1114,7 @@ export const ReelCameraModal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowEditDrawer(prev => !prev)}
-                  className={`w-10 h-10 rounded-full backdrop-blur-md text-white flex items-center justify-center transition-all active:scale-95 cursor-pointer border border-white/10 shadow-md ${
+                  className={`w-10 h-10 rounded-full backdrop-blur-md text-white flex items-center justify-center transition-all  cursor-pointer border border-white/10 shadow-md ${
                     showEditDrawer || brightness !== 0 || contrast !== 0 || saturation !== 0 || rotation !== 0
                       ? 'bg-blue-600 text-white'
                       : 'bg-black/40 hover:bg-black/60'
@@ -1129,7 +1129,7 @@ export const ReelCameraModal: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setIsMuted(prev => !prev)}
-                    className="w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white flex items-center justify-center transition-all active:scale-95 cursor-pointer border border-white/10 shadow-md"
+                    className="w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white flex items-center justify-center transition-all cursor-pointer border border-white/10 shadow-md"
                     title={isMuted ? 'Unmute' : 'Mute'}
                   >
                     {isMuted ? <VolumeX className="w-4.5 h-4.5 text-rose-400" /> : <Volume2 className="w-4.5 h-4.5 text-white" />}
@@ -1143,7 +1143,7 @@ export const ReelCameraModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowSizeMenu(prev => !prev)}
-                className={`flex items-center space-x-1.5 px-3 py-2 rounded-full backdrop-blur-md border border-white/15 text-xs font-bold transition-all shadow-lg active:scale-95 cursor-pointer ${
+                className={`flex items-center space-x-1.5 px-3 py-2 rounded-full backdrop-blur-md border border-white/15 text-xs font-bold transition-all shadow-lg  cursor-pointer ${
                   showSizeMenu ? 'bg-blue-600 text-white' : 'bg-black/50 hover:bg-black/70 text-white'
                 }`}
                 title="Select screen size / aspect ratio"
@@ -1322,7 +1322,7 @@ export const ReelCameraModal: React.FC = () => {
               <button
                 type="button"
                 onClick={handleRetake}
-                className="px-5 py-2.5 rounded-full bg-white/15 hover:bg-white/25 text-white font-bold text-xs uppercase tracking-wider transition-all active:scale-95 cursor-pointer border border-white/10 backdrop-blur-md"
+                className="px-5 py-2.5 rounded-full bg-white/15 hover:bg-white/25 text-white font-bold text-xs uppercase tracking-wider transition-all cursor-pointer border border-white/10 backdrop-blur-md"
               >
                 Retake
               </button>
@@ -1334,7 +1334,7 @@ export const ReelCameraModal: React.FC = () => {
                   setShowEditDrawer(false);
                   setStage('details');
                 }}
-                className="px-6 py-2.5 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-xs uppercase tracking-wider flex items-center space-x-1.5 shadow-xl shadow-blue-500/30 transition-all active:scale-95 cursor-pointer border border-white/15"
+                className="px-6 py-2.5 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-xs uppercase tracking-wider flex items-center space-x-1.5 shadow-xl shadow-blue-500/30 transition-all cursor-pointer border border-white/15"
               >
                 <span>Next</span>
                 <ChevronRight className="w-4 h-4 stroke-[2.5]" />
@@ -1355,7 +1355,7 @@ export const ReelCameraModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setStage('preview')}
-                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all active:scale-95 cursor-pointer border-0 shadow-sm"
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-sm"
                 title="Back to Preview"
               >
                 <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
@@ -1376,7 +1376,7 @@ export const ReelCameraModal: React.FC = () => {
                 type="button"
                 disabled={isPublishing}
                 onClick={handleShare}
-                className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg shadow-blue-500/30 transition-all active:scale-95 cursor-pointer border-0 disabled:opacity-50"
+                className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg shadow-blue-500/30 transition-all cursor-pointer border-0 disabled:opacity-50"
               >
                 {isPublishing ? (
                   <>

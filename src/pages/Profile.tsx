@@ -17,6 +17,7 @@ import { formatTime, formatCount } from '../utils';
 import { FacebookProfileSkeleton, FacebookPostSkeleton, FacebookGridSkeleton } from '../components/Skeletons';
 import { AccountSwitcherModal } from '../components/AccountSwitcherModal';
 import { MediaCropModal } from '../components/MediaCropModal';
+import { shareContent } from '../services/shareService';
 
 const isVideoMedia = (url?: string | null): boolean => {
   if (!url) return false;
@@ -89,7 +90,7 @@ const UserRowWithFollow = React.memo(({ user, currentUser, onSelectUser }: { use
           <button 
             onClick={handleFollowToggle}
             disabled={loading}
-            className={`font-semibold text-[12px] px-3.5 py-1.5 rounded-full transition-all active:scale-95 border-0 ${
+            className={`font-semibold text-[12px] px-3.5 py-1.5 rounded-full transition-all  border-0 ${
               isFriend 
                 ? 'bg-neutral-100 text-neutral-800 hover:bg-neutral-200 shadow-none' 
                 : isFollowing 
@@ -697,34 +698,51 @@ export default function Profile() {
     }
   };
 
-  const handleMessage = async () => {
+  const handleMessage = () => {
     if (!currentUser || !user || isCurrentUser) return;
+
+    // 1. FAST PATH: the chat already exists in the local conversation cache, so
+    //    the screen opens in the same frame - no network round trip.
     try {
-      const convId = await createConversation(
-        [currentUser.uid, user.uid],
-        {
-          [currentUser.uid]: { name: currentUser.name, avatar: currentUser.avatar },
-          [user.uid]: { name: user.name, avatar: user.avatar }
-        }
-      );
-      setActiveChat(convId);
-      pushPage('messages');
-    } catch (error) {
-      console.error(error);
-    }
+      const cached = useAppStore.getState().cachedConversations || [];
+      const existing = cached.find((c: any) => {
+        const ids: string[] = c?.participantIds || [];
+        return (
+          ids.length === 2 &&
+          ids.includes(currentUser.uid) &&
+          ids.includes(user.uid)
+        );
+      });
+      if (existing?.id) {
+        setActiveChat(existing.id);
+        pushPage('messages');
+        return;
+      }
+    } catch (e) {}
+
+    // 2. No cached thread yet: open Messages immediately and resolve the thread
+    //    id in the background, instead of freezing the button for seconds.
+    pushPage('messages');
+    createConversation(
+      [currentUser.uid, user.uid],
+      {
+        [currentUser.uid]: { name: currentUser.name, avatar: currentUser.avatar },
+        [user.uid]: { name: user.name, avatar: user.avatar }
+      }
+    )
+      .then((convId) => {
+        if (convId) setActiveChat(convId);
+      })
+      .catch((error) => console.error(error));
   };
 
   const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `${profileName}'s Profile`,
-          url: `${window.location.origin}/profile/${profileHandle.replace('@', '')}`
-        });
-      } catch (err) {
-        console.error(err);
-      }
-    }
+    const handle = profileHandle.replace('@', '');
+    await shareContent({
+      title: `${profileName}'s Profile`,
+      text: `${profileName} on Ennvo`,
+      url: `${window.location.origin}/user/${encodeURIComponent(handle)}`,
+    });
   };
 
   const handleRefreshProfile = async () => {
@@ -750,7 +768,7 @@ export default function Profile() {
             <div className="h-14 bg-white/95 backdrop-blur-md border-b border-neutral-100 flex items-center justify-between px-3 sticky top-0 z-20 shrink-0">
               <button 
                 onClick={(e) => { e.stopPropagation(); setShowProfileViews(false); }} 
-                className="w-9 h-9 rounded-full hover:bg-neutral-100 text-neutral-800 flex items-center justify-center transition-colors active:scale-90"
+                className="w-9 h-9 rounded-full hover:bg-neutral-100 text-neutral-800 flex items-center justify-center transition-colors"
                 title="Back"
               >
                 <ArrowLeft className="w-5 h-5 text-neutral-900" strokeWidth={2.2} />
@@ -787,7 +805,7 @@ export default function Profile() {
             <div className="h-14 bg-white/95 backdrop-blur-md border-b border-neutral-100 flex items-center justify-between px-3 sticky top-0 z-20 shrink-0">
               <button 
                 onClick={(e) => { e.stopPropagation(); setShowFollowersList(null); }} 
-                className="w-9 h-9 rounded-full hover:bg-neutral-100 text-neutral-800 flex items-center justify-center transition-colors active:scale-90"
+                className="w-9 h-9 rounded-full hover:bg-neutral-100 text-neutral-800 flex items-center justify-center transition-colors"
                 title="Back"
               >
                 <ArrowLeft className="w-5 h-5 text-neutral-900" strokeWidth={2.2} />
@@ -827,7 +845,7 @@ export default function Profile() {
               <div className="w-full px-4 pt-5 pb-3 flex items-center justify-between mb-8">
                 <button 
                   onClick={() => popPage()} 
-                  className="p-2 -ml-2 text-neutral-800 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full active:scale-90 transition-all"
+                  className="p-2 -ml-2 text-neutral-800 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-all"
                   title="Back"
                 >
                   <ArrowLeft className="w-6 h-6 text-neutral-900 dark:text-white" strokeWidth={2.2} />
@@ -857,7 +875,7 @@ export default function Profile() {
 
               <button
                 onClick={() => popPage()}
-                className="px-6 py-2.5 rounded-full bg-neutral-900 hover:bg-black dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-black font-semibold text-sm active:scale-95 transition-all shadow-sm cursor-pointer"
+                className="px-6 py-2.5 rounded-full bg-neutral-900 hover:bg-black dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-black font-semibold text-sm transition-all shadow-sm cursor-pointer"
               >
                 Go Back
               </button>
@@ -911,7 +929,7 @@ export default function Profile() {
                   {!isCurrentUser ? (
                     <button 
                       onClick={() => popPage()} 
-                      className="p-1.5 text-neutral-800 hover:text-neutral-900 active:scale-90 transition-all"
+                      className="p-1.5 text-neutral-800 hover:text-neutral-900 transition-all"
                       title="Back"
                     >
                       <ArrowLeft className="w-6 h-6 text-neutral-800" strokeWidth={2.2} />
@@ -923,7 +941,7 @@ export default function Profile() {
                   <div className="flex items-center space-x-2 ml-auto">
                     {isCurrentUser && (
                       <button 
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-800 hover:bg-neutral-100/60 active:scale-90 transition-all relative border-0 shadow-none overflow-visible"
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-800 hover:bg-neutral-100/60 transition-all relative border-0 shadow-none overflow-visible"
                         onClick={() => {
                           localStorage.setItem('lastCheckedProfileViewsCount', profileViewsCount.toString());
                           setUnreadViewsCount(0);
@@ -947,7 +965,7 @@ export default function Profile() {
                     {isCurrentUser && (
                       <button 
                         onClick={() => pushPage('settings')}
-                        className="w-8 h-8 rounded-full bg-white/90 hover:bg-neutral-100 text-neutral-700 shadow-xs flex items-center justify-center active:scale-90 transition-all backdrop-blur-md border border-neutral-200/50"
+                        className="w-8 h-8 rounded-full bg-white/90 hover:bg-neutral-100 text-neutral-700 shadow-xs flex items-center justify-center transition-all backdrop-blur-md border border-neutral-200/50"
                         title="Settings"
                       >
                         <Settings className="w-4 h-4 text-neutral-700" strokeWidth={1.8} />
@@ -962,7 +980,7 @@ export default function Profile() {
                 {!isCurrentUser ? (
                   <button 
                     onClick={() => popPage()} 
-                    className="p-1.5 text-neutral-800 hover:text-neutral-900 active:scale-90 transition-all"
+                    className="p-1.5 text-neutral-800 hover:text-neutral-900 transition-all"
                     title="Back"
                   >
                     <ArrowLeft className="w-6 h-6 text-neutral-800" strokeWidth={2.2} />
@@ -974,7 +992,7 @@ export default function Profile() {
                 <div className="flex items-center space-x-2 ml-auto">
                   {isCurrentUser && (
                     <button 
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-800 hover:bg-neutral-100/60 active:scale-90 transition-all relative border-0 shadow-none overflow-visible"
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-800 hover:bg-neutral-100/60 transition-all relative border-0 shadow-none overflow-visible"
                       onClick={() => {
                         localStorage.setItem('lastCheckedProfileViewsCount', profileViewsCount.toString());
                         setUnreadViewsCount(0);
@@ -998,7 +1016,7 @@ export default function Profile() {
                   {isCurrentUser && (
                     <button 
                       onClick={() => pushPage('settings')}
-                      className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 shadow-none flex items-center justify-center active:scale-90 transition-all border-0"
+                      className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 shadow-none flex items-center justify-center transition-all border-0"
                       title="Settings"
                     >
                       <Settings className="w-4 h-4 text-neutral-700" strokeWidth={1.8} />
@@ -1066,7 +1084,7 @@ export default function Profile() {
                             e.stopPropagation();
                             pushPage('edit-profile');
                           }}
-                          className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-sm flex items-center justify-center transition-all active:scale-90 border-2 border-white z-10"
+                          className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-sm flex items-center justify-center transition-all border-2 border-white z-10"
                           title="Edit profile"
                         >
                           <Pencil className="w-3 h-3 text-white" strokeWidth={2.2} />
@@ -1088,7 +1106,7 @@ export default function Profile() {
                     {/* Horizontal Stats counters on right side - Shifted right with balanced spacing */}
                     <div className="flex items-center space-x-5 sm:space-x-6 mt-3">
                       <div 
-                        className="flex flex-col cursor-pointer active:scale-95 transition-transform"
+                        className="flex flex-col cursor-pointer transition-transform"
                         onClick={() => setShowFollowersList('following')}
                       >
                         <span className="text-[17px] sm:text-[18px] font-black text-neutral-900 leading-none">
@@ -1098,7 +1116,7 @@ export default function Profile() {
                       </div>
 
                       <div 
-                        className="flex flex-col cursor-pointer active:scale-95 transition-transform"
+                        className="flex flex-col cursor-pointer transition-transform"
                         onClick={() => setShowFollowersList('followers')}
                       >
                         <span className="text-[17px] sm:text-[18px] font-black text-neutral-900 leading-none">
@@ -1131,7 +1149,7 @@ export default function Profile() {
 
                     <div className="flex items-center space-x-5 sm:space-x-6 mt-3">
                       <div 
-                        className="flex flex-col cursor-pointer active:scale-95 transition-transform"
+                        className="flex flex-col cursor-pointer transition-transform"
                         onClick={() => setShowFollowersList('following')}
                       >
                         <span className="text-[17px] sm:text-[18px] font-black text-gray-900 leading-none">
@@ -1141,7 +1159,7 @@ export default function Profile() {
                       </div>
 
                       <div 
-                        className="flex flex-col cursor-pointer active:scale-95 transition-transform"
+                        className="flex flex-col cursor-pointer transition-transform"
                         onClick={() => setShowFollowersList('followers')}
                       >
                         <span className="text-[17px] sm:text-[18px] font-black text-gray-900 leading-none">
@@ -1211,7 +1229,7 @@ export default function Profile() {
                             e.stopPropagation();
                             pushPage('edit-profile');
                           }}
-                          className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-md flex items-center justify-center transition-all active:scale-90 border-2 border-white z-10"
+                          className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-md flex items-center justify-center transition-all border-2 border-white z-10"
                           title="Edit profile"
                         >
                           <Pencil className="w-3.5 h-3.5 text-white" strokeWidth={2.2} />
@@ -1254,7 +1272,7 @@ export default function Profile() {
                       <>
                         <button 
                           onClick={handleMessage}
-                          className="flex-1 bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 active:scale-95 text-white font-semibold text-[13.5px] py-2.5 px-4 rounded-full shadow-sm flex items-center justify-center space-x-1.5 transition-all"
+                          className="flex-1 bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 text-white font-semibold text-[13.5px] py-2.5 px-4 rounded-full shadow-sm flex items-center justify-center space-x-1.5 transition-all"
                         >
                           <MessageCircle className="w-4 h-4 text-white" />
                           <span>Message</span>
@@ -1273,7 +1291,7 @@ export default function Profile() {
                         <button 
                           onClick={handleFollow}
                           disabled={loading}
-                          className={`flex-1 font-semibold text-[13.5px] px-4 py-2.5 rounded-full flex items-center justify-center disabled:opacity-50 transition-all active:scale-95 ${
+                          className={`flex-1 font-semibold text-[13.5px] px-4 py-2.5 rounded-full flex items-center justify-center disabled:opacity-50 transition-all  ${
                             friendship.following 
                               ? 'bg-neutral-100 text-neutral-800 hover:bg-neutral-200 border-0 shadow-none' 
                               : 'bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 text-white shadow-sm'
@@ -1283,7 +1301,7 @@ export default function Profile() {
                         </button>
                         <button 
                           onClick={handleMessage}
-                          className="flex-1 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-semibold text-[13.5px] px-4 py-2.5 rounded-full transition-all active:scale-95 border-0 shadow-none flex items-center justify-center"
+                          className="flex-1 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-semibold text-[13.5px] px-4 py-2.5 rounded-full transition-all border-0 shadow-none flex items-center justify-center"
                         >
                           <span>Message</span>
                         </button>
@@ -1307,7 +1325,7 @@ export default function Profile() {
                         href={(userData?.link || user?.link)?.startsWith('http') ? (userData?.link || user?.link) : `https://${userData?.link || user?.link}`} 
                         target="_blank" 
                         rel="noopener noreferrer" 
-                        className="inline-flex items-center space-x-1.5 px-3 py-1 bg-neutral-100 hover:bg-neutral-200 active:scale-95 text-neutral-800 text-[12px] font-medium rounded-full transition-all border border-neutral-200/70"
+                        className="inline-flex items-center space-x-1.5 px-3 py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[12px] font-medium rounded-full transition-all border border-neutral-200/70"
                       >
                         <LinkIcon className="w-3 h-3 text-neutral-500 shrink-0" />
                         <span className="truncate max-w-[240px]">{(userData?.link || user?.link)?.replace(/^https?:\/\//, '')}</span>
@@ -1336,7 +1354,7 @@ export default function Profile() {
                           onContextMenu={(e) => e.preventDefault()}
                           onClick={() => setViewingHighlightUrl(highlight)}
                         >
-                          <div className="w-[68px] h-[68px] sm:w-[74px] sm:h-[74px] rounded-[24px] p-[2.5px] bg-gradient-to-tr from-purple-300 via-pink-200 to-indigo-300 shadow-2xs group-hover:scale-105 active:scale-95 transition-transform duration-200">
+                          <div className="w-[68px] h-[68px] sm:w-[74px] sm:h-[74px] rounded-[24px] p-[2.5px] bg-gradient-to-tr from-purple-300 via-pink-200 to-indigo-300 shadow-2xs transition-transform duration-200">
                             <div className="w-full h-full rounded-[21px] overflow-hidden bg-white border border-white/80">
                               {isVideoMedia(highlight) ? (
                                 <video 
@@ -1397,7 +1415,7 @@ export default function Profile() {
                 <div className="absolute top-4 right-4 flex items-center space-x-2 z-20">
                   <button 
                     onClick={handleShare}
-                    className="w-8 h-8 rounded-full bg-white/90 hover:bg-white text-neutral-700 shadow-xs flex items-center justify-center active:scale-90 transition-all backdrop-blur-md border-0"
+                    className="w-8 h-8 rounded-full bg-white/90 hover:bg-white text-neutral-700 shadow-xs flex items-center justify-center transition-all backdrop-blur-md border-0"
                     title="Share Profile"
                   >
                     <LinkIcon className="w-3.5 h-3.5" />
@@ -1405,7 +1423,7 @@ export default function Profile() {
                   {isCurrentUser && (
                     <button 
                       onClick={() => pushPage('settings')}
-                      className="w-8 h-8 rounded-full bg-white/90 hover:bg-white text-neutral-700 shadow-xs flex items-center justify-center active:scale-90 transition-all backdrop-blur-md border-0"
+                      className="w-8 h-8 rounded-full bg-white/90 hover:bg-white text-neutral-700 shadow-xs flex items-center justify-center transition-all backdrop-blur-md border-0"
                       title="Settings"
                     >
                       <Settings className="w-4 h-4 text-neutral-700" strokeWidth={1.8} />
@@ -1418,7 +1436,7 @@ export default function Profile() {
               <div className="px-8 pt-4 pb-0 flex items-center justify-end space-x-2">
                 <button 
                   onClick={handleShare}
-                  className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center active:scale-90 transition-all border-0"
+                  className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-all border-0"
                   title="Share Profile"
                 >
                   <LinkIcon className="w-3.5 h-3.5" />
@@ -1426,7 +1444,7 @@ export default function Profile() {
                 {isCurrentUser && (
                   <button 
                     onClick={() => pushPage('settings')}
-                    className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center active:scale-90 transition-all border-0"
+                    className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-all border-0"
                     title="Settings"
                   >
                     <Settings className="w-4 h-4 text-neutral-700" strokeWidth={1.8} />
@@ -1491,7 +1509,7 @@ export default function Profile() {
                             e.stopPropagation();
                             pushPage('edit-profile');
                           }}
-                          className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-md flex items-center justify-center transition-all active:scale-90 border-2 border-white z-10"
+                          className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-md flex items-center justify-center transition-all border-2 border-white z-10"
                           title="Edit profile"
                         >
                           <Pencil className="w-3.5 h-3.5 text-white" strokeWidth={2.2} />
@@ -1543,7 +1561,7 @@ export default function Profile() {
                         <>
                           <button 
                             onClick={handleMessage}
-                            className="px-6 py-2.5 rounded-full bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 active:scale-95 text-white font-semibold text-sm shadow-sm flex items-center space-x-1.5 transition-all"
+                            className="px-6 py-2.5 rounded-full bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 text-white font-semibold text-sm shadow-sm flex items-center space-x-1.5 transition-all"
                           >
                             <MessageCircle className="w-4 h-4 text-white" />
                             <span>Message</span>
@@ -1561,7 +1579,7 @@ export default function Profile() {
                           <button 
                             onClick={handleFollow}
                             disabled={loading}
-                            className={`px-6 py-2.5 rounded-full font-semibold text-sm transition-all active:scale-95 ${
+                            className={`px-6 py-2.5 rounded-full font-semibold text-sm transition-all  ${
                               friendship.following 
                                 ? 'bg-neutral-100 text-neutral-800 hover:bg-neutral-200 border-0 shadow-none' 
                                 : 'bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 text-white shadow-sm'
@@ -1571,7 +1589,7 @@ export default function Profile() {
                           </button>
                           <button 
                             onClick={handleMessage}
-                            className="px-6 py-2.5 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-semibold text-sm transition-all active:scale-95 border-0 shadow-none"
+                            className="px-6 py-2.5 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-semibold text-sm transition-all border-0 shadow-none"
                           >
                             Message
                           </button>
@@ -1585,7 +1603,7 @@ export default function Profile() {
               {/* Stats Row Desktop */}
               <div className="flex items-center space-x-8 py-3 px-5 bg-white/50 backdrop-blur-md rounded-2xl border border-white/80 max-w-lg mb-5 shadow-2xs">
                 <div 
-                  className="flex items-center space-x-2 cursor-pointer active:scale-95 transition-transform"
+                  className="flex items-center space-x-2 cursor-pointer transition-transform"
                   onClick={() => setShowFollowersList('following')}
                 >
                   <span className="text-base font-bold text-gray-900">
@@ -1595,7 +1613,7 @@ export default function Profile() {
                 </div>
                 <div className="w-px h-4 bg-purple-200/80" />
                 <div 
-                  className="flex items-center space-x-2 cursor-pointer active:scale-95 transition-transform"
+                  className="flex items-center space-x-2 cursor-pointer transition-transform"
                   onClick={() => setShowFollowersList('followers')}
                 >
                   <span className="text-base font-bold text-gray-900">
@@ -1653,7 +1671,7 @@ export default function Profile() {
                         onContextMenu={(e) => e.preventDefault()}
                         onClick={() => setViewingHighlightUrl(highlight)}
                       >
-                        <div className="w-16 h-16 rounded-[22px] p-[2.5px] bg-gradient-to-tr from-purple-300 via-pink-200 to-indigo-300 shadow-2xs group-hover:scale-105 active:scale-95 transition-transform duration-200">
+                        <div className="w-16 h-16 rounded-[22px] p-[2.5px] bg-gradient-to-tr from-purple-300 via-pink-200 to-indigo-300 shadow-2xs transition-transform duration-200">
                           <div className="w-full h-full rounded-[19px] overflow-hidden bg-white border border-white/80">
                             {isVideoMedia(highlight) ? (
                               <video src={highlight} autoPlay loop muted playsInline className="w-full h-full object-cover pointer-events-none" />
@@ -1690,7 +1708,7 @@ export default function Profile() {
                 <button 
                   type="button"
                   onClick={() => setActiveTab('posts')}
-                  className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group active:scale-95 ${
+                  className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group  ${
                     activeTab === 'posts' 
                       ? 'text-neutral-950 dark:text-white font-medium' 
                       : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
@@ -1698,7 +1716,7 @@ export default function Profile() {
                   title="Posts"
                   aria-label="Posts"
                 >
-                  <Grid className="w-5 h-5 transition-transform group-hover:scale-105" strokeWidth={activeTab === 'posts' ? 2.4 : 1.8} />
+                  <Grid className="w-5 h-5 transition-transform" strokeWidth={activeTab === 'posts' ? 2.4 : 1.8} />
                   {activeTab === 'posts' && (
                     <motion.div 
                       layoutId="profileActiveTabLine"
@@ -1712,7 +1730,7 @@ export default function Profile() {
                 <button 
                   type="button"
                   onClick={() => setActiveTab('reels')}
-                  className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group active:scale-95 ${
+                  className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group  ${
                     activeTab === 'reels' 
                       ? 'text-neutral-950 dark:text-white font-medium' 
                       : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
@@ -1720,7 +1738,7 @@ export default function Profile() {
                   title="Reels"
                   aria-label="Reels"
                 >
-                  <PlaySquare className="w-5 h-5 transition-transform group-hover:scale-105" strokeWidth={activeTab === 'reels' ? 2.4 : 1.8} />
+                  <PlaySquare className="w-5 h-5 transition-transform" strokeWidth={activeTab === 'reels' ? 2.4 : 1.8} />
                   {activeTab === 'reels' && (
                     <motion.div 
                       layoutId="profileActiveTabLine"
@@ -1734,7 +1752,7 @@ export default function Profile() {
                 <button 
                   type="button"
                   onClick={() => setActiveTab('reposts')}
-                  className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group active:scale-95 ${
+                  className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group  ${
                     activeTab === 'reposts' 
                       ? 'text-neutral-950 dark:text-white font-medium' 
                       : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
@@ -1742,7 +1760,7 @@ export default function Profile() {
                   title="Reposts"
                   aria-label="Reposts"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={activeTab === 'reposts' ? 2.4 : 1.8} strokeLinecap="round" strokeLinejoin="round" className="transition-transform group-hover:scale-105">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={activeTab === 'reposts' ? 2.4 : 1.8} strokeLinecap="round" strokeLinejoin="round" className="transition-transform">
                     <path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
                   </svg>
                   {activeTab === 'reposts' && (
@@ -1759,7 +1777,7 @@ export default function Profile() {
                   <button 
                     type="button"
                     onClick={() => setActiveTab('saved')}
-                    className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group active:scale-95 ${
+                    className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group  ${
                       activeTab === 'saved' 
                         ? 'text-neutral-950 dark:text-white font-medium' 
                         : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
@@ -1767,7 +1785,7 @@ export default function Profile() {
                     title="Favorites & Saved"
                     aria-label="Favorites & Saved"
                   >
-                    <Bookmark className="w-5 h-5 transition-transform group-hover:scale-105" strokeWidth={activeTab === 'saved' ? 2.4 : 1.8} />
+                    <Bookmark className="w-5 h-5 transition-transform" strokeWidth={activeTab === 'saved' ? 2.4 : 1.8} />
                     {activeTab === 'saved' && (
                       <motion.div 
                         layoutId="profileActiveTabLine"
@@ -1783,7 +1801,7 @@ export default function Profile() {
                   <button 
                     type="button"
                     onClick={() => setActiveTab('private')}
-                    className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group active:scale-95 ${
+                    className={`flex-1 relative py-3 sm:py-3.5 flex flex-col items-center justify-center transition-colors cursor-pointer select-none group  ${
                       activeTab === 'private' 
                         ? 'text-purple-600 dark:text-purple-400 font-medium' 
                         : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'
@@ -1792,7 +1810,7 @@ export default function Profile() {
                     aria-label="Private Posts"
                   >
                     <span className="relative flex items-center justify-center">
-                      <Lock className="w-4.5 h-4.5 transition-transform group-hover:scale-105" strokeWidth={activeTab === 'private' ? 2.4 : 1.8} />
+                      <Lock className="w-4.5 h-4.5 transition-transform" strokeWidth={activeTab === 'private' ? 2.4 : 1.8} />
                       <span className="absolute -top-1 -right-2 bg-purple-600 text-white text-[9px] font-bold px-1 py-0.2 rounded-full leading-none">
                         {privatePosts.length}
                       </span>
@@ -1864,7 +1882,7 @@ export default function Profile() {
                       ) : (
                         <>
                           {post.media?.[0] ? (
-                            <img src={post.media[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="Repost" />
+                            <img src={post.media[0]} className="w-full h-full object-cover transition-transform duration-500" alt="Repost" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-purple-500 to-indigo-600 text-white text-[10px] text-center font-normal">
                               {post.text?.substring(0, 40)}...
@@ -1928,7 +1946,7 @@ export default function Profile() {
                   <div className="col-span-3 sm:col-span-4 md:col-span-5 lg:col-span-6 flex justify-center py-6">
                     <button
                       onClick={() => setVisibleCount((prev) => prev + 24)}
-                      className="px-6 py-2.5 rounded-full bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 text-xs font-semibold active:scale-95 transition-all cursor-pointer shadow-xs"
+                      className="px-6 py-2.5 rounded-full bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 text-xs font-semibold transition-all cursor-pointer shadow-xs"
                     >
                       Load More Reels ({reels.length - visibleCount} remaining)
                     </button>
@@ -2071,7 +2089,7 @@ export default function Profile() {
                                 });
                                 pushPage('create');
                               }}
-                              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-xl text-[11px] font-medium flex items-center space-x-1 shadow-2xs transition-all"
+                              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-[11px] font-medium flex items-center space-x-1 shadow-2xs transition-all"
                             >
                               <span>Use Audio</span>
                             </button>
@@ -2088,7 +2106,7 @@ export default function Profile() {
                                   }
                                 }}
                                 title="Remove from favorites"
-                                className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors active:scale-90"
+                                className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
                               >
                                 <Heart className="w-4 h-4 fill-rose-500" />
                               </button>
@@ -2143,7 +2161,7 @@ export default function Profile() {
                           ) : (
                             <>
                               {post.media?.[0] ? (
-                                <img src={post.media[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="Saved" />
+                                <img src={post.media[0]} className="w-full h-full object-cover transition-transform duration-500" alt="Saved" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-blue-600 to-purple-700 text-white text-[11px] font-medium text-center">
                                   {post.text?.substring(0, 50)}...
@@ -2225,7 +2243,7 @@ export default function Profile() {
                               className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" 
                             />
                           ) : post.media?.[0] ? (
-                            <img src={post.media[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="Private" />
+                            <img src={post.media[0]} className="w-full h-full object-cover transition-transform duration-300" alt="Private" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center p-2 bg-gradient-to-br from-gray-800 to-gray-900 text-white text-[10px] text-center">
                               {post.text?.substring(0, 30)}
@@ -2255,7 +2273,7 @@ export default function Profile() {
                                 console.error("Failed to make public:", err);
                               }
                             }}
-                            className="w-full py-1.5 bg-white/95 hover:bg-white active:scale-95 text-gray-900 rounded-xl text-[11px] font-semibold flex items-center justify-center space-x-1 shadow-sm transition-all backdrop-blur-md"
+                            className="w-full py-1.5 bg-white/95 hover:bg-white text-gray-900 rounded-xl text-[11px] font-semibold flex items-center justify-center space-x-1 shadow-sm transition-all backdrop-blur-md"
                           >
                             <Globe className="w-3 h-3 text-purple-600" />
                             <span>Make Public</span>
@@ -2291,13 +2309,13 @@ export default function Profile() {
                     }
                     setDeleteHighlightUrl(null);
                   }}
-                  className="w-full bg-red-500 hover:bg-red-600 text-white font-normal py-2.5 rounded-xl transition-all active:scale-95"
+                  className="w-full bg-red-500 hover:bg-red-600 text-white font-normal py-2.5 rounded-xl transition-all"
                 >
                   Delete
                 </button>
                 <button 
                   onClick={() => setDeleteHighlightUrl(null)}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-900 font-normal py-2.5 rounded-xl transition-all active:scale-95"
+                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-900 font-normal py-2.5 rounded-xl transition-all"
                 >
                   Cancel
                 </button>
@@ -2328,7 +2346,7 @@ export default function Profile() {
               </div>
               <button 
                 onClick={() => setViewingHighlightUrl(null)}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all active:scale-90"
+                className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-all"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -2358,7 +2376,7 @@ export default function Profile() {
                 <button 
                   onClick={handleSendHighlightReply}
                   disabled={!highlightReplyText.trim() || sendingHighlightReply}
-                  className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white p-2.5 rounded-full transition-all active:scale-95 shrink-0 flex items-center justify-center"
+                  className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white p-2.5 rounded-full transition-all shrink-0 flex items-center justify-center"
                 >
                   {sendingHighlightReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
@@ -2538,7 +2556,7 @@ export default function Profile() {
                 <button
                   type="button"
                   onClick={() => setEditingHighlightIndex(null)}
-                  className="flex-1 py-2.5 rounded-2xl border border-neutral-200 text-neutral-700 font-semibold text-xs hover:bg-neutral-50 active:scale-95 transition-all"
+                  className="flex-1 py-2.5 rounded-2xl border border-neutral-200 text-neutral-700 font-semibold text-xs hover:bg-neutral-50 transition-all"
                 >
                   Cancel
                 </button>
@@ -2560,7 +2578,7 @@ export default function Profile() {
                     }
                     setEditingHighlightIndex(null);
                   }}
-                  className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 active:scale-95 text-white font-semibold text-xs transition-all shadow-sm"
+                  className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 text-white font-semibold text-xs transition-all shadow-sm"
                 >
                   Save
                 </button>

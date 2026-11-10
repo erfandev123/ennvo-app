@@ -186,6 +186,22 @@ export const subscribeStories = (
   );
 };
 
+/**
+ * Load a single story by id. Used by deep links such as /story/<id> so a
+ * shared story opens directly in the viewer.
+ */
+export const getStory = async (storyId: string): Promise<Story | null> => {
+  if (!storyId) return null;
+  try {
+    const snap = await getDoc(doc(db, "stories", storyId));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...(snap.data() as any) } as Story;
+  } catch (err) {
+    console.warn("getStory failed:", err);
+    return null;
+  }
+};
+
 export const deleteStory = async (storyId: string) => {
   try {
     const storyRef = doc(db, "stories", storyId);

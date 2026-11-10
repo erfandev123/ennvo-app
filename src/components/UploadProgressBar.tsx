@@ -26,7 +26,7 @@ export const UploadProgressBar: React.FC = () => {
           /* Minimized discreet floating pill */
           <div 
             onClick={() => setIsMinimized(false)}
-            className="pointer-events-auto cursor-pointer bg-neutral-900/90 hover:bg-neutral-900 text-white border border-white/20 rounded-full px-2.5 py-1 flex items-center space-x-1.5 shadow-xl backdrop-blur-xl transition-all active:scale-95 transform-gpu"
+            className="pointer-events-auto cursor-pointer bg-neutral-900/90 hover:bg-neutral-900 text-white border border-white/20 rounded-full px-2.5 py-1 flex items-center space-x-1.5 shadow-xl backdrop-blur-xl transition-all transform-gpu"
             title="Click to view upload progress"
           >
             <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
@@ -96,7 +96,7 @@ export const UploadProgressBar: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsMinimized(true)}
-                className="p-1 hover:bg-white/10 active:scale-90 text-neutral-400 hover:text-white rounded-full transition-colors cursor-pointer shrink-0"
+                className="p-1 hover:bg-white/10 text-neutral-400 hover:text-white rounded-full transition-colors cursor-pointer shrink-0"
                 title="Hide popup (Upload continues in background)"
               >
                 <EyeOff className="w-3.5 h-3.5" />
@@ -105,7 +105,7 @@ export const UploadProgressBar: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setUploadTask(null)}
-                className="p-1 hover:bg-white/10 active:scale-90 text-neutral-400 hover:text-white rounded-full transition-colors cursor-pointer shrink-0"
+                className="p-1 hover:bg-white/10 text-neutral-400 hover:text-white rounded-full transition-colors cursor-pointer shrink-0"
                 title="Dismiss"
               >
                 <span className="text-xs font-bold leading-none px-1">✕</span>

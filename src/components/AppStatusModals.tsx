@@ -172,7 +172,7 @@ export const AppUpdateModal: React.FC<{
         <div className="space-y-2">
           <button
             onClick={handleUpdate}
-            className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-purple-500/25 active:scale-98 transition-all cursor-pointer flex items-center justify-center space-x-2"
+            className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-purple-500/25 transition-all cursor-pointer flex items-center justify-center space-x-2"
           >
             <Download className="w-4 h-4" />
             <span>{forced ? 'Update Now to Continue' : 'Update Ennvo'}</span>

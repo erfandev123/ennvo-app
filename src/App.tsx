@@ -69,6 +69,7 @@ import {
   BannedInfo 
 } from './components/AppStatusModals';
 import { applyRouteSEO } from './services/seoService';
+import { shareContent } from './services/shareService';
 
 import { playNotificationSound } from './services/soundService';
 
@@ -130,7 +131,7 @@ const InAppToaster = memo(() => {
         className="fixed top-[max(calc(env(safe-area-inset-top,0px)+8px),12px)] left-0 right-0 z-[350] flex justify-center pointer-events-none px-3 sm:px-4"
       >
         <div 
-          className="bg-white/95 dark:bg-[#121824]/95 text-neutral-900 dark:text-white shadow-[0_16px_40px_rgba(14,165,233,0.18),0_4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.45)] border border-sky-200/90 dark:border-sky-500/25 rounded-[26px] p-3.5 pointer-events-auto cursor-pointer max-w-[400px] w-full transition-transform active:scale-[0.985] relative overflow-hidden group backdrop-blur-2xl transform-gpu select-none"
+          className="bg-white/95 dark:bg-[#121824]/95 text-neutral-900 dark:text-white shadow-[0_16px_40px_rgba(14,165,233,0.18),0_4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.45)] border border-sky-200/90 dark:border-sky-500/25 rounded-[26px] p-3.5 pointer-events-auto cursor-pointer max-w-[400px] w-full transition-transform relative overflow-hidden group backdrop-blur-2xl transform-gpu select-none"
           onClick={async () => {
              setToast(null);
              if (toast.type === 'message' || toast.type === 'typing') {
@@ -259,7 +260,7 @@ const InAppToaster = memo(() => {
                   setActiveChat(toast.conversationId);
                   pushPage('messages');
                 }}
-                className="text-white bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 font-semibold text-[11.5px] px-3.5 py-1.5 rounded-full shrink-0 ml-2 transition-transform active:scale-95 shadow-sm shadow-sky-500/25"
+                className="text-white bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 font-semibold text-[11.5px] px-3.5 py-1.5 rounded-full shrink-0 ml-2 transition-transform shadow-sm shadow-sky-500/25"
               >
                 Reply
               </button>
@@ -933,7 +934,7 @@ export default function App() {
                   setShowBatteryPrompt(false);
                   bridge.requestBatteryExemption();
                 }}
-                className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-2xl font-semibold text-sm shadow-lg active:scale-95 transition-all"
+                className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-2xl font-semibold text-sm shadow-lg transition-all"
               >
                 Enable Background Calls & Alerts
               </button>
@@ -989,7 +990,7 @@ export default function App() {
           <button 
             type="button"
             onClick={() => { setViewingReel(null); setViewingReelList(null); }}
-            className="fixed top-[max(calc(env(safe-area-inset-top,0px)+12px),16px)] left-4 sm:top-6 sm:left-6 z-[160] p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/20 shadow-2xl transition-transform active:scale-90 cursor-pointer flex items-center justify-center group"
+            className="fixed top-[max(calc(env(safe-area-inset-top,0px)+12px),16px)] left-4 sm:top-6 sm:left-6 z-[160] p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/20 shadow-2xl transition-transform cursor-pointer flex items-center justify-center group"
             title="Close Reel"
             aria-label="Close Reel"
           >
@@ -1259,17 +1260,12 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
   };
 
   const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Story by ${currentStory.authorName || currentStory.name}`,
-          text: currentStory.text || 'Check out this story!',
-          url: window.location.href,
-        });
-      } catch (e) {}
-    } else {
-      setShowShareModal(true);
-    }
+    const mode = await shareContent({
+      title: `Story by ${currentStory.authorName || currentStory.name}`,
+      text: currentStory.text || 'Check out this story on Ennvo!',
+      url: `https://ennvo.vercel.app/story/${currentStory.id || ''}`,
+    });
+    if (!mode) setShowShareModal(true);
   };
 
   useEffect(() => {
@@ -1364,7 +1360,7 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
       <button 
         type="button"
         onClick={onClose} 
-        className="hidden sm:flex fixed top-5 right-5 sm:top-6 sm:right-6 z-[160] p-3 rounded-full bg-white/10 hover:bg-white/25 text-white border border-white/20 shadow-2xl backdrop-blur-md transition-all active:scale-95 cursor-pointer"
+        className="hidden sm:flex fixed top-5 right-5 sm:top-6 sm:right-6 z-[160] p-3 rounded-full bg-white/10 hover:bg-white/25 text-white border border-white/20 shadow-2xl backdrop-blur-md transition-all cursor-pointer"
         title="Close Story (Esc)"
         aria-label="Close Story"
       >
@@ -1413,7 +1409,7 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
               <button
                 type="button"
                 onClick={handleSaveSong}
-                className="flex items-center space-x-1 bg-white/20 hover:bg-white/30 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/25 text-white active:scale-95 transition-transform shrink-0 cursor-pointer shadow-xs max-w-[120px]"
+                className="flex items-center space-x-1 bg-white/20 hover:bg-white/30 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/25 text-white transition-transform shrink-0 cursor-pointer shadow-xs max-w-[120px]"
                 title="Click to save song"
               >
                 <Music className="w-2.5 h-2.5 text-purple-300 animate-spin [animation-duration:5s] shrink-0" />
@@ -1431,7 +1427,7 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
               <button 
                 onClick={handleDelete} 
                 title="Delete Story" 
-                className="w-8 h-8 bg-black/40 hover:bg-red-500/80 rounded-full flex items-center justify-center transition-all text-white backdrop-blur-md border border-white/15 active:scale-90 shadow-md cursor-pointer"
+                className="w-8 h-8 bg-black/40 hover:bg-red-500/80 rounded-full flex items-center justify-center transition-all text-white backdrop-blur-md border border-white/15 shadow-md cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -1439,7 +1435,7 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
             <button 
               onClick={onClose} 
               title="Close" 
-              className="w-8 h-8 bg-black/40 hover:bg-white/25 rounded-full flex items-center justify-center transition-all text-white backdrop-blur-md border border-white/15 active:scale-90 shadow-md cursor-pointer"
+              className="w-8 h-8 bg-black/40 hover:bg-white/25 rounded-full flex items-center justify-center transition-all text-white backdrop-blur-md border border-white/15 shadow-md cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1502,7 +1498,7 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
                 key={emoji}
                 type="button"
                 onClick={() => handleQuickEmoji(emoji)}
-                className="w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-lg active:scale-125 transition-transform cursor-pointer shadow-sm"
+                className="w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-lg transition-transform cursor-pointer shadow-sm"
               >
                 {emoji}
               </button>
@@ -1531,14 +1527,14 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
 
             <button 
               onClick={handleReact} 
-              className="w-10 h-10 bg-black/45 backdrop-blur-xl border border-white/15 rounded-full flex items-center justify-center text-white hover:bg-black/60 transition-all active:scale-90 shrink-0 shadow-lg cursor-pointer"
+              className="w-10 h-10 bg-black/45 backdrop-blur-xl border border-white/15 rounded-full flex items-center justify-center text-white hover:bg-black/60 transition-all shrink-0 shadow-lg cursor-pointer"
             >
               <Heart className={`w-5 h-5 ${isLiked ? 'fill-rose-500 text-rose-500' : 'text-white'}`} />
             </button>
 
             <button 
               onClick={handleShare} 
-              className="w-10 h-10 bg-black/45 backdrop-blur-xl border border-white/15 rounded-full flex items-center justify-center text-white hover:bg-black/60 transition-all active:scale-90 shrink-0 shadow-lg cursor-pointer"
+              className="w-10 h-10 bg-black/45 backdrop-blur-xl border border-white/15 rounded-full flex items-center justify-center text-white hover:bg-black/60 transition-all shrink-0 shadow-lg cursor-pointer"
             >
               <Share2 className="w-5 h-5 text-white" />
             </button>
@@ -1785,7 +1781,7 @@ const GlobalReelItem = memo(({ reel }: { reel: any }) => {
 
           <div className="absolute right-4 bottom-20 flex flex-col items-center space-y-7 z-20">
             <button onClick={(e) => { e.stopPropagation(); handleLike(); }} className="flex flex-col items-center group">
-              <Heart className={`w-[28px] h-[28px] drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] transition-transform active:scale-125 ${liked ? 'fill-red-500 text-red-500' : 'text-white'}`} strokeWidth={2.5} />
+              <Heart className={`w-[28px] h-[28px] drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] transition-transform  ${liked ? 'fill-red-500 text-red-500' : 'text-white'}`} strokeWidth={2.5} />
               <span className="text-xs font-normal mt-1 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{likesCount}</span>
             </button>
             <button onClick={(e) => { e.stopPropagation(); setShowComments(true); }} className="flex flex-col items-center group">

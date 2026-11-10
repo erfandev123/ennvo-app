@@ -135,7 +135,7 @@ export const BlockedUsersModal: React.FC<BlockedUsersModalProps> = ({ isOpen, on
               />
               <button
                 type="submit"
-                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-2xl transition-all active:scale-95 shadow-xs"
+                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-2xl transition-all shadow-xs"
               >
                 Block
               </button>

@@ -247,7 +247,7 @@ const FollowerItem = React.memo(
             setIsOptimisticFollowing(true);
             onFollowBack(follower);
           }}
-          className={`px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-all active:scale-95 border-0 shrink-0 cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-all  border-0 shrink-0 cursor-pointer ${
             isFriend
               ? "bg-neutral-100 text-neutral-800 hover:bg-neutral-200"
               : isActuallyFollowing
@@ -394,7 +394,7 @@ const StackedMediaAlbumBubble = React.memo(({
             <button
               type="button"
               onClick={handlePrev}
-              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-black/50 hover:bg-black/75 active:scale-90 backdrop-blur-md text-white border border-white/20 flex items-center justify-center shadow-md transition-all opacity-80 hover:opacity-100 cursor-pointer"
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-black/50 hover:bg-black/75 backdrop-blur-md text-white border border-white/20 flex items-center justify-center shadow-md transition-all opacity-80 hover:opacity-100 cursor-pointer"
               title="Previous photo"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
@@ -406,7 +406,7 @@ const StackedMediaAlbumBubble = React.memo(({
             <button
               type="button"
               onClick={handleNext}
-              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-black/50 hover:bg-black/75 active:scale-90 backdrop-blur-md text-white border border-white/20 flex items-center justify-center shadow-md transition-all opacity-80 hover:opacity-100 cursor-pointer"
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-black/50 hover:bg-black/75 backdrop-blur-md text-white border border-white/20 flex items-center justify-center shadow-md transition-all opacity-80 hover:opacity-100 cursor-pointer"
               title="Next photo"
             >
               <ChevronRight className="w-3.5 h-3.5" />
@@ -420,7 +420,7 @@ const StackedMediaAlbumBubble = React.memo(({
               e.stopPropagation();
               downloadMediaFile(currentItem.url, `media_${Date.now()}.${currentItem.type === 'video' ? 'mp4' : 'jpg'}`);
             }}
-            className="absolute bottom-2 right-2 z-20 p-1.5 bg-black/60 hover:bg-black/85 active:scale-90 text-white rounded-full transition-all shadow-md backdrop-blur-xs"
+            className="absolute bottom-2 right-2 z-20 p-1.5 bg-black/60 hover:bg-black/85 text-white rounded-full transition-all shadow-md backdrop-blur-xs"
             title="Download this photo"
           >
             <Download className="w-3.5 h-3.5" />
@@ -496,7 +496,7 @@ const ReelMessageBubble = React.memo(({
     return (
       <div className="flex flex-col max-w-[145px] will-change-transform">
         <div
-          className="relative w-28 sm:w-32 aspect-[9/14] max-h-[165px] rounded-2xl overflow-hidden cursor-pointer bg-neutral-900 group border-0 transition-transform duration-150 active:scale-[0.97] shadow-none select-none"
+          className="relative w-28 sm:w-32 aspect-[9/14] max-h-[165px] rounded-2xl overflow-hidden cursor-pointer bg-neutral-900 group border-0 transition-transform duration-150 shadow-none select-none"
           onClick={() => {
             if (reel) {
               setViewingReel({ ...reel, single: true });
@@ -520,7 +520,7 @@ const ReelMessageBubble = React.memo(({
             {isVideo ? (
               <video
                 src={`${coverPic}#t=0.001`}
-                className="w-full h-full object-cover opacity-100 group-hover:scale-105 transition-transform duration-200"
+                className="w-full h-full object-cover opacity-100 transition-transform duration-200"
                 preload="none"
                 muted
                 playsInline
@@ -528,14 +528,14 @@ const ReelMessageBubble = React.memo(({
             ) : (
               <img
                 src={coverPic}
-                className="w-full h-full object-cover opacity-100 group-hover:scale-105 transition-transform duration-200"
+                className="w-full h-full object-cover opacity-100 transition-transform duration-200"
                 alt="Reel cover"
                 loading="lazy"
                 referrerPolicy="no-referrer"
               />
             )}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-7 h-7 rounded-full bg-white/95 text-neutral-900 flex items-center justify-center group-hover:scale-110 transition-transform shadow-xs">
+              <div className="w-7 h-7 rounded-full bg-white/95 text-neutral-900 flex items-center justify-center transition-transform shadow-xs">
                 <Play className="w-3.5 h-3.5 fill-neutral-900 translate-x-0.5" />
               </div>
             </div>
@@ -611,7 +611,7 @@ const MultipleReelsDeck = React.memo(({
                 marginLeft: i === 0 ? 0 : '-52px',
                 zIndex: i + 1,
               }}
-              className="relative w-28 sm:w-32 aspect-[9/14] max-h-[160px] rounded-2xl overflow-hidden cursor-pointer bg-neutral-900 border-2 border-white dark:border-neutral-800 shadow-[0_6px_20px_rgba(0,0,0,0.25)] hover:scale-105 hover:rotate-0 hover:z-40 active:scale-95 transition-all duration-200 transform-gpu shrink-0 group"
+              className="relative w-28 sm:w-32 aspect-[9/14] max-h-[160px] rounded-2xl overflow-hidden cursor-pointer bg-neutral-900 border-2 border-white dark:border-neutral-800 shadow-[0_6px_20px_rgba(0,0,0,0.25)] hover:rotate-0 hover:z-40 transition-all duration-200 transform-gpu shrink-0 group"
             >
               {isVid ? (
                 <video
@@ -728,7 +728,7 @@ const VoiceMessageBubble = ({ msg, isMe }: { msg: any; isMe: boolean; borderRadi
       <button
         type="button"
         onClick={togglePlay}
-        className={`w-8.5 h-8.5 rounded-full flex items-center justify-center shrink-0 cursor-pointer active:scale-90 transition-transform border-0 shadow-xs ${
+        className={`w-8.5 h-8.5 rounded-full flex items-center justify-center shrink-0 cursor-pointer  transition-transform border-0 shadow-xs ${
           isMe
             ? "bg-white text-blue-600"
             : "bg-sky-500 text-white"
@@ -1141,7 +1141,7 @@ const MessageBubble = React.memo(function MessageBubble({
                         e.stopPropagation();
                         downloadMediaFile(msg.mediaUrl!, `video_${msg.id || Date.now()}.mp4`);
                       }}
-                      className="absolute bottom-2 right-2 p-1.5 bg-black/60 hover:bg-black/85 active:scale-90 text-white rounded-full transition-all shadow-md backdrop-blur-sm"
+                      className="absolute bottom-2 right-2 p-1.5 bg-black/60 hover:bg-black/85 text-white rounded-full transition-all shadow-md backdrop-blur-sm"
                       title="Download Video"
                     >
                       <Download className="w-3.5 h-3.5" />
@@ -1185,7 +1185,7 @@ const MessageBubble = React.memo(function MessageBubble({
                   const isVidDoc = msg.mediaUrl?.startsWith('data:video') || Boolean(msg.mediaUrl?.match(/\.(mp4|webm|mov)/i));
                   return (
                     <div
-                      className="relative group cursor-pointer rounded-2xl overflow-hidden max-w-[200px] sm:max-w-[220px] shadow-2xs border border-black/10 select-none transition-transform duration-200 active:scale-98"
+                      className="relative group cursor-pointer rounded-2xl overflow-hidden max-w-[200px] sm:max-w-[220px] shadow-2xs border border-black/10 select-none transition-transform duration-200"
                       onClick={() =>
                         setViewingMedia({
                           type: isVidDoc ? "video" : "image",
@@ -1214,7 +1214,7 @@ const MessageBubble = React.memo(function MessageBubble({
                         <img
                           src={msg.mediaUrl}
                           alt="Document media"
-                          className="w-full h-auto max-h-[200px] object-cover transition-transform duration-300 group-hover:scale-102"
+                          className="w-full h-auto max-h-[200px] object-cover transition-transform duration-300"
                           loading="lazy"
                         />
                       )}
@@ -1232,7 +1232,7 @@ const MessageBubble = React.memo(function MessageBubble({
                           e.stopPropagation();
                           downloadMediaFile(msg.mediaUrl!, fName);
                         }}
-                        className="absolute bottom-2 right-2 p-1.5 bg-black/70 hover:bg-black text-white rounded-full transition-all shadow-xs backdrop-blur-sm active:scale-90 border-0 cursor-pointer"
+                        className="absolute bottom-2 right-2 p-1.5 bg-black/70 hover:bg-black text-white rounded-full transition-all shadow-xs backdrop-blur-sm border-0 cursor-pointer"
                         title="Download File"
                       >
                         <Download className="w-3 h-3" />
@@ -1256,7 +1256,7 @@ const MessageBubble = React.memo(function MessageBubble({
                         e.stopPropagation();
                         downloadMediaFile(msg.mediaUrl || msg.content, fName);
                       }}
-                      className="p-1 rounded-lg bg-black/10 hover:bg-black/20 text-current active:scale-90 transition-all border-0 cursor-pointer"
+                      className="p-1 rounded-lg bg-black/10 hover:bg-black/20 text-current transition-all border-0 cursor-pointer"
                     >
                       <Download className="w-3 h-3" />
                     </button>
@@ -1280,7 +1280,7 @@ const MessageBubble = React.memo(function MessageBubble({
                     <img
                       src={msg.mediaUrl}
                       alt="Sent image"
-                      className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-102"
+                      className="w-full h-full object-cover transition-transform duration-200"
                       loading="lazy"
                     />
                     <div className="absolute inset-0 bg-black/15 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
@@ -1295,7 +1295,7 @@ const MessageBubble = React.memo(function MessageBubble({
                         e.stopPropagation();
                         downloadMediaFile(msg.mediaUrl!, `photo_${msg.id || Date.now()}.jpg`);
                       }}
-                      className="absolute bottom-1.5 right-1.5 p-1 bg-black/60 hover:bg-black/85 active:scale-90 text-white rounded-full transition-all shadow-xs backdrop-blur-sm border-0 cursor-pointer"
+                      className="absolute bottom-1.5 right-1.5 p-1 bg-black/60 hover:bg-black/85 text-white rounded-full transition-all shadow-xs backdrop-blur-sm border-0 cursor-pointer"
                       title="Download Photo"
                     >
                       <Download className="w-3 h-3" />
@@ -1318,7 +1318,7 @@ const MessageBubble = React.memo(function MessageBubble({
                 const isVideoSticker = msg.stickerType === "video" || (stickerSrc && (stickerSrc.includes(".mp4") || stickerSrc.includes(".webm") || stickerSrc.includes(".mov")));
                 return (
                   <div
-                    className="relative group/stk cursor-pointer transition-all duration-200 active:scale-95 max-w-[210px] sm:max-w-[240px] select-none hover:scale-[1.02] bg-transparent border-0 shadow-none outline-none"
+                    className="relative group/stk cursor-pointer transition-all duration-200 max-w-[210px] sm:max-w-[240px] select-none bg-transparent border-0 shadow-none outline-none"
                     onClick={() => {
                       if (onViewSticker && stickerSrc) {
                         onViewSticker(stickerSrc, isVideoSticker ? 'video' : 'image');
@@ -1416,7 +1416,7 @@ const MessageBubble = React.memo(function MessageBubble({
                       <button
                         type="button"
                         onClick={() => handleStartCall(isVideoCall ? 'video' : 'audio')}
-                        className={`w-full py-1.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all active:scale-95 border-0 cursor-pointer shadow-none ${
+                        className={`w-full py-1.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all  border-0 cursor-pointer shadow-none ${
                           isMe 
                             ? "bg-white/20 hover:bg-white/30 text-white" 
                             : "bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-800 dark:text-white"
@@ -1452,7 +1452,7 @@ const MessageBubble = React.memo(function MessageBubble({
                 onToggleReaction(msg.id, (msg as any).reaction);
               }}
               title="Click to remove reaction"
-              className={`absolute -bottom-2 ${isMe ? "right-1.5" : "left-1.5"} text-[15px] z-20 bg-transparent border-0 p-0 shadow-none outline-none select-none cursor-pointer hover:scale-125 active:scale-90 transition-transform`}
+              className={`absolute -bottom-2 ${isMe ? "right-1.5" : "left-1.5"} text-[15px] z-20 bg-transparent border-0 p-0 shadow-none outline-none select-none cursor-pointer   transition-transform`}
             >
               {(msg as any).reaction}
             </button>
@@ -1737,6 +1737,80 @@ export default function Messages() {
   const [isDesktop, setIsDesktop] = useState<boolean>(() =>
     typeof window !== "undefined" ? window.innerWidth >= 768 : false
   );
+
+  // ---- PC only: draggable divider between the chat list and the conversation ----
+  const SIDEBAR_MIN = 300;
+  const SIDEBAR_MAX = 620;
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      const saved = Number(localStorage.getItem("ennvo_messages_sidebar_w"));
+      if (saved >= SIDEBAR_MIN && saved <= SIDEBAR_MAX) return saved;
+    } catch (e) {}
+    return typeof window !== "undefined" && window.innerWidth >= 1280 ? 410 : 380;
+  });
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const sidebarDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const sidebarWidthRef = useRef<number>(sidebarWidth);
+  sidebarWidthRef.current = sidebarWidth;
+
+  const applySidebarWidth = (next: number) => {
+    const clamped = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, Math.round(next)));
+    setSidebarWidth(clamped);
+    return clamped;
+  };
+
+  const handleSidebarResizeStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDesktop) return;
+    e.preventDefault();
+    e.stopPropagation();
+    (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
+    sidebarDragRef.current = { startX: e.clientX, startWidth: sidebarWidth };
+    setIsResizingSidebar(true);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  const handleSidebarResizeEnd = (e?: React.PointerEvent<HTMLDivElement>) => {
+    if (!sidebarDragRef.current) return;
+    sidebarDragRef.current = null;
+    setIsResizingSidebar(false);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    try {
+      e?.currentTarget?.releasePointerCapture?.(e.pointerId as number);
+    } catch (err) {}
+    try {
+      localStorage.setItem("ennvo_messages_sidebar_w", String(sidebarWidthRef.current));
+    } catch (err) {}
+  };
+
+  const resetSidebarWidth = () => {
+    const next = applySidebarWidth(380);
+    try {
+      localStorage.setItem("ennvo_messages_sidebar_w", String(next));
+    } catch (err) {}
+  };
+
+  // Global listeners keep the drag alive even when the pointer leaves the handle.
+  useEffect(() => {
+    if (!isResizingSidebar) return;
+    const onMove = (ev: PointerEvent) => {
+      const drag = sidebarDragRef.current;
+      if (!drag) return;
+      applySidebarWidth(drag.startWidth + (ev.clientX - drag.startX));
+    };
+    const onUp = () => handleSidebarResizeEnd();
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizingSidebar]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -2026,7 +2100,7 @@ export default function Messages() {
       setTimeout(() => {
         messagesContainerRef.current?.scrollTo({
           top: messagesContainerRef.current.scrollHeight,
-          behavior: "smooth"
+          behavior: "auto"
         });
       }, 100);
     }
@@ -2803,7 +2877,7 @@ export default function Messages() {
       if (isAdded) {
         messagesContainerRef.current.scrollTo({
           top: messagesContainerRef.current.scrollHeight,
-          behavior: 'smooth'
+          behavior: 'auto'
         });
       }
     }
@@ -2816,7 +2890,7 @@ export default function Messages() {
       if (messagesContainerRef.current && shouldAutoScrollRef.current) {
         messagesContainerRef.current.scrollTo({
           top: messagesContainerRef.current.scrollHeight,
-          behavior: 'smooth'
+          behavior: 'auto'
         });
       }
     }
@@ -3733,7 +3807,8 @@ export default function Messages() {
 
       {/* Left Sidebar (Contacts & Stories) - Pure High-White Glass & Solid OLED Dark Mode Seamlessly under PC Dock */}
       <div
-        className={`w-full md:w-[380px] lg:w-[410px] md:pl-[84px] lg:pl-[92px] flex-shrink-0 border-r border-neutral-200/40 dark:border-white/10 flex-col h-full bg-transparent md:bg-white/70 dark:md:bg-black/40 md:backdrop-blur-xl z-10 transition-colors ${activeChat ? "hidden md:flex" : "flex"}`}
+        className={`w-full md:w-auto md:pl-[84px] lg:pl-[92px] flex-shrink-0 border-r border-neutral-200/50 dark:border-white/10 flex-col h-full bg-transparent md:bg-white dark:md:bg-[#0b0b0e] z-10 transition-colors ${activeChat ? "hidden md:flex" : "flex"}`}
+        style={isDesktop ? { width: sidebarWidth } : undefined}
       >
         {/* Top Controls Area (NO Boxed Header - completely transparent so blur & background flows seamlessly to the top) */}
         <div className="px-3 sm:px-4 pt-[max(calc(env(safe-area-inset-top,0px)+8px),12px)] pb-2 flex items-center justify-between sticky top-0 bg-transparent border-0 z-20 w-full min-h-[52px] transition-all select-none">
@@ -3756,7 +3831,7 @@ export default function Messages() {
                   <button
                     type="button"
                     onClick={() => setSearchQuery("")}
-                    className="absolute right-3 p-1 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 active:scale-90 transition-transform cursor-pointer border-0 bg-transparent"
+                    className="absolute right-3 p-1 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-transform cursor-pointer border-0 bg-transparent"
                   >
                     <X className="w-4 h-4" strokeWidth={2.2} />
                   </button>
@@ -3768,7 +3843,7 @@ export default function Messages() {
                   setIsSearchExpanded(false);
                   setSearchQuery("");
                 }}
-                className="px-3 py-1.5 text-[13px] font-semibold text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white active:scale-95 transition-all cursor-pointer border-0 bg-transparent shrink-0"
+                className="px-3 py-1.5 text-[13px] font-semibold text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-all cursor-pointer border-0 bg-transparent shrink-0"
               >
                 Cancel
               </button>
@@ -3779,7 +3854,7 @@ export default function Messages() {
               <button
                 type="button"
                 onClick={() => setShowCreateGroup(true)}
-                className="w-10 h-10 rounded-full bg-white/70 dark:bg-white/10 hover:bg-neutral-100 dark:hover:bg-white/15 active:scale-90 transition-all flex items-center justify-center text-neutral-800 dark:text-neutral-100 cursor-pointer border border-black/5 dark:border-white/10 shadow-xs touch-manipulation shrink-0"
+                className="w-10 h-10 rounded-full bg-white/70 dark:bg-white/10 hover:bg-neutral-100 dark:hover:bg-white/15 transition-all flex items-center justify-center text-neutral-800 dark:text-neutral-100 cursor-pointer border border-black/5 dark:border-white/10 shadow-xs touch-manipulation shrink-0"
                 title="New Group"
               >
                 <Users className="w-5 h-5 text-neutral-800 dark:text-neutral-100" strokeWidth={2.1} />
@@ -3789,7 +3864,7 @@ export default function Messages() {
               <button
                 type="button"
                 onClick={() => setShowPrivacySheet(true)}
-                className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full hover:bg-white/60 dark:hover:bg-white/10 active:scale-95 transition-all cursor-pointer border-0 bg-transparent shadow-none touch-manipulation group"
+                className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full hover:bg-white/60 dark:hover:bg-white/10 transition-all cursor-pointer border-0 bg-transparent shadow-none touch-manipulation group"
                 title="Chats, Online Status & Privacy"
               >
                 <h1 className="text-[20px] font-extrabold tracking-[-0.4px] text-neutral-950 dark:text-white leading-none">
@@ -3819,7 +3894,7 @@ export default function Messages() {
               <button
                 type="button"
                 onClick={() => setIsSearchExpanded(true)}
-                className="w-10 h-10 rounded-full bg-white/70 dark:bg-white/10 hover:bg-neutral-100 dark:hover:bg-white/15 active:scale-90 transition-all flex items-center justify-center text-neutral-800 dark:text-neutral-100 cursor-pointer border border-black/5 dark:border-white/10 shadow-xs touch-manipulation shrink-0"
+                className="w-10 h-10 rounded-full bg-white/70 dark:bg-white/10 hover:bg-neutral-100 dark:hover:bg-white/15 transition-all flex items-center justify-center text-neutral-800 dark:text-neutral-100 cursor-pointer border border-black/5 dark:border-white/10 shadow-xs touch-manipulation shrink-0"
                 title="Search chats"
               >
                 <Search className="w-4.5 h-4.5 text-neutral-800 dark:text-neutral-100" strokeWidth={2.2} />
@@ -3857,7 +3932,7 @@ export default function Messages() {
                           setShowStatusInput(true);
                         }
                       }}
-                      className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-white/85 dark:bg-neutral-900/85 backdrop-blur-md border border-white/70 dark:border-white/20 shadow-sm rounded-[18px] z-30 w-auto min-w-[82px] max-w-[136px] cursor-pointer hover:scale-105 active:scale-95 transition-all flex items-center justify-center select-none text-center"
+                      className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-white/85 dark:bg-neutral-900/85 backdrop-blur-md border border-white/70 dark:border-white/20 shadow-sm rounded-[18px] z-30 w-auto min-w-[82px] max-w-[136px] cursor-pointer transition-all flex items-center justify-center select-none text-center"
                       title={(currentUser as any)?.statusNote ? "View your note" : "Share a note"}
                     >
                       <span className="text-[11px] font-bold text-neutral-900 dark:text-white leading-tight line-clamp-2 break-words text-center">
@@ -3879,7 +3954,7 @@ export default function Messages() {
                         setSelectedCreateMode('story');
                         setShowReelCamera(true);
                       }}
-                      className="cursor-pointer transition-transform active:scale-95 relative p-[3px] rounded-full bg-gradient-to-tr from-violet-600 via-pink-500 to-amber-400"
+                      className="cursor-pointer transition-transform relative p-[3px] rounded-full bg-gradient-to-tr from-violet-600 via-pink-500 to-amber-400"
                     >
                       <div className="p-[2.5px] bg-white dark:bg-neutral-950 rounded-full">
                         <img
@@ -4018,7 +4093,7 @@ export default function Messages() {
                                   timestamp: Date.now() - 3600000,
                                 });
                               }}
-                              className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-white/85 dark:bg-neutral-900/85 backdrop-blur-md border border-white/70 dark:border-white/20 shadow-sm rounded-[18px] z-30 w-auto min-w-[82px] max-w-[136px] select-none cursor-pointer hover:scale-105 active:scale-95 transition-all flex items-center justify-center text-center group"
+                              className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-white/85 dark:bg-neutral-900/85 backdrop-blur-md border border-white/70 dark:border-white/20 shadow-sm rounded-[18px] z-30 w-auto min-w-[82px] max-w-[136px] select-none cursor-pointer transition-all flex items-center justify-center text-center group"
                               title={`View ${authorInfo.name}'s note`}
                             >
                               <span className="text-[11px] font-bold text-neutral-900 dark:text-white leading-tight line-clamp-2 break-words text-center">
@@ -4029,7 +4104,7 @@ export default function Messages() {
                               <div className="absolute -bottom-2 left-2.5 w-1 h-1 rounded-full bg-white/85 dark:bg-neutral-900/85 backdrop-blur-xs border border-white/60 dark:border-white/20 pointer-events-none"></div>
                             </div>
                           )}
-                          <div className={`w-[94px] h-[94px] rounded-full transition-transform active:scale-95 flex items-center justify-center shrink-0 ${
+                          <div className={`w-[94px] h-[94px] rounded-full transition-transform  flex items-center justify-center shrink-0 ${
                             hasStory
                               ? isViewed
                                 ? "bg-neutral-300 dark:bg-neutral-700"
@@ -4361,7 +4436,7 @@ export default function Messages() {
                         }
                       }}
                       onMouseUp={handleChatTouchEnd}
-                      className="flex items-center justify-between px-3 py-2 my-[1px] rounded-[18px] cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.07] active:bg-black/[0.07] dark:active:bg-white/[0.12] active:scale-[0.985] transition-all duration-75 group touch-manipulation select-none will-change-transform"
+                      className="flex items-center justify-between px-3 py-2 my-[1px] rounded-[18px] cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.07] active:bg-black/[0.07] dark:active:bg-white/[0.12] transition-all duration-75 group touch-manipulation select-none will-change-transform"
                     >
                       <div className="flex items-center space-x-3 min-w-0 flex-1">
                         <div
@@ -4407,7 +4482,7 @@ export default function Messages() {
                           ) : (() => {
                             const isOnline = !isJarvis && !!otherId && !!(presenceData[otherId]?.isOnline || (presenceData[otherId] as any)?.state === "online" || userDataCache[otherId]?.isOnline);
                             return (
-                              <div className={`relative shrink-0 transition-transform active:scale-95 flex items-center justify-center ${
+                              <div className={`relative shrink-0 transition-transform  flex items-center justify-center ${
                                 hasStory 
                                   ? `w-[56px] h-[56px] rounded-full ${
                                       isStoryViewed 
@@ -4516,6 +4591,27 @@ export default function Messages() {
         </PullToRefresh>
       </div>
 
+      {/* PC only: drag this divider to resize the chat list (double click resets) */}
+      {isDesktop && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize chat list"
+          title="Drag to resize · double click to reset"
+          onPointerDown={handleSidebarResizeStart}
+          onDoubleClick={resetSidebarWidth}
+          className={`hidden md:flex items-center justify-center w-[9px] -ml-[9px] shrink-0 cursor-col-resize touch-none select-none relative z-30 ${
+            isResizingSidebar ? "bg-sky-500/20" : "hover:bg-sky-500/15"
+          }`}
+        >
+          <span
+            className={`w-[2px] h-full rounded-full transition-colors duration-150 ${
+              isResizingSidebar ? "bg-sky-500" : "bg-neutral-200/80 group-hover:bg-sky-400"
+            }`}
+          />
+        </div>
+      )}
+
       {/* Right Chat Area */}
       <AnimatePresence>
         {activeChat ? (
@@ -4526,7 +4622,7 @@ export default function Messages() {
               animate={{ x: 0, opacity: 1 }}
               exit={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
               transition={isDesktop ? { duration: 0 } : { duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-full bg-[#f2f2f7] dark:bg-black will-change-transform select-none"
+              className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 min-w-0 flex flex-col h-full bg-[#f2f2f7] dark:bg-black will-change-transform select-none"
             >
               <Notifications onBack={() => setActiveChat(null)} isModal={true} />
             </motion.div>
@@ -4537,7 +4633,7 @@ export default function Messages() {
               animate={{ x: 0, opacity: 1 }}
               exit={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
               transition={isDesktop ? { duration: 0 } : { duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
-              className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-full bg-white will-change-opacity select-none"
+              className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 min-w-0 flex flex-col h-full bg-white will-change-opacity select-none"
               onTouchStart={(e) => {
                 if (activeChat === "activity") {
                   activityTouchStartXRef.current = e.touches[0].clientX;
@@ -4561,11 +4657,11 @@ export default function Messages() {
               }}
             >
               {/* Clean 2D Modern Activity Header with Frosted Glass */}
-              <div className="min-h-[56px] md:min-h-[60px] px-3.5 md:px-4 pt-[calc(env(safe-area-inset-top,0px)+6px)] md:pt-0 pb-1.5 md:pb-0 border-b border-neutral-100/60 flex items-center justify-between bg-white/85 backdrop-blur-xl sticky top-0 z-30 select-none">
+              <div className="min-h-[56px] md:min-h-[60px] px-3.5 md:px-4 pt-[calc(env(safe-area-inset-top,0px)+6px)] md:pt-0 pb-1.5 md:pb-0 border-b border-neutral-100/60 flex items-center justify-between bg-white sticky top-0 z-30 select-none">
                 <div className="flex items-center space-x-2.5">
                   <button
                     type="button"
-                    className="p-1.5 -ml-1 hover:bg-neutral-100 active:scale-90 rounded-full transition-all cursor-pointer border-0 bg-transparent flex items-center justify-center text-neutral-800"
+                    className="p-1.5 -ml-1 hover:bg-neutral-100 rounded-full transition-all cursor-pointer border-0 bg-transparent flex items-center justify-center text-neutral-800"
                     onClick={() => setActiveChat(null)}
                     title="Back to Chats"
                   >
@@ -4629,7 +4725,7 @@ export default function Messages() {
                           <div
                             key={req.id}
                             onClick={() => setActiveChat(req.id)}
-                            className="flex items-center justify-between p-3.5 rounded-2xl bg-white hover:bg-neutral-50 border border-neutral-100 transition-all cursor-pointer active:scale-[0.99] shadow-xs"
+                            className="flex items-center justify-between p-3.5 rounded-2xl bg-white hover:bg-neutral-50 border border-neutral-100 transition-all cursor-pointer shadow-xs"
                           >
                             <div className="flex items-center space-x-3.5 min-w-0 flex-1">
                               <div className="w-12 h-12 rounded-full overflow-hidden bg-neutral-100 shrink-0 border border-neutral-100">
@@ -4884,7 +4980,7 @@ export default function Messages() {
                                       setFollowingIds(prevF);
                                     }
                                   }}
-                                  className={`px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-all active:scale-95 border-0 shrink-0 cursor-pointer ${
+                                  className={`px-3.5 py-1.5 rounded-full text-[12px] font-semibold transition-all  border-0 shrink-0 cursor-pointer ${
                                     (followingIds || []).includes(n.actorId) && (followerIds || []).includes(n.actorId)
                                       ? 'bg-neutral-100 text-neutral-800 hover:bg-neutral-200'
                                       : (followingIds || []).includes(n.actorId)
@@ -5028,7 +5124,7 @@ export default function Messages() {
                           <button
                             type="button"
                             onClick={() => setActivityTab("activity")}
-                            className={`px-4.5 py-2 text-[13px] font-extrabold rounded-full transition-all cursor-pointer flex items-center space-x-1.5 active:scale-95 border-0 ${
+                            className={`px-4.5 py-2 text-[13px] font-extrabold rounded-full transition-all cursor-pointer flex items-center space-x-1.5  border-0 ${
                               activityTab === "activity"
                                 ? "bg-neutral-950 text-white shadow-xs"
                                 : "bg-transparent text-neutral-600 hover:text-neutral-950"
@@ -5046,7 +5142,7 @@ export default function Messages() {
                           <button
                             type="button"
                             onClick={() => setActivityTab("followers")}
-                            className={`px-4.5 py-2 text-[13px] font-extrabold rounded-full transition-all cursor-pointer flex items-center space-x-1.5 active:scale-95 border-0 ${
+                            className={`px-4.5 py-2 text-[13px] font-extrabold rounded-full transition-all cursor-pointer flex items-center space-x-1.5  border-0 ${
                               activityTab === "followers"
                                 ? "bg-neutral-950 text-white shadow-xs"
                                 : "bg-transparent text-neutral-600 hover:text-neutral-950"
@@ -5076,7 +5172,7 @@ export default function Messages() {
               animate={{ x: 0, opacity: 1 }}
               exit={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
               transition={isDesktop ? { duration: 0 } : { duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-              className="chat-view-container fixed inset-0 z-[100] md:relative md:z-auto flex-1 flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-white dark:bg-black select-none will-change-transform"
+              className="chat-view-container fixed inset-0 z-[100] md:relative md:z-auto flex-1 min-w-0 flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-white dark:bg-black select-none will-change-transform"
             >
               {/* Chat Background Layer - Mobile & Desktop Theme Wallpaper */}
               {(() => {
@@ -5171,7 +5267,7 @@ export default function Messages() {
                     {/* Left: Back button + Friend Profile Info */}
                     <div className="relative z-10 flex items-center space-x-2 min-w-0 flex-1">
                       <button
-                        className="md:hidden w-9.5 h-9.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 active:scale-90 transition-all text-neutral-800 dark:text-neutral-100 shrink-0 flex items-center justify-center cursor-pointer border-0 shadow-none touch-manipulation"
+                        className="md:hidden w-9.5 h-9.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-all text-neutral-800 dark:text-neutral-100 shrink-0 flex items-center justify-center cursor-pointer border-0 shadow-none touch-manipulation"
                         onClick={(e) => {
                           e.stopPropagation();
                           setActiveChat(null);
@@ -5190,7 +5286,7 @@ export default function Messages() {
                       >
                         <div className="relative shrink-0">
                           {activeContact?.isGroup && !activeContact.avatar ? (
-                            <div className="cursor-pointer group-hover:scale-105 transition-transform">
+                            <div className="cursor-pointer transition-transform">
                               <GroupAvatar
                                 members={
                                   activeConversation?.participantIds
@@ -5207,7 +5303,7 @@ export default function Messages() {
                               />
                             </div>
                           ) : (
-                            <div className="relative w-10 h-10 shrink-0 group-hover:scale-105 transition-all flex items-center justify-center">
+                            <div className="relative w-10 h-10 shrink-0 transition-all flex items-center justify-center">
                               <img
                                 src={activeContact?.avatar as string}
                                 alt="Avatar"
@@ -5258,7 +5354,7 @@ export default function Messages() {
                             setJarvisMessages(welcome);
                             try { localStorage.setItem("jarvis_chat_history", JSON.stringify(welcome)); } catch(e){}
                           }}
-                          className="px-3.5 py-1.5 bg-white/90 dark:bg-neutral-800 hover:bg-white dark:hover:bg-neutral-700 active:scale-95 text-purple-700 dark:text-purple-300 text-xs font-semibold rounded-full border-0 transition-all cursor-pointer shadow-none touch-manipulation"
+                          className="px-3.5 py-1.5 bg-white/90 dark:bg-neutral-800 hover:bg-white dark:hover:bg-neutral-700 text-purple-700 dark:text-purple-300 text-xs font-semibold rounded-full border-0 transition-all cursor-pointer shadow-none touch-manipulation"
                         >
                           Reset Chat
                         </button>
@@ -5267,14 +5363,14 @@ export default function Messages() {
                           <button
                             onClick={() => handleStartCall('audio')}
                             title="Audio Call"
-                            className="w-9.5 h-9.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 active:scale-90 text-neutral-700 dark:text-neutral-200 hover:text-black dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer border-0 shadow-none transition-all touch-manipulation"
+                            className="w-9.5 h-9.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 hover:text-black dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer border-0 shadow-none transition-all touch-manipulation"
                           >
                             <Phone className="w-5 h-5" strokeWidth={2.1} />
                           </button>
                           <button
                             onClick={() => handleStartCall('video')}
                             title="Video Call"
-                            className="w-9.5 h-9.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 active:scale-90 text-neutral-700 dark:text-neutral-200 hover:text-black dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer border-0 shadow-none transition-all touch-manipulation"
+                            className="w-9.5 h-9.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 hover:text-black dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer border-0 shadow-none transition-all touch-manipulation"
                           >
                             <Video className="w-5 h-5" strokeWidth={2.1} />
                           </button>
@@ -5283,7 +5379,7 @@ export default function Messages() {
                       <button
                         onClick={() => setShowChatSettings(true)}
                         title="Chat Details"
-                        className="w-9.5 h-9.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 active:scale-90 text-neutral-700 dark:text-neutral-200 hover:text-black dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer border-0 shadow-none transition-all touch-manipulation"
+                        className="w-9.5 h-9.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 hover:text-black dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer border-0 shadow-none transition-all touch-manipulation"
                       >
                         <Info
                           className="w-5 h-5"
@@ -5455,7 +5551,7 @@ export default function Messages() {
                           <button
                             type="button"
                             onClick={() => setSelectedMediaItems((prev) => prev.filter((_, i) => i !== idx))}
-                            className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-black active:scale-90 text-white rounded-full transition-all shadow-xs cursor-pointer"
+                            className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-black text-white rounded-full transition-all shadow-xs cursor-pointer"
                             title="Remove"
                           >
                             <X className="w-3 h-3 stroke-[2.5]" />
@@ -5535,7 +5631,7 @@ export default function Messages() {
                     <button
                       type="button"
                       onClick={() => setReplyingTo(null)}
-                      className="p-1.5 hover:bg-gray-200/60 active:scale-90 rounded-full transition-all shrink-0 text-gray-400 hover:text-gray-700 ml-2"
+                      className="p-1.5 hover:bg-gray-200/60 rounded-full transition-all shrink-0 text-gray-400 hover:text-gray-700 ml-2"
                     >
                       <X className="w-3.5 h-3.5" strokeWidth={2.5} />
                     </button>
@@ -5570,7 +5666,7 @@ export default function Messages() {
                             setActiveChat(null);
                           }
                         }}
-                        className="flex-1 py-2 px-3 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-[13px] font-semibold transition-all text-center active:scale-95 cursor-pointer"
+                        className="flex-1 py-2 px-3 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-[13px] font-semibold transition-all text-center cursor-pointer"
                       >
                         Block
                       </button>
@@ -5582,7 +5678,7 @@ export default function Messages() {
                           await declineConversationRequest(activeConversation.id);
                           setActiveChat(null);
                         }}
-                        className="flex-1 py-2 px-3 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-100 text-[13px] font-semibold transition-all text-center active:scale-95 cursor-pointer"
+                        className="flex-1 py-2 px-3 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-100 text-[13px] font-semibold transition-all text-center cursor-pointer"
                       >
                         Delete
                       </button>
@@ -5593,7 +5689,7 @@ export default function Messages() {
                           const { acceptConversationRequest } = await import("../services/chatService");
                           await acceptConversationRequest(activeConversation.id);
                         }}
-                        className="flex-1 py-2 px-3 rounded-xl bg-gray-900 hover:bg-black text-white text-[13px] font-semibold transition-all text-center shadow-xs active:scale-95 cursor-pointer"
+                        className="flex-1 py-2 px-3 rounded-xl bg-gray-900 hover:bg-black text-white text-[13px] font-semibold transition-all text-center shadow-xs cursor-pointer"
                       >
                         Accept
                       </button>
@@ -5629,7 +5725,7 @@ export default function Messages() {
                             key={stk.id}
                             type="button"
                             onClick={() => handleSendStickerDirect(stk.url, stk.type)}
-                            className="shrink-0 p-1 rounded-2xl bg-white/60 dark:bg-neutral-800/60 hover:bg-white dark:hover:bg-neutral-800 border border-neutral-200/50 dark:border-neutral-700/50 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-2xs group"
+                            className="shrink-0 p-1 rounded-2xl bg-white/60 dark:bg-neutral-800/60 hover:bg-white dark:hover:bg-neutral-800 border border-neutral-200/50 dark:border-neutral-700/50 transition-all cursor-pointer flex items-center justify-center shadow-2xs group"
                             title={stk.title || "Send Sticker"}
                           >
                             {stk.type === "video" ? (
@@ -5639,7 +5735,7 @@ export default function Messages() {
                                 loop
                                 muted
                                 playsInline
-                                className="w-13 h-13 md:w-15 md:h-15 object-contain rounded-xl pointer-events-none group-hover:scale-105 transition-transform"
+                                className="w-13 h-13 md:w-15 md:h-15 object-contain rounded-xl pointer-events-none transition-transform"
                               />
                             ) : (
                               <img
@@ -5647,7 +5743,7 @@ export default function Messages() {
                                 alt={stk.title || "Sticker"}
                                 referrerPolicy="no-referrer"
                                 loading="lazy"
-                                className="w-13 h-13 md:w-15 md:h-15 object-contain pointer-events-none rounded-xl group-hover:scale-105 transition-transform"
+                                className="w-13 h-13 md:w-15 md:h-15 object-contain pointer-events-none rounded-xl transition-transform"
                                 onError={(e) => {
                                   const el = e.currentTarget;
                                   if (stk.url.includes('/uploads/') && !el.dataset.retried) {
@@ -5693,7 +5789,7 @@ export default function Messages() {
                           <button
                             type="button"
                             onClick={cancelRecording}
-                            className="w-9 h-9 rounded-full bg-rose-500/15 dark:bg-rose-500/25 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 border border-rose-400/30 flex items-center justify-center shrink-0 cursor-pointer active:scale-90 transition-all touch-manipulation shadow-none"
+                            className="w-9 h-9 rounded-full bg-rose-500/15 dark:bg-rose-500/25 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 border border-rose-400/30 flex items-center justify-center shrink-0 cursor-pointer transition-all touch-manipulation shadow-none"
                             title="Cancel Voice Recording"
                           >
                             <X className="w-4.5 h-4.5 stroke-[2.2]" />
@@ -5703,7 +5799,7 @@ export default function Messages() {
                             <button
                               type="button"
                               onClick={() => setShowAttachMenu((prev) => !prev)}
-                              className={`w-9 h-9 rounded-full bg-sky-500/15 dark:bg-sky-400/20 backdrop-blur-md text-sky-600 dark:text-sky-300 border border-sky-400/30 hover:bg-sky-500/25 active:scale-90 flex items-center justify-center shrink-0 cursor-pointer transition-all touch-manipulation shadow-xs ${showAttachMenu ? 'rotate-45' : ''}`}
+                              className={`w-9 h-9 rounded-full bg-sky-500/15 dark:bg-sky-400/20 backdrop-blur-md text-sky-600 dark:text-sky-300 border border-sky-400/30 hover:bg-sky-500/25  flex items-center justify-center shrink-0 cursor-pointer transition-all touch-manipulation shadow-xs ${showAttachMenu ? 'rotate-45' : ''}`}
                               title="Share File / Media"
                             >
                               <Paperclip className="w-4 h-4 stroke-[2.2]" />
@@ -5729,7 +5825,7 @@ export default function Messages() {
                                         setShowAttachMenu(false);
                                         fileInputRef.current?.click();
                                       }}
-                                      className="flex items-center space-x-2.5 px-3 py-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-98 transition-all text-left cursor-pointer border-0 touch-manipulation"
+                                      className="flex items-center space-x-2.5 px-3 py-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all text-left cursor-pointer border-0 touch-manipulation"
                                     >
                                       <div className="w-7.5 h-7.5 rounded-full bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 flex items-center justify-center shrink-0">
                                         <ImageIcon className="w-4 h-4" />
@@ -5743,7 +5839,7 @@ export default function Messages() {
                                         setShowAttachMenu(false);
                                         docInputRef.current?.click();
                                       }}
-                                      className="flex items-center space-x-2.5 px-3 py-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-98 transition-all text-left cursor-pointer border-0 touch-manipulation"
+                                      className="flex items-center space-x-2.5 px-3 py-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all text-left cursor-pointer border-0 touch-manipulation"
                                     >
                                       <div className="w-7.5 h-7.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 flex items-center justify-center shrink-0">
                                         <FileText className="w-4 h-4" />
@@ -5803,7 +5899,7 @@ export default function Messages() {
                                     requestAnimationFrame(() => {
                                       messagesContainerRef.current?.scrollTo({
                                         top: messagesContainerRef.current.scrollHeight,
-                                        behavior: 'smooth'
+                                        behavior: 'auto'
                                       });
                                     });
                                   }
@@ -5813,7 +5909,7 @@ export default function Messages() {
                                     requestAnimationFrame(() => {
                                       messagesContainerRef.current?.scrollTo({
                                         top: messagesContainerRef.current.scrollHeight,
-                                        behavior: 'smooth'
+                                        behavior: 'auto'
                                       });
                                     });
                                   }
@@ -5823,7 +5919,7 @@ export default function Messages() {
                                     requestAnimationFrame(() => {
                                       messagesContainerRef.current?.scrollTo({
                                         top: messagesContainerRef.current.scrollHeight,
-                                        behavior: 'smooth'
+                                        behavior: 'auto'
                                       });
                                     });
                                   }
@@ -5849,7 +5945,7 @@ export default function Messages() {
                                 }
                                 setShowStickerModal((prev) => !prev);
                               }}
-                              className="w-8 h-8 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-neutral-700/60 active:scale-90 rounded-full transition-all shrink-0 flex items-center justify-center cursor-pointer border-0 shadow-none bg-transparent touch-manipulation"
+                              className="w-8 h-8 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-neutral-700/60 rounded-full transition-all shrink-0 flex items-center justify-center cursor-pointer border-0 shadow-none bg-transparent touch-manipulation"
                               title="Stickers"
                             >
                               <svg
@@ -5878,7 +5974,7 @@ export default function Messages() {
                             <button
                               type="button"
                               onClick={stopRecording}
-                              className="w-9 h-9 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 active:scale-90 text-white rounded-full flex items-center justify-center cursor-pointer shadow-xs border-0 shrink-0 touch-manipulation transition-all"
+                              className="w-9 h-9 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white rounded-full flex items-center justify-center cursor-pointer shadow-xs border-0 shrink-0 touch-manipulation transition-all"
                               title="Send Voice Message"
                             >
                               <svg
@@ -5908,7 +6004,7 @@ export default function Messages() {
                               {/* Send Button: Exactly concentric, icon perfectly centered without right-shift, color matching message bubble */}
                               <button
                                 type="submit"
-                                className={`absolute inset-0 w-9 h-9 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 active:scale-90 text-white rounded-full flex items-center justify-center shadow-xs border-0 cursor-pointer touch-manipulation transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] transform-gpu ${
+                                className={`absolute inset-0 w-9 h-9 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700  text-white rounded-full flex items-center justify-center shadow-xs border-0 cursor-pointer touch-manipulation transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] transform-gpu ${
                                   (inputText.trim() || selectedImagePreview || selectedMediaItems.length > 0)
                                     ? "opacity-100 scale-100 pointer-events-auto"
                                     : "opacity-0 scale-50 pointer-events-none"
@@ -5942,7 +6038,7 @@ export default function Messages() {
                               <button
                                 type="button"
                                 onClick={startRecording}
-                                className={`absolute inset-0 w-9 h-9 rounded-full bg-sky-500/15 dark:bg-sky-400/20 backdrop-blur-md text-sky-600 dark:text-sky-300 border border-sky-400/30 hover:bg-sky-500/25 active:scale-90 flex items-center justify-center cursor-pointer shadow-xs touch-manipulation transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] transform-gpu ${
+                                className={`absolute inset-0 w-9 h-9 rounded-full bg-sky-500/15 dark:bg-sky-400/20 backdrop-blur-md text-sky-600 dark:text-sky-300 border border-sky-400/30 hover:bg-sky-500/25  flex items-center justify-center cursor-pointer shadow-xs touch-manipulation transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] transform-gpu ${
                                   !(inputText.trim() || selectedImagePreview || selectedMediaItems.length > 0)
                                     ? "opacity-100 scale-100 pointer-events-auto"
                                     : "opacity-0 scale-50 pointer-events-none"
@@ -6015,7 +6111,7 @@ export default function Messages() {
                               }
                               closeContextMenu();
                             }}
-                            className="text-[19px] hover:scale-120 active:scale-90 transition-transform p-1 shrink-0 cursor-pointer"
+                            className="text-[19px] transition-transform p-1 shrink-0 cursor-pointer"
                           >
                             {emoji}
                           </button>
@@ -6185,7 +6281,7 @@ export default function Messages() {
               <button 
                 type="button"
                 onClick={() => setShowCreateGroup(true)}
-                className="bg-neutral-900 hover:bg-black dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-black font-semibold px-5.5 py-2 rounded-full transition-all shadow-none active:scale-95 text-[13px] cursor-pointer"
+                className="bg-neutral-900 hover:bg-black dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-black font-semibold px-5.5 py-2 rounded-full transition-all shadow-none text-[13px] cursor-pointer"
               >
                 Start Conversation
               </button>
@@ -6314,7 +6410,7 @@ export default function Messages() {
                   <button 
                     type="button" 
                     onClick={closeContextMenu}
-                    className="absolute top-3.5 right-3.5 w-7 h-7 rounded-full bg-neutral-100 hover:bg-neutral-200 dark:bg-white/10 dark:hover:bg-white/15 flex items-center justify-center text-neutral-500 dark:text-neutral-300 transition-colors cursor-pointer active:scale-90"
+                    className="absolute top-3.5 right-3.5 w-7 h-7 rounded-full bg-neutral-100 hover:bg-neutral-200 dark:bg-white/10 dark:hover:bg-white/15 flex items-center justify-center text-neutral-500 dark:text-neutral-300 transition-colors cursor-pointer"
                     title="Close"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -6327,7 +6423,7 @@ export default function Messages() {
                   <button
                     type="button"
                     onClick={() => togglePinChat(chatContextMenu.convId)}
-                    className="w-full text-left px-3.5 py-2.5 hover:bg-neutral-100 dark:hover:bg-white/[0.06] rounded-[20px] flex items-center space-x-3.5 transition-colors text-neutral-800 dark:text-neutral-100 cursor-pointer active:scale-[0.985]"
+                    className="w-full text-left px-3.5 py-2.5 hover:bg-neutral-100 dark:hover:bg-white/[0.06] rounded-[20px] flex items-center space-x-3.5 transition-colors text-neutral-800 dark:text-neutral-100 cursor-pointer"
                   >
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isPinned ? 'bg-blue-500 text-white shadow-xs' : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400'}`}>
                       <Pin className="w-4.5 h-4.5" />
@@ -6346,7 +6442,7 @@ export default function Messages() {
                   <button
                     type="button"
                     onClick={() => toggleMuteChat(chatContextMenu.convId)}
-                    className="w-full text-left px-3.5 py-2.5 hover:bg-neutral-100 dark:hover:bg-white/[0.06] rounded-[20px] flex items-center space-x-3.5 transition-colors text-neutral-800 dark:text-neutral-100 cursor-pointer active:scale-[0.985]"
+                    className="w-full text-left px-3.5 py-2.5 hover:bg-neutral-100 dark:hover:bg-white/[0.06] rounded-[20px] flex items-center space-x-3.5 transition-colors text-neutral-800 dark:text-neutral-100 cursor-pointer"
                   >
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isMuted ? 'bg-amber-500 text-white shadow-xs' : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'}`}>
                       {isMuted ? <Bell className="w-4.5 h-4.5" /> : <BellOff className="w-4.5 h-4.5" />}
@@ -6373,7 +6469,7 @@ export default function Messages() {
                       });
                       setChatContextMenu(null);
                     }}
-                    className="w-full text-left px-3.5 py-2.5 hover:bg-orange-50 dark:hover:bg-orange-950/20 rounded-[20px] flex items-center space-x-3.5 transition-colors text-neutral-800 dark:text-neutral-100 cursor-pointer active:scale-[0.985] group"
+                    className="w-full text-left px-3.5 py-2.5 hover:bg-orange-50 dark:hover:bg-orange-950/20 rounded-[20px] flex items-center space-x-3.5 transition-colors text-neutral-800 dark:text-neutral-100 cursor-pointer group"
                   >
                     <div className="w-9 h-9 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
                       <Layers className="w-4.5 h-4.5" />
@@ -6400,7 +6496,7 @@ export default function Messages() {
                       });
                       setChatContextMenu(null);
                     }}
-                    className="w-full text-left px-3.5 py-2.5 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-[20px] flex items-center space-x-3.5 transition-colors text-rose-600 dark:text-rose-400 cursor-pointer active:scale-[0.985]"
+                    className="w-full text-left px-3.5 py-2.5 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-[20px] flex items-center space-x-3.5 transition-colors text-rose-600 dark:text-rose-400 cursor-pointer"
                   >
                     <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 flex items-center justify-center shrink-0">
                       <UserX className="w-4.5 h-4.5" />
@@ -6477,7 +6573,7 @@ export default function Messages() {
                 <button
                   type="button"
                   onClick={() => setConfirmAction(null)}
-                  className="flex-1 py-3 rounded-2xl bg-neutral-100 hover:bg-neutral-200 dark:bg-white/10 dark:hover:bg-white/15 text-neutral-700 dark:text-neutral-200 font-semibold text-[13.5px] transition-all cursor-pointer active:scale-95"
+                  className="flex-1 py-3 rounded-2xl bg-neutral-100 hover:bg-neutral-200 dark:bg-white/10 dark:hover:bg-white/15 text-neutral-700 dark:text-neutral-200 font-semibold text-[13.5px] transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -6518,7 +6614,7 @@ export default function Messages() {
                       }
                     }
                   }}
-                  className={`flex-1 py-3 rounded-2xl text-white font-bold text-[13.5px] transition-all cursor-pointer active:scale-95 shadow-md ${
+                  className={`flex-1 py-3 rounded-2xl text-white font-bold text-[13.5px] transition-all cursor-pointer  shadow-md ${
                     confirmAction.type === 'clear_chat'
                       ? 'bg-orange-600 hover:bg-orange-500 shadow-orange-600/30'
                       : 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/30'
@@ -6710,7 +6806,7 @@ export default function Messages() {
                         }
                       }}
                     />
-                    <button className="w-20 h-20 rounded-full border-4 border-white/50 flex items-center justify-center transition-transform active:scale-95 bg-white/20">
+                    <button className="w-20 h-20 rounded-full border-4 border-white/50 flex items-center justify-center transition-transform bg-white/20">
                       <div className="w-16 h-16 bg-white rounded-full transition-all"></div>
                     </button>
                   </div>
@@ -6748,7 +6844,7 @@ export default function Messages() {
                       setShowChatSettings(false);
                     }
                   }}
-                  className="p-2.5 -ml-1 hover:bg-gray-100 rounded-full transition-all active:scale-95 cursor-pointer text-gray-800"
+                  className="p-2.5 -ml-1 hover:bg-gray-100 rounded-full transition-all cursor-pointer text-gray-800"
                 >
                   <ArrowLeft className="w-5 h-5 text-gray-800" strokeWidth={2.2} />
                 </button>
@@ -6867,7 +6963,7 @@ export default function Messages() {
                             <img
                               src={item.cover || item.mediaUrl}
                               alt="Shared media"
-                              className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                              className="w-full h-full object-cover transition-transform duration-200"
                               loading="lazy"
                               referrerPolicy="no-referrer"
                             />
@@ -6894,7 +6990,7 @@ export default function Messages() {
                                 `shared_${item.mediaType}_${item.id || Date.now()}.${ext}`
                               );
                             }}
-                            className="absolute bottom-1 right-1 p-1.5 bg-black/65 hover:bg-black/90 active:scale-90 rounded-full text-white transition-all shadow-md"
+                            className="absolute bottom-1 right-1 p-1.5 bg-black/65 hover:bg-black/90 rounded-full text-white transition-all shadow-md"
                             title="Download"
                           >
                             <Download className="w-3 h-3" />
@@ -7291,7 +7387,7 @@ export default function Messages() {
                         });
                         pushPage("profile");
                       }}
-                      className="flex flex-col items-center justify-center p-3 bg-slate-50 hover:bg-purple-50 hover:text-purple-600 rounded-2xl border border-gray-100 transition-all active:scale-95 group cursor-pointer"
+                      className="flex flex-col items-center justify-center p-3 bg-slate-50 hover:bg-purple-50 hover:text-purple-600 rounded-2xl border border-gray-100 transition-all group cursor-pointer"
                     >
                       <UserSquare className="w-5 h-5 text-gray-700 group-hover:text-purple-600 mb-1" />
                       <span className="text-[11px] font-semibold text-gray-600 group-hover:text-purple-600">
@@ -7300,7 +7396,7 @@ export default function Messages() {
                     </button>
 
                     <button
-                      className="flex flex-col items-center justify-center p-3 bg-slate-50 hover:bg-purple-50 hover:text-purple-600 rounded-2xl border border-gray-100 transition-all active:scale-95 group cursor-pointer"
+                      className="flex flex-col items-center justify-center p-3 bg-slate-50 hover:bg-purple-50 hover:text-purple-600 rounded-2xl border border-gray-100 transition-all group cursor-pointer"
                     >
                       <Bell className="w-5 h-5 text-gray-700 group-hover:text-purple-600 mb-1" />
                       <span className="text-[11px] font-semibold text-gray-600 group-hover:text-purple-600">
@@ -7309,7 +7405,7 @@ export default function Messages() {
                     </button>
 
                     <button
-                      className="flex flex-col items-center justify-center p-3 bg-slate-50 hover:bg-purple-50 hover:text-purple-600 rounded-2xl border border-gray-100 transition-all active:scale-95 group cursor-pointer"
+                      className="flex flex-col items-center justify-center p-3 bg-slate-50 hover:bg-purple-50 hover:text-purple-600 rounded-2xl border border-gray-100 transition-all group cursor-pointer"
                     >
                       <Search className="w-5 h-5 text-gray-700 group-hover:text-purple-600 mb-1" />
                       <span className="text-[11px] font-semibold text-gray-600 group-hover:text-purple-600">

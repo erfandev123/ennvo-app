@@ -18,9 +18,10 @@ import { App as CapApp } from '@capacitor/app';
 import { useAppStore, PageType } from '../store';
 import { getPost } from './postService';
 import { getUserByUsernameOrId } from './userService';
+import { shareContent } from './shareService';
 
 export interface ParsedDeepLink {
-  type: 'account' | 'post' | 'reel' | 'chat' | 'page' | 'auth' | 'unknown';
+  type: 'account' | 'post' | 'reel' | 'story' | 'chat' | 'page' | 'auth' | 'unknown';
   param?: string;
   originalUrl: string;
 }
@@ -32,7 +33,10 @@ export const parseDeepLink = (rawUrl: string): ParsedDeepLink => {
     let path = rawUrl;
     if (rawUrl.includes('://')) {
       const parsed = new URL(rawUrl);
-      path = parsed.pathname;
+      // ennvo://user/erfan keeps the first segment in the host, not the path.
+      path = parsed.protocol === 'http:' || parsed.protocol === 'https:'
+        ? parsed.pathname
+        : `/${parsed.host}${parsed.pathname}`;
     }
 
     const segments = path.replace(/^\//, '').split('/').filter(Boolean);
@@ -52,6 +56,9 @@ export const parseDeepLink = (rawUrl: string): ParsedDeepLink => {
     }
     if (prefix === 'post' || prefix === 'p') {
       return { type: 'post', param: param || '', originalUrl: rawUrl };
+    }
+    if (prefix === 'story' || prefix === 'stories') {
+      return { type: 'story', param: param || '', originalUrl: rawUrl };
     }
     if (prefix === 'reel' || prefix === 'reels' || prefix === 'r') {
       if (param) {
@@ -175,6 +182,13 @@ export const openFromLink = async (rawUrl: string): Promise<boolean> => {
         store.setViewingReel(post);
         return true;
       }
+    } else if (parsed.type === 'story' && parsed.param) {
+      const { getStory } = await import('./storyService');
+      const story = await getStory(parsed.param);
+      if (story) {
+        store.setViewingStory(story);
+        return true;
+      }
     } else if (parsed.type === 'chat') {
       if (parsed.param) {
         store.setActiveChat(parsed.param);
@@ -203,32 +217,23 @@ export const shareUserProfile = async (usernameOrId: string, name?: string): Pro
   const base = typeof window !== 'undefined' ? window.location.origin : 'https://ennvo.vercel.app';
   const profileUrl = `${base}/user/${encodeURIComponent(usernameOrId)}`;
   const title = name ? `${name} on Ennvo` : `@${usernameOrId} on Ennvo`;
-  const text = `Connect with ${name || usernameOrId} on Ennvo: ${profileUrl}`;
+  const text = `Connect with ${name || usernameOrId} on Ennvo:`;
 
-  if (typeof navigator !== 'undefined' && navigator.share) {
-    try {
-      await navigator.share({
-        title,
-        text,
-        url: profileUrl,
-      });
-      return true;
-    } catch (e) {
-      // User cancelled or share failed, fallback to clipboard
-    }
-  }
-
-  if (typeof navigator !== 'undefined' && navigator.clipboard) {
-    try {
-      await navigator.clipboard.writeText(profileUrl);
-      return true;
-    } catch (e) {}
-  }
-
-  return false;
+  const result = await shareContent({ title, text, url: profileUrl });
+  return !!result;
 };
 
 export const initDeepLinkListeners = () => {
+  // 0. Native -> web bridge. The Android side calls this for every VIEW intent
+  //    (ennvo://user/x, https://ennvo.vercel.app/...) so links always open in
+  //    the app instead of the system browser.
+  if (typeof window !== 'undefined') {
+    (window as any).__ennvoOpenLink = (url: string) => {
+      if (!url) return;
+      openFromLink(url).catch(() => {});
+    };
+  }
+
   // 1. Capacitor native appUrlOpen listener
   try {
     CapApp.addListener('appUrlOpen', (event) => {

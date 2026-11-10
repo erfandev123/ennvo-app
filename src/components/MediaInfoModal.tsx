@@ -51,7 +51,7 @@ export const MediaInfoModal: React.FC<MediaInfoModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-white bg-gray-800/80 hover:bg-gray-800 rounded-full transition-all active:scale-90"
+              className="p-2 text-gray-400 hover:text-white bg-gray-800/80 hover:bg-gray-800 rounded-full transition-all"
             >
               <X className="w-5 h-5" />
             </button>
@@ -97,7 +97,7 @@ export const MediaInfoModal: React.FC<MediaInfoModalProps> = ({
 
           <button
             onClick={onClose}
-            className="w-full mt-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-2xl text-xs transition-all active:scale-98 shadow-lg shadow-purple-600/20"
+            className="w-full mt-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-2xl text-xs transition-all shadow-lg shadow-purple-600/20"
           >
             Close
           </button>

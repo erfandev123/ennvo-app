@@ -84,7 +84,7 @@ export const StickerDetailModal: React.FC<StickerDetailModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-3 right-3 p-1.5 rounded-full bg-gray-100 dark:bg-neutral-800 text-gray-500 dark:text-neutral-300 hover:text-black dark:hover:text-white active:scale-90 transition-all cursor-pointer border-0"
+            className="absolute top-3 right-3 p-1.5 rounded-full bg-gray-100 dark:bg-neutral-800 text-gray-500 dark:text-neutral-300 hover:text-black dark:hover:text-white transition-all cursor-pointer border-0"
             title="Close"
           >
             <X className="w-4 h-4" />
@@ -130,7 +130,7 @@ export const StickerDetailModal: React.FC<StickerDetailModalProps> = ({
             <button
               type="button"
               onClick={handleToggleSave}
-              className={`w-full py-2.5 px-2 rounded-2xl text-[12px] font-semibold flex items-center justify-center space-x-1.5 active:scale-95 transition-all cursor-pointer border ${
+              className={`w-full py-2.5 px-2 rounded-2xl text-[12px] font-semibold flex items-center justify-center space-x-1.5  transition-all cursor-pointer border ${
                 isSaved
                   ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
                   : "bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-300 border-sky-200/80 dark:border-sky-800/40 hover:bg-sky-100"
@@ -153,7 +153,7 @@ export const StickerDetailModal: React.FC<StickerDetailModalProps> = ({
             <button
               type="button"
               onClick={handleActionSendOrShare}
-              className="w-full py-2.5 px-2 bg-gradient-to-tr from-[#fe2c55] via-rose-500 to-pink-500 hover:opacity-95 text-white rounded-2xl text-[12px] font-semibold flex items-center justify-center space-x-1.5 active:scale-95 transition-all cursor-pointer border-0 shadow-sm"
+              className="w-full py-2.5 px-2 bg-gradient-to-tr from-[#fe2c55] via-rose-500 to-pink-500 hover:opacity-95 text-white rounded-2xl text-[12px] font-semibold flex items-center justify-center space-x-1.5 transition-all cursor-pointer border-0 shadow-sm"
             >
               {copied ? (
                 <>

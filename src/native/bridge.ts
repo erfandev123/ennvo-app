@@ -127,16 +127,21 @@ export const bridge = {
   },
 
   openUrl(url: string): void {
-    const A = (window as any).Android || (window as any).AndroidInterface;
-    if (A && typeof A.openUrl === 'function') {
-      try {
-        A.openUrl(url);
-        return;
-      } catch (e) {}
+    if (native.isAvailable()) {
+      native.openUrl(url);
+      return;
     }
     if (typeof window !== 'undefined') {
-      window.open(url, '_blank');
+      try {
+        window.open(url, '_blank', 'noopener');
+      } catch (e) {
+        window.location.href = url;
+      }
     }
+  },
+
+  shareText(title: string, text: string): void {
+    native.shareText(title, text);
   },
 
   openStore(): void {

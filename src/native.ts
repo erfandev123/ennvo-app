@@ -366,6 +366,38 @@ export const native = {
     } catch (e) {}
   },
 
+  /**
+   * Open any URL / scheme (tel:, mailto:, sms:, whatsapp:, market:, intent:, https:)
+   * with the Android system so taps never die inside the WebView.
+   */
+  openUrl(url: string): void {
+    try {
+      const A = getA();
+      if (!A) return;
+      if (typeof A.openUrl === 'function') {
+        A.openUrl(url || '');
+      }
+    } catch (e) {
+      console.warn('[Native] openUrl error:', e);
+    }
+  },
+
+  /**
+   * Share text/link through the native Android share sheet (WhatsApp, Telegram,
+   * Gmail ...). The Web Share API does not exist inside a WebView.
+   */
+  shareText(title: string, text: string): void {
+    try {
+      const A = getA();
+      if (!A) return;
+      if (typeof A.shareText === 'function') {
+        A.shareText(title || 'Ennvo', text || '');
+      }
+    } catch (e) {
+      console.warn('[Native] shareText error:', e);
+    }
+  },
+
   exitApp(): void {
     try {
       const A = getA();

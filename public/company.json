@@ -1,23 +1,31 @@
-﻿{
+{
   "name": "Ennvo App",
-  "alternateName": ["Ennvo App", "Ennvoapp", "Ennvo Social", "Ennvo Platform"],
+  "alternateName": [
+    "Ennvo App",
+    "Ennvoapp",
+    "Ennvo Social",
+    "Ennvo Platform"
+  ],
   "url": "https://ennvo.vercel.app/",
   "logo": "https://ennvo.vercel.app/icon-512.png",
-  "description": "Ennvo is an independent social platform founded by Erfan Sarker and co-developed by Rita Akter. It brings short video reels, stories, instant messaging, and HD audio and video calls into one fast, simple experience.",
-  "slogan": "Social, without the noise.",
+  "description": "Ennvo is an independent social platform owned and led by founder & CEO Erfan Sarker, with a team of 10 people. It brings short video reels, stories, instant messaging, and HD audio and video calls into one fast, simple experience.",
+  "slogan": "Connect. Share. Explore.",
   "foundingDate": "2026",
   "foundingLocation": "Bijoynagar, Brahmanbaria, Bangladesh",
   "founders": [
     {
       "name": "Erfan Sarker",
-      "role": "Founder & Software Engineer",
+      "role": "Founder, CEO & Owner",
+      "isOwner": true,
       "image": "https://ennvo.vercel.app/images/erfan.avif",
-      "url": "https://ennvo.vercel.app/about",
-      "sameAs": ["https://www.facebook.com/erfanbnp123"]
+      "url": "https://ennvo.vercel.app/about#team",
+      "sameAs": [
+        "https://www.facebook.com/erfanbnp123"
+      ]
     },
     {
       "name": "Rita Akter",
-      "role": "Co-Developer & Partner",
+      "role": "Partner & Core Team",
       "image": "https://ennvo.vercel.app/images/rita.jpg",
       "url": "https://ennvo.vercel.app/about#team"
     }
@@ -32,7 +40,10 @@
     "addressRegion": "Brahmanbaria",
     "addressCountry": "Bangladesh"
   },
-  "platforms": ["Web", "Android"],
+  "platforms": [
+    "Web",
+    "Android"
+  ],
   "price": "Free to use; standard data charges may apply",
   "features": [
     "Short video reels",
@@ -106,6 +117,40 @@
       "datePublished": "2026-11-09"
     }
   ],
-  "sameAs": ["https://www.facebook.com/erfanbnp123"]
+  "sameAs": [
+    "https://www.facebook.com/erfanbnp123"
+  ],
+  "teamSize": 10,
+  "ownership": "Erfan Sarker (Founder, CEO & Owner)",
+  "founder": {
+    "name": "Erfan Sarker",
+    "role": "Founder, CEO & Owner",
+    "image": "https://ennvo.vercel.app/images/erfan.avif",
+    "url": "https://ennvo.vercel.app/about#team",
+    "sameAs": [
+      "https://www.facebook.com/erfanbnp123"
+    ]
+  },
+  "team": [
+    {
+      "name": "Erfan Sarker",
+      "role": "Founder, CEO & Owner"
+    },
+    {
+      "name": "Rita Akter",
+      "role": "Partner & Core Team"
+    },
+    {
+      "name": "Evan Sarker",
+      "role": "Developer"
+    },
+    {
+      "name": "Joi Akter",
+      "role": "Core Team"
+    },
+    {
+      "name": "Junaid Mia",
+      "role": "Core Team"
+    }
+  ]
 }
-

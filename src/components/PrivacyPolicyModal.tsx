@@ -37,7 +37,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, 
             </div>
             <button 
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all active:scale-95"
+              className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
             >
               <X className="w-5 h-5" />
             </button>
@@ -127,7 +127,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, 
             <span className="text-[11px] font-medium text-gray-500">© 2026 Ennvo • Developed by Erfan Sarker</span>
             <button
               onClick={onClose}
-              className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs rounded-xl shadow-md transition-all active:scale-95"
+              className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs rounded-xl shadow-md transition-all"
             >
               Close Privacy Policy
             </button>

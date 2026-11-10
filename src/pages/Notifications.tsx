@@ -241,7 +241,7 @@ const ActivityCard = React.memo(({
             <img 
               src={notif.postMedia} 
               alt="post" 
-              className="w-full h-full object-cover pointer-events-none transition-transform duration-300 group-hover:scale-105" 
+              className="w-full h-full object-cover pointer-events-none transition-transform duration-300" 
               referrerPolicy="no-referrer" 
               loading="lazy"
             />

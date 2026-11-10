@@ -392,7 +392,7 @@ export const StickerCreatorStudio: React.FC<StickerCreatorStudioProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-full bg-sky-500/15 dark:bg-sky-400/20 text-sky-700 dark:text-sky-300 border border-sky-400/30 flex items-center justify-center hover:bg-sky-500/25 active:scale-90 transition-all cursor-pointer"
+              className="w-9 h-9 rounded-full bg-sky-500/15 dark:bg-sky-400/20 text-sky-700 dark:text-sky-300 border border-sky-400/30 flex items-center justify-center hover:bg-sky-500/25 transition-all cursor-pointer"
               title="Close"
             >
               <X className="w-5 h-5" />
@@ -419,7 +419,7 @@ export const StickerCreatorStudio: React.FC<StickerCreatorStudioProps> = ({
                 type="button"
                 onClick={handleSaveSticker}
                 disabled={isSaving || isSending}
-                className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/40 active:scale-95 transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs disabled:opacity-50"
               >
                 {isSaving ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -433,7 +433,7 @@ export const StickerCreatorStudio: React.FC<StickerCreatorStudioProps> = ({
                 type="button"
                 onClick={handleSendDirectlyToChat}
                 disabled={isSaving || isSending}
-                className="px-4 py-1.5 rounded-full text-xs font-bold bg-gradient-to-tr from-[#fe2c55] via-rose-500 to-pink-500 hover:opacity-90 active:scale-95 text-white flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                className="px-4 py-1.5 rounded-full text-xs font-bold bg-gradient-to-tr from-[#fe2c55] via-rose-500 to-pink-500 hover:opacity-90 text-white flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm disabled:opacity-50"
               >
                 {isSending ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -482,7 +482,7 @@ export const StickerCreatorStudio: React.FC<StickerCreatorStudioProps> = ({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="py-3 px-4 rounded-2xl bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 text-sky-700 dark:text-sky-300 border border-sky-300/80 dark:border-sky-800/80 flex flex-col items-center justify-center space-y-1.5 active:scale-95 transition-all cursor-pointer font-semibold text-xs shadow-xs"
+                  className="py-3 px-4 rounded-2xl bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 text-sky-700 dark:text-sky-300 border border-sky-300/80 dark:border-sky-800/80 flex flex-col items-center justify-center space-y-1.5 transition-all cursor-pointer font-semibold text-xs shadow-xs"
                 >
                   <Upload className="w-5 h-5" />
                   <span>Choose Photo</span>
@@ -491,7 +491,7 @@ export const StickerCreatorStudio: React.FC<StickerCreatorStudioProps> = ({
                 <button
                   type="button"
                   onClick={() => cameraInputRef.current?.click()}
-                  className="py-3 px-4 rounded-2xl bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 text-sky-700 dark:text-sky-300 border border-sky-300/80 dark:border-sky-800/80 flex flex-col items-center justify-center space-y-1.5 active:scale-95 transition-all cursor-pointer font-semibold text-xs shadow-xs"
+                  className="py-3 px-4 rounded-2xl bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 text-sky-700 dark:text-sky-300 border border-sky-300/80 dark:border-sky-800/80 flex flex-col items-center justify-center space-y-1.5 transition-all cursor-pointer font-semibold text-xs shadow-xs"
                 >
                   <Camera className="w-5 h-5" />
                   <span>Take Photo</span>
@@ -594,7 +594,7 @@ export const StickerCreatorStudio: React.FC<StickerCreatorStudioProps> = ({
                     setSelectedFile(null);
                     setPreviewUrl(null);
                   }}
-                  className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white active:scale-90 transition-all cursor-pointer border-0 z-30"
+                  className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white transition-all cursor-pointer border-0 z-30"
                   title="Remove Image"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -608,7 +608,7 @@ export const StickerCreatorStudio: React.FC<StickerCreatorStudioProps> = ({
                   <button
                     type="button"
                     onClick={() => setRotation((prev) => (prev + 90) % 360)}
-                    className="p-2 rounded-xl bg-white/80 dark:bg-slate-900/80 hover:bg-sky-50 dark:hover:bg-sky-950/40 text-slate-700 dark:text-slate-200 border border-sky-200/80 dark:border-sky-900/50 flex items-center space-x-1.5 text-xs font-semibold cursor-pointer active:scale-95 transition-all shadow-xs"
+                    className="p-2 rounded-xl bg-white/80 dark:bg-slate-900/80 hover:bg-sky-50 dark:hover:bg-sky-950/40 text-slate-700 dark:text-slate-200 border border-sky-200/80 dark:border-sky-900/50 flex items-center space-x-1.5 text-xs font-semibold cursor-pointer transition-all shadow-xs"
                     title="Rotate 90 degrees"
                   >
                     <RotateCw className="w-3.5 h-3.5" />
@@ -618,7 +618,7 @@ export const StickerCreatorStudio: React.FC<StickerCreatorStudioProps> = ({
                   <button
                     type="button"
                     onClick={() => setFlipH((prev) => !prev)}
-                    className="p-2 rounded-xl bg-white/80 dark:bg-slate-900/80 hover:bg-sky-50 dark:hover:bg-sky-950/40 text-slate-700 dark:text-slate-200 border border-sky-200/80 dark:border-sky-900/50 flex items-center space-x-1.5 text-xs font-semibold cursor-pointer active:scale-95 transition-all shadow-xs"
+                    className="p-2 rounded-xl bg-white/80 dark:bg-slate-900/80 hover:bg-sky-50 dark:hover:bg-sky-950/40 text-slate-700 dark:text-slate-200 border border-sky-200/80 dark:border-sky-900/50 flex items-center space-x-1.5 text-xs font-semibold cursor-pointer transition-all shadow-xs"
                     title="Flip Horizontal"
                   >
                     <FlipHorizontal className="w-3.5 h-3.5" />
@@ -628,7 +628,7 @@ export const StickerCreatorStudio: React.FC<StickerCreatorStudioProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveCrop((prev) => (prev === "square" ? "circle" : "square"))}
-                    className={`p-2 rounded-xl border flex items-center space-x-1.5 text-xs font-semibold cursor-pointer active:scale-95 transition-all shadow-xs ${
+                    className={`p-2 rounded-xl border flex items-center space-x-1.5 text-xs font-semibold cursor-pointer  transition-all shadow-xs ${
                       activeCrop === "circle"
                         ? "bg-sky-500 text-white border-sky-500"
                         : "bg-white/80 dark:bg-slate-900/80 text-slate-700 dark:text-slate-200 border-sky-200/80 dark:border-sky-900/50"
@@ -642,7 +642,7 @@ export const StickerCreatorStudio: React.FC<StickerCreatorStudioProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsDrawingMode((prev) => !prev)}
-                    className={`p-2 rounded-xl border flex items-center space-x-1.5 text-xs font-semibold cursor-pointer active:scale-95 transition-all shadow-xs ${
+                    className={`p-2 rounded-xl border flex items-center space-x-1.5 text-xs font-semibold cursor-pointer  transition-all shadow-xs ${
                       isDrawingMode
                         ? "bg-sky-500 text-white border-sky-500"
                         : "bg-white/80 dark:bg-slate-900/80 text-slate-700 dark:text-slate-200 border-sky-200/80 dark:border-sky-900/50"
@@ -673,7 +673,7 @@ export const StickerCreatorStudio: React.FC<StickerCreatorStudioProps> = ({
                       <button
                         type="button"
                         onClick={() => setDoodlePaths([])}
-                        className="ml-2 text-xs text-rose-500 hover:text-rose-600 font-bold active:scale-90"
+                        className="ml-2 text-xs text-rose-500 hover:text-rose-600 font-bold"
                       >
                         Clear
                       </button>

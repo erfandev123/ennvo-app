@@ -96,7 +96,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </p>
           <button
             onClick={this.handleReload}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-semibold rounded-xl shadow-md active:scale-95 transition-transform cursor-pointer"
+            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-semibold rounded-xl shadow-md transition-transform cursor-pointer"
           >
             <RotateCw className="w-3.5 h-3.5" />
             <span>Reload screen</span>

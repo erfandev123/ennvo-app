@@ -22,6 +22,7 @@ import { BlockedAccountsScreen } from '../components/settings/BlockedAccountsScr
 import { changeUserPassword, sendPasswordReset, setUserPassword, logout } from '../services/authService';
 import { saveAccount } from '../services/accountService';
 import { shareUserProfile } from '../services/deepLinkService';
+import { shareContent } from '../services/shareService';
 
 type SettingsScreen = 
   | 'main'                    // Settings and privacy
@@ -650,7 +651,7 @@ export default function Settings() {
           icon: Headphones,
           badge: '24/7',
           action: () => {
-            alert('ðŸ“ž Ennvo Official Customer Care\nHotline: +880 1700-000000\nEmail: ennvoapp@gmail.com\n\nFor Verified Blue Badge inquiries, review responses are delivered within 24 hours. Our support staff is online 24/7.');
+            alert('📞 Ennvo Official Customer Care\nHotline: +880 1700-000000\nEmail: ennvoapp@gmail.com\n\nFor Verified Blue Badge inquiries, review responses are delivered within 24 hours. Our support staff is online 24/7.');
           }
         }
       ]
@@ -670,34 +671,39 @@ export default function Settings() {
   ], [devices.length, userSettings.isPrivate, userSettings.appTheme, navStyle, notifMode, currentUser?.username, pushPage]);
 
   return (
-    <div className="h-full w-full overflow-y-auto overscroll-y-contain bg-[#F8F9FA] text-gray-900 font-sans antialiased md:pl-24 flex flex-col items-center">
+    <div className="h-full w-full overflow-y-auto overscroll-y-contain bg-[#F4F8FF] text-slate-900 font-sans antialiased md:pl-24 flex flex-col items-center">
       {/* Container: on mobile max-w-xl, on PC max-w-7xl with two columns */}
       <div className="w-full max-w-xl md:max-w-7xl min-h-full flex flex-col pb-20 px-0 md:px-6 md:py-6">
         
         {/* Desktop Top Title Bar */}
-        <div className="hidden md:flex items-center justify-between pb-5 mb-6 border-b border-gray-200/80">
-          <div className="flex items-center gap-3">
+        <div className="hidden md:flex items-center justify-between gap-4 pb-5 mb-6 border-b border-sky-100">
+          <div className="flex items-center gap-3.5">
             <button
               onClick={() => popPage()}
-              className="p-2.5 rounded-2xl hover:bg-gray-200/60 text-gray-700 transition-colors border border-gray-200/60 bg-white shadow-2xs cursor-pointer"
+              className="p-2.5 rounded-2xl hover:bg-sky-50 text-slate-600 transition-colors border border-sky-100 bg-white shadow-[0_1px_2px_rgba(2,132,199,0.06)] cursor-pointer"
               title="Return to app"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-[18px] h-[18px]" />
             </button>
-            <div>
-              <h1 className="text-2xl font-black text-gray-900 tracking-tight">Settings & Privacy</h1>
-              <p className="text-xs text-gray-500 font-medium">Manage your personal account, security credentials, and preferences</p>
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center shadow-[0_6px_16px_rgba(2,132,199,0.28)]">
+                <Shield className="w-5 h-5" strokeWidth={2.2} />
+              </div>
+              <div>
+                <h1 className="text-[22px] font-black text-slate-900 tracking-tight leading-tight">Settings &amp; privacy</h1>
+                <p className="text-[12.5px] text-slate-500 font-medium">Account, security, privacy and preferences in one place</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-3 bg-white px-3.5 py-2 rounded-2xl border border-gray-200/70 shadow-2xs">
+          <div className="flex items-center gap-3 bg-white px-3.5 py-2 rounded-2xl border border-sky-100 shadow-[0_1px_2px_rgba(2,132,199,0.06)]">
             <img 
               src={currentUser?.avatar || "https://picsum.photos/seed/myprofile/120/120"} 
               alt="Avatar" 
-              className="w-9 h-9 rounded-full object-cover border border-purple-500/30"
+              className="w-9 h-9 rounded-full object-cover border border-sky-500/30"
             />
             <div className="leading-tight">
               <p className="text-[13px] font-bold text-gray-900">{currentUser?.name || 'Ennvo User'}</p>
-              <p className="text-[11px] text-purple-700 font-medium">@{currentUser?.username || 'user'}</p>
+              <p className="text-[11px] text-blue-700 font-medium">@{currentUser?.username || 'user'}</p>
             </div>
           </div>
         </div>
@@ -706,10 +712,10 @@ export default function Settings() {
         <div className="w-full md:grid md:grid-cols-12 md:gap-6 lg:gap-8 items-start">
           
           {/* DESKTOP LEFT NAVIGATION SIDEBAR (Visible on md+) */}
-          <aside className="hidden md:flex md:col-span-5 lg:col-span-4 flex-col bg-white rounded-3xl border border-gray-200/80 shadow-xs p-4 sticky top-6 max-h-[calc(100vh-6rem)] overflow-y-auto space-y-5">
+          <aside className="hidden md:flex md:col-span-5 lg:col-span-4 flex-col bg-white rounded-[24px] border border-sky-100 shadow-[0_2px_10px_rgba(2,132,199,0.06)] p-3.5 sticky top-6 max-h-[calc(100vh-6rem)] overflow-y-auto space-y-5">
             {navGroups.map((group) => (
               <div key={group.title} className="space-y-1">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 px-3 py-1">
+                <p className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-sky-700/60 px-3 pt-1 pb-1.5">
                   {group.title}
                 </p>
                 <div className="space-y-0.5">
@@ -726,14 +732,14 @@ export default function Settings() {
                             setCurrentScreen(item.id as SettingsScreen);
                           }
                         }}
-                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-left text-[14px] font-medium transition-all cursor-pointer ${
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-[14px] text-left text-[13.5px] font-medium transition-colors cursor-pointer ${
                           isActive
-                            ? 'bg-purple-600 text-white font-semibold shadow-xs shadow-purple-600/25'
-                            : 'text-gray-700 hover:bg-gray-100/70 hover:text-gray-900'
+                            ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white font-semibold shadow-[0_6px_16px_rgba(2,132,199,0.28)]'
+                            : 'text-slate-700 hover:bg-sky-50 hover:text-slate-900'
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-gray-500'}`} />
+                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-sky-500'}`} />
                           <span className="truncate">{item.label}</span>
                         </div>
                         {item.badge && (
@@ -770,7 +776,7 @@ export default function Settings() {
           </aside>
 
           {/* RIGHT DETAIL CONTENT PANEL (Full width on mobile, col-span-7/8 on desktop) */}
-          <main className="w-full md:col-span-7 lg:col-span-8 bg-transparent md:bg-white md:rounded-3xl md:border md:border-gray-200/80 md:shadow-xs overflow-hidden min-h-[620px]">
+          <main className="w-full md:col-span-7 lg:col-span-8 bg-transparent md:bg-white md:rounded-[24px] md:border md:border-sky-100 md:shadow-[0_2px_10px_rgba(2,132,199,0.06)] overflow-hidden min-h-[620px]">
 
         {/* ========================================================= */}
         {/* SCREEN 1: MAIN "Settings and privacy"                     */}
@@ -778,7 +784,7 @@ export default function Settings() {
         {(!isDesktop && currentScreen === 'main') && (
           <div className="flex-1 flex flex-col pb-16">
             {/* Header */}
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button 
                 onClick={handleBack}
                 className="p-1 -ml-1 text-gray-900 hover:text-gray-600 transition-colors"
@@ -792,30 +798,58 @@ export default function Settings() {
             </div>
 
             <div className="px-4 pt-3 pb-8 space-y-4">
+              {/* --- Profile hero card --- */}
+              <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-sky-500 via-blue-600 to-blue-700 p-[18px] text-white shadow-[0_10px_28px_-6px_rgba(2,132,199,0.45)]">
+                <div className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full bg-white/10" aria-hidden="true" />
+                <div className="pointer-events-none absolute -bottom-16 -left-10 h-36 w-36 rounded-full bg-white/[0.07]" aria-hidden="true" />
+                <div className="relative flex items-center gap-3.5">
+                  <img
+                    src={currentUser?.avatar || "https://ui-avatars.com/api/?name=" + encodeURIComponent(currentUser?.name || "Ennvo") + "&background=0ea5e9&color=fff"}
+                    alt="Profile"
+                    className="h-14 w-14 shrink-0 rounded-full object-cover ring-2 ring-white/70"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[16px] font-bold leading-tight">{currentUser?.name || 'Ennvo User'}</p>
+                    <p className="truncate text-[12.5px] font-medium text-white/80">@{currentUser?.username || 'user'}</p>
+                    <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-[3px] text-[10.5px] font-semibold ring-1 ring-inset ring-white/25">
+                      <ShieldCheck className="h-3 w-3" strokeWidth={2.4} />
+                      {userSettings.isPrivate ? 'Private account' : 'Personal account'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentScreen('account')}
+                    className="shrink-0 rounded-full bg-white/15 px-3.5 py-1.5 text-[12px] font-bold ring-1 ring-inset ring-white/30 hover:bg-white/25 transition-colors cursor-pointer"
+                  >
+                    Manage
+                  </button>
+                </div>
+              </div>
+
               {/* --- 1. Account Section --- */}
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Account</p>
-                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Account</p>
+                <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                   <button 
                     onClick={() => setCurrentScreen('account')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <User className="w-5 h-5 text-gray-700 shrink-0" />
+                      <User className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Account</span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </button>
 
                   <button 
                     onClick={() => setCurrentScreen('security_permissions')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <Shield className="w-5 h-5 text-gray-700 shrink-0" />
+                      <Shield className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Security and permissions</span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </button>
 
                   <button 
@@ -826,101 +860,101 @@ export default function Settings() {
                         setShowShareModal(true);
                       }
                     }}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <Share2 className="w-5 h-5 text-gray-700 shrink-0" />
+                      <Share2 className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Share profile</span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </button>
                 </div>
               </div>
 
               {/* --- 2. Visibility Section --- */}
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Visibility</p>
-                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Visibility</p>
+                <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                   <button 
                     onClick={() => setCurrentScreen('private_account')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <Lock className="w-5 h-5 text-gray-700 shrink-0" />
+                      <Lock className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Private account</span>
                     </div>
                     <div className="flex items-center space-x-1.5">
                       <span className="text-[13px] text-gray-400">
                         {userSettings.isPrivate ? 'On' : 'Off'}
                       </span>
-                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                     </div>
                   </button>
 
                   <button 
                     onClick={() => setCurrentScreen('blocked_accounts')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <UserX className="w-5 h-5 text-gray-700 shrink-0" />
+                      <UserX className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Blocked accounts</span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </button>
                 </div>
               </div>
 
               {/* --- 3. Interactions Section --- */}
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Interactions</p>
-                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Interactions</p>
+                <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                   <button 
                     onClick={() => setCurrentScreen('comments')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <MessageSquare className="w-5 h-5 text-gray-700 shrink-0" />
+                      <MessageSquare className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Comments</span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </button>
 
                   <button 
                     onClick={() => setCurrentScreen('mentions')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <AtSign className="w-5 h-5 text-gray-700 shrink-0" />
+                      <AtSign className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Mentions</span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </button>
 
                   <button 
                     onClick={() => setCurrentScreen('direct_messages')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <Send className="w-5 h-5 text-gray-700 shrink-0" />
+                      <Send className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Direct messages</span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </button>
 
                   <button 
                     onClick={() => setCurrentScreen('reuse_content')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <Film className="w-5 h-5 text-gray-700 shrink-0" />
+                      <Film className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Reuse of content</span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </button>
 
                   <div className="w-full flex items-center justify-between px-4 py-3.5">
                     <div className="flex items-center space-x-3">
-                      <Link className="w-5 h-5 text-gray-700 shrink-0" />
+                      <Link className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Display profile when sharing links</span>
                     </div>
                     <button 
@@ -936,7 +970,7 @@ export default function Settings() {
 
                   <div className="w-full flex items-center justify-between px-4 py-3.5">
                     <div className="flex items-center space-x-3">
-                      <Download className="w-5 h-5 text-gray-700 shrink-0" />
+                      <Download className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Downloads</span>
                     </div>
                     <button 
@@ -952,39 +986,39 @@ export default function Settings() {
 
                   <button 
                     onClick={() => setCurrentScreen('following_list')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <Users className="w-5 h-5 text-gray-700 shrink-0" />
+                      <Users className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Following list</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <span className="text-[14px] text-gray-400 capitalize">
                         {userSettings.followingListPrivacy === 'only_you' ? 'Only you' : 'Everyone'}
                       </span>
-                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                     </div>
                   </button>
 
                   <button 
                     onClick={() => setCurrentScreen('liked_videos')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <Heart className="w-5 h-5 text-gray-700 shrink-0" />
+                      <Heart className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Liked videos</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <span className="text-[14px] text-gray-400">
                         {userSettings.likedVideosPrivacy === 'everyone' ? 'Everyone' : 'Only you'}
                       </span>
-                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                     </div>
                   </button>
 
                   <div className="w-full flex items-center justify-between px-4 py-3.5">
                     <div className="flex items-center space-x-3">
-                      <Eye className="w-5 h-5 text-gray-700 shrink-0" />
+                      <Eye className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Viewers</span>
                     </div>
                     <button 
@@ -1002,13 +1036,13 @@ export default function Settings() {
 
               {/* --- 4. Content & Display Section --- */}
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Content & display</p>
-                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Content & display</p>
+                <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                   {/* Direct Dark Mode Switch */}
                   <div className="w-full flex items-center justify-between px-4 py-3.5">
                     <div className="flex items-center space-x-3">
                       {appTheme === 'dark' ? (
-                        <Moon className="w-5 h-5 text-purple-500 shrink-0" />
+                        <Moon className="w-5 h-5 text-sky-500 shrink-0" />
                       ) : (
                         <Sun className="w-5 h-5 text-amber-500 shrink-0" />
                       )}
@@ -1025,7 +1059,7 @@ export default function Settings() {
                         updateSettingValue('appTheme', next);
                       }}
                       className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer ${
-                        appTheme === 'dark' ? 'bg-purple-600' : 'bg-gray-200'
+                        appTheme === 'dark' ? 'bg-blue-600' : 'bg-gray-200'
                       }`}
                     >
                       <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-xs ${
@@ -1035,63 +1069,63 @@ export default function Settings() {
                   </div>
                   <button 
                     onClick={() => setCurrentScreen('notifications')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <Bell className="w-5 h-5 text-gray-700 shrink-0" />
+                      <Bell className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <div>
                         <span className="text-[15px] font-medium text-gray-900 block">Push Notifications & Privacy</span>
                         <span className="text-[12px] text-gray-500 block">On, Secret mode, or Off</span>
                       </div>
                     </div>
                     <div className="flex items-center space-x-1">
-                      <span className="text-[13px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full capitalize">{notifMode}</span>
-                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                      <span className="text-[13px] font-semibold text-blue-700 bg-sky-50 px-2 py-0.5 rounded-full capitalize">{notifMode}</span>
+                      <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                     </div>
                   </button>
 
                   <button 
                     onClick={() => setCurrentScreen('ui_customize')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-purple-50/60 transition-colors text-left bg-purple-50/30"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/60 transition-colors text-left bg-sky-50/30"
                   >
                     <div className="flex items-center space-x-3">
-                      <Palette className="w-5 h-5 text-purple-600 shrink-0" />
+                      <Palette className="w-5 h-5 text-sky-600 shrink-0" />
                       <div>
                         <span className="text-[15px] font-bold text-gray-900 block">UI Customization</span>
                         <span className="text-[12px] text-gray-500 block">Classic vs Glass Nav, Profile & Reels</span>
                       </div>
                     </div>
                     <div className="flex items-center space-x-1">
-                      <span className="text-[12px] font-bold text-purple-700 bg-purple-100/90 px-2.5 py-0.5 rounded-full capitalize">{navStyle === 'glass' ? 'Glass' : 'Classic'}</span>
-                      <ChevronRight className="w-4 h-4 text-purple-600 shrink-0" />
+                      <span className="text-[12px] font-bold text-blue-700 bg-sky-100/90 px-2.5 py-0.5 rounded-full capitalize">{navStyle === 'glass' ? 'Glass' : 'Classic'}</span>
+                      <ChevronRight className="w-4 h-4 text-sky-600 shrink-0" />
                     </div>
                   </button>
 
                   <button 
                     onClick={() => setCurrentScreen('display_theme')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <Sun className="w-5 h-5 text-gray-700 shrink-0" />
+                      <Sun className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Display</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <span className="text-[14px] text-gray-400 capitalize">{userSettings.appTheme || 'Light'}</span>
-                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                     </div>
                   </button>
 
                   <button 
                     onClick={() => setCurrentScreen('free_up_space')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <Trash2 className="w-5 h-5 text-gray-700 shrink-0" />
+                      <Trash2 className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Free up space</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <span className="text-[14px] text-gray-400">{cacheSize.toFixed(1)} MB</span>
-                      <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                     </div>
                   </button>
                 </div>
@@ -1099,42 +1133,42 @@ export default function Settings() {
 
               {/* --- 5. Support, Admin & Log out --- */}
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">About, Staff & Log out</p>
-                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">About, Staff & Log out</p>
+                <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                   <button 
                     onClick={() => pushPage('admin')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-purple-50/50 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <ShieldAlert className="w-5 h-5 text-purple-600 shrink-0" />
+                      <ShieldAlert className="w-5 h-5 text-sky-600 shrink-0" />
                       <div>
                         <span className="text-[15px] font-semibold text-gray-900 block">Company Admin Panel</span>
-                        <span className="text-[11px] text-purple-600 font-medium">Staff & Operations Dashboard</span>
+                        <span className="text-[11px] text-sky-600 font-medium">Staff & Operations Dashboard</span>
                       </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-purple-600 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-600 shrink-0" />
                   </button>
 
                   <button 
                     onClick={() => setShowPrivacyModal(true)}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <FileText className="w-5 h-5 text-gray-700 shrink-0" />
+                      <FileText className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Terms and policies</span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </button>
 
                   <button 
                     onClick={handleSwitchAccount}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
-                      <RefreshCw className="w-5 h-5 text-gray-700 shrink-0" />
+                      <RefreshCw className="w-9 h-9 p-2 rounded-[12px] bg-sky-50 text-sky-600 ring-1 ring-sky-100 shrink-0" />
                       <span className="text-[15px] font-medium text-gray-900">Switch account</span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </button>
 
                   <button 
@@ -1142,7 +1176,7 @@ export default function Settings() {
                     className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-red-50/40 transition-colors text-left"
                   >
                     <span className="text-[15px] font-medium text-red-600">Log out</span>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </button>
                 </div>
               </div>
@@ -1156,7 +1190,7 @@ export default function Settings() {
         {effectiveScreen === 'account' && (
           <div className="flex-1 flex flex-col pb-16">
             {/* Header */}
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button 
                 onClick={handleBack}
                 className="p-1 -ml-1 text-gray-900 hover:text-gray-600 transition-colors"
@@ -1169,23 +1203,23 @@ export default function Settings() {
             </div>
 
             <div className="px-4 py-4 space-y-4">
-              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+              <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                 {/* 1. Account information */}
                 <button 
                   onClick={() => setCurrentScreen('account_info')}
-                  className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                 >
                   <span className="text-[15px] font-medium text-gray-900">Account information</span>
-                  <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                 </button>
 
                 {/* 2. Password */}
                 <button 
                   onClick={() => setCurrentScreen('password')}
-                  className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                 >
                   <span className="text-[15px] font-medium text-gray-900">Password</span>
-                  <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                 </button>
 
                 {/* 3. Passkey */}
@@ -1206,7 +1240,7 @@ export default function Settings() {
                   </div>
                   {isPasskeyEnabled && (
                     <span className="text-[11px] text-emerald-600 font-semibold block mt-1">
-                      âœ“ Active on {detectedDevice.os}
+                      ✓ Active on {detectedDevice.os}
                     </span>
                   )}
                   <p className="text-[12px] text-gray-500 font-normal leading-relaxed mt-1 pr-6">
@@ -1217,7 +1251,7 @@ export default function Settings() {
                 {/* 4. Verification */}
                 <button 
                   onClick={() => setCurrentScreen('verification')}
-                  className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                 >
                   <div className="flex items-center space-x-2">
                     <span className="text-[15px] font-medium text-gray-900">Verification</span>
@@ -1225,7 +1259,7 @@ export default function Settings() {
                       <BadgeCheck className="w-4 h-4 text-blue-500 shrink-0" />
                     )}
                   </div>
-                  <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                 </button>
 
                 {/* 5. Become a Verified Business Account */}
@@ -1235,7 +1269,7 @@ export default function Settings() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[15px] font-medium text-gray-900">Become a Verified Business Account</span>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </div>
                   <p className="text-[12px] text-gray-500 font-normal leading-relaxed mt-1 pr-6">
                     You're currently using a personal account. To become a Verified Business Account, verify your business and unlock additional commercial tools and features.
@@ -1249,7 +1283,7 @@ export default function Settings() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[15px] font-medium text-gray-900">Account legacy</span>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </div>
                   <p className="text-[12px] text-gray-500 font-normal leading-relaxed mt-1 pr-6">
                     Plan ahead for how your account will be cared for.
@@ -1263,7 +1297,7 @@ export default function Settings() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[15px] font-medium text-gray-900">Download your data</span>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </div>
                   <p className="text-[12px] text-gray-500 font-normal leading-relaxed mt-1 pr-6">
                     Get a copy of your data from all the Ennvo apps you use.
@@ -1273,10 +1307,10 @@ export default function Settings() {
                 {/* 8. Deactivate or delete account */}
                 <button 
                   onClick={() => setShowDeactivateModal(true)}
-                  className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                  className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                 >
                   <span className="text-[15px] font-medium text-gray-900">Deactivate or delete account</span>
-                  <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                 </button>
               </div>
             </div>
@@ -1289,7 +1323,7 @@ export default function Settings() {
         {effectiveScreen === 'security_permissions' && (
           <div className="flex-1 flex flex-col pb-16">
             {/* Header */}
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button 
                 onClick={handleBack}
                 className="p-1 -ml-1 text-gray-900 hover:text-gray-600 transition-colors"
@@ -1304,33 +1338,33 @@ export default function Settings() {
             <div className="px-4 py-3 space-y-4">
               {/* Category: Security */}
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Security</p>
-                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Security</p>
+                <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                   {/* Security alerts */}
                   <button 
                     onClick={() => setCurrentScreen('security_overview')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <span className="text-[15px] font-medium text-gray-900">Security alerts</span>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </button>
 
                   {/* Security checkup */}
                   <button 
                     onClick={() => setShowSecurityCheckupModal(true)}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <span className="text-[15px] font-medium text-gray-900">Security checkup</span>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </button>
 
                   {/* Your devices */}
                   <button 
                     onClick={() => setCurrentScreen('manage_devices')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left"
                   >
                     <span className="text-[15px] font-medium text-gray-900">Your devices</span>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </button>
 
                   {/* 2-step verification */}
@@ -1371,32 +1405,32 @@ export default function Settings() {
                   {/* Help friends recover accounts */}
                   <div 
                     onClick={() => alert('Trusted Friend Recovery is enabled. You can receive secure verification codes to help trusted contacts regain account access.')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left cursor-pointer"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left cursor-pointer"
                   >
                     <span className="text-[15px] font-medium text-gray-900">Help friends recover accounts</span>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </div>
                 </div>
               </div>
 
               {/* Category: Permissions */}
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Permissions</p>
-                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Permissions</p>
+                <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                   <div 
                     onClick={() => alert('All Ennvo apps & camera/microphone permissions are active and securely managed.')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left cursor-pointer"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left cursor-pointer"
                   >
                     <span className="text-[15px] font-medium text-gray-900">Apps and services permissions</span>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </div>
 
                   <div 
                     onClick={() => alert('Browser cookies and cache permissions are configured to optimize playback performance.')}
-                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50/70 transition-colors text-left cursor-pointer"
+                    className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-sky-50/70 active:bg-sky-50 transition-colors text-left cursor-pointer"
                   >
                     <span className="text-[15px] font-medium text-gray-900">Browser settings</span>
-                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-sky-300 shrink-0" />
                   </div>
                 </div>
               </div>
@@ -1410,7 +1444,7 @@ export default function Settings() {
         {effectiveScreen === 'security_overview' && (
           <div className="flex-1 flex flex-col pb-16">
             {/* Header */}
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button 
                 onClick={handleBack}
                 className="p-1 -ml-1 text-gray-900 hover:text-gray-600 transition-colors"
@@ -1580,7 +1614,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {effectiveScreen === 'password' && (
           <div className="flex-1 flex flex-col pb-16">
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
                 <ArrowLeft className="w-6 h-6" />
               </button>
@@ -1612,7 +1646,7 @@ export default function Settings() {
               )}
 
               <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
-                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                   {currentUser?.hasPassword && (
                     <div className="p-4">
                       <label className="block text-[13px] font-medium text-gray-500 mb-1">Current password</label>
@@ -1679,7 +1713,7 @@ export default function Settings() {
                 <button
                   type="submit"
                   disabled={isChangingPw}
-                  className="w-full py-3.5 bg-gray-900 hover:bg-black text-white font-bold text-[15px] rounded-2xl transition-transform active:scale-98 disabled:opacity-60 flex items-center justify-center space-x-2"
+                  className="w-full py-3.5 bg-gray-900 hover:bg-black text-white font-bold text-[15px] rounded-2xl transition-transform disabled:opacity-60 flex items-center justify-center space-x-2"
                 >
                   {isChangingPw ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -1710,7 +1744,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {effectiveScreen === 'private_account' && (
           <div className="flex-1 flex flex-col pb-16">
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
                 <ArrowLeft className="w-6 h-6" />
               </button>
@@ -1748,7 +1782,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {effectiveScreen === 'comments' && (
           <div className="flex-1 flex flex-col pb-16">
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
                 <ArrowLeft className="w-6 h-6" />
               </button>
@@ -1759,8 +1793,8 @@ export default function Settings() {
 
             <div className="px-4 py-4 space-y-4">
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Who can comment on your videos</p>
-                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Who can comment on your videos</p>
+                <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                   {[
                     { id: 'everyone', label: 'Everyone' },
                     { id: 'friends', label: 'Followers you follow back' },
@@ -1781,7 +1815,7 @@ export default function Settings() {
               </div>
 
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Comment filters</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Comment filters</p>
                 <div className="bg-white rounded-2xl border border-gray-100/90 p-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1811,7 +1845,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {effectiveScreen === 'mentions' && (
           <div className="flex-1 flex flex-col pb-16">
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
                 <ArrowLeft className="w-6 h-6" />
               </button>
@@ -1821,8 +1855,8 @@ export default function Settings() {
             </div>
 
             <div className="px-4 py-4 space-y-4">
-              <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Who can mention you in comments or videos</p>
-              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+              <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Who can mention you in comments or videos</p>
+              <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                 {[
                   { id: 'everyone', label: 'Everyone' },
                   { id: 'friends', label: 'People you follow' },
@@ -1849,7 +1883,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {effectiveScreen === 'direct_messages' && (
           <div className="flex-1 flex flex-col pb-16">
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
                 <ArrowLeft className="w-6 h-6" />
               </button>
@@ -1860,8 +1894,8 @@ export default function Settings() {
 
             <div className="px-4 py-4 space-y-4">
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Who can send you direct messages</p>
-                <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+                <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Who can send you direct messages</p>
+                <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                   {[
                     { id: 'everyone', label: 'Everyone' },
                     { id: 'friends', label: 'Friends' },
@@ -1882,7 +1916,7 @@ export default function Settings() {
               </div>
 
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Message status</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Message status</p>
                 <div className="bg-white rounded-2xl border border-gray-100/90 p-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1912,7 +1946,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {effectiveScreen === 'reuse_content' && (
           <div className="flex-1 flex flex-col pb-16">
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
                 <ArrowLeft className="w-6 h-6" />
               </button>
@@ -1922,8 +1956,8 @@ export default function Settings() {
             </div>
 
             <div className="px-4 py-4 space-y-4">
-              <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Who can Duet and Stitch with your videos</p>
-              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+              <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Who can Duet and Stitch with your videos</p>
+              <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                 {[
                   { id: 'everyone', label: 'Everyone' },
                   { id: 'friends', label: 'Followers you follow back' },
@@ -1950,7 +1984,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {effectiveScreen === 'following_list' && (
           <div className="flex-1 flex flex-col pb-16">
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
                 <ArrowLeft className="w-6 h-6" />
               </button>
@@ -1960,8 +1994,8 @@ export default function Settings() {
             </div>
 
             <div className="px-4 py-4 space-y-4">
-              <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Who can see your following list</p>
-              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+              <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Who can see your following list</p>
+              <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                 {[
                   { id: 'everyone', label: 'Everyone' },
                   { id: 'only_you', label: 'Only you' }
@@ -1987,7 +2021,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {effectiveScreen === 'liked_videos' && (
           <div className="flex-1 flex flex-col pb-16">
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
                 <ArrowLeft className="w-6 h-6" />
               </button>
@@ -1997,8 +2031,8 @@ export default function Settings() {
             </div>
 
             <div className="px-4 py-4 space-y-4">
-              <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Who can watch your liked videos</p>
-              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+              <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Who can watch your liked videos</p>
+              <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                 {[
                   { id: 'only_you', label: 'Only you' },
                   { id: 'everyone', label: 'Everyone' }
@@ -2024,7 +2058,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {effectiveScreen === 'free_up_space' && (
           <div className="flex-1 flex flex-col pb-16">
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
                 <ArrowLeft className="w-6 h-6" />
               </button>
@@ -2034,7 +2068,7 @@ export default function Settings() {
             </div>
 
             <div className="px-4 py-4 space-y-4">
-              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+              <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                 {/* Cache item */}
                 <div className="p-4 flex items-center justify-between">
                   <div>
@@ -2049,7 +2083,7 @@ export default function Settings() {
                   <button
                     onClick={handleClearCache}
                     disabled={isClearingCache || cacheSize === 0}
-                    className="px-4 py-2 border border-gray-300 rounded-xl text-[13px] font-bold text-gray-900 hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-40 shrink-0 ml-3"
+                    className="px-4 py-2 border border-gray-300 rounded-xl text-[13px] font-bold text-gray-900 hover:bg-gray-50 transition-all disabled:opacity-40 shrink-0 ml-3"
                   >
                     {isClearingCache ? 'Clearing...' : 'Clear'}
                   </button>
@@ -2069,7 +2103,7 @@ export default function Settings() {
                   <button
                     onClick={handleClearDownloads}
                     disabled={isClearingDownloads || downloadsSize === 0}
-                    className="px-4 py-2 border border-gray-300 rounded-xl text-[13px] font-bold text-gray-900 hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-40 shrink-0 ml-3"
+                    className="px-4 py-2 border border-gray-300 rounded-xl text-[13px] font-bold text-gray-900 hover:bg-gray-50 transition-all disabled:opacity-40 shrink-0 ml-3"
                   >
                     {isClearingDownloads ? 'Clearing...' : 'Clear'}
                   </button>
@@ -2084,7 +2118,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {effectiveScreen === 'notifications' && (
           <div className="flex-1 flex flex-col pb-16">
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600 cursor-pointer">
                 <ArrowLeft className="w-6 h-6" />
               </button>
@@ -2095,11 +2129,11 @@ export default function Settings() {
 
             <div className="px-4 py-5 space-y-6">
               {/* Informational banner */}
-              <div className="bg-purple-50/70 border border-purple-200/80 rounded-2xl p-4 flex items-start space-x-3">
-                <ShieldCheck className="w-5 h-5 text-purple-700 shrink-0 mt-0.5" />
-                <div className="text-xs text-purple-900 space-y-1">
+              <div className="bg-sky-50/70 border border-sky-200/80 rounded-2xl p-4 flex items-start space-x-3">
+                <ShieldCheck className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
+                <div className="text-xs text-blue-900 space-y-1">
                   <p className="font-bold">Message Push Notification Modes</p>
-                  <p className="text-purple-800 leading-relaxed font-normal">
+                  <p className="text-blue-800 leading-relaxed font-normal">
                     Choose how message notifications appear on your phone. <strong className="font-bold">Calls are never affected</strong> and will continue to ring in every mode.
                   </p>
                 </div>
@@ -2117,13 +2151,13 @@ export default function Settings() {
                   onClick={() => handleSelectNotifMode('on')}
                   className={`w-full p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-start justify-between ${
                     notifMode === 'on'
-                      ? 'bg-purple-50/80 border-purple-400 shadow-xs'
+                      ? 'bg-sky-50/80 border-sky-400 shadow-xs'
                       : 'bg-white border-gray-200/80 hover:border-gray-300'
                   }`}
                 >
                   <div className="flex items-start space-x-3.5">
                     <div className={`p-2.5 rounded-xl shrink-0 ${
-                      notifMode === 'on' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'
+                      notifMode === 'on' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'
                     }`}>
                       <Bell className="w-5 h-5" />
                     </div>
@@ -2135,7 +2169,7 @@ export default function Settings() {
                     </div>
                   </div>
                   {notifMode === 'on' ? (
-                    <Check className="w-5 h-5 text-purple-600 shrink-0 ml-3 mt-1" />
+                    <Check className="w-5 h-5 text-sky-600 shrink-0 ml-3 mt-1" />
                   ) : (
                     <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-3 mt-1" />
                   )}
@@ -2147,20 +2181,20 @@ export default function Settings() {
                   onClick={() => handleSelectNotifMode('secret')}
                   className={`w-full p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-start justify-between ${
                     notifMode === 'secret'
-                      ? 'bg-purple-50/80 border-purple-400 shadow-xs'
+                      ? 'bg-sky-50/80 border-sky-400 shadow-xs'
                       : 'bg-white border-gray-200/80 hover:border-gray-300'
                   }`}
                 >
                   <div className="flex items-start space-x-3.5">
                     <div className={`p-2.5 rounded-xl shrink-0 ${
-                      notifMode === 'secret' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'
+                      notifMode === 'secret' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'
                     }`}>
                       <Lock className="w-5 h-5" />
                     </div>
                     <div>
                       <div className="flex items-center space-x-2">
                         <h4 className="text-[15px] font-bold text-gray-900">Secret Mode (Private)</h4>
-                        <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-200 text-purple-900 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-sky-200 text-blue-900 px-2 py-0.5 rounded-full">
                           Confidential
                         </span>
                       </div>
@@ -2170,7 +2204,7 @@ export default function Settings() {
                     </div>
                   </div>
                   {notifMode === 'secret' ? (
-                    <Check className="w-5 h-5 text-purple-600 shrink-0 ml-3 mt-1" />
+                    <Check className="w-5 h-5 text-sky-600 shrink-0 ml-3 mt-1" />
                   ) : (
                     <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-3 mt-1" />
                   )}
@@ -2182,13 +2216,13 @@ export default function Settings() {
                   onClick={() => handleSelectNotifMode('off')}
                   className={`w-full p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-start justify-between ${
                     notifMode === 'off'
-                      ? 'bg-purple-50/80 border-purple-400 shadow-xs'
+                      ? 'bg-sky-50/80 border-sky-400 shadow-xs'
                       : 'bg-white border-gray-200/80 hover:border-gray-300'
                   }`}
                 >
                   <div className="flex items-start space-x-3.5">
                     <div className={`p-2.5 rounded-xl shrink-0 ${
-                      notifMode === 'off' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'
+                      notifMode === 'off' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'
                     }`}>
                       <BellOff className="w-5 h-5" />
                     </div>
@@ -2200,7 +2234,7 @@ export default function Settings() {
                     </div>
                   </div>
                   {notifMode === 'off' ? (
-                    <Check className="w-5 h-5 text-purple-600 shrink-0 ml-3 mt-1" />
+                    <Check className="w-5 h-5 text-sky-600 shrink-0 ml-3 mt-1" />
                   ) : (
                     <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-3 mt-1" />
                   )}
@@ -2226,14 +2260,14 @@ export default function Settings() {
                     <button
                       type="button"
                       onClick={() => native.requestBatteryExemption()}
-                      className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl active:scale-95 transition-all cursor-pointer shadow-xs"
+                      className="px-4 py-2.5 bg-blue-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-xs"
                     >
                       Allow Background Messages & Calls
                     </button>
                     <button
                       type="button"
                       onClick={() => native.openNotificationSettings()}
-                      className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl active:scale-95 transition-all cursor-pointer"
+                      className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl transition-all cursor-pointer"
                     >
                       System Notification Settings
                     </button>
@@ -2249,7 +2283,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {effectiveScreen === 'display_theme' && (
           <div className="flex-1 flex flex-col pb-16">
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
                 <ArrowLeft className="w-6 h-6" />
               </button>
@@ -2259,8 +2293,8 @@ export default function Settings() {
             </div>
 
             <div className="px-4 py-4 space-y-4">
-              <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Appearance</p>
-              <div className="bg-white rounded-2xl border border-gray-100/90 overflow-hidden divide-y divide-gray-100">
+              <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Appearance</p>
+              <div className="bg-white rounded-[20px] border border-sky-100/80 shadow-[0_1px_3px_rgba(2,132,199,0.05)] overflow-hidden divide-y divide-slate-100">
                 {[
                   { id: 'light', label: 'Light', icon: Sun },
                   { id: 'dark', label: 'Dark', icon: Moon }
@@ -2281,7 +2315,7 @@ export default function Settings() {
                         <span className="text-[15px] font-medium text-gray-900">{t.label}</span>
                       </div>
                       {appTheme === t.id && (
-                        <Check className="w-5 h-5 text-purple-600" />
+                        <Check className="w-5 h-5 text-sky-600" />
                       )}
                     </button>
                   );
@@ -2296,7 +2330,7 @@ export default function Settings() {
         {/* ========================================================= */}
         {effectiveScreen === 'ui_customize' && (
           <div className="flex-1 flex flex-col pb-16">
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-2xs">
+            <div className="sticky top-0 z-20 bg-white/95 border-b border-sky-100 flex items-center justify-between px-4 pt-7 md:pt-4 pb-3.5 shadow-[0_1px_2px_rgba(2,132,199,0.05)]">
               <button onClick={handleBack} className="p-1 -ml-1 text-gray-900 hover:text-gray-600">
                 <ArrowLeft className="w-6 h-6" />
               </button>
@@ -2308,19 +2342,19 @@ export default function Settings() {
             <div className="px-4 py-4 space-y-6">
               {/* Navigation Bar Design */}
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Navigation Bar (2 Designs)</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Navigation Bar (2 Designs)</p>
                 <div className="space-y-2.5">
                   <button
                     onClick={() => setNavStyle('glass')}
                     className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${
                       navStyle === 'glass' 
-                        ? 'bg-purple-50/70 border-purple-300 shadow-2xs' 
+                        ? 'bg-sky-50/70 border-sky-300 shadow-2xs' 
                         : 'bg-white border-gray-100 hover:border-gray-200'
                     }`}
                   >
                     <div className="flex items-center space-x-3.5 min-w-0">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        navStyle === 'glass' ? 'bg-purple-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
+                        navStyle === 'glass' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
                       }`}>
                         <Sparkles className="w-5 h-5" />
                       </div>
@@ -2330,7 +2364,7 @@ export default function Settings() {
                       </div>
                     </div>
                     {navStyle === 'glass' ? (
-                      <Check className="w-5 h-5 text-purple-600 shrink-0 ml-2" />
+                      <Check className="w-5 h-5 text-sky-600 shrink-0 ml-2" />
                     ) : (
                       <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-2" />
                     )}
@@ -2340,13 +2374,13 @@ export default function Settings() {
                     onClick={() => setNavStyle('classic')}
                     className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${
                       navStyle === 'classic' 
-                        ? 'bg-purple-50/70 border-purple-300 shadow-2xs' 
+                        ? 'bg-sky-50/70 border-sky-300 shadow-2xs' 
                         : 'bg-white border-gray-100 hover:border-gray-200'
                     }`}
                   >
                     <div className="flex items-center space-x-3.5 min-w-0">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        navStyle === 'classic' ? 'bg-purple-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
+                        navStyle === 'classic' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
                       }`}>
                         <Smartphone className="w-5 h-5" />
                       </div>
@@ -2356,7 +2390,7 @@ export default function Settings() {
                       </div>
                     </div>
                     {navStyle === 'classic' ? (
-                      <Check className="w-5 h-5 text-purple-600 shrink-0 ml-2" />
+                      <Check className="w-5 h-5 text-sky-600 shrink-0 ml-2" />
                     ) : (
                       <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-2" />
                     )}
@@ -2366,19 +2400,19 @@ export default function Settings() {
 
               {/* Profile Layout Design */}
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Profile Layout (2 Designs)</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Profile Layout (2 Designs)</p>
                 <div className="space-y-2.5">
                   <button
                     onClick={() => setProfileStyle('design1')}
                     className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${
                       profileStyle === 'design1' 
-                        ? 'bg-purple-50/70 border-purple-300 shadow-2xs' 
+                        ? 'bg-sky-50/70 border-sky-300 shadow-2xs' 
                         : 'bg-white border-gray-100 hover:border-gray-200'
                     }`}
                   >
                     <div className="flex items-center space-x-3.5 min-w-0">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        profileStyle === 'design1' ? 'bg-purple-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
+                        profileStyle === 'design1' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
                       }`}>
                         <User className="w-5 h-5" />
                       </div>
@@ -2388,7 +2422,7 @@ export default function Settings() {
                       </div>
                     </div>
                     {profileStyle === 'design1' ? (
-                      <Check className="w-5 h-5 text-purple-600 shrink-0 ml-2" />
+                      <Check className="w-5 h-5 text-sky-600 shrink-0 ml-2" />
                     ) : (
                       <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-2" />
                     )}
@@ -2398,13 +2432,13 @@ export default function Settings() {
                     onClick={() => setProfileStyle('design2')}
                     className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${
                       profileStyle === 'design2' 
-                        ? 'bg-purple-50/70 border-purple-300 shadow-2xs' 
+                        ? 'bg-sky-50/70 border-sky-300 shadow-2xs' 
                         : 'bg-white border-gray-100 hover:border-gray-200'
                     }`}
                   >
                     <div className="flex items-center space-x-3.5 min-w-0">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        profileStyle === 'design2' ? 'bg-purple-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
+                        profileStyle === 'design2' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
                       }`}>
                         <UserCheck className="w-5 h-5" />
                       </div>
@@ -2414,7 +2448,7 @@ export default function Settings() {
                       </div>
                     </div>
                     {profileStyle === 'design2' ? (
-                      <Check className="w-5 h-5 text-purple-600 shrink-0 ml-2" />
+                      <Check className="w-5 h-5 text-sky-600 shrink-0 ml-2" />
                     ) : (
                       <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-2" />
                     )}
@@ -2424,19 +2458,19 @@ export default function Settings() {
 
               {/* Reels Layout Design */}
               <div>
-                <p className="text-[13px] font-medium text-gray-500 px-2 py-1">Reels Feed (2 Designs)</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-sky-700/70 px-3 pt-1 pb-1.5">Reels Feed (2 Designs)</p>
                 <div className="space-y-2.5">
                   <button
                     onClick={() => setReelsStyle('design1')}
                     className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${
                       reelsStyle === 'design1' 
-                        ? 'bg-purple-50/70 border-purple-300 shadow-2xs' 
+                        ? 'bg-sky-50/70 border-sky-300 shadow-2xs' 
                         : 'bg-white border-gray-100 hover:border-gray-200'
                     }`}
                   >
                     <div className="flex items-center space-x-3.5 min-w-0">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        reelsStyle === 'design1' ? 'bg-purple-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
+                        reelsStyle === 'design1' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
                       }`}>
                         <Film className="w-5 h-5" />
                       </div>
@@ -2446,7 +2480,7 @@ export default function Settings() {
                       </div>
                     </div>
                     {reelsStyle === 'design1' ? (
-                      <Check className="w-5 h-5 text-purple-600 shrink-0 ml-2" />
+                      <Check className="w-5 h-5 text-sky-600 shrink-0 ml-2" />
                     ) : (
                       <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-2" />
                     )}
@@ -2456,13 +2490,13 @@ export default function Settings() {
                     onClick={() => setReelsStyle('design2')}
                     className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left ${
                       reelsStyle === 'design2' 
-                        ? 'bg-purple-50/70 border-purple-300 shadow-2xs' 
+                        ? 'bg-sky-50/70 border-sky-300 shadow-2xs' 
                         : 'bg-white border-gray-100 hover:border-gray-200'
                     }`}
                   >
                     <div className="flex items-center space-x-3.5 min-w-0">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        reelsStyle === 'design2' ? 'bg-purple-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
+                        reelsStyle === 'design2' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600'
                       }`}>
                         <Play className="w-5 h-5" />
                       </div>
@@ -2472,7 +2506,7 @@ export default function Settings() {
                       </div>
                     </div>
                     {reelsStyle === 'design2' ? (
-                      <Check className="w-5 h-5 text-purple-600 shrink-0 ml-2" />
+                      <Check className="w-5 h-5 text-sky-600 shrink-0 ml-2" />
                     ) : (
                       <div className="w-5 h-5 rounded-full border border-gray-300 shrink-0 ml-2" />
                     )}
@@ -2522,27 +2556,27 @@ export default function Settings() {
                   setCopiedLink(true);
                   setTimeout(() => setCopiedLink(false), 2000);
                 }}
-                className="w-full flex items-center justify-center space-x-2 py-3 bg-gray-900 text-white text-[14px] font-bold rounded-2xl active:scale-98 transition-all"
+                className="w-full flex items-center justify-center space-x-2 py-3 bg-gray-900 text-white text-[14px] font-bold rounded-2xl transition-all"
               >
                 {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                 <span>{copiedLink ? 'Link copied!' : 'Copy link'}</span>
               </button>
 
-              <button 
+              <button
                 onClick={() => {
-                  if (navigator.share) {
-                    navigator.share({
-                      title: `${currentUser?.name} on Ennvo`,
-                      url: window.location.href
-                    }).catch(() => {});
-                  } else {
-                    const url = `${window.location.origin}/@${currentUser?.username || 'user'}`;
-                    navigator.clipboard.writeText(url);
-                    setCopiedLink(true);
-                    setTimeout(() => setCopiedLink(false), 2000);
-                  }
+                  const url = `${window.location.origin}/user/${encodeURIComponent(currentUser?.username || currentUser?.uid || 'user')}`;
+                  shareContent({
+                    title: `${currentUser?.name} on Ennvo`,
+                    text: `Connect with ${currentUser?.name || 'me'} on Ennvo`,
+                    url,
+                  }).then((mode) => {
+                    if (mode === 'copied') {
+                      setCopiedLink(true);
+                      setTimeout(() => setCopiedLink(false), 2000);
+                    }
+                  });
                 }}
-                className="w-full flex items-center justify-center space-x-2 py-3 border border-gray-200 text-gray-800 text-[14px] font-bold rounded-2xl active:scale-98 transition-all"
+                className="w-full flex items-center justify-center space-x-2 py-3 border border-gray-200 text-gray-800 text-[14px] font-bold rounded-2xl transition-all"
               >
                 <Share2 className="w-4 h-4" />
                 <span>Share via apps</span>
@@ -2559,13 +2593,13 @@ export default function Settings() {
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
               <h3 className="text-base font-bold text-gray-900">Verified Business Account</h3>
               <button onClick={() => setShowBusinessModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">
-                âœ•
+                ✕
               </button>
             </div>
 
             {businessUpgradeSuccess ? (
               <div className="p-4 bg-emerald-50 rounded-2xl text-emerald-800 text-center font-bold text-sm">
-                ðŸŽ‰ Congratulations! Your account has been upgraded to a Verified Business Account.
+                🎉 Congratulations! Your account has been upgraded to a Verified Business Account.
               </div>
             ) : (
               <form onSubmit={handleUpgradeToBusiness} className="space-y-3.5">
@@ -2623,7 +2657,7 @@ export default function Settings() {
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
               <h3 className="text-base font-bold text-gray-900">Account legacy</h3>
               <button onClick={() => setShowLegacyModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">
-                âœ•
+                ✕
               </button>
             </div>
 

@@ -252,7 +252,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({ isOp
             {!showAddForm && accounts.length < 7 && (
               <button 
                 onClick={() => setShowAddForm(true)}
-                className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center active:scale-90 transition-all border-0"
+                className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-all border-0"
                 title="Add account"
               >
                 <Plus className="w-4 h-4 stroke-[2.2]" />
@@ -260,7 +260,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({ isOp
             )}
             <button 
               onClick={handleCloseModal}
-              className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center active:scale-90 transition-all border-0"
+              className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-all border-0"
               title="Close"
             >
               <X className="w-4 h-4 stroke-[2.2]" />
@@ -297,7 +297,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({ isOp
                         e.preventDefault();
                         setAccountToRemove(acc);
                       }}
-                      className={`flex items-center justify-between p-2 rounded-2xl cursor-pointer transition-colors active:scale-[0.99] select-none ${
+                      className={`flex items-center justify-between p-2 rounded-2xl cursor-pointer transition-colors  select-none ${
                         isCurrent 
                           ? 'bg-neutral-100/90 text-neutral-900' 
                           : 'hover:bg-neutral-50 text-neutral-900 active:bg-neutral-100/60'
@@ -335,7 +335,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({ isOp
                 {accounts.length < 7 && (
                   <div
                     onClick={() => setShowAddForm(true)}
-                    className="flex items-center space-x-3 p-2 rounded-2xl cursor-pointer hover:bg-neutral-50 transition-colors active:scale-[0.99]"
+                    className="flex items-center space-x-3 p-2 rounded-2xl cursor-pointer hover:bg-neutral-50 transition-colors"
                   >
                     <div className="w-10 h-10 rounded-full bg-neutral-100 text-neutral-700 flex items-center justify-center shrink-0">
                       <Plus className="w-4.5 h-4.5 stroke-[2]" />
@@ -352,7 +352,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({ isOp
                 type="button"
                 onClick={handleGoogleSignInSubmit}
                 disabled={isLoading}
-                className="w-full py-2.5 px-4 rounded-xl border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-[13px] flex items-center justify-center space-x-2 transition-all active:scale-[0.98] disabled:opacity-50"
+                className="w-full py-2.5 px-4 rounded-xl border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-[13px] flex items-center justify-center space-x-2 transition-all disabled:opacity-50"
               >
                 <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />

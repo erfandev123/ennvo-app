@@ -94,7 +94,7 @@ const UserRowWithFollow = ({ u, currentUser, onSelect }: { u: any; currentUser: 
         <button 
           onClick={handleFollowToggle}
           disabled={loading}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-95 shrink-0 ml-2 min-w-[85px] text-center ${
+          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all  shrink-0 ml-2 min-w-[85px] text-center ${
             friendship.isFriend 
               ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
               : friendship.following 
@@ -215,7 +215,7 @@ export const AnalyticsModal = () => {
         <div className="flex items-center space-x-3">
           <button 
             onClick={() => setShowAnalytics(false)} 
-            className="p-2 bg-zinc-900 hover:bg-zinc-800 rounded-full border border-zinc-800 active:scale-95 text-zinc-300 hover:text-white transition-transform"
+            className="p-2 bg-zinc-900 hover:bg-zinc-800 rounded-full border border-zinc-800 text-zinc-300 hover:text-white transition-transform"
           >
             <X className="w-5 h-5" />
           </button>

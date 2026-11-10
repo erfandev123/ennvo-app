@@ -149,7 +149,7 @@ const BottomNav = memo(() => {
                 key={item.id}
                 type="button"
                 onClick={() => handleItemClick(item.id)}
-                className="relative flex-1 h-full flex items-center justify-center px-1 rounded-full cursor-pointer transition-transform active:scale-90"
+                className="relative flex-1 h-full flex items-center justify-center px-1 rounded-full cursor-pointer transition-transform"
                 title={item.label}
               >
                 {/* iPhone Smooth Fluid Pill with Haptic Spring */}
@@ -167,7 +167,7 @@ const BottomNav = memo(() => {
 
                 <div className="relative z-10 flex items-center justify-center">
                   {item.id === 'create' ? (
-                    <div className="w-[32px] h-[32px] rounded-full bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-sm shadow-sky-500/35 hover:scale-105 active:scale-95 transition-transform">
+                    <div className="w-[32px] h-[32px] rounded-full bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-sm shadow-sky-500/35 transition-transform">
                       <NavCreateIcon size={17} className="text-white" />
                     </div>
                   ) : item.id === 'profile' ? (
@@ -235,7 +235,7 @@ const BottomNav = memo(() => {
           <button
             key={item.id}
             onClick={() => handleItemClick(item.id)}
-            className="flex items-center justify-center flex-1 h-full relative active:scale-90 transform-gpu transition-transform duration-75 ease-out select-none touch-manipulation cursor-pointer"
+            className="flex items-center justify-center flex-1 h-full relative transform-gpu transition-transform duration-75 ease-out select-none touch-manipulation cursor-pointer"
           >
             <div className="relative flex flex-col items-center justify-center pointer-events-none">
               {item.id === 'profile' ? (

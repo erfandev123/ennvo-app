@@ -401,7 +401,7 @@ export const CallOverlay = () => {
               <div className="flex flex-col items-center space-y-1.5">
                 <button 
                   onClick={handleRejectIncoming}
-                  className="w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-500 active:scale-95 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 transition-all cursor-pointer border border-rose-400/30"
+                  className="w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 transition-all cursor-pointer border border-rose-400/30"
                   title="Decline Call"
                 >
                   <PhoneOff className="w-7 h-7" />
@@ -413,7 +413,7 @@ export const CallOverlay = () => {
               <div className="flex flex-col items-center space-y-1.5">
                 <button 
                   onClick={handleAcceptIncoming}
-                  className="w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-sky-400 hover:from-emerald-400 hover:to-sky-300 active:scale-95 text-white flex items-center justify-center shadow-lg shadow-sky-500/30 transition-all cursor-pointer border border-white/50"
+                  className="w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-sky-400 hover:from-emerald-400 hover:to-sky-300 text-white flex items-center justify-center shadow-lg shadow-sky-500/30 transition-all cursor-pointer border border-white/50"
                   title="Accept Call"
                 >
                   <Phone className="w-7 h-7" />
@@ -477,7 +477,7 @@ export const CallOverlay = () => {
                     </span>
                     <button 
                       onClick={() => { setIsMinimized(true); setIsHiddenPill(false); }}
-                      className="p-2.5 bg-sky-200/60 dark:bg-white/10 hover:bg-sky-300/60 dark:hover:bg-white/20 active:scale-95 rounded-full text-slate-800 dark:text-white cursor-pointer transition-all shadow-xs border border-sky-300/50 dark:border-white/20"
+                      className="p-2.5 bg-sky-200/60 dark:bg-white/10 hover:bg-sky-300/60 dark:hover:bg-white/20 rounded-full text-slate-800 dark:text-white cursor-pointer transition-all shadow-xs border border-sky-300/50 dark:border-white/20"
                       title="Minimize Call"
                     >
                       <Minimize2 className="w-4.5 h-4.5" />
@@ -553,7 +553,7 @@ export const CallOverlay = () => {
                         <button
                           type="button"
                           onClick={() => switchCamera()}
-                          className="p-1 bg-black/60 hover:bg-black/80 active:scale-90 text-white rounded-full border border-white/20 transition-all cursor-pointer"
+                          className="p-1 bg-black/60 hover:bg-black/80 text-white rounded-full border border-white/20 transition-all cursor-pointer"
                           title="Switch Camera"
                         >
                           <SwitchCamera className="w-3 h-3" />
@@ -577,7 +577,7 @@ export const CallOverlay = () => {
                     <div className="flex flex-col items-center space-y-1">
                       <button 
                         onClick={toggleMute}
-                        className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-95 cursor-pointer shadow-md ${
+                        className={`w-14 h-14 rounded-full flex items-center justify-center transition-all  cursor-pointer shadow-md ${
                           isMuted 
                             ? 'bg-rose-500 text-white shadow-rose-500/30 border border-rose-400' 
                             : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white border border-sky-200 dark:border-slate-700'
@@ -593,7 +593,7 @@ export const CallOverlay = () => {
                     <div className="flex flex-col items-center space-y-1">
                       <button 
                         onClick={toggleSpeaker}
-                        className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-95 cursor-pointer shadow-md ${
+                        className={`w-14 h-14 rounded-full flex items-center justify-center transition-all  cursor-pointer shadow-md ${
                           !isSpeakerOn 
                             ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-300 dark:border-slate-700' 
                             : 'bg-sky-500 text-white shadow-sky-500/30 border border-sky-400'
@@ -610,7 +610,7 @@ export const CallOverlay = () => {
                       <div className="flex flex-col items-center space-y-1">
                         <button 
                           onClick={() => switchCamera()}
-                          className="w-14 h-14 rounded-full bg-white dark:bg-slate-800 text-slate-800 dark:text-white flex items-center justify-center transition-all active:scale-95 cursor-pointer border border-sky-200 dark:border-slate-700 shadow-md"
+                          className="w-14 h-14 rounded-full bg-white dark:bg-slate-800 text-slate-800 dark:text-white flex items-center justify-center transition-all cursor-pointer border border-sky-200 dark:border-slate-700 shadow-md"
                           title="Switch Camera"
                         >
                           <SwitchCamera className="w-6 h-6" />
@@ -624,7 +624,7 @@ export const CallOverlay = () => {
                       <div className="flex flex-col items-center space-y-1">
                         <button 
                           onClick={toggleVideo}
-                          className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-95 cursor-pointer shadow-md ${
+                          className={`w-14 h-14 rounded-full flex items-center justify-center transition-all  cursor-pointer shadow-md ${
                             isVideoOff 
                               ? 'bg-rose-500 text-white shadow-rose-500/30 border border-rose-400' 
                               : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white border border-sky-200 dark:border-slate-700'
@@ -641,7 +641,7 @@ export const CallOverlay = () => {
                     <div className="flex flex-col items-center space-y-1">
                       <button 
                         onClick={handleEndActiveCall}
-                        className="w-14 h-14 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center transition-all active:scale-95 cursor-pointer shadow-lg shadow-rose-600/30 border border-rose-400"
+                        className="w-14 h-14 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center transition-all cursor-pointer shadow-lg shadow-rose-600/30 border border-rose-400"
                         title="End Call"
                       >
                         <PhoneOff className="w-6 h-6" />

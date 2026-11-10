@@ -308,7 +308,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                 if (audioRef.current) audioRef.current.pause();
                 onClose();
               }}
-              className="p-2 -ml-2 text-neutral-800 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/10 rounded-full transition-all active:scale-95 cursor-pointer border-0 shadow-none"
+              className="p-2 -ml-2 text-neutral-800 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/10 rounded-full transition-all cursor-pointer border-0 shadow-none"
             >
               <ArrowLeft className="w-6 h-6" />
             </button>
@@ -318,7 +318,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
           <button
             onClick={handleCreatePostSubmit}
             disabled={loading || (!postText.trim() && postFiles.length === 0)}
-            className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-sm px-6 py-2 rounded-full shadow-md shadow-blue-500/20 disabled:opacity-40 disabled:active:scale-100 transition-all flex items-center space-x-2"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-6 py-2 rounded-full shadow-md shadow-blue-500/20 disabled:opacity-40 transition-all flex items-center space-x-2"
           >
             {loading ? (
               <>
@@ -368,14 +368,14 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => setAspectRatioFit((prev) => (prev === 'cover' ? 'contain' : 'cover'))}
-                      className="text-xs font-semibold text-purple-300 bg-purple-500/20 hover:bg-purple-500/30 px-3 py-1 rounded-full border border-purple-500/30 flex items-center space-x-1 active:scale-95 transition-all cursor-pointer"
+                      className="text-xs font-semibold text-purple-300 bg-purple-500/20 hover:bg-purple-500/30 px-3 py-1 rounded-full border border-purple-500/30 flex items-center space-x-1 transition-all cursor-pointer"
                     >
                       <Maximize2 className="w-3 h-3" />
                       <span>{aspectRatioFit === 'cover' ? 'Full' : 'Fit'}</span>
                     </button>
                     <button
                       onClick={() => handleRemoveMedia(currentMediaIdx)}
-                      className="p-1.5 bg-white/10 hover:bg-rose-600 rounded-full text-white backdrop-blur-md transition-all active:scale-90 cursor-pointer"
+                      className="p-1.5 bg-white/10 hover:bg-rose-600 rounded-full text-white backdrop-blur-md transition-all cursor-pointer"
                       title="Remove photo"
                     >
                       <X className="w-4 h-4" />
@@ -417,7 +417,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                         onClick={() =>
                           setCurrentMediaIdx((prev) => (prev > 0 ? prev - 1 : postPreviews.length - 1))
                         }
-                        className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 backdrop-blur-md transition-all active:scale-90"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 backdrop-blur-md transition-all"
                       >
                         <ChevronLeft className="w-5 h-5" />
                       </button>
@@ -425,7 +425,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                         onClick={() =>
                           setCurrentMediaIdx((prev) => (prev < postPreviews.length - 1 ? prev + 1 : 0))
                         }
-                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 backdrop-blur-md transition-all active:scale-90"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 backdrop-blur-md transition-all"
                       >
                         <ChevronRight className="w-5 h-5" />
                       </button>
@@ -675,7 +675,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                       className={`w-11 h-11 rounded-2xl shrink-0 transition-all flex items-center justify-center ${preset.bg} ${
                         selectedBg.id === preset.id
                           ? 'ring-4 ring-blue-500 ring-offset-2 scale-105 shadow-md'
-                          : 'border border-gray-300/80 hover:scale-105 opacity-90'
+                          : 'border border-gray-300/80  opacity-90'
                       }`}
                     >
                       {selectedBg.id === preset.id && (
@@ -704,7 +704,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                 <div className="grid grid-cols-2 gap-2.5">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center space-x-3 p-3 bg-gray-50 hover:bg-gray-100 rounded-2xl border border-gray-100 transition-all active:scale-95 text-left"
+                    className="flex items-center space-x-3 p-3 bg-gray-50 hover:bg-gray-100 rounded-2xl border border-gray-100 transition-all text-left"
                   >
                     <div className="w-9 h-9 rounded-xl bg-green-500/10 text-green-600 flex items-center justify-center shrink-0">
                       <ImageIcon className="w-5 h-5" />
@@ -717,7 +717,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
                   <button
                     onClick={() => setShowMusicModal(true)}
-                    className="flex items-center space-x-3 p-3 bg-purple-50/60 hover:bg-purple-100/60 rounded-2xl border border-purple-100 transition-all active:scale-95 text-left"
+                    className="flex items-center space-x-3 p-3 bg-purple-50/60 hover:bg-purple-100/60 rounded-2xl border border-purple-100 transition-all text-left"
                   >
                     <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center shrink-0">
                       <Music className="w-5 h-5" />
@@ -732,7 +732,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
                   <button
                     onClick={() => setShowTagModal(true)}
-                    className="flex items-center space-x-3 p-3 bg-blue-50/60 hover:bg-blue-100/60 rounded-2xl border border-blue-100 transition-all active:scale-95 text-left"
+                    className="flex items-center space-x-3 p-3 bg-blue-50/60 hover:bg-blue-100/60 rounded-2xl border border-blue-100 transition-all text-left"
                   >
                     <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0">
                       <UserPlus className="w-5 h-5" />
@@ -747,7 +747,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
                   <button
                     onClick={() => setShowLocationModal(true)}
-                    className="flex items-center space-x-3 p-3 bg-emerald-50/60 hover:bg-emerald-100/60 rounded-2xl border border-emerald-100 transition-all active:scale-95 text-left"
+                    className="flex items-center space-x-3 p-3 bg-emerald-50/60 hover:bg-emerald-100/60 rounded-2xl border border-emerald-100 transition-all text-left"
                   >
                     <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
                       <MapPin className="w-5 h-5" />

@@ -1,0 +1,2126 @@
+name: Custom APK Builder
+
+on:
+  repository_dispatch:
+    types: [start_custom_build]
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Payload goes through env vars only (never inline in scripts) to prevent shell injection.
+    env:
+      APP_NAME: ${{ github.event.client_payload.app_name }}
+      PACKAGE_ID: ${{ github.event.client_payload.package_id }}
+      CFG: ${{ toJson(github.event.client_payload.config) }}
+      NODE_OPTIONS: --max-old-space-size=6144
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-cap8-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: gradle-cap8-${{ runner.os }}-
+
+      - name: Parse and validate options
+        run: |
+          [ -n "$APP_NAME" ] || { echo "::error::app_name is empty"; exit 1; }
+          [[ "$PACKAGE_ID" =~ ^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$ ]] || { echo "::error::Invalid package_id"; exit 1; }
+          node - <<'JS' >> "$GITHUB_ENV"
+          const c = JSON.parse(process.env.CFG || '{}') || {};
+          const pick = (v, ok, d) => ok.includes(v) ? v : d;
+          const out = {
+            SOURCE: pick(c.source, ['zip', 'url'], 'zip'),
+            ORIENTATION: pick(c.orientation, ['portrait', 'landscape', 'unspecified'], 'unspecified'),
+            STATUS_BAR: pick(c.status_bar, ['show', 'overlay', 'hide'], 'overlay'),
+            NAV_BAR: pick(c.nav_bar, ['show', 'overlay', 'hide'], 'overlay'),
+            THEME_COLOR: /^#[0-9a-fA-F]{6}$/.test(c.theme_color) ? c.theme_color : '#000000',
+            NATIVE_FEEL: String(c.native_feel !== false),
+            KEEP_AWAKE: String(c.keep_awake === true),
+            SECURE: String(c.secure === true),
+            HAS_LOGO: String(c.has_logo === true),
+            HAS_GS: String(c.google_services === true),
+            ICON_MODE: pick(c.icon_mode, ['fit', 'fill'], 'fit'),
+            ICON_BG: /^#[0-9a-fA-F]{6}$/.test(c.icon_bg) ? c.icon_bg : '#ffffff',
+            PERF_MODE: String(c.perf_mode !== false),
+            ASK_PERMS: String(c.ask_perms === true),
+            BUILD_AAB: String(c.build_aab === true),
+            DEEP_HOST: /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/i.test(c.deep_link_host || '') ? c.deep_link_host.toLowerCase() : '',
+            PUSH_API: /^https:\/\/[^\s"'<>\\]+$/.test(c.push_api_url || '') ? c.push_api_url.replace(/\/+$/, '') : '',
+            VERSION_NAME: /^[0-9A-Za-z.\-]{1,20}$/.test(c.version_name || '') ? c.version_name : '1.0.0',
+            PERMS: (Array.isArray(c.permissions) ? c.permissions : [])
+              .filter(p => ['CAMERA', 'RECORD_AUDIO', 'POST_NOTIFICATIONS', 'ACCESS_FINE_LOCATION', 'MEDIA', 'VIBRATE', 'BLUETOOTH', 'CONTACTS'].includes(p)).join(','),
+            SITE_URL: /^https:\/\/[^\s"'<>\\]+$/.test(c.site_url || '') ? c.site_url : ''
+          };
+          if (out.SOURCE === 'url' && !out.SITE_URL) { console.error('::error::A valid https:// site_url is required'); process.exit(1); }
+          for (const [k, v] of Object.entries(out)) console.log(`${k}=${v}`);
+          JS
+
+      - name: Validate google-services.json
+        if: env.HAS_GS == 'true'
+        run: |
+          node - <<'JS'
+          const fs = require('fs');
+          if (!fs.existsSync('google-services.json')) {
+            console.log('::warning::google_services is on but google-services.json is not in the repository. Building without push.');
+            fs.appendFileSync(process.env.GITHUB_ENV, 'HAS_GS=false\n');
+            process.exit(0);
+          }
+          let j;
+          try { j = JSON.parse(fs.readFileSync('google-services.json', 'utf8')); }
+          catch (e) { console.error('::error::google-services.json is not valid JSON.'); process.exit(1); }
+          const pk = (j.client || []).map(c => c.client_info && c.client_info.android_client_info && c.client_info.android_client_info.package_name).filter(Boolean);
+          if (!pk.includes(process.env.PACKAGE_ID)) {
+            console.error('::error::google-services.json is for [' + pk.join(', ') + '] but this build uses ' + process.env.PACKAGE_ID + '. Download it again from the Firebase Android app with this exact package ID.');
+            process.exit(1);
+          }
+          console.log('google-services.json matches ' + process.env.PACKAGE_ID);
+          JS
+
+      - name: Extract project and detect type
+        run: |
+          APP_DIR="$RUNNER_TEMP/app"
+          mkdir -p "$APP_DIR/www"
+          echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
+          # A real, offline-capable app: if project.zip is in the repository root the
+          # code is always bundled into the APK. URL mode (a WebView that only loads a
+          # website) is used only when there is no project.zip at all, because a URL
+          # build needs the network and cannot work offline.
+          if [ -f project.zip ]; then
+            if [ "$SOURCE" = "url" ]; then
+              echo "::notice::project.zip found - building the bundled offline app (url mode ignored)."
+            fi
+            SOURCE=zip
+            echo "SOURCE=zip" >> "$GITHUB_ENV"
+          elif [ "$SOURCE" = "url" ]; then
+            echo '<!doctype html><meta charset="utf-8"><title>App</title>' > "$APP_DIR/www/index.html"
+            { echo "TYPE=url"; echo "WEB=true"; } >> "$GITHUB_ENV"
+            exit 0
+          else
+            echo "::error::project.zip not found in the repository root"; exit 1
+          fi
+          EXTRACT="$RUNNER_TEMP/extract"
+          mkdir -p "$EXTRACT"
+          unzip -q project.zip -d "$EXTRACT"
+          rm -rf "$EXTRACT/__MACOSX"
+          SRC="$EXTRACT"
+          while [ "$(find "$SRC" -mindepth 1 -maxdepth 1 | wc -l)" -eq 1 ] && [ -d "$(find "$SRC" -mindepth 1 -maxdepth 1)" ]; do
+            SRC="$(find "$SRC" -mindepth 1 -maxdepth 1)"
+          done
+          if [ -f "$SRC/pubspec.yaml" ]; then T=flutter
+          elif [ -f "$SRC/package.json" ]; then T=node
+          elif [ -f "$SRC/settings.gradle" ] || [ -f "$SRC/settings.gradle.kts" ] || [ -f "$SRC/build.gradle" ] || [ -f "$SRC/build.gradle.kts" ]; then T=gradle
+          elif [ -f "$SRC/index.html" ]; then T=static
+          else echo "::error::Unknown project type. Need index.html, package.json, pubspec.yaml or a Gradle project in the zip root."; exit 1
+          fi
+          echo "Detected project type: $T"
+          { echo "SRC_DIR=$SRC"; echo "TYPE=$T"; } >> "$GITHUB_ENV"
+          if [ "$T" = "flutter" ] || [ "$T" = "gradle" ]; then
+            { echo "WEB=false"; echo "ROOT=$SRC"; } >> "$GITHUB_ENV"
+          else
+            echo "WEB=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Set up Flutter
+        if: env.TYPE == 'flutter'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build web assets (React, Vite, HTML5 games, static)
+        if: env.TYPE == 'node' || env.TYPE == 'static'
+        run: |
+          cd "$SRC_DIR"
+          cat > "$RUNNER_TEMP/perf.js" <<'JS'
+          const fs = require('fs'), path = require('path');
+          const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(f => f.isDirectory() ? walk(path.join(d, f.name)) : [path.join(d, f.name)]);
+          let changed = 0;
+          for (const p of walk('src').filter(p => /\.(tsx?|jsx?|css)$/.test(p))) {
+            const o = fs.readFileSync(p, 'utf8');
+            const s = o
+              .replace(/(^|[^\w-])(?:[\w-]+:)*backdrop-blur(?:-\[[^\]]*\]|-\w+)?(?![\w-])/g, (m, a) => a)
+              .replace(/(?:-webkit-)?backdrop-filter\s*:[^;}]*;?/gi, '')
+              .replace(/(?:Webkit)?[bB]ackdropFilter\s*:\s*(['"`])[^'"`]*\1\s*,?/g, '');
+            if (s !== o) { fs.writeFileSync(p, s); changed++; }
+          }
+          console.log('Low-end speed mode: removed blur effects in ' + changed + ' files');
+          JS
+          if [ "$TYPE" = "node" ] && [ "$PERF_MODE" = "true" ]; then node "$RUNNER_TEMP/perf.js"; fi
+          if [ "$TYPE" = "node" ]; then
+            # Known bug in this app: the reels page is 'home', but the bar color logic checked 'reels'.
+            if grep -q "currentPage === 'reels' || !!viewingReel" src/App.tsx 2>/dev/null; then
+              sed -i "s/currentPage === 'reels' || !!viewingReel/currentPage === 'home' || !!viewingReel/" src/App.tsx
+              echo "Patched bar color logic in src/App.tsx"
+            fi
+            if grep -q "currentPage === 'home' || !!viewingReel" src/App.tsx 2>/dev/null; then
+              sed -i "s/currentPage === 'home' || !!viewingReel/currentPage === 'home' || currentPage === 'create' || !!viewingReel/" src/App.tsx
+              echo "Reels create page now uses the dark status bar"
+            fi
+            npm install --no-audit --no-fund || npm install --no-audit --no-fund --legacy-peer-deps || { rm -rf node_modules package-lock.json; npm install --no-audit --no-fund --legacy-peer-deps; }
+            npm run build --if-present || { echo "::warning::Auto-fix: npm run build failed (often a type check). Building with Vite directly."; npx --yes vite build; }
+            OUT=""
+            for d in dist build; do
+              if [ -f "$d/index.html" ]; then OUT="$d"; break; fi
+            done
+            if [ -n "$OUT" ]; then
+              cp -a "$OUT"/. "$APP_DIR/www/"
+            elif [ -f index.html ]; then
+              rsync -a --exclude node_modules --exclude .git ./ "$APP_DIR/www/"
+            else
+              echo "::error::Build produced no dist/ or build/ folder with index.html"; exit 1
+            fi
+          else
+            cp -a . "$APP_DIR/www/"
+          fi
+          # Never ship source maps or the Express server bundle inside the APK.
+          find "$APP_DIR/www" -name '*.map' -delete
+          rm -f "$APP_DIR/www"/server.cjs*
+          ls -la "$APP_DIR/www"
+
+      - name: Inject native glue (camera release, video fixes)
+        if: env.TYPE == 'node' || env.TYPE == 'static'
+        run: |
+          cd "$APP_DIR"
+          cat > "$RUNNER_TEMP/glue.js" <<'GLUE'
+          (function () {
+            if (window.__nativeGlue) return;
+            window.__nativeGlue = true;
+          
+            // Release the camera and microphone when the screen showing them is gone, and when the app is hidden.
+            var md = navigator.mediaDevices;
+            var streams = new Set(), usedTracks = new Set(), seen = new Set(), gone = new Map();
+            if (md && md.getUserMedia) {
+              var orig = md.getUserMedia.bind(md);
+              md.getUserMedia = function (c) {
+                return orig(c).then(function (s) { streams.add(s); return s; });
+              };
+            }
+            var PC = window.RTCPeerConnection;
+            if (PC) {
+              var at = PC.prototype.addTrack;
+              PC.prototype.addTrack = function (t) { if (t) usedTracks.add(t); return at.apply(this, arguments); };
+              var as = PC.prototype.addStream;
+              if (as) PC.prototype.addStream = function (s) { if (s) s.getTracks().forEach(function (t) { usedTracks.add(t); }); return as.apply(this, arguments); };
+              var ct = PC.prototype.addTransceiver;
+              if (ct) PC.prototype.addTransceiver = function (t) { if (t && t.kind) usedTracks.add(t); return ct.apply(this, arguments); };
+            }
+            var RS = window.RTCRtpSender;
+            if (RS && RS.prototype.replaceTrack) {
+              var rt = RS.prototype.replaceTrack;
+              RS.prototype.replaceTrack = function (t) { if (t) usedTracks.add(t); return rt.apply(this, arguments); };
+            }
+            function live(s) { return s.getTracks().some(function (t) { return t.readyState === 'live'; }); }
+            function inCall(s) { return s.getTracks().some(function (t) { return usedTracks.has(t); }); }
+            function shown(s) {
+              var els = document.querySelectorAll('video,audio');
+              for (var i = 0; i < els.length; i++) if (els[i].srcObject === s) return true;
+              return false;
+            }
+            function stop(s) {
+              s.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+              streams.delete(s); seen.delete(s); gone.delete(s);
+            }
+            function sweep(force) {
+              if (window.__inCall) return;
+              streams.forEach(function (s) {
+                if (!live(s)) { streams.delete(s); return; }
+                if (inCall(s)) return;
+                if (force) { stop(s); return; }
+                if (shown(s)) { seen.add(s); gone.delete(s); return; }
+                if (seen.has(s)) {
+                  var n = (gone.get(s) || 0) + 1;
+                  gone.set(s, n);
+                  if (n >= 2) stop(s);
+                }
+              });
+            }
+            window.__releaseMedia = function () { sweep(true); };
+            document.addEventListener('visibilitychange', function () {
+              if (document.visibilityState === 'hidden') sweep(true);
+            });
+          
+            // Camera previews sometimes stay frozen in a WebView: start any paused live preview.
+            setInterval(function () {
+              if (!streams.size || document.visibilityState === 'hidden') return;
+              sweep(false);
+              var vs = document.querySelectorAll('video');
+              for (var i = 0; i < vs.length; i++) {
+                var v = vs[i];
+                if (v.srcObject && v.paused && v.autoplay && v.readyState >= 2) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+              }
+            }, 1200);
+          
+            // No grey play button on videos while they load.
+            var st = document.createElement('style');
+            st.textContent = 'video::-webkit-media-controls-overlay-play-button,video::-webkit-media-controls-start-playback-button{display:none!important;-webkit-appearance:none}';
+            (document.head || document.documentElement).appendChild(st);
+
+            // Tell the native splash screen the page has painted, so it fades out right away.
+            var done = false;
+            function ready() {
+              if (done) return;
+              done = true;
+              try { (window.AndroidInterface || window.Android).appReady(); } catch (e) {}
+            }
+            function arm() { requestAnimationFrame(function () { requestAnimationFrame(ready); }); }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arm); else arm();
+            setTimeout(ready, 2500);
+          })();
+          GLUE
+          node - <<'JS'
+          const fs = require('fs');
+          const f = 'www/index.html';
+          let h = fs.readFileSync(f, 'utf8');
+          const tag = '<script>' + fs.readFileSync(process.env.RUNNER_TEMP + '/glue.js', 'utf8') + '</script>';
+          h = /<head[^>]*>/i.test(h) ? h.replace(/<head[^>]*>/i, m => m + tag) : tag + h;
+          // viewport-fit=cover lets the page draw under the camera cut-out. Without it WebView leaves a black strip there.
+          const vre = /<meta[^>]+name=["']viewport["'][^>]*>/i;
+          const vm = h.match(vre);
+          if (vm && !/viewport-fit/i.test(vm[0])) h = h.replace(vre, m => m.replace(/content=(["'])([^"']*)\1/i, (x, q, c) => 'content=' + q + c + ',viewport-fit=cover' + q));
+          else if (!vm) h = h.replace(/<head[^>]*>/i, m => m + '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">');
+          // Speed mode: blur effects and smooth-scroll animation are the most expensive things a phone WebView paints.
+          if (process.env.PERF_MODE === 'true') {
+            const pc = '<style>*,*::before,*::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;text-shadow:none!important;scroll-behavior:auto!important}</style>';
+            h = h.includes('</head>') ? h.replace('</head>', () => pc + '</head>') : h + pc;
+          }
+          fs.writeFileSync(f, h);
+          JS
+
+      - name: Native feel tweaks for web assets
+        if: env.NATIVE_FEEL == 'true' && (env.TYPE == 'node' || env.TYPE == 'static')
+        run: |
+          cd "$APP_DIR"
+          node - <<'JS'
+          const fs = require('fs');
+          const f = 'www/index.html';
+          let h = fs.readFileSync(f, 'utf8');
+          const vp = '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">';
+          const re = /<meta[^>]+name=["']viewport["'][^>]*>/i;
+          h = re.test(h) ? h.replace(re, () => vp) : h.replace(/<head[^>]*>/i, m => m + vp);
+          const css = '<meta name="theme-color" content="' + process.env.THEME_COLOR + '"><style>html{-webkit-text-size-adjust:100%}img{-webkit-user-drag:none}*{-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}html,body{overscroll-behavior:none;touch-action:manipulation}body{-webkit-user-select:none;user-select:none}input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text}</style>';
+          h = h.includes('</head>') ? h.replace('</head>', () => css + '</head>') : css + h;
+          fs.writeFileSync(f, h);
+          JS
+
+      - name: Capacitor setup (web, URL and games)
+        if: env.WEB == 'true'
+        run: |
+          cd "$APP_DIR"
+          npm init -y > /dev/null
+          # Capacitor 8 needs Node 22, JDK 21, compileSdk 36, AGP 8.13 and Gradle 8.14. Its own template already has them,
+          # so nothing is downgraded here. Other @capacitor/* plugins the project uses are installed at major version 8.
+          # @capacitor/push-notifications is skipped on purpose: this build has its own native Firebase service.
+          PLUGINS="$(node -e 'try{const d=require(process.argv[1]).dependencies||{};console.log(Object.keys(d).filter(k=>/^(@capacitor\/(?!core$|cli$|android$|ios$|push-notifications$)|@capgo\/capacitor-updater$)/.test(k)).join(" "))}catch(e){}' "${SRC_DIR:-/none}/package.json")"
+          echo "Plugins: $PLUGINS"
+          CAP=8.6.0
+          for attempt in 1 2 3; do
+            if npm install --no-audit --no-fund "@capacitor/core@$CAP" "@capacitor/cli@$CAP" "@capacitor/android@$CAP"; then break; fi
+            echo "::warning::Auto-fix: Capacitor $CAP install failed (try $attempt). Retrying."
+            [ "$attempt" = 2 ] && CAP=8
+            sleep 5
+          done
+          [ -d node_modules/@capacitor/android ] || { echo "::error::Capacitor could not be installed."; exit 1; }
+          for p in $PLUGINS; do
+            npm install --no-audit --no-fund "$p@8" || npm install --no-audit --no-fund --legacy-peer-deps "$p@8" || echo "::warning::Auto-fix: skipped $p (no Capacitor 8 version)."
+          done
+          node -e 'console.log("Capacitor core " + require("@capacitor/core/package.json").version + ", android " + require("@capacitor/android/package.json").version)'
+          node - <<'JS'
+          const e = process.env;
+          const c = {
+            appId: e.PACKAGE_ID, appName: e.APP_NAME, webDir: 'www',
+            backgroundColor: e.THEME_COLOR, loggingBehavior: 'none',
+            server: { androidScheme: 'https' },
+            android: { webContentsDebuggingEnabled: false, allowMixedContent: false, backgroundColor: e.THEME_COLOR },
+            plugins: {
+              SplashScreen: { launchShowDuration: 0, launchAutoHide: true, backgroundColor: e.THEME_COLOR },
+              // The native code below handles the safe areas and keyboard itself, so Capacitor's own handling is switched off.
+              SystemBars: { insetsHandling: 'disable' },
+              StatusBar: { overlaysWebView: e.STATUS_BAR === 'overlay', backgroundColor: e.THEME_COLOR },
+              CapacitorUpdater: { autoUpdate: false }
+            }
+          };
+          if (e.TYPE === 'url') {
+            const h = new URL(e.SITE_URL).hostname;
+            c.server.url = e.SITE_URL; c.server.cleartext = false; c.server.allowNavigation = [h, '*.' + h];
+          }
+          require('fs').writeFileSync('capacitor.config.json', JSON.stringify(c, null, 2));
+          JS
+          npx cap add android || { echo "::warning::Auto-fix: cap add android failed, retrying."; sleep 5; rm -rf android; npx cap add android; }
+          cd android
+          grep -nE "(compile|min|target)SdkVersion" variables.gradle || true
+          grep -n "com.android.tools.build:gradle" build.gradle || true
+          grep -n "distributionUrl" gradle/wrapper/gradle-wrapper.properties || true
+          # Faster and safer Gradle settings.
+          sed -i '/^org.gradle.jvmargs/d' gradle.properties
+          printf '%s\n' 'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8' 'org.gradle.parallel=true' 'org.gradle.caching=true' 'android.useAndroidX=true' >> gradle.properties
+          cd ..
+          echo "ROOT=$APP_DIR/android" >> "$GITHUB_ENV"
+
+      - name: Install image tools
+        if: env.HAS_LOGO == 'true'
+        run: npm install --no-audit --no-fund --prefix "$RUNNER_TEMP/tools" sharp
+
+      - name: Customize manifest, version, permissions and icons (all project types)
+        run: |
+          NODE_PATH="$RUNNER_TEMP/tools/node_modules" node - <<'JS'
+          const fs = require('fs'), path = require('path'), e = process.env;
+          const walk = (d, o = []) => {
+            for (const f of fs.readdirSync(d, { withFileTypes: true })) {
+              if (['node_modules', 'build', '.git', '.gradle'].includes(f.name)) continue;
+              const p = path.join(d, f.name);
+              f.isDirectory() ? walk(p, o) : o.push(p);
+            }
+            return o;
+          };
+          const man = walk(e.ROOT).find(p => p.endsWith(path.join('src', 'main', 'AndroidManifest.xml')) && fs.readFileSync(p, 'utf8').includes('<application'));
+          if (!man) { console.error('::error::AndroidManifest.xml not found'); process.exit(1); }
+          const mod = path.resolve(path.dirname(man), '../..');
+          const web = e.WEB === 'true';
+          const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+          let x = fs.readFileSync(man, 'utf8');
+          if (!web) x = x.replace(/android:label="[^"]*"/g, () => `android:label="${esc(e.APP_NAME)}"`);
+          if (e.ORIENTATION !== 'unspecified') {
+            x = x.replace(/<activity(?=[\s>])[^>]*>/g, t => /screenOrientation=/.test(t)
+              ? t.replace(/android:screenOrientation="[^"]*"/, () => `android:screenOrientation="${e.ORIENTATION}"`)
+              : t.replace('<activity', () => `<activity android:screenOrientation="${e.ORIENTATION}"`));
+          }
+          if (web) x = x.replace(/<application\b/, () => '<application android:largeHeap="true" android:hardwareAccelerated="true"');
+          const fcm = web && e.HAS_GS === 'true' && fs.existsSync(path.join(e.GITHUB_WORKSPACE, 'google-services.json'));
+          if (web) x = x.replace('</application>', () => '<meta-data android:name="android.webkit.WebView.EnableSafeBrowsing" android:value="false"/><receiver android:name=".ReplyReceiver" android:exported="false"/><service android:name=".CallService" android:exported="false" android:foregroundServiceType="microphone|camera"/>' + (fcm ? '<service android:name=".AppFcmService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT"/></intent-filter></service><meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_notify"/><meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="app_messages"/>' : '') + '</application>');
+          const EXP = {
+            RECORD_AUDIO: ['RECORD_AUDIO', 'MODIFY_AUDIO_SETTINGS', 'FOREGROUND_SERVICE', 'FOREGROUND_SERVICE_MICROPHONE', 'FOREGROUND_SERVICE_CAMERA', 'WAKE_LOCK'],
+            POST_NOTIFICATIONS: ['POST_NOTIFICATIONS', 'USE_FULL_SCREEN_INTENT'],
+            ACCESS_FINE_LOCATION: ['ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION'],
+            MEDIA: ['READ_MEDIA_IMAGES', 'READ_MEDIA_VIDEO', 'READ_MEDIA_AUDIO', 'READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE'],
+            BLUETOOTH: ['BLUETOOTH_CONNECT'],
+            CONTACTS: ['READ_CONTACTS']
+          };
+          const perms = new Set();
+          (e.PERMS || '').split(',').filter(Boolean).forEach(p => (EXP[p] || [p]).forEach(q => perms.add(q)));
+          if (web) { perms.add('ACCESS_NETWORK_STATE'); perms.add('VIBRATE'); }
+          if (web && fcm) { perms.add('POST_NOTIFICATIONS'); }
+          const add = [...perms].filter(p => !x.includes(`android.permission.${p}"`))
+            .map(p => `<uses-permission android:name="android.permission.${p}"${p === 'WRITE_EXTERNAL_STORAGE' ? ' android:maxSdkVersion="28"' : p === 'READ_EXTERNAL_STORAGE' ? ' android:maxSdkVersion="32"' : ''}/>`).join('')
+            + (perms.has('CAMERA') ? '<uses-feature android:name="android.hardware.camera" android:required="false"/>' : '')
+            + (perms.has('RECORD_AUDIO') ? '<uses-feature android:name="android.hardware.microphone" android:required="false"/>' : '');
+          x = x.replace(/<application\b/, m => add + m);
+          if (web) {
+            // Android 11+ hides other apps unless they are declared here. Without this block
+            // resolveActivity() returns null and tel:/mailto:/sms:/https links did nothing.
+            const queries = '<queries>'
+              + '<intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent>'
+              + '<intent><action android:name="android.intent.action.VIEW"/><data android:scheme="http"/></intent>'
+              + '<intent><action android:name="android.intent.action.VIEW"/><data android:scheme="tel"/></intent>'
+              + '<intent><action android:name="android.intent.action.VIEW"/><data android:scheme="mailto"/></intent>'
+              + '<intent><action android:name="android.intent.action.SENDTO"/><data android:scheme="mailto"/></intent>'
+              + '<intent><action android:name="android.intent.action.VIEW"/><data android:scheme="sms"/></intent>'
+              + '<intent><action android:name="android.intent.action.VIEW"/><data android:scheme="geo"/></intent>'
+              + '<intent><action android:name="android.intent.action.VIEW"/><data android:scheme="market"/></intent>'
+              + '<intent><action android:name="android.intent.action.SEND"/><data android:mimeType="*/*"/></intent>'
+              + '<intent><action android:name="android.intent.action.DIAL"/><data android:scheme="tel"/></intent>'
+              + '</queries>';
+            if (!x.includes('<queries>')) x = x.replace(/<application\b/, m => queries + m);
+          }
+          if (web) {
+            // Picture-in-picture, "Share to this app" and verified web links open the main screen.
+            const cat = '<category android:name="android.intent.category.DEFAULT"/>';
+            const share = '<intent-filter><action android:name="android.intent.action.SEND"/>' + cat + '<data android:mimeType="text/plain"/><data android:mimeType="image/*"/><data android:mimeType="video/*"/></intent-filter>'
+              + '<intent-filter><action android:name="android.intent.action.SEND_MULTIPLE"/>' + cat + '<data android:mimeType="image/*"/><data android:mimeType="video/*"/></intent-filter>';
+            const deep = e.DEEP_HOST ? '<intent-filter android:autoVerify="true"><action android:name="android.intent.action.VIEW"/>' + cat + '<category android:name="android.intent.category.BROWSABLE"/><data android:scheme="https" android:host="' + e.DEEP_HOST + '"/></intent-filter>' : '';
+            x = x.replace(/\sandroid:windowSoftInputMode="[^"]*"/g, '');
+            x = x.replace(/<activity(?=[\s>])/, () => '<activity android:supportsPictureInPicture="true" android:windowSoftInputMode="adjustResize"');
+            const schemeDeep = '<intent-filter><action android:name="android.intent.action.VIEW"/>' + cat
+              + '<category android:name="android.intent.category.BROWSABLE"/>'
+              + '<data android:scheme="ennvo"/><data android:host="*"/></intent-filter>'
+              + '<intent-filter><action android:name="android.intent.action.VIEW"/>' + cat
+              + '<category android:name="android.intent.category.BROWSABLE"/>'
+              + '<data android:scheme="ennvoapp"/><data android:host="*"/></intent-filter>';
+            x = x.replace('</activity>', () => share + deep + schemeDeep + '</activity>');
+          }
+          fs.writeFileSync(man, x);
+
+          const ws = e.GITHUB_WORKSPACE;
+          const g = ['build.gradle', 'build.gradle.kts'].map(n => path.join(mod, n)).find(fs.existsSync);
+          if (g) {
+            let s = fs.readFileSync(g, 'utf8');
+            if (!web) s = s.replace(/(applicationId\s*=?\s*)["'][^"']*["']/, (m, a) => `${a}"${e.PACKAGE_ID}"`);
+            s = s.replace(/(versionName\s*=?\s*)["'][^"']*["']/, (m, a) => `${a}"${e.VERSION_NAME}"`)
+                 .replace(/(versionCode\s*=?\s*)\d+/, (m, a) => `${a}${e.GITHUB_RUN_NUMBER}`);
+            if (web) {
+              const deps = [];
+              if (!s.includes('core-splashscreen')) deps.push("implementation 'androidx.core:core-splashscreen:1.2.0'");
+              // Only Firebase Messaging: no Analytics or Crashlytics, so the app starts faster and stays light.
+              if (fcm) deps.push("implementation 'com.google.firebase:firebase-messaging:25.0.1'");
+              if (deps.length) s = s.replace(/dependencies\s*\{/, m => m + '\n    ' + deps.join('\n    '));
+              if (fcm && !s.includes('com.google.gms.google-services')) s += "\napply plugin: 'com.google.gms.google-services'\n";
+              // Lint is skipped: it only slows the build down.
+              s += "\nandroid {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n}\n";
+            }
+            fs.writeFileSync(g, s);
+          }
+          if (fcm) {
+            fs.copyFileSync(path.join(ws, 'google-services.json'), path.join(mod, 'google-services.json'));
+            const rb = path.join(mod, '..', 'build.gradle');
+            if (fs.existsSync(rb)) {
+              let r = fs.readFileSync(rb, 'utf8');
+              const add = [];
+              if (!r.includes('google-services')) add.push("classpath 'com.google.gms:google-services:4.4.4'");
+              if (add.length) {
+                r = r.replace(/(buildscript\s*\{[\s\S]*?dependencies\s*\{)/, m => m + '\n        ' + add.join('\n        '));
+                fs.writeFileSync(rb, r);
+              }
+            }
+          }
+
+          const res = path.join(mod, 'src', 'main', 'res');
+          const T = { r: 0, g: 0, b: 0, alpha: 0 };
+          const wr = (p, t) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, t); };
+          // A notification icon always exists (a white chat bubble). A logo with transparency replaces it below.
+          const notifXml = path.join(res, 'drawable', 'ic_stat_notify.xml');
+          if (web) wr(notifXml, '<?xml version="1.0" encoding="utf-8"?><vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24"><path android:fillColor="#FFFFFFFF" android:pathData="M20,2H4C2.9,2 2,2.9 2,4v18l4,-4h14c1.1,0 2,-0.9 2,-2V4C22,2.9 21.1,2 20,2z"/></vector>');
+          // Fast native splash: theme color, plus the round logo when there is one. Android draws it before any web code loads.
+          const splashStyle = icon => {
+            if (!web) return;
+            const sp = path.join(res, 'values', 'styles.xml');
+            const re = /<style name="AppTheme\.NoActionBarLaunch"[\s\S]*?<\/style>/;
+            if (!fs.existsSync(sp) || !re.test(fs.readFileSync(sp, 'utf8'))) return;
+            fs.writeFileSync(sp, fs.readFileSync(sp, 'utf8').replace(re, () =>
+              `<style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen"><item name="windowSplashScreenBackground">${e.THEME_COLOR}</item>${icon ? '<item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>' : ''}<item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item></style>`));
+            for (const d of fs.readdirSync(res)) {
+              if (!d.startsWith('drawable')) continue;
+              for (const f of fs.readdirSync(path.join(res, d))) if (/^splash\./.test(f)) fs.unlinkSync(path.join(res, d, f));
+            }
+            fs.appendFileSync(e.GITHUB_ENV, 'SPLASH_OK=true\n');
+          };
+          const logo = path.join(ws, 'logo.img');
+          if (e.HAS_LOGO !== 'true' || !fs.existsSync(logo)) { splashStyle(false); process.exit(0); }
+          const sharp = require('sharp');
+          const fill = e.ICON_MODE === 'fill';
+          const ratio = fill ? 0.78 : 0.62;
+          const rgb = h => ({ r: parseInt(h.slice(1, 3), 16), g: parseInt(h.slice(3, 5), 16), b: parseInt(h.slice(5, 7), 16), alpha: 1 });
+          const circle = s => Buffer.from(`<svg width="${s}" height="${s}"><circle cx="${s / 2}" cy="${s / 2}" r="${s / 2}"/></svg>`);
+          (async () => {
+            for (const [d, s] of Object.entries({ mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 })) {
+              const dir = path.join(res, 'mipmap-' + d);
+              fs.mkdirSync(dir, { recursive: true });
+              for (const f of fs.readdirSync(dir)) if (/^ic_launcher.*\.webp$/.test(f)) fs.unlinkSync(path.join(dir, f));
+              // Legacy icon (Android 7 and older, and the round variant): logo over the icon background color.
+              const inner = await sharp(logo).resize(s, s, { fit: 'contain', background: T }).png().toBuffer();
+              const square = await sharp({ create: { width: s, height: s, channels: 4, background: rgb(e.ICON_BG) } })
+                .composite([{ input: inner }]).png().toBuffer();
+              fs.writeFileSync(path.join(dir, 'ic_launcher.png'), square);
+              fs.writeFileSync(path.join(dir, 'ic_launcher_round.png'),
+                await sharp(square).composite([{ input: circle(s), blend: 'dest-in' }]).png().toBuffer());
+              // Adaptive icon foreground: the logo scaled into the safe zone, so no launcher shape can cut it.
+              const F = Math.round(s * 2.25), I = Math.round(F * ratio), pad = Math.floor((F - I) / 2);
+              const fg = await sharp(logo).resize(I, I, { fit: 'contain', background: T }).png().toBuffer();
+              await sharp({ create: { width: F, height: F, channels: 4, background: T } })
+                .composite([{ input: fg, left: pad, top: pad }]).png()
+                .toFile(path.join(dir, 'ic_launcher_foreground.png'));
+            }
+            fs.mkdirSync(path.join(res, 'values'), { recursive: true });
+            fs.writeFileSync(path.join(res, 'values', 'zz_icon_colors.xml'),
+              `<?xml version="1.0" encoding="utf-8"?><resources><color name="icon_bg_custom">${e.ICON_BG}</color></resources>`);
+            fs.mkdirSync(path.join(res, 'mipmap-anydpi-v26'), { recursive: true });
+            const ad = '<?xml version="1.0" encoding="utf-8"?><adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"><background android:drawable="@color/icon_bg_custom"/><foreground android:drawable="@mipmap/ic_launcher_foreground"/></adaptive-icon>';
+            for (const n of ['ic_launcher.xml', 'ic_launcher_round.xml']) fs.writeFileSync(path.join(res, 'mipmap-anydpi-v26', n), ad);
+
+            // One-color notification icon, only when the logo has transparency (a solid square would show as a white block).
+            if (web && !(await sharp(logo).stats()).isOpaque) {
+              fs.mkdirSync(path.join(res, 'drawable-nodpi'), { recursive: true });
+              const ic = await sharp(logo).resize(96, 96, { fit: 'contain', background: T }).png().toBuffer();
+              await sharp({ create: { width: 96, height: 96, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } } })
+                .composite([{ input: ic, blend: 'dest-in' }]).png().toFile(path.join(res, 'drawable-nodpi', 'ic_stat_notify.png'));
+              if (fs.existsSync(notifXml)) fs.unlinkSync(notifXml);
+            }
+
+            // Round splash logo. The picture is cut to a circle that is exactly the size of the Android 12+ splash mask
+            // (two thirds of the icon canvas), so every Android version shows the same round logo.
+            if (web) {
+              const S = 1024, D = Math.round(S * 2 / 3), L = fill ? D : Math.round(D * 0.7);
+              const mark = await sharp(logo).resize(L, L, { fit: fill ? 'cover' : 'contain', background: T }).png().toBuffer();
+              const disc = await sharp({ create: { width: D, height: D, channels: 4, background: rgb(e.ICON_BG) } })
+                .composite([{ input: mark, left: Math.floor((D - L) / 2), top: Math.floor((D - L) / 2) }]).png().toBuffer();
+              const round = await sharp(disc).composite([{ input: circle(D), blend: 'dest-in' }]).png().toBuffer();
+              fs.mkdirSync(path.join(res, 'drawable-nodpi'), { recursive: true });
+              await sharp({ create: { width: S, height: S, channels: 4, background: T } })
+                .composite([{ input: round, left: Math.floor((S - D) / 2), top: Math.floor((S - D) / 2) }]).png()
+                .toFile(path.join(res, 'drawable-nodpi', 'splash_icon.png'));
+              splashStyle(true);
+            }
+          })().catch(err => { console.error(err); process.exit(1); });
+          JS
+
+      - name: Generate native Android code (bars, notifications, reply, FCM, splash)
+        if: env.WEB == 'true'
+        run: |
+          cd "$APP_DIR"
+          node - <<'JS'
+          const fs = require('fs'), path = require('path'), cp = require('child_process'), e = process.env;
+          const f = cp.execSync('find android/app/src/main/java -name MainActivity.java').toString().split('\n')[0];
+          if (!f) { console.error('MainActivity.java not found'); process.exit(1); }
+          const dir = path.dirname(f);
+          const lumOf = h => { const n = parseInt(h.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
+          const lum = lumOf(e.THEME_COLOR);
+          const accent = lumOf(e.ICON_BG) > 0.8 ? '#2979FF' : e.ICON_BG;
+          const P = e.PACKAGE_ID;
+          const fcm = e.HAS_GS === 'true' && fs.existsSync(path.join(e.GITHUB_WORKSPACE, 'google-services.json'));
+          const splash = e.SPLASH_OK === 'true';
+          fs.writeFileSync(f, `package ${P};
+
+          import android.app.DownloadManager;
+          import android.app.PictureInPictureParams;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.content.pm.PackageManager;
+          import android.graphics.drawable.ColorDrawable;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.content.pm.PackageInfo;
+          import android.content.res.Configuration;
+          import android.graphics.Bitmap;
+          import android.graphics.Color;
+          import android.net.Uri;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.media.AudioManager;
+          import android.os.Environment;
+          import android.os.PowerManager;
+          import android.os.VibrationEffect;
+          import android.os.Vibrator;
+          import android.provider.Settings;
+          import android.util.Rational;
+          import android.view.View;
+          import android.view.Window;
+          import android.view.WindowManager;
+          import android.webkit.JavascriptInterface;
+          import android.webkit.MimeTypeMap;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.widget.Toast;
+          import androidx.activity.EdgeToEdge;
+          import androidx.core.app.NotificationManagerCompat;
+          import androidx.core.content.ContextCompat;
+          import androidx.core.graphics.Insets;
+          import androidx.core.view.ViewCompat;
+          import androidx.core.view.WindowCompat;
+          import androidx.core.view.WindowInsetsCompat;
+          import androidx.core.view.WindowInsetsControllerCompat;
+          import com.getcapacitor.BridgeActivity;
+          import java.io.File;
+          import java.io.FileOutputStream;
+          import java.io.InputStream;
+          import java.io.OutputStream;
+          import java.util.ArrayList;
+          import java.util.List;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          public class MainActivity extends BridgeActivity {
+              private static final String STATUS = "${e.STATUS_BAR}";
+              private static final String NAV = "${e.NAV_BAR}";
+              private static final int BG = Color.parseColor("${e.THEME_COLOR}");
+              private static final boolean LIGHT = ${lum > 0.6};
+              private static final boolean ASK = ${e.ASK_PERMS === 'true'};
+              private static final List<String> RUNTIME = java.util.Arrays.asList(
+                  "android.permission.CAMERA", "android.permission.RECORD_AUDIO", "android.permission.POST_NOTIFICATIONS",
+                  "android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION",
+                  "android.permission.READ_MEDIA_IMAGES", "android.permission.READ_MEDIA_VIDEO", "android.permission.READ_MEDIA_AUDIO",
+                  "android.permission.READ_EXTERNAL_STORAGE", "android.permission.BLUETOOTH_CONNECT", "android.permission.READ_CONTACTS");
+              private volatile boolean splashHold = true;
+              private final Handler ui = new Handler(Looper.getMainLooper());
+              private final Runnable rehide = () -> applyBars();
+              private int lastWinBg = Integer.MIN_VALUE;
+              private int lastCutout = -1;
+              private String askedName = "";
+              private float lt = -1f, lb = -1f, ll = -1f, lr = -1f;
+              // Bar colors. The web app updates them per page through setStatusBarColor().
+              private int sColor = BG;
+              private int nColor = BG;
+              private boolean light = LIGHT;
+              private boolean inCall = false;
+              private PowerManager.WakeLock prox;
+              private boolean pipOn = false;
+              private int pipW = 9;
+              private int pipH = 16;
+              static volatile String pendingShare = null;
+              static volatile String pendingOpen = null;
+              static volatile String pendingCall = null;
+
+              @Override
+              public void onCreate(Bundle saved) {
+                  ${splash ? `androidx.core.splashscreen.SplashScreen sp = androidx.core.splashscreen.SplashScreen.installSplashScreen(this);
+                  sp.setKeepOnScreenCondition(() -> splashHold);
+                  sp.setOnExitAnimationListener(vp -> vp.getView().animate().alpha(0f).setDuration(160).withEndAction(() -> vp.remove()).start());` : ''}
+                  EdgeToEdge.enable(this);
+                  super.onCreate(saved);
+                  // The splash screen never stays longer than 1.5 seconds, even if the page does not report in.
+                  new Handler(Looper.getMainLooper()).postDelayed(() -> splashHold = false, 900);
+                  Notifier.activity = this;
+                  Notifier.channels(this);
+                  Window win = getWindow();
+                  if (${e.KEEP_AWAKE === 'true'}) win.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                  if (${e.SECURE === 'true'}) win.addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+                  WebView w = getBridge().getWebView();
+                  w.setBackgroundColor(BG);
+                  w.setOverScrollMode(View.OVER_SCROLL_NEVER);
+                  // Hide the grey default play icon and the spinner WebView draws on videos while they load.
+                  w.setWebChromeClient(new com.getcapacitor.BridgeWebChromeClient(getBridge()) {
+                      @Override
+                      public Bitmap getDefaultVideoPoster() { return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888); }
+
+                      @Override
+                      public View getVideoLoadingProgressView() { return new View(MainActivity.this); }
+
+                      // target=_blank / window.open: hand the URL to Android instead of doing nothing.
+                      @Override
+                      public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, android.os.Message resultMsg) {
+                          try {
+                              WebView.HitTestResult r = view.getHitTestResult();
+                              String u = r == null ? null : r.getExtra();
+                              if (u != null && !u.isEmpty()) { openExternal(u); return true; }
+                          } catch (Exception ignored) { }
+                          return false;
+                      }
+                  });
+                  WebSettings s = w.getSettings();
+                  s.setSupportZoom(false);
+                  s.setBuiltInZoomControls(false);
+                  s.setDisplayZoomControls(false);
+                  s.setMediaPlaybackRequiresUserGesture(false);
+                  s.setDomStorageEnabled(true);
+                  s.setDatabaseEnabled(true);
+                  s.setCacheMode(WebSettings.LOAD_DEFAULT);
+                  // Popups and target=_blank open in the system (OAuth, share sheets), never a dead tap.
+                  s.setJavaScriptCanOpenWindowsAutomatically(true);
+                  s.setSupportMultipleWindows(true);
+                  s.setLoadsImagesAutomatically(true);
+                  // The phone font-size setting must never break the layout.
+                  s.setTextZoom(100);
+                  // One GPU layer for the whole page: no re-rasterising while scrolling.
+                  w.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                  w.addJavascriptInterface(new NativeBridge(), "AndroidInterface");
+                  w.addJavascriptInterface(new NativeBridge(), "Android");
+                  setupInsets();
+                  applyBars();
+              askPermsOnce();
+                  handleIntent(getIntent());
+                  ${fcm ? `com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken().addOnSuccessListener(tok -> Notifier.saveToken(MainActivity.this, tok));` : ''}
+              }
+
+              // First launch: ask for every permission the app declares, in one go.
+              private boolean askPermsOnce() {
+                  if (!ASK || Build.VERSION.SDK_INT < 23) return false;
+                  SharedPreferences sp = getSharedPreferences("app", MODE_PRIVATE);
+                  if (sp.getBoolean("perms_asked", false)) return false;
+                  sp.edit().putBoolean("perms_asked", true).apply();
+                  try {
+                      PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), PackageManager.GET_PERMISSIONS);
+                      List<String> need = new ArrayList<>();
+                      if (pi.requestedPermissions != null) {
+                          for (String p : pi.requestedPermissions) {
+                              if (!RUNTIME.contains(p)) continue;
+                              if ((p.equals("android.permission.POST_NOTIFICATIONS") || p.startsWith("android.permission.READ_MEDIA_")) && Build.VERSION.SDK_INT < 33) continue;
+                              if (p.equals("android.permission.BLUETOOTH_CONNECT") && Build.VERSION.SDK_INT < 31) continue;
+                              if (p.equals("android.permission.READ_EXTERNAL_STORAGE") && Build.VERSION.SDK_INT >= 33) continue;
+                              if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) need.add(p);
+                          }
+                      }
+                      if (need.isEmpty()) return false;
+                      requestPermissions(need.toArray(new String[0]), 1001);
+                      return true;
+                  } catch (Exception e) {
+                      return false;
+                  }
+              }
+
+              // ---- Permissions: asked at the moment the app needs them ----
+              // Camera and microphone are asked by the WebView when a call or camera really starts, location when the page asks for it.
+              // The web app can also ask itself: window.Android.requestPermission('notifications'|'camera'|'microphone'|'location'|'media'|'contacts'|'bluetooth')
+              // and read the answer in window.onPermissionResult(name, granted).
+              private String[] permsFor(String name) {
+                  if (name == null) return new String[0];
+                  switch (name.toLowerCase()) {
+                      case "camera": return new String[]{"android.permission.CAMERA"};
+                      case "microphone": case "mic": return new String[]{"android.permission.RECORD_AUDIO"};
+                      case "notifications": return Build.VERSION.SDK_INT >= 33 ? new String[]{"android.permission.POST_NOTIFICATIONS"} : new String[0];
+                      case "location": return new String[]{"android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"};
+                      case "media": return Build.VERSION.SDK_INT >= 33
+                          ? new String[]{"android.permission.READ_MEDIA_IMAGES", "android.permission.READ_MEDIA_VIDEO", "android.permission.READ_MEDIA_AUDIO"}
+                          : new String[]{"android.permission.READ_EXTERNAL_STORAGE"};
+                      case "contacts": return new String[]{"android.permission.READ_CONTACTS"};
+                      case "bluetooth": return Build.VERSION.SDK_INT >= 31 ? new String[]{"android.permission.BLUETOOTH_CONNECT"} : new String[0];
+                      default: return new String[0];
+                  }
+              }
+
+              private List<String> missing(String name) {
+                  List<String> need = new ArrayList<>();
+                  for (String p : permsFor(name)) if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) need.add(p);
+                  return need;
+              }
+
+              private boolean isGranted(String name) {
+                  if (name != null && name.equalsIgnoreCase("location")) {
+                      return checkSelfPermission("android.permission.ACCESS_FINE_LOCATION") == PackageManager.PERMISSION_GRANTED
+                          || checkSelfPermission("android.permission.ACCESS_COARSE_LOCATION") == PackageManager.PERMISSION_GRANTED;
+                  }
+                  return missing(name).isEmpty();
+              }
+
+              // Notifications are asked once, the first time the web app tries to notify or the user logs in, never at app start.
+              private void askNotificationsOnce() {
+                  if (Build.VERSION.SDK_INT < 33) return;
+                  final SharedPreferences sp = getSharedPreferences("app", MODE_PRIVATE);
+                  if (sp.getBoolean("notif_asked", false)) return;
+                  runOnUiThread(() -> {
+                      try {
+                          if (missing("notifications").isEmpty()) return;
+                          sp.edit().putBoolean("notif_asked", true).apply();
+                          requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 1001);
+                      } catch (Exception ignored) { }
+                  });
+              }
+
+              @Override
+              public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
+                  super.onRequestPermissionsResult(code, perms, res);
+                  if (code != 1002) return;
+                  runJs("window.onPermissionResult&&window.onPermissionResult(" + JSONObject.quote(askedName) + "," + isGranted(askedName) + ")");
+              }
+
+              // Safe areas and keyboard, handled natively so the page never gets a double gap.
+              // "show": the bar pushes the page away. "overlay": the page draws under the bar and reads --safe-area-inset-*.
+              // "hide": the bar is gone and the page fills that whole edge. Nothing is padded, so no black strip is left behind.
+              private void setupInsets() {
+                  final boolean sOv = STATUS.equals("overlay");
+                  final boolean nOv = NAV.equals("overlay");
+                  final boolean sHide = STATUS.equals("hide");
+                  final boolean nHide = NAV.equals("hide");
+                  final boolean sFree = sOv || sHide;
+                  final boolean nFree = nOv || nHide;
+                  View content = findViewById(android.R.id.content);
+                  ViewCompat.setOnApplyWindowInsetsListener(content, (v, ins) -> {
+                      try {
+                          Insets bars = ins.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+                          Insets cut = ins.getInsets(WindowInsetsCompat.Type.displayCutout());
+                          Insets ime = ins.getInsets(WindowInsetsCompat.Type.ime());
+                          boolean kb = ins.isVisible(WindowInsetsCompat.Type.ime()) && ime.bottom > 0;
+                          v.setPadding(nFree ? 0 : bars.left, sFree ? 0 : bars.top, nFree ? 0 : bars.right, kb ? ime.bottom : (nFree ? 0 : bars.bottom));
+                          float d = getResources().getDisplayMetrics().density;
+                          // The page is told how much is covered: the bars in overlay mode, only the camera cut-out when a bar is hidden.
+                          float pt = sOv ? bars.top / d : (sHide ? cut.top / d : 0f);
+                          float pb = (nOv && !kb) ? bars.bottom / d : 0f;
+                          float pl = nOv ? bars.left / d : (nHide ? cut.left / d : 0f);
+                          float pr = nOv ? bars.right / d : (nHide ? cut.right / d : 0f);
+                          pushInsets(pt, pb, pl, pr);
+                          // A bar the user hid can pop back (keyboard, dialog, rotation). Hide it again after the usual delay.
+                          if ((sHide && ins.isVisible(WindowInsetsCompat.Type.statusBars())) || (nHide && ins.isVisible(WindowInsetsCompat.Type.navigationBars()))) {
+                              ui.removeCallbacks(rehide);
+                              ui.postDelayed(rehide, 3500);
+                          }
+                          if (!sFree && !nFree) return WindowInsetsCompat.CONSUMED;
+                          WindowInsetsCompat.Builder b = new WindowInsetsCompat.Builder(ins);
+                          if (!sFree) b.setInsets(WindowInsetsCompat.Type.statusBars(), Insets.NONE);
+                          if (!nFree) b.setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.NONE);
+                          if (kb) b.setInsets(WindowInsetsCompat.Type.ime(), Insets.NONE);
+                          return b.build();
+                      } catch (Exception e) {
+                          return ins;
+                      }
+                  });
+              }
+
+              private void pushInsets(float t, float b, float l, float r) {
+                  if (t == lt && b == lb && l == ll && r == lr) return;
+                  lt = t; lb = b; ll = l; lr = r;
+                  injectInsets();
+              }
+
+              void injectInsets() {
+                  if (lt < 0f) return;
+                  runJs("(function(){var s=document.documentElement.style;s.setProperty('--safe-area-inset-top','" + lt + "px');s.setProperty('--safe-area-inset-bottom','" + lb
+                      + "px');s.setProperty('--safe-area-inset-left','" + ll + "px');s.setProperty('--safe-area-inset-right','" + lr + "px');})()");
+              }
+
+              @Override
+              public void onResume() {
+                  super.onResume();
+                  injectInsets();
+              }
+
+              // The app is visible between onStart and onStop. Notifications are skipped while it is visible.
+              @Override
+              public void onStart() {
+                  super.onStart();
+                  Notifier.foreground = true;
+                  Notifier.clearMessages(this);
+              }
+
+              @Override
+              public void onStop() {
+                  Notifier.foreground = false;
+                  if (Build.VERSION.SDK_INT >= 27) {
+                      try { setShowWhenLocked(false); setTurnScreenOn(false); } catch (Exception ignored) { }
+                  }
+                  super.onStop();
+              }
+
+              @Override
+              public void onDestroy() {
+                  if (Notifier.activity == this) Notifier.activity = null;
+                  super.onDestroy();
+              }
+
+              @Override
+              public void onWindowFocusChanged(boolean hasFocus) {
+                  super.onWindowFocusChanged(hasFocus);
+                  if (hasFocus) applyBars();
+              }
+
+              // Once a push has arrived, the server push is the single source of notifications (no duplicates, with chat ids).
+              private boolean pushHandles() {
+                  return getSharedPreferences("app", MODE_PRIVATE).getBoolean("push_ok", false);
+              }
+
+              void runJs(final String js) {
+                  runOnUiThread(() -> {
+                      try { getBridge().getWebView().evaluateJavascript(js, null); } catch (Exception ignored) { }
+                  });
+              }
+
+              // Keep the page, and the WebRTC call inside it, running when the user leaves the app during a call.
+              @Override
+              public void onPause() {
+                  super.onPause();
+                  if (inCall) {
+                      try {
+                          WebView w = getBridge().getWebView();
+                          w.onResume();
+                          w.resumeTimers();
+                      } catch (Exception ignored) { }
+                  }
+              }
+
+              @Override
+              public void onNewIntent(Intent intent) {
+                  super.onNewIntent(intent);
+                  handleIntent(intent);
+              }
+
+              @Override
+              public void onUserLeaveHint() {
+                  super.onUserLeaveHint();
+                  if (pipOn && Build.VERSION.SDK_INT >= 26 && Build.VERSION.SDK_INT < 31) {
+                      try { enterPictureInPictureMode(pipParams()); } catch (Exception ignored) { }
+                  }
+              }
+
+              @Override
+              public void onPictureInPictureModeChanged(boolean inPip, Configuration cfg) {
+                  super.onPictureInPictureModeChanged(inPip, cfg);
+                  runJs("window.onPipChanged&&window.onPipChanged(" + inPip + ")");
+              }
+
+              private PictureInPictureParams pipParams() {
+                  float r = Math.max(0.42f, Math.min(2.39f, (float) pipW / (float) Math.max(1, pipH)));
+                  PictureInPictureParams.Builder b = new PictureInPictureParams.Builder()
+                      .setAspectRatio(new Rational(Math.round(r * 100f), 100));
+                  if (Build.VERSION.SDK_INT >= 31) b.setAutoEnterEnabled(pipOn);
+                  return b.build();
+              }
+
+              private void setProx(boolean on) {
+                  try {
+                      if (prox != null && prox.isHeld()) prox.release();
+                      prox = null;
+                      if (!on) return;
+                      PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+                      if (pm != null && pm.isWakeLockLevelSupported(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK)) {
+                          prox = pm.newWakeLock(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK, "app:proximity");
+                          prox.acquire(3600000L);
+                      }
+                  } catch (Exception ignored) { }
+              }
+
+              // Opens any scheme with the system. Without this, tel:/mailto:/sms:/whatsapp: taps died silently.
+              void openExternal(String url) {
+                  if (url == null) return;
+                  final String u = url.trim();
+                  if (u.isEmpty()) return;
+
+                  if (u.startsWith("intent:")) {
+                      try {
+                          Intent i = Intent.parseUri(u, Intent.URI_INTENT_SCHEME);
+                          i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                          startActivity(i);
+                          return;
+                      } catch (Exception e) {
+                          String pkg = null;
+                          try { pkg = Intent.parseUri(u, Intent.URI_INTENT_SCHEME).getPackage(); } catch (Exception ignored) { }
+                          if (pkg != null) {
+                              try {
+                                  startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + pkg))
+                                      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                                  return;
+                              } catch (Exception ignored) { }
+                          }
+                          try {
+                              startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://" + u.substring("intent://".length())))
+                                  .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                          } catch (Exception ignored) { }
+                          return;
+                      }
+                  }
+
+                  // Never bounce an Ennvo link back into the system browser.
+                  if (u.startsWith("http://localhost") || u.startsWith("https://localhost")) {
+                      runJs("window.__ennvoOpenLink&&window.__ennvoOpenLink(" + JSONObject.quote(u) + ")");
+                      return;
+                  }
+
+                  try {
+                      Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(u));
+                      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                      startActivity(i);
+                      return;
+                  } catch (Exception ignored) { }
+
+                  // Fallbacks when no dialer / messenger / mail app is installed.
+                  try {
+                      if (u.startsWith("tel:")) {
+                          startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse(u)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                      } else if (u.startsWith("mailto:")) {
+                          startActivity(new Intent(Intent.ACTION_SENDTO, Uri.parse(u)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                      }
+                  } catch (Exception ignored) { }
+              }
+
+              // "Share to this app": copy shared files into the cache so the web app can read them, then tell the page.
+              private void handleIntent(final Intent it) {
+                  if (it == null) return;
+                  try {
+                      // Tapping a message notification opens that chat; tapping Answer or the call screen opens the call.
+                      String oc = it.getStringExtra("open_conv");
+                      String on = it.getStringExtra("open_name");
+                      if ((oc != null && !oc.isEmpty()) || (on != null && !on.isEmpty())) {
+                          pendingOpen = new JSONObject().put("c", oc == null ? "" : oc).put("n", on == null ? "" : on).toString();
+                          it.removeExtra("open_conv");
+                          it.removeExtra("open_name");
+                          runJs("window.onNativeOpen&&window.onNativeOpen()");
+                      }
+                      String ca = it.getStringExtra("call_action");
+                      if (ca != null) {
+                          pendingCall = new JSONObject().put("a", ca).put("id", it.getStringExtra("call_id"))
+                              .put("name", it.getStringExtra("call_name")).put("type", it.getStringExtra("call_type")).toString();
+                          if (it.getBooleanExtra("call_screen", false) && Build.VERSION.SDK_INT >= 27) {
+                              setShowWhenLocked(true);
+                              setTurnScreenOn(true);
+                          }
+                          it.removeExtra("call_action");
+                          Notifier.cancelCall(this);
+                          runJs("window.onNativeCallAction&&window.onNativeCallAction()");
+                      }
+                  } catch (Exception ignored) { }
+
+                  // ennvo://user/x and https://ennvo.vercel.app/... : route inside the app, never to the browser.
+                  try {
+                      if (Intent.ACTION_VIEW.equals(it.getAction()) && it.getData() != null) {
+                          String raw = it.getData().toString();
+                          it.setData(null);
+                          if (raw != null && !raw.isEmpty()
+                              && !raw.startsWith("http://localhost") && !raw.startsWith("https://localhost")) {
+                              runJs("window.__ennvoOpenLink&&window.__ennvoOpenLink(" + JSONObject.quote(raw) + ")");
+                          }
+                      }
+                  } catch (Exception ignored) { }
+
+                  String a = it.getAction();
+                  if (!Intent.ACTION_SEND.equals(a) && !Intent.ACTION_SEND_MULTIPLE.equals(a)) return;
+                  final boolean multi = Intent.ACTION_SEND_MULTIPLE.equals(a);
+                  new Thread(() -> {
+                      try {
+                          JSONObject o = new JSONObject();
+                          JSONArray files = new JSONArray();
+                          String text = it.getStringExtra(Intent.EXTRA_TEXT);
+                          if (text != null) o.put("text", text);
+                          List<Uri> uris = new ArrayList<>();
+                          if (multi) {
+                              ArrayList<Uri> l = it.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+                              if (l != null) uris.addAll(l);
+                          } else {
+                              Uri single = it.getParcelableExtra(Intent.EXTRA_STREAM);
+                              if (single != null) uris.add(single);
+                          }
+                          File dir = new File(getCacheDir(), "shared");
+                          dir.mkdirs();
+                          int n = 0;
+                          for (Uri u : uris) {
+                              if (n >= 10) break;
+                              n++;
+                              String mime = getContentResolver().getType(u);
+                              String ext = mime == null ? null : MimeTypeMap.getSingleton().getExtensionFromMimeType(mime);
+                              File f = new File(dir, "share_" + System.currentTimeMillis() + "_" + n + (ext == null ? "" : "." + ext));
+                              try (InputStream in = getContentResolver().openInputStream(u); OutputStream out = new FileOutputStream(f)) {
+                                  byte[] buf = new byte[65536];
+                                  int len;
+                                  while (in != null && (len = in.read(buf)) > 0) out.write(buf, 0, len);
+                              }
+                              files.put(new JSONObject().put("url", "/_capacitor_file_" + f.getAbsolutePath())
+                                  .put("mime", mime == null ? "" : mime).put("name", f.getName()));
+                          }
+                          o.put("files", files);
+                          pendingShare = o.toString();
+                          runJs("window.onShareReceived&&window.onShareReceived()");
+                      } catch (Exception ignored) { }
+                  }).start();
+              }
+
+              private void applyBars() {
+                  Window win = getWindow();
+                  WindowCompat.setDecorFitsSystemWindows(win, false);
+                  // The bars are always transparent. The window color only shows behind a bar that is "show".
+                  if (sColor != lastWinBg) {
+                      win.setBackgroundDrawable(new ColorDrawable(sColor));
+                      lastWinBg = sColor;
+                  }
+                  win.setStatusBarColor(Color.TRANSPARENT);
+                  win.setNavigationBarColor(Color.TRANSPARENT);
+                  if (Build.VERSION.SDK_INT >= 29) win.setNavigationBarContrastEnforced(false);
+                  if (Build.VERSION.SDK_INT >= 28) {
+                      // Draw into the camera cut-out on every edge, so no black strip is left there. Only changed when needed (it forces a relayout).
+                      int mode = Build.VERSION.SDK_INT >= 30
+                          ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                          : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                      if (mode != lastCutout) {
+                          WindowManager.LayoutParams p = win.getAttributes();
+                          p.layoutInDisplayCutoutMode = mode;
+                          win.setAttributes(p);
+                          lastCutout = mode;
+                      }
+                  }
+                  WindowInsetsControllerCompat c = WindowCompat.getInsetsController(win, win.getDecorView());
+                  c.setAppearanceLightStatusBars(light);
+                  c.setAppearanceLightNavigationBars(light);
+                  c.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                  if (STATUS.equals("hide")) c.hide(WindowInsetsCompat.Type.statusBars()); else c.show(WindowInsetsCompat.Type.statusBars());
+                  if (NAV.equals("hide")) c.hide(WindowInsetsCompat.Type.navigationBars()); else c.show(WindowInsetsCompat.Type.navigationBars());
+              }
+
+              // Methods the web app calls as window.AndroidInterface.* and window.Android.*
+              public class NativeBridge {
+                  @JavascriptInterface
+                  public void showNotification(String title, String body, String icon, String type) {
+                  askNotificationsOnce();
+                      if (pushHandles()) return;
+                      Notifier.showMessage(MainActivity.this, title, body, icon, null);
+                  }
+
+                  @JavascriptInterface
+                  public void showNotification(String title, String body, String type) {
+                  askNotificationsOnce();
+                      if (pushHandles()) return;
+                      Notifier.showMessage(MainActivity.this, title, body, null, null);
+                  }
+
+                  @JavascriptInterface
+                  public void sendNotification(String title, String body) {
+                  askNotificationsOnce();
+                      if (pushHandles()) return;
+                      Notifier.showMessage(MainActivity.this, title, body, null, null);
+                  }
+
+                  @JavascriptInterface
+                  public void showIncomingCall(String name, String avatar, String type, String callId) {
+                      if (pushHandles()) return;
+                      Notifier.showCall(MainActivity.this, name, avatar, type, callId);
+                  }
+
+                  @JavascriptInterface
+                  public void dismissIncomingCall() {
+                      Notifier.cancelCall(MainActivity.this);
+                  }
+
+                  @JavascriptInterface
+                  public void downloadMedia(String url, String filename, String mime) {
+                      if (url == null || !url.startsWith("http")) return;
+                      try {
+                          final String name = (filename == null || filename.isEmpty()) ? "download" : filename.replace('/', '_').replace(':', '_');
+                          DownloadManager.Request r = new DownloadManager.Request(Uri.parse(url))
+                              .setTitle(name)
+                              .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                              .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name);
+                          if (mime != null && !mime.isEmpty()) r.setMimeType(mime);
+                          ((DownloadManager) getSystemService(DOWNLOAD_SERVICE)).enqueue(r);
+                          runOnUiThread(() -> Toast.makeText(MainActivity.this, "Downloading " + name, Toast.LENGTH_SHORT).show());
+                      } catch (Exception ignored) { }
+                  }
+
+                  // Called by the web app on every page change so the status and navigation bars match the UI.
+                  @JavascriptInterface
+                  public void setStatusBarColor(String hex, boolean isDark) {
+                      runOnUiThread(() -> {
+                          try {
+                              int c = Color.parseColor(hex);
+                              sColor = c;
+                              nColor = c;
+                              light = !isDark;
+                              getBridge().getWebView().setBackgroundColor(c);
+                              applyBars();
+                          } catch (Exception ignored) { }
+                      });
+                  }
+
+                  @JavascriptInterface
+                  public void exitApp() {
+                      runOnUiThread(() -> finishAffinity());
+                  }
+
+                  // ---- Calls: keep the mic alive in the background, route audio, turn the screen off near the ear ----
+                  @JavascriptInterface
+                  public void startCall(String name, boolean video) {
+                      final String nm = name == null ? "" : name;
+                      final boolean vid = video;
+                      runOnUiThread(() -> {
+                          inCall = true;
+                          runJs("window.__inCall=true");
+                          try {
+                              ContextCompat.startForegroundService(MainActivity.this,
+                                  new Intent(MainActivity.this, CallService.class).putExtra("name", nm).putExtra("video", vid));
+                          } catch (Exception ignored) { }
+                          AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
+                          am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+                          am.setSpeakerphoneOn(vid);
+                          setProx(!vid);
+                      });
+                  }
+
+                  @JavascriptInterface
+                  public void endCall() {
+                      runOnUiThread(() -> {
+                          inCall = false;
+                          runJs("window.__inCall=false");
+                          try { stopService(new Intent(MainActivity.this, CallService.class)); } catch (Exception ignored) { }
+                          AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
+                          am.setMode(AudioManager.MODE_NORMAL);
+                          am.setSpeakerphoneOn(false);
+                          setProx(false);
+                      });
+                  }
+
+                  @JavascriptInterface
+                  public void setSpeaker(boolean on) {
+                      final boolean speaker = on;
+                      runOnUiThread(() -> {
+                          ((AudioManager) getSystemService(AUDIO_SERVICE)).setSpeakerphoneOn(speaker);
+                          setProx(!speaker && inCall);
+                      });
+                  }
+
+                  // ---- Picture-in-picture: the web app enables it while a video or call is on screen ----
+                  @JavascriptInterface
+                  public void setPip(boolean enabled, int w, int h) {
+                      pipOn = enabled;
+                      if (w > 0 && h > 0) { pipW = w; pipH = h; }
+                      if (Build.VERSION.SDK_INT >= 26) {
+                          runOnUiThread(() -> {
+                              try { setPictureInPictureParams(pipParams()); } catch (Exception ignored) { }
+                          });
+                      }
+                  }
+
+                  // ---- Share target, app info, updates, crash reports ----
+                  @JavascriptInterface
+                  public String getPendingShare() {
+                      String s = pendingShare;
+                      pendingShare = null;
+                      return s == null ? "" : s;
+                  }
+
+                  @JavascriptInterface
+                  public String getAppInfo() {
+                      try {
+                          PackageInfo p = getPackageManager().getPackageInfo(getPackageName(), 0);
+                          long code = Build.VERSION.SDK_INT >= 28 ? p.getLongVersionCode() : p.versionCode;
+                          return new JSONObject().put("versionName", p.versionName).put("versionCode", code)
+                              .put("sdk", Build.VERSION.SDK_INT).put("model", Build.MODEL).toString();
+                      } catch (Exception e) {
+                          return "{}";
+                      }
+                  }
+
+                  // Every scheme is allowed now: tel:, mailto:, sms:, whatsapp:, geo:, market:, intent://, https://
+                  @JavascriptInterface
+                  public void openUrl(String url) {
+                      openExternal(url);
+                  }
+
+                  // Share through the Android chooser (WhatsApp, Telegram, Gmail ...).
+                  // The Web Share API does not exist inside a WebView.
+                  @JavascriptInterface
+                  public void shareText(String title, String text) {
+                      try {
+                          Intent i = new Intent(Intent.ACTION_SEND);
+                          i.setType("text/plain");
+                          if (title != null && !title.isEmpty()) i.putExtra(Intent.EXTRA_SUBJECT, title);
+                          i.putExtra(Intent.EXTRA_TEXT, text == null ? "" : text);
+                          Intent chooser = Intent.createChooser(i, title == null || title.isEmpty() ? "Share with" : title);
+                          chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                          startActivity(chooser);
+                      } catch (Exception ignored) { }
+                  }
+
+                  @JavascriptInterface
+                  public void openStore() {
+                      try {
+                          startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                      } catch (Exception e) {
+                          openUrl("https://play.google.com/store/apps/details?id=" + getPackageName());
+                      }
+                  }
+
+                  @JavascriptInterface
+                  public void reportError(String message, String stack) { }
+
+                  @JavascriptInterface
+                  public void setUserId(String uid) { askNotificationsOnce(); }
+
+                  // Called by the page once it has painted: the native splash screen fades out right away.
+                  @JavascriptInterface
+                  public void appReady() {
+                      splashHold = false;
+                      injectInsets();
+                  }
+
+                  // ---- Notification settings and health ----
+                  @JavascriptInterface
+                  public void setNotificationMode(String mode) {
+                      if ("on".equals(mode) || "off".equals(mode) || "secret".equals(mode)) {
+                          getSharedPreferences("app", MODE_PRIVATE).edit().putString("notif_mode", mode).apply();
+                      }
+                  }
+
+                  @JavascriptInterface
+                  public String getNotificationMode() {
+                      return getSharedPreferences("app", MODE_PRIVATE).getString("notif_mode", "on");
+                  }
+
+                  @JavascriptInterface
+                  public String getPushStatus() {
+                      try {
+                          PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+                          boolean unrestricted = Build.VERSION.SDK_INT < 23 || (pm != null && pm.isIgnoringBatteryOptimizations(getPackageName()));
+                          return new JSONObject()
+                              .put("notificationsAllowed", NotificationManagerCompat.from(MainActivity.this).areNotificationsEnabled())
+                              .put("hasToken", !getSharedPreferences("app", MODE_PRIVATE).getString("fcm", "").isEmpty())
+                              .put("fcmBuilt", ${fcm})
+                              .put("batteryUnrestricted", unrestricted)
+                              .put("mode", getSharedPreferences("app", MODE_PRIVATE).getString("notif_mode", "on")).toString();
+                      } catch (Exception e) {
+                          return "{}";
+                      }
+                  }
+
+                  @JavascriptInterface
+                  public void openBatterySettings() {
+                      try {
+                          startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                      } catch (Exception e) {
+                          openAppSettings();
+                      }
+                  }
+
+                  @JavascriptInterface
+                  public void openAppSettings() {
+                      try {
+                          startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                      } catch (Exception ignored) { }
+                  }
+
+                  // ---- Open-from-notification and call actions, pulled by the web app ----
+                  @JavascriptInterface
+                  public String getPendingOpen() {
+                      String s = pendingOpen;
+                      pendingOpen = null;
+                      return s == null ? "" : s;
+                  }
+
+                  @JavascriptInterface
+                  public String getPendingCallAction() {
+                      String s = pendingCall;
+                      pendingCall = null;
+                      return s == null ? "" : s;
+                  }
+
+                  // ---- Permissions on demand (the web app asks when the user taps something that needs one) ----
+                  @JavascriptInterface
+                  public boolean hasPermission(String name) {
+                      try { return isGranted(name); } catch (Exception e) { return false; }
+                  }
+
+                  @JavascriptInterface
+                  public void requestPermission(final String name) {
+                      runOnUiThread(() -> {
+                          try {
+                              askedName = name == null ? "" : name;
+                              List<String> need = missing(name);
+                              if (need.isEmpty()) {
+                                  runJs("window.onPermissionResult&&window.onPermissionResult(" + JSONObject.quote(askedName) + "," + isGranted(askedName) + ")");
+                                  return;
+                              }
+                              requestPermissions(need.toArray(new String[0]), 1002);
+                          } catch (Exception ignored) { }
+                      });
+                  }
+                  // ---- Small native helpers ----
+                  @JavascriptInterface
+                  public void vibrate(int ms) {
+                      try {
+                          Vibrator v = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+                          if (v == null) return;
+                          int d = Math.max(5, Math.min(ms, 500));
+                          if (Build.VERSION.SDK_INT >= 26) v.vibrate(VibrationEffect.createOneShot(d, VibrationEffect.DEFAULT_AMPLITUDE));
+                          else v.vibrate(d);
+                      } catch (Exception ignored) { }
+                  }
+
+                  @JavascriptInterface
+                  public void shareText(String title, String text) {
+                      try {
+                          Intent s = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text == null ? "" : text);
+                          startActivity(Intent.createChooser(s, title == null ? "Share" : title).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                      } catch (Exception ignored) { }
+                  }
+
+                  @JavascriptInterface
+                  public void setKeepScreenOn(boolean on) {
+                      final boolean keep = on;
+                      runOnUiThread(() -> {
+                          if (keep) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                          else if (!${e.KEEP_AWAKE === 'true'}) getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                      });
+                  }
+
+                  @JavascriptInterface
+                  public String getFcmToken() {
+                      return getSharedPreferences("app", MODE_PRIVATE).getString("fcm", "");
+                  }
+
+                  @JavascriptInterface
+                  public String getPendingReplies() {
+                      return Notifier.takePending(MainActivity.this);
+                  }
+              }
+          }
+          `);
+          fs.writeFileSync(path.join(dir, 'Notifier.java'), `package ${P};
+
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.PendingIntent;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.graphics.Bitmap;
+          import android.graphics.BitmapFactory;
+          import android.graphics.Canvas;
+          import android.graphics.Color;
+          import android.graphics.Paint;
+          import android.graphics.PorterDuff;
+          import android.graphics.PorterDuffXfermode;
+          import android.graphics.Rect;
+          import android.media.AudioAttributes;
+          import android.media.RingtoneManager;
+          import android.os.Build;
+          import androidx.core.app.NotificationCompat;
+          import androidx.core.app.Person;
+          import androidx.core.app.RemoteInput;
+          import androidx.core.content.pm.ShortcutInfoCompat;
+          import androidx.core.content.pm.ShortcutManagerCompat;
+          import androidx.core.graphics.drawable.IconCompat;
+          import java.io.InputStream;
+          import java.io.OutputStream;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.util.ArrayList;
+          import java.util.HashMap;
+          import java.util.List;
+          import java.util.Map;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          // One place that builds every notification: bridge calls from the web app and FCM pushes.
+          public class Notifier {
+              static volatile boolean foreground = false;
+              static volatile MainActivity activity = null;
+              static final String MSG_CH = "app_messages";
+              static final String CALL_CH = "app_calls";
+              static final String ACT_CH = "app_activity";
+              static final int CALL_ID = 9001;
+              static final int SECRET_ID = 9003;
+              // Cloud Function that lets a notification reply or decline work while the app is closed.
+              static final String PUSH_API = "${e.PUSH_API}";
+              static final String APP = ${JSON.stringify(e.APP_NAME)};
+              private static long lastSecret = 0;
+              static final int ACCENT = Color.parseColor("${accent}");
+              private static final Map<Integer, Conv> convs = new HashMap<>();
+              private static String lastKey = "";
+              private static long lastTime = 0;
+
+              static class Msg {
+                  final String text;
+                  final long ts = System.currentTimeMillis();
+                  final boolean mine;
+                  Msg(String t, boolean m) { text = t; mine = m; }
+              }
+
+              static class Conv {
+                  String title = "";
+                  String convId = "";
+                  Bitmap avatar;
+                  final List<Msg> msgs = new ArrayList<>();
+              }
+
+              static void channels(Context ctx) {
+                  if (Build.VERSION.SDK_INT < 26) return;
+                  NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+                  NotificationChannel m = new NotificationChannel(MSG_CH, "Messages", NotificationManager.IMPORTANCE_HIGH);
+                  m.enableVibration(true);
+                  m.setVibrationPattern(new long[]{0, 120, 80, 120});
+                  nm.createNotificationChannel(m);
+                  NotificationChannel c = new NotificationChannel(CALL_CH, "Calls", NotificationManager.IMPORTANCE_HIGH);
+                  AudioAttributes aa = new AudioAttributes.Builder()
+                      .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                      .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
+                  c.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE), aa);
+                  c.enableVibration(true);
+                  c.setVibrationPattern(new long[]{0, 800, 600, 800});
+                  c.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+                  nm.createNotificationChannel(c);
+                  nm.createNotificationChannel(new NotificationChannel(ACT_CH, "Activity", NotificationManager.IMPORTANCE_DEFAULT));
+              }
+
+              // Lowercase letters and digits only, so "Sam" and "Sam (emoji)" match.
+              private static String norm(String s) {
+                  StringBuilder b = new StringBuilder();
+                  if (s != null) {
+                      for (int i = 0; i < s.length(); i++) {
+                          char ch = s.charAt(i);
+                          if (Character.isLetterOrDigit(ch)) b.append(Character.toLowerCase(ch));
+                      }
+                  }
+                  return b.toString();
+              }
+
+              // Drops trailing emoji and spaces from a title like "Sam (emoji)".
+              private static String clean(String s) {
+                  int last = -1;
+                  for (int i = 0; i < s.length(); i++) if (Character.isLetterOrDigit(s.charAt(i))) last = i;
+                  return last < 0 ? s : s.substring(0, last + 1);
+              }
+
+              static void showMessage(final Context ctx, String title, String body, final String avatarUrl, String convId) {
+                  if (foreground) return;
+                  String mode = ctx.getSharedPreferences("app", Context.MODE_PRIVATE).getString("notif_mode", "on");
+                  if ("off".equals(mode)) return;
+                  if ("secret".equals(mode)) { showSecret(ctx); return; }
+                  final String t = title == null ? "" : title;
+                  final String b = body == null ? "" : body;
+                  final String cid = convId == null ? "" : convId;
+                  final int id = ("c:" + norm(t)).hashCode();
+                  final String key = norm(t) + "|" + norm(b);
+                  synchronized (Notifier.class) {
+                      long now = System.currentTimeMillis();
+                      if (key.equals(lastKey) && now - lastTime < 15000) {
+                          // Same message from the web app and from FCM: show it once, but keep the conversation id for replies.
+                          Conv dup = convs.get(id);
+                          if (dup != null && dup.convId.isEmpty() && !cid.isEmpty()) {
+                              dup.convId = cid;
+                              repost(ctx, id, false);
+                          }
+                          return;
+                      }
+                      lastKey = key;
+                      lastTime = now;
+                  }
+                  new Thread(() -> {
+                      Bitmap av = loadAvatar(avatarUrl);
+                      synchronized (Notifier.class) {
+                          Conv c = convs.get(id);
+                          if (c == null) { c = new Conv(); convs.put(id, c); }
+                          c.title = clean(t);
+                          if (!cid.isEmpty()) c.convId = cid;
+                          if (av != null) c.avatar = av;
+                          c.msgs.add(new Msg(b, false));
+                          while (c.msgs.size() > 8) c.msgs.remove(0);
+                      }
+                      repost(ctx, id, true);
+                  }).start();
+              }
+
+              // Secret mode: no name, no text, no picture. Just the app name.
+              private static void showSecret(Context ctx) {
+                  synchronized (Notifier.class) {
+                      long now = System.currentTimeMillis();
+                      if (now - lastSecret < 4000) return;
+                      lastSecret = now;
+                  }
+                  channels(ctx);
+                  NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, MSG_CH)
+                      .setSmallIcon(smallIcon(ctx))
+                      .setColor(ACCENT)
+                      .setContentTitle(APP)
+                      .setContentText("You have a new message")
+                      .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                      .setPriority(NotificationCompat.PRIORITY_HIGH)
+                      .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                      .setAutoCancel(true)
+                      .setDefaults(NotificationCompat.DEFAULT_SOUND)
+                      .setContentIntent(open(ctx, SECRET_ID, "", ""));
+                  ((NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE)).notify(SECRET_ID, b.build());
+              }
+
+              static synchronized void repost(Context ctx, int id, boolean alert) {
+                  Conv c = convs.get(id);
+                  if (c == null || c.msgs.isEmpty()) return;
+                  channels(ctx);
+                  Person me = new Person.Builder().setName("You").build();
+                  String shortcutId = "conv_" + id;
+                  Person.Builder pb = new Person.Builder().setName(c.title).setKey(shortcutId).setImportant(true);
+                  if (c.avatar != null) pb.setIcon(IconCompat.createWithBitmap(c.avatar));
+                  Person other = pb.build();
+                  // A conversation shortcut makes Android show the sender's picture with the app icon badge, like WhatsApp.
+                  try {
+                      Intent si = new Intent(ctx, MainActivity.class).setAction("app.OPEN")
+                          .putExtra("open_conv", c.convId).putExtra("open_name", c.title);
+                      ShortcutInfoCompat.Builder sb = new ShortcutInfoCompat.Builder(ctx, shortcutId)
+                          .setLongLived(true).setShortLabel(c.title).setIntent(si).setPerson(other);
+                      if (c.avatar != null) sb.setIcon(IconCompat.createWithBitmap(c.avatar));
+                      ShortcutManagerCompat.pushDynamicShortcut(ctx, sb.build());
+                  } catch (Exception ignored) { }
+                  NotificationCompat.MessagingStyle style = new NotificationCompat.MessagingStyle(me);
+                  for (Msg m : c.msgs) style.addMessage(m.text, m.ts, m.mine ? me : other);
+
+                  RemoteInput ri = new RemoteInput.Builder("reply_text").setLabel("Reply").build();
+                  Intent replyIntent = new Intent(ctx, ReplyReceiver.class).setAction("reply").putExtra("id", id);
+                  PendingIntent replyPi = PendingIntent.getBroadcast(ctx, id, replyIntent,
+                      PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0));
+                  NotificationCompat.Action reply = new NotificationCompat.Action.Builder(android.R.drawable.ic_menu_send, "Reply", replyPi)
+                      .addRemoteInput(ri)
+                      .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
+                      .setShowsUserInterface(false).build();
+                  Intent delIntent = new Intent(ctx, ReplyReceiver.class).setAction("dismiss").putExtra("id", id);
+                  PendingIntent delPi = PendingIntent.getBroadcast(ctx, id + 1, delIntent,
+                      PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+                  NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, MSG_CH)
+                      .setSmallIcon(smallIcon(ctx))
+                      .setColor(ACCENT)
+                      .setStyle(style)
+                      .setContentTitle(c.title)
+                      .setContentText(c.msgs.get(c.msgs.size() - 1).text)
+                      .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                      .setPriority(NotificationCompat.PRIORITY_HIGH)
+                      .setAutoCancel(true)
+                      .setOnlyAlertOnce(!alert)
+                      .setDefaults(NotificationCompat.DEFAULT_SOUND)
+                      .addAction(reply)
+                      .setShortcutId(shortcutId)
+                      .setContentIntent(open(ctx, id, c.convId, c.title))
+                      .setDeleteIntent(delPi);
+                  if (c.avatar != null) b.setLargeIcon(c.avatar);
+                  ((NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE)).notify(id, b.build());
+              }
+
+              static void handleReply(Context ctx, int id, String text) {
+                  String convId = "";
+                  String title = "";
+                  synchronized (Notifier.class) {
+                      Conv c = convs.get(id);
+                      if (c != null) { convId = c.convId; title = c.title; c.msgs.add(new Msg(text, true)); }
+                  }
+                  MainActivity a = activity;
+                  if (a != null) {
+                      a.runJs("(window.__replyQ=window.__replyQ||[]).push({c:" + JSONObject.quote(convId)
+                          + ",t:" + JSONObject.quote(text) + ",n:" + JSONObject.quote(title)
+                          + "});window.__flushReplies&&window.__flushReplies();");
+                  } else if (!sendRemote(ctx, convId, text)) {
+                      queue(ctx, convId, text, title);
+                  }
+                  repost(ctx, id, false);
+              }
+
+              // The app is closed: send the reply through the Cloud Function, authenticated by this device's push token.
+              private static boolean sendRemote(Context ctx, String convId, String text) {
+                  if (convId.isEmpty()) return false;
+                  try {
+                      return remote(ctx, "replyMessage", new JSONObject().put("convId", convId).put("text", text));
+                  } catch (Exception e) {
+                      return false;
+                  }
+              }
+
+              static void remoteDecline(Context ctx, String callId) {
+                  try { remote(ctx, "declineCall", new JSONObject().put("callId", callId)); } catch (Exception ignored) { }
+              }
+
+              private static boolean remote(Context ctx, String fn, JSONObject body) {
+                  if (PUSH_API.isEmpty()) return false;
+                  try {
+                      body.put("token", ctx.getSharedPreferences("app", Context.MODE_PRIVATE).getString("fcm", ""));
+                      HttpURLConnection h = (HttpURLConnection) new URL(PUSH_API + "/" + fn).openConnection();
+                      h.setRequestMethod("POST");
+                      h.setConnectTimeout(8000);
+                      h.setReadTimeout(8000);
+                      h.setDoOutput(true);
+                      h.setRequestProperty("Content-Type", "application/json");
+                      OutputStream o = h.getOutputStream();
+                      o.write(body.toString().getBytes("UTF-8"));
+                      o.close();
+                      int code = h.getResponseCode();
+                      h.disconnect();
+                      return code >= 200 && code < 300;
+                  } catch (Exception e) {
+                      return false;
+                  }
+              }
+
+              static synchronized void forget(int id) { convs.remove(id); }
+
+              static synchronized void clearMessages(Context ctx) {
+                  NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+                  nm.cancel(SECRET_ID);
+                  for (Integer id : convs.keySet()) nm.cancel(id);
+                  convs.clear();
+              }
+
+              static void showCall(final Context ctx, final String name, final String avatarUrl, final String type, final String callId) {
+                  if (foreground) return;
+                  channels(ctx);
+                  new Thread(() -> {
+                      Bitmap av = loadAvatar(avatarUrl);
+                      String nm = name == null ? "" : name;
+                      String cid = callId == null ? "" : callId;
+                      PendingIntent screen = callActivity(ctx, 77, "open", cid, nm, type);
+                      PendingIntent answer = callActivity(ctx, 78, "answer", cid, nm, type);
+                      Intent di = new Intent(ctx, ReplyReceiver.class).setAction("decline").putExtra("call_id", cid);
+                      PendingIntent decline = PendingIntent.getBroadcast(ctx, 79, di, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                      Person.Builder pb = new Person.Builder().setName(nm).setImportant(true);
+                      if (av != null) pb.setIcon(IconCompat.createWithBitmap(av));
+                      NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, CALL_CH)
+                          .setSmallIcon(android.R.drawable.sym_call_incoming)
+                          .setColor(ACCENT)
+                          .setContentText("video".equals(type) ? "Incoming video call" : "Incoming voice call")
+                          .setCategory(NotificationCompat.CATEGORY_CALL)
+                          .setPriority(NotificationCompat.PRIORITY_MAX)
+                          .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                          .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE))
+                          .setOngoing(true)
+                          .setTimeoutAfter(45000)
+                          .setStyle(NotificationCompat.CallStyle.forIncomingCall(pb.build(), decline, answer))
+                          .setFullScreenIntent(screen, true)
+                          .setContentIntent(screen);
+                      if (av != null) b.setLargeIcon(av);
+                      Notification n = b.build();
+                      n.flags |= Notification.FLAG_INSISTENT;
+                      ((NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE)).notify(CALL_ID, n);
+                  }).start();
+              }
+
+              private static PendingIntent callActivity(Context ctx, int code, String act, String callId, String name, String type) {
+                  Intent i = new Intent(ctx, MainActivity.class).setAction("app.CALL." + act)
+                      .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                      .putExtra("call_action", act).putExtra("call_id", callId).putExtra("call_name", name)
+                      .putExtra("call_type", type == null ? "voice" : type).putExtra("call_screen", true);
+                  return PendingIntent.getActivity(ctx, code, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+              }
+
+              // Likes, comments and follows.
+              static void showActivity(final Context ctx, final String text, final String avatarUrl) {
+                  if (foreground) return;
+                  String mode = ctx.getSharedPreferences("app", Context.MODE_PRIVATE).getString("notif_mode", "on");
+                  if ("off".equals(mode)) return;
+                  final boolean secret = "secret".equals(mode);
+                  channels(ctx);
+                  new Thread(() -> {
+                      Bitmap av = secret ? null : loadAvatar(avatarUrl);
+                      NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, ACT_CH)
+                          .setSmallIcon(smallIcon(ctx))
+                          .setColor(ACCENT)
+                          .setContentTitle(APP)
+                          .setContentText(secret ? "You have a new notification" : (text == null ? "" : text))
+                          .setCategory(NotificationCompat.CATEGORY_SOCIAL)
+                          .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                          .setAutoCancel(true)
+                          .setContentIntent(open(ctx, 8001, "", ""));
+                      if (av != null) b.setLargeIcon(av);
+                      ((NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE))
+                          .notify((int) (System.currentTimeMillis() % 100000) + 20000, b.build());
+                  }).start();
+              }
+
+              static void cancelCall(Context ctx) {
+                  ((NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE)).cancel(CALL_ID);
+              }
+
+              static void saveToken(Context ctx, String token) {
+                  ctx.getSharedPreferences("app", Context.MODE_PRIVATE).edit().putString("fcm", token).apply();
+                  MainActivity a = activity;
+                  if (a != null) a.runJs("window.onFcmToken&&window.onFcmToken(" + JSONObject.quote(token) + ")");
+              }
+
+              static synchronized void queue(Context ctx, String c, String t, String n) {
+                  try {
+                      SharedPreferences sp = ctx.getSharedPreferences("app", Context.MODE_PRIVATE);
+                      JSONArray a = new JSONArray(sp.getString("pending", "[]"));
+                      a.put(new JSONObject().put("c", c).put("t", t).put("n", n));
+                      sp.edit().putString("pending", a.toString()).apply();
+                  } catch (Exception ignored) { }
+              }
+
+              static synchronized String takePending(Context ctx) {
+                  SharedPreferences sp = ctx.getSharedPreferences("app", Context.MODE_PRIVATE);
+                  String s = sp.getString("pending", "[]");
+                  sp.edit().remove("pending").apply();
+                  return s;
+              }
+
+              private static int smallIcon(Context ctx) {
+                  int r = ctx.getResources().getIdentifier("ic_stat_notify", "drawable", ctx.getPackageName());
+                  return r != 0 ? r : android.R.drawable.stat_notify_chat;
+              }
+
+              private static PendingIntent open(Context ctx, int code, String convId, String name) {
+                  Intent i = new Intent(ctx, MainActivity.class).setAction("app.OPEN")
+                      .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                      .putExtra("open_conv", convId == null ? "" : convId).putExtra("open_name", name == null ? "" : name);
+                  return PendingIntent.getActivity(ctx, code, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+              }
+
+              private static Bitmap loadAvatar(String u) {
+                  if (u == null || !u.startsWith("http")) return null;
+                  try {
+                      HttpURLConnection h = (HttpURLConnection) new URL(u).openConnection();
+                      h.setConnectTimeout(4000);
+                      h.setReadTimeout(4000);
+                      InputStream in = h.getInputStream();
+                      Bitmap src = BitmapFactory.decodeStream(in);
+                      in.close();
+                      if (src == null) return null;
+                      int s = Math.min(src.getWidth(), src.getHeight());
+                      Rect from = new Rect((src.getWidth() - s) / 2, (src.getHeight() - s) / 2, (src.getWidth() + s) / 2, (src.getHeight() + s) / 2);
+                      Bitmap out = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888);
+                      Canvas cv = new Canvas(out);
+                      Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+                      cv.drawCircle(64, 64, 64, p);
+                      p.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+                      cv.drawBitmap(src, from, new Rect(0, 0, 128, 128), p);
+                      return out;
+                  } catch (Exception e) {
+                      return null;
+                  }
+              }
+          }
+          `);
+          fs.writeFileSync(path.join(dir, 'ReplyReceiver.java'), `package ${P};
+
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.os.Bundle;
+          import androidx.core.app.RemoteInput;
+          import org.json.JSONObject;
+
+          public class ReplyReceiver extends BroadcastReceiver {
+              @Override
+              public void onReceive(final Context ctx, final Intent i) {
+                  String act = i.getAction();
+                  if ("hangup".equals(act)) {
+                      MainActivity a = Notifier.activity;
+                      if (a != null) a.runJs("window.onNativeHangup&&window.onNativeHangup()");
+                      return;
+                  }
+                  final int id = i.getIntExtra("id", 0);
+                  if ("dismiss".equals(act)) {
+                      Notifier.forget(id);
+                      return;
+                  }
+                  if ("decline".equals(act)) {
+                      String raw = i.getStringExtra("call_id");
+                      final String callId = raw == null ? "" : raw;
+                      Notifier.cancelCall(ctx);
+                      MainActivity a = Notifier.activity;
+                      if (a != null) {
+                          a.runJs("(window.__callQ=window.__callQ||[]).push({a:'decline',id:" + JSONObject.quote(callId)
+                              + "});window.onNativeCallAction&&window.onNativeCallAction();");
+                          return;
+                      }
+                      final PendingResult pr = goAsync();
+                      new Thread(() -> {
+                          try { Notifier.remoteDecline(ctx, callId); } finally { pr.finish(); }
+                      }).start();
+                      return;
+                  }
+                  Bundle r = RemoteInput.getResultsFromIntent(i);
+                  CharSequence t = r == null ? null : r.getCharSequence("reply_text");
+                  if (t == null || t.toString().trim().length() == 0) return;
+                  final String text = t.toString().trim();
+                  final PendingResult pr = goAsync();
+                  new Thread(() -> {
+                      try { Notifier.handleReply(ctx, id, text); } finally { pr.finish(); }
+                  }).start();
+              }
+          }
+          `);
+          fs.writeFileSync(path.join(dir, 'CallService.java'), `package ${P};
+
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.PendingIntent;
+          import android.app.Service;
+          import android.content.Intent;
+          import android.content.pm.ServiceInfo;
+          import android.os.Build;
+          import android.os.IBinder;
+          import androidx.core.app.NotificationCompat;
+
+          // Foreground service for an ongoing call. Without it Android cuts the microphone when the app is minimized.
+          public class CallService extends Service {
+              private static final String CH = "app_ongoing";
+              private static final int ID = 9002;
+
+              @Override
+              public IBinder onBind(Intent intent) { return null; }
+
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  String name = intent == null ? "" : intent.getStringExtra("name");
+                  boolean video = intent != null && intent.getBooleanExtra("video", false);
+                  if (Build.VERSION.SDK_INT >= 26) {
+                      NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                      nm.createNotificationChannel(new NotificationChannel(CH, "Ongoing call", NotificationManager.IMPORTANCE_LOW));
+                  }
+                  PendingIntent open = PendingIntent.getActivity(this, 5,
+                      new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                      PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                  PendingIntent hang = PendingIntent.getBroadcast(this, 6,
+                      new Intent(this, ReplyReceiver.class).setAction("hangup"),
+                      PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                  Notification n = new NotificationCompat.Builder(this, CH)
+                      .setSmallIcon(android.R.drawable.sym_action_call)
+                      .setColor(Notifier.ACCENT)
+                      .setContentTitle(name == null ? "" : name)
+                      .setContentText(video ? "Ongoing video call" : "Ongoing voice call")
+                      .setCategory(NotificationCompat.CATEGORY_CALL)
+                      .setOngoing(true)
+                      .setUsesChronometer(true)
+                      .setWhen(System.currentTimeMillis())
+                      .setContentIntent(open)
+                      .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Hang up", hang)
+                      .build();
+                  try {
+                      if (Build.VERSION.SDK_INT >= 29) {
+                          int type = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE | (video ? ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA : 0);
+                          try {
+                              startForeground(ID, n, type);
+                          } catch (SecurityException se) {
+                              startForeground(ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
+                          }
+                      } else {
+                          startForeground(ID, n);
+                      }
+                  } catch (Exception e) {
+                      stopSelf();
+                  }
+                  return START_NOT_STICKY;
+              }
+          }
+          `);
+          try {
+            const sp = 'android/app/src/main/res/values/styles.xml';
+            let st = fs.readFileSync(sp, 'utf8');
+            st = st.replace(/(<style name="AppTheme\.NoActionBar"[^>]*>)([\s\S]*?)(<\/style>)/, (m, a, b, c) => {
+              const add = [];
+              if (!b.includes('windowLayoutInDisplayCutoutMode')) add.push('<item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>');
+              if (!b.includes('android:statusBarColor')) add.push('<item name="android:statusBarColor">@android:color/transparent</item>');
+              if (!b.includes('android:navigationBarColor')) add.push('<item name="android:navigationBarColor">@android:color/transparent</item>');
+              return a + b + add.join('') + c;
+            });
+            fs.writeFileSync(sp, st);
+          } catch (err) { console.log('::warning::Could not patch styles.xml: ' + err.message); }
+          if (fcm) fs.writeFileSync(path.join(dir, 'AppFcmService.java'), `package ${P};
+
+          import com.google.firebase.messaging.FirebaseMessagingService;
+          import com.google.firebase.messaging.RemoteMessage;
+          import java.util.Map;
+
+          public class AppFcmService extends FirebaseMessagingService {
+              @Override
+              public void onMessageReceived(RemoteMessage m) {
+                  Map<String, String> d = m.getData();
+                  getSharedPreferences("app", MODE_PRIVATE).edit().putBoolean("push_ok", true).apply();
+                  String type = d.get("type");
+                  if ("call".equals(type)) {
+                      Notifier.showCall(this, d.get("name"), d.get("avatar"), d.get("callType"), d.get("callId"));
+                  } else if ("call_cancel".equals(type)) {
+                      Notifier.cancelCall(this);
+                  } else if ("activity".equals(type)) {
+                      Notifier.showActivity(this, d.get("body"), d.get("avatar"));
+                  } else if (d.get("body") != null) {
+                      Notifier.showMessage(this, d.get("title"), d.get("body"), d.get("avatar"), d.get("convId"));
+                  }
+              }
+
+              @Override
+              public void onNewToken(String token) {
+                  Notifier.saveToken(this, token);
+              }
+          }
+          `);
+          JS
+
+      - name: Build web/game app (optimized release, automatic retries)
+        if: env.WEB == 'true'
+        run: |
+          cd "$APP_DIR/android"
+          chmod +x gradlew
+          EXTRA=""
+          run_gradle() {
+            ./gradlew "$@" $EXTRA --no-daemon --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle.log"
+            return "${PIPESTATUS[0]}"
+          }
+          # Reads the failed build log and repairs the usual causes before the next try.
+          autofix() {
+            L="$RUNNER_TEMP/gradle.log"
+            EXTRA="--refresh-dependencies"
+            if grep -qE "OutOfMemoryError|Java heap space|GC overhead|Metaspace" "$L"; then
+              echo "::warning::Auto-fix: Gradle ran out of memory. Raising the limit."
+              sed -i '/^org.gradle.jvmargs/d' gradle.properties
+              echo 'org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=2g -Dfile.encoding=UTF-8' >> gradle.properties
+            fi
+            N="$(grep -oE "compile against version [0-9]+" "$L" | grep -oE "[0-9]+" | sort -n | tail -n 1 || true)"
+            CUR="$(grep -oE "compileSdkVersion[[:space:]]*=[[:space:]]*[0-9]+" variables.gradle | grep -oE "[0-9]+$" | head -n 1 || true)"
+            if [ -n "$N" ] && [ -n "$CUR" ] && [ "$N" -gt "$CUR" ]; then
+              echo "::warning::Auto-fix: a library needs compileSdk $N. Updating."
+              yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-$N" > /dev/null 2>&1 || true
+              sed -i -E "s/(compileSdkVersion[[:space:]]*=[[:space:]]*)[0-9]+/\1$N/" variables.gradle
+              echo "android.suppressUnsupportedCompileSdk=$N" >> gradle.properties
+            fi
+            return 0
+          }
+          try_build() {
+            for i in 1 2 3; do
+              if run_gradle "$1"; then return 0; fi
+              echo "::warning::Build attempt $i of 3 failed. Applying automatic fixes."
+              autofix
+              sleep 5
+            done
+            return 1
+          }
+          try_build assembleRelease || { echo "::error::The build failed after 3 automatic attempts. Check the Gradle log above."; exit 1; }
+          if [ "$BUILD_AAB" = "true" ]; then
+            try_build bundleRelease || echo "::warning::The .aab could not be built. The APK is fine."
+          fi
+
+      - name: Build Flutter app
+        if: env.TYPE == 'flutter'
+        run: |
+          cd "$SRC_DIR"
+          flutter pub get
+          flutter build apk --release --build-name "$VERSION_NAME" --build-number "$GITHUB_RUN_NUMBER"
+
+      - name: Build native Android project (Java/Kotlin)
+        if: env.TYPE == 'gradle'
+        run: |
+          cd "$SRC_DIR"
+          if [ -f gradlew ]; then chmod +x gradlew; G=./gradlew; else G=gradle; fi
+          $G assembleRelease --no-daemon --stacktrace || $G assembleDebug --no-daemon --stacktrace
+
+      - name: Sign and collect APK
+        env:
+          KS_B64: ${{ secrets.KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KS_KEYPASS: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          APK="$(find "$ROOT" -path '*outputs*' -name '*.apk' | grep -i release | head -n 1 || true)"
+          [ -n "$APK" ] || APK="$(find "$ROOT" -path '*outputs*' -name '*.apk' | head -n 1)"
+          [ -n "$APK" ] || { echo "::error::No APK was produced"; exit 1; }
+          echo "Found: $APK"
+          mkdir -p "$RUNNER_TEMP/out"
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)"
+          KS="$RUNNER_TEMP/app.jks"
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$KS"
+            ALIAS="${KS_ALIAS:-app}"; SP="$KS_PASS"; KP="${KS_KEYPASS:-$KS_PASS}"
+            echo "Signing with your permanent keystore."
+          else
+            ALIAS=app; SP=android; KP=android
+            keytool -genkeypair -keystore "$KS" -alias app -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android -dname "CN=App"
+            echo "::warning::No keystore secret found. A temporary key is used, so uninstall the old app before installing this APK."
+          fi
+          if [[ "$APK" == *unsigned* ]]; then
+            "$BT/zipalign" -f -p 4 "$APK" "$RUNNER_TEMP/aligned.apk"
+            "$BT/apksigner" sign --ks "$KS" --ks-pass "pass:$SP" --key-pass "pass:$KP" --ks-key-alias "$ALIAS" \
+              --out "$RUNNER_TEMP/out/app.apk" "$RUNNER_TEMP/aligned.apk"
+          else
+            cp "$APK" "$RUNNER_TEMP/out/app.apk"
+          fi
+          AAB="$(find "$ROOT" -path '*outputs*' -name '*.aab' | grep -i release | head -n 1 || true)"
+          if [ -n "$AAB" ]; then
+            jarsigner -keystore "$KS" -storepass "$SP" -keypass "$KP" -sigalg SHA256withRSA -digestalg SHA-256 \
+              -signedjar "$RUNNER_TEMP/out/app.aab" "$AAB" "$ALIAS"
+          fi
+          echo "Certificate fingerprint (use the SHA-256 line in assetlinks.json for deep links):"
+          "$BT/apksigner" verify --print-certs "$RUNNER_TEMP/out/app.apk" | grep -i "SHA-256" || true
+          # Verified App Links: put this file on the website so https:// links open the app directly.
+          if [ -n "$DEEP_HOST" ]; then
+            CERT_SHA="$("$BT/apksigner" verify --print-certs "$RUNNER_TEMP/out/app.apk" | sed -n 's/.*SHA-256 digest: //p' | head -n 1)"
+            if [ -n "$CERT_SHA" ]; then
+              printf '[{"relation":["delegate_permission/common.handle_all_urls"],"target":[{"namespace":"android_app","package_name":"%s","sha256_cert_fingerprints":["%s"]}]}]\n' "$PACKAGE_ID" "$CERT_SHA" > "$RUNNER_TEMP/out/assetlinks.json"
+              echo "::notice::Deep links ready. Upload assetlinks.json to https://$DEEP_HOST/.well-known/assetlinks.json"
+            fi
+          fi
+          if [ "$WEB" = "true" ]; then
+            (cd "$APP_DIR/www" && zip -qr "$RUNNER_TEMP/out/web-bundle.zip" .)
+          fi
+          ls -la "$RUNNER_TEMP/out"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-apk-${{ github.run_number }}
+          path: ${{ runner.temp }}/out/app.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload AAB and OTA web bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: extras-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/out/app.aab
+            ${{ runner.temp }}/out/web-bundle.zip
+            ${{ runner.temp }}/out/assetlinks.json
+          if-no-files-found: ignore
+          retention-days: 7

@@ -200,7 +200,7 @@ export const MediaCropModal: React.FC<MediaCropModalProps> = ({
       <div className="w-full max-w-md flex items-center justify-between text-white py-2">
         <button
           onClick={onClose}
-          className="p-2 rounded-full hover:bg-white/10 active:scale-95 transition-colors"
+          className="p-2 rounded-full hover:bg-white/10 transition-colors"
         >
           <X className="w-6 h-6" />
         </button>
@@ -210,7 +210,7 @@ export const MediaCropModal: React.FC<MediaCropModalProps> = ({
         <button
           onClick={handleApplyCrop}
           disabled={processing}
-          className="px-4 py-1.5 rounded-full bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 font-bold text-sm text-white shadow-md active:scale-95 transition-all flex items-center space-x-1"
+          className="px-4 py-1.5 rounded-full bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 font-bold text-sm text-white shadow-md transition-all flex items-center space-x-1"
         >
           {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
           <span>Done</span>
@@ -285,7 +285,7 @@ export const MediaCropModal: React.FC<MediaCropModalProps> = ({
         <div className="flex items-center justify-between text-xs font-medium px-2">
           <button
             onClick={() => setRotation((prev) => (prev + 90) % 360)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors active:scale-95"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
           >
             <RotateCw className="w-3.5 h-3.5" />
             <span>Rotate</span>
@@ -299,7 +299,7 @@ export const MediaCropModal: React.FC<MediaCropModalProps> = ({
               setRotation(0);
               setPan({ x: 0, y: 0 });
             }}
-            className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors active:scale-95"
+            className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
           >
             Reset
           </button>

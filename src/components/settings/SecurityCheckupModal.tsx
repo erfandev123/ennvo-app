@@ -253,7 +253,7 @@ export const SecurityCheckupModal: React.FC<SecurityCheckupModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="w-full py-3.5 bg-gray-900 hover:bg-black text-white font-extrabold text-xs rounded-2xl shadow-sm transition-transform active:scale-98"
+              className="w-full py-3.5 bg-gray-900 hover:bg-black text-white font-extrabold text-xs rounded-2xl shadow-sm transition-transform"
             >
               Done Checkup
             </button>

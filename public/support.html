@@ -35,13 +35,13 @@
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Ennvo App" />
-    <meta property="og:title" content="Ennvo Support â€“ Create a Ticket or Send Feedback" />
+    <meta property="og:title" content="Ennvo Support – Create a Ticket or Send Feedback" />
     <meta
       property="og:description"
       content="Official Ennvo support. Create a ticket, report a problem, send feedback, or raise a safety concern."
     />
     <meta property="og:url" content="https://ennvo.vercel.app/support" />
-    <meta property="og:image" content="https://ennvo.vercel.app/og-image.jpg" />
+    <meta property="og:image" content="https://ennvo.vercel.app/og-image.jpg?v=3" />
     <meta property="og:image:alt" content="Ennvo Support Center" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Ennvo Support Center" />
@@ -49,7 +49,7 @@
       name="twitter:description"
       content="Create a support ticket, report a problem, or send feedback to the Ennvo team."
     />
-    <meta name="twitter:image" content="https://ennvo.vercel.app/og-image.jpg" />
+    <meta name="twitter:image" content="https://ennvo.vercel.app/og-image.jpg?v=3" />
     <meta name="twitter:image:alt" content="Ennvo Support Center" />
 
     <script type="application/ld+json">
@@ -121,7 +121,7 @@
           "@type": "ContactPage",
           "@id": "https://ennvo.vercel.app/support#webpage",
           "url": "https://ennvo.vercel.app/support",
-          "name": "Ennvo Support â€“ Create a Ticket or Send Feedback",
+          "name": "Ennvo Support – Create a Ticket or Send Feedback",
           "description": "Official Ennvo support page for tickets, problem reports, feedback, and safety concerns.",
           "isPartOf": { "@id": "https://ennvo.vercel.app/#website" },
           "about": { "@id": "https://ennvo.vercel.app/#organization" },
@@ -433,7 +433,7 @@
             <div class="form-status" id="form-status" role="status" aria-live="polite">
               <h3>Your ticket is ready.</h3>
               <p>
-                Ticket <span class="ticket-id" id="ticket-id">â€”</span>
+                Ticket <span class="ticket-id" id="ticket-id">—</span>
               </p>
               <p>
                 Open your email app and send the prepared message to
@@ -481,7 +481,7 @@
                 not ask for them. If someone claims to be from Ennvo and asks for money or codes,
                 report it.
               </p>
-              <p><a href="/trust">Read Trust &amp; Safety â†’</a></p>
+              <p><a href="/trust">Read Trust &amp; Safety →</a></p>
             </div>
             <div class="support-side-card">
               <h3>Other ways to get help</h3>
@@ -490,7 +490,7 @@
                 <a href="mailto:ennvoapp@gmail.com">ennvoapp@gmail.com</a>.
               </p>
               <p>
-                Press and business requests can use the same email with â€œPressâ€ or â€œBusinessâ€ in
+                Press and business requests can use the same email with “Press” or “Business” in
                 the subject.
               </p>
             </div>
@@ -498,7 +498,7 @@
               <h3>Privacy</h3>
               <p>
                 Read the <a href="/privacy">Privacy Policy</a> to understand how information is
-                handled. For a data request, choose â€œPrivacy / data requestâ€ in the form.
+                handled. For a data request, choose “Privacy / data request” in the form.
               </p>
             </div>
           </aside>
@@ -603,7 +603,7 @@
         </div>
         <div class="footer-bottom">
           <span>&copy; <span data-year>2026</span> Ennvo. All rights reserved.</span>
-          <span>Founded by Erfan Sarker Â· Co-developed by Rita Akter Â· Built in Bangladesh</span>
+          <span>Founded by Erfan Sarker · Co-developed by Rita Akter · Built in Bangladesh</span>
         </div>
       </div>
     </footer>
@@ -678,7 +678,7 @@
             .map(function (ticket) {
               return (
                 '<div class="ticket-history-item">' +
-                '<span><code>' + escapeHtml(ticket.id) + '</code> Â· ' + escapeHtml(ticket.subject) + '</span>' +
+                '<span><code>' + escapeHtml(ticket.id) + '</code> · ' + escapeHtml(ticket.subject) + '</span>' +
                 '<span>' + escapeHtml(formatDate(ticket.createdAt)) + '</span>' +
                 '</div>'
               );
@@ -702,7 +702,7 @@
             'Message:',
             ticket.message,
             '',
-            'â€”',
+            '—',
             'Prepared from https://ennvo.vercel.app/support'
           ].join('\n');
         }
@@ -741,7 +741,7 @@
         function showStatus(ticket) {
           current = ticket;
           ticketIdEl.textContent = ticket.id;
-          summaryEl.textContent = ticket.requestType + ' Â· ' + ticket.topic + ' Â· ' + ticket.subject;
+          summaryEl.textContent = ticket.requestType + ' · ' + ticket.topic + ' · ' + ticket.subject;
           openEmail.href = ticketMailto(ticket);
           status.classList.add('is-visible');
           status.scrollIntoView({ behavior: 'smooth', block: 'center' });

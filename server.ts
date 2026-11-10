@@ -705,6 +705,37 @@ app.post("/api/delete-r2", async (req, res): Promise<any> => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Static content pages (/about, /landing, /help, /privacy, /blog/...) live in
+// public/ next to the app bundle. Serve them directly so they open as real
+// pages in dev, on Vercel and inside the Android APK, instead of falling back
+// to the React app and landing on the home screen.
+// ---------------------------------------------------------------------------
+const STATIC_PAGE_NAMES = ['about', 'help', 'support', 'contact', 'privacy', 'terms', 'trust', 'press', 'landing'];
+const staticPagesRoot = () => path.join(process.cwd(), process.env.NODE_ENV === 'production' ? 'dist' : 'public');
+
+STATIC_PAGE_NAMES.forEach((page) => {
+  app.get([`/${page}`, `/${page}.html`], (req, res) => {
+    const file = path.join(staticPagesRoot(), `${page}.html`);
+    if (fs.existsSync(file)) return res.sendFile(file);
+    return res.status(404).send('Page not found');
+  });
+});
+
+app.get(['/blog', '/blog/'], (req, res, next) => {
+  const file = path.join(staticPagesRoot(), 'blog', 'index.html');
+  if (fs.existsSync(file)) return res.sendFile(file);
+  return next();
+});
+
+app.get('/blog/:slug', (req, res, next) => {
+  const slug = String(req.params.slug || '').replace(/\.html$/i, '');
+  if (!/^[a-zA-Z0-9_-]+$/.test(slug)) return next();
+  const file = path.join(staticPagesRoot(), 'blog', `${slug}.html`);
+  if (fs.existsSync(file)) return res.sendFile(file);
+  return next();
+});
+
 async function startServer() {
   // Vite middleware setup for dev vs production
   if (process.env.NODE_ENV !== "production") {

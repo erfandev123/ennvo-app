@@ -210,7 +210,7 @@ const StoryItem = React.memo(({ story, onClick }: { story: any, onClick: () => v
     return (
       <div 
         onClick={onClick} 
-        className="relative shrink-0 cursor-pointer group active:scale-95 transition-all select-none w-[96px] h-[142px] sm:w-[110px] sm:h-[162px] rounded-[24px] sm:rounded-[26px] overflow-hidden bg-neutral-100 dark:bg-white/[0.06] flex flex-col justify-between p-2.5 shadow-xs ring-1 ring-black/5 dark:ring-white/10"
+        className="relative shrink-0 cursor-pointer group transition-all select-none w-[96px] h-[142px] sm:w-[110px] sm:h-[162px] rounded-[24px] sm:rounded-[26px] overflow-hidden bg-neutral-100 dark:bg-white/[0.06] flex flex-col justify-between p-2.5 shadow-xs ring-1 ring-black/5 dark:ring-white/10"
       >
         <img 
           src={story.bg || `https://ui-avatars.com/api/?name=${encodeURIComponent(story.name || 'User')}&background=random`} 
@@ -218,10 +218,10 @@ const StoryItem = React.memo(({ story, onClick }: { story: any, onClick: () => v
           loading="lazy" 
           decoding="async" 
           referrerPolicy="no-referrer"
-          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300" 
         />
         {/* Top Plus Badge - positioned on the left */}
-        <div className="relative z-10 self-start w-8 h-8 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center shadow-md ring-2 ring-white/90 dark:ring-black/90 group-hover:scale-110 transition-transform">
+        <div className="relative z-10 self-start w-8 h-8 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center shadow-md ring-2 ring-white/90 dark:ring-black/90 transition-transform">
           <Plus className="w-4 h-4 stroke-[3]" />
         </div>
         {/* Bottom Label */}
@@ -240,7 +240,7 @@ const StoryItem = React.memo(({ story, onClick }: { story: any, onClick: () => v
   return (
     <div 
       onClick={onClick} 
-      className="relative shrink-0 cursor-pointer group active:scale-95 transition-all select-none w-[96px] h-[142px] sm:w-[110px] sm:h-[162px] rounded-[24px] sm:rounded-[26px] overflow-hidden bg-neutral-100 dark:bg-white/[0.06] flex flex-col justify-between p-2.5 shadow-xs ring-1 ring-black/5 dark:ring-white/10"
+      className="relative shrink-0 cursor-pointer group transition-all select-none w-[96px] h-[142px] sm:w-[110px] sm:h-[162px] rounded-[24px] sm:rounded-[26px] overflow-hidden bg-neutral-100 dark:bg-white/[0.06] flex flex-col justify-between p-2.5 shadow-xs ring-1 ring-black/5 dark:ring-white/10"
     >
       <img 
         src={mediaImg} 
@@ -248,7 +248,7 @@ const StoryItem = React.memo(({ story, onClick }: { story: any, onClick: () => v
         loading="lazy" 
         decoding="async" 
         referrerPolicy="no-referrer"
-        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300" 
         onError={(e) => { (e.currentTarget as HTMLImageElement).src = avatarImg; }}
       />
       {/* Top author mini avatar - clean, left side, without blue box */}
@@ -320,7 +320,7 @@ const SuggestedRightItem: React.FC<{ user: AppUser }> = React.memo(({ user }) =>
 
       <button 
         onClick={handleFollow}
-        className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all active:scale-95 shrink-0 cursor-pointer border-0 ${
+        className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all  shrink-0 cursor-pointer border-0 ${
           isFollowing 
             ? 'bg-neutral-200 dark:bg-white/10 text-gray-600 dark:text-gray-300 shadow-none' 
             : 'bg-gradient-to-r from-[#ff3b5c] to-[#ff5376] hover:brightness-105 text-white shadow-sm'
@@ -363,7 +363,7 @@ const SuggestedAccountItem: React.FC<{ user: AppUser }> = React.memo(({ user }) 
       <div className="relative mb-2">
         <img 
           src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`} 
-          className="w-12 h-12 rounded-full object-cover ring-2 ring-white/90 dark:ring-white/15 shadow-xs group-hover:scale-105 transition-transform" 
+          className="w-12 h-12 rounded-full object-cover ring-2 ring-white/90 dark:ring-white/15 shadow-xs transition-transform" 
           alt={user.name} 
           referrerPolicy="no-referrer"
         />
@@ -377,7 +377,7 @@ const SuggestedAccountItem: React.FC<{ user: AppUser }> = React.memo(({ user }) 
       <p className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-2.5 truncate w-full">Suggested for you</p>
       <button 
         onClick={handleFollow}
-        className={`w-full font-bold py-1.5 rounded-full text-[11px] backdrop-blur-md transition-all active:scale-95 cursor-pointer border-0 shadow-xs ${
+        className={`w-full font-bold py-1.5 rounded-full text-[11px] backdrop-blur-md transition-all  cursor-pointer border-0 shadow-xs ${
           isFollowing 
             ? 'bg-neutral-200/80 dark:bg-white/15 text-neutral-700 dark:text-neutral-200 shadow-none' 
             : 'bg-blue-600/85 hover:bg-blue-600 text-white shadow-blue-500/20'
@@ -848,7 +848,7 @@ const RightPanelInlineChat: React.FC<{
                 </button>
                 <button 
                   onClick={finishRecording} 
-                  className="px-3 py-1 bg-blue-600 dark:bg-black dark:border dark:border-white/30 text-white rounded-full text-xs font-semibold active:scale-95 transition-transform cursor-pointer"
+                  className="px-3 py-1 bg-blue-600 dark:bg-black dark:border dark:border-white/30 text-white rounded-full text-xs font-semibold transition-transform cursor-pointer"
                 >
                   Send
                 </button>
@@ -882,7 +882,7 @@ const RightPanelInlineChat: React.FC<{
         {inputText.trim() ? (
           <button 
             onClick={handleSend}
-            className="p-1.5 rounded-full bg-blue-600 dark:bg-black dark:border dark:border-white/30 text-white shadow-none hover:bg-blue-700 dark:hover:bg-white/10 active:scale-90 transition-all cursor-pointer shrink-0"
+            className="p-1.5 rounded-full bg-blue-600 dark:bg-black dark:border dark:border-white/30 text-white shadow-none hover:bg-blue-700 dark:hover:bg-white/10 transition-all cursor-pointer shrink-0"
           >
             <Send className="w-3 h-3 fill-current" />
           </button>
@@ -890,7 +890,7 @@ const RightPanelInlineChat: React.FC<{
           <button 
             onMouseDown={startRecording}
             title="Hold to record voice"
-            className="p-1.5 rounded-full bg-gray-100 dark:bg-black dark:border dark:border-white/30 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 active:scale-90 transition-all cursor-pointer shrink-0"
+            className="p-1.5 rounded-full bg-gray-100 dark:bg-black dark:border dark:border-white/30 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 transition-all cursor-pointer shrink-0"
           >
             <Mic className="w-3 h-3 text-blue-500 dark:text-white" />
           </button>
@@ -1035,7 +1035,7 @@ const RightPanel = React.memo(() => {
                     return (
                       <div 
                         key={contact.uid} 
-                        className="group flex items-center justify-between p-2.5 px-3 hover:bg-neutral-100/70 dark:hover:bg-white/[0.06] rounded-2xl cursor-pointer transition-all active:scale-[0.98] border-0 select-none"
+                        className="group flex items-center justify-between p-2.5 px-3 hover:bg-neutral-100/70 dark:hover:bg-white/[0.06] rounded-2xl cursor-pointer transition-all border-0 select-none"
                         onClick={() => {
                           // Prevent separate floating mini chat from opening
                           setMiniChatUser(null);
@@ -1558,7 +1558,7 @@ export default function Home() {
                     </div>
                     <div className="relative">
                       <input type="file" accept="image/*,video/*" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={handleCreateStory} />
-                      <button className="w-18 h-18 rounded-full border-4 border-white/50 flex items-center justify-center transition-transform active:scale-95 bg-white/20 cursor-pointer">
+                      <button className="w-18 h-18 rounded-full border-4 border-white/50 flex items-center justify-center transition-transform bg-white/20 cursor-pointer">
                         <div className="w-14 h-14 bg-white rounded-full"></div>
                       </button>
                     </div>

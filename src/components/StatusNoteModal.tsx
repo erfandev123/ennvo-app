@@ -145,7 +145,7 @@ export default function StatusNoteModal({
             <button
               type="button"
               onClick={onClose}
-              className="w-10 h-10 rounded-full bg-black/[0.05] dark:bg-white/[0.08] hover:bg-black/[0.1] dark:hover:bg-white/[0.14] text-neutral-800 dark:text-neutral-200 transition-all active:scale-95 flex items-center justify-center cursor-pointer border border-black/[0.04] dark:border-white/10 backdrop-blur-md"
+              className="w-10 h-10 rounded-full bg-black/[0.05] dark:bg-white/[0.08] hover:bg-black/[0.1] dark:hover:bg-white/[0.14] text-neutral-800 dark:text-neutral-200 transition-all flex items-center justify-center cursor-pointer border border-black/[0.04] dark:border-white/10 backdrop-blur-md"
               title="Close"
             >
               <X className="w-5 h-5" strokeWidth={2.4} />
@@ -166,7 +166,7 @@ export default function StatusNoteModal({
               type="button"
               disabled={!noteText.trim() || isSaving}
               onClick={handleShareNote}
-              className="px-5 py-2 rounded-full bg-gradient-to-r from-sky-500 via-blue-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold text-[14px] disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-all border-0 shadow-md cursor-pointer"
+              className="px-5 py-2 rounded-full bg-gradient-to-r from-sky-500 via-blue-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold text-[14px] disabled:opacity-40 disabled:cursor-not-allowed transition-all border-0 shadow-md cursor-pointer"
             >
               {isSaving ? "Saving..." : mode === "edit" ? "Save" : "Share"}
             </button>
@@ -242,7 +242,7 @@ export default function StatusNoteModal({
                       key={sug}
                       type="button"
                       onClick={() => setNoteText(sug)}
-                      className="px-3.5 py-1.5 bg-black/[0.04] hover:bg-black/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1] text-neutral-800 dark:text-neutral-200 rounded-full text-[12.5px] font-medium transition-all active:scale-95 border border-black/[0.04] dark:border-white/5 cursor-pointer backdrop-blur-xs"
+                      className="px-3.5 py-1.5 bg-black/[0.04] hover:bg-black/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1] text-neutral-800 dark:text-neutral-200 rounded-full text-[12.5px] font-medium transition-all border border-black/[0.04] dark:border-white/5 cursor-pointer backdrop-blur-xs"
                     >
                       {sug}
                     </button>
@@ -262,7 +262,7 @@ export default function StatusNoteModal({
                   type="button"
                   disabled={isSaving}
                   onClick={handleDeleteNote}
-                  className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-semibold py-3 rounded-2xl transition-all active:scale-[0.98] text-center text-[13.5px] cursor-pointer border border-red-500/20 disabled:opacity-50 flex items-center justify-center space-x-1.5"
+                  className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-semibold py-3 rounded-2xl transition-all text-center text-[13.5px] cursor-pointer border border-red-500/20 disabled:opacity-50 flex items-center justify-center space-x-1.5"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>Delete current note</span>

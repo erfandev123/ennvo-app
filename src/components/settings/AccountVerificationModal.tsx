@@ -99,7 +99,7 @@ export const AccountVerificationModal: React.FC<AccountVerificationModalProps> =
                 </div>
                 <button
                   onClick={onClose}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-2xl shadow-md shadow-blue-500/20 transition-transform active:scale-98"
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-2xl shadow-md shadow-blue-500/20 transition-transform"
                 >
                   Awesome, Close
                 </button>
@@ -187,14 +187,14 @@ export const AccountVerificationModal: React.FC<AccountVerificationModalProps> =
                   <button
                     type="button"
                     onClick={onClose}
-                    className="w-1/2 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold text-xs rounded-2xl transition-colors active:scale-98"
+                    className="w-1/2 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold text-xs rounded-2xl transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-1/2 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-2xl shadow-md shadow-blue-500/20 flex items-center justify-center space-x-1.5 transition-transform active:scale-98 disabled:opacity-70"
+                    className="w-1/2 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-2xl shadow-md shadow-blue-500/20 flex items-center justify-center space-x-1.5 transition-transform disabled:opacity-70"
                   >
                     {isSubmitting ? (
                       <Loader2 className="w-4 h-4 animate-spin" />

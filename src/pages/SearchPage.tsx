@@ -158,14 +158,14 @@ const UniformMediaCard = React.memo(({
         triggerHaptic(10);
         onClick();
       }}
-      className="aspect-[4/5] bg-white dark:bg-black rounded-2xl sm:rounded-3xl border border-gray-200/90 dark:border dark:border-white/20 overflow-hidden relative group cursor-pointer transition-transform duration-200 active:scale-[0.97] select-none shadow-[0_4px_16px_rgba(0,0,0,0.04)]"
+      className="aspect-[4/5] bg-white dark:bg-black rounded-2xl sm:rounded-3xl border border-gray-200/90 dark:border dark:border-white/20 overflow-hidden relative group cursor-pointer transition-transform duration-200 select-none shadow-[0_4px_16px_rgba(0,0,0,0.04)]"
     >
       {mediaUrl || thumbnail ? (
         <div className="w-full h-full relative bg-neutral-900 dark:bg-black overflow-hidden">
           {thumbnail ? (
             <img 
               src={thumbnail} 
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+              className="w-full h-full object-cover transition-transform duration-300" 
               alt="thumbnail" 
               referrerPolicy="no-referrer" 
               loading="lazy"
@@ -177,7 +177,7 @@ const UniformMediaCard = React.memo(({
           ) : (
             <img 
               src={mediaUrl} 
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+              className="w-full h-full object-cover transition-transform duration-300" 
               alt="media" 
               referrerPolicy="no-referrer" 
               loading="lazy"
@@ -553,7 +553,7 @@ export default function SearchPage() {
                 setSearchTerm('');
                 searchInputRef.current?.focus();
               }} 
-              className="absolute right-3 p-1 bg-neutral-200/80 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/20 text-neutral-600 dark:text-neutral-300 rounded-full transition-colors active:scale-90 cursor-pointer"
+              className="absolute right-3 p-1 bg-neutral-200/80 dark:bg-white/10 hover:bg-neutral-300 dark:hover:bg-white/20 text-neutral-600 dark:text-neutral-300 rounded-full transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -587,7 +587,7 @@ export default function SearchPage() {
                   triggerHaptic(8);
                   setActiveTab(tab);
                 }} 
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 cursor-pointer active:scale-95 ${
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 cursor-pointer  ${
                   isActive 
                     ? 'bg-neutral-950 dark:bg-white text-white dark:text-black shadow-xs' 
                     : 'bg-white/80 dark:bg-black text-neutral-600 dark:text-neutral-300 border border-gray-200/90 dark:border-white/20 hover:bg-gray-100 dark:hover:bg-white/10'
@@ -695,7 +695,7 @@ export default function SearchPage() {
                 <button
                   key={tag}
                   onClick={() => triggerSearchSelect(tag)}
-                  className="px-3 py-1 bg-white dark:bg-black hover:bg-gray-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 rounded-full text-xs font-bold border border-gray-200/90 dark:border-white/20 transition-all shrink-0 active:scale-95 cursor-pointer shadow-none"
+                  className="px-3 py-1 bg-white dark:bg-black hover:bg-gray-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-300 rounded-full text-xs font-bold border border-gray-200/90 dark:border-white/20 transition-all shrink-0 cursor-pointer shadow-none"
                 >
                   {tag}
                 </button>
@@ -793,7 +793,7 @@ export default function SearchPage() {
                     <button
                       onClick={requestUserLocation}
                       disabled={geoLoading}
-                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-xs font-bold text-white rounded-full flex items-center space-x-1.5 transition-all cursor-pointer shrink-0"
+                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-xs font-bold text-white rounded-full flex items-center space-x-1.5 transition-all cursor-pointer shrink-0"
                     >
                       <MapPin className="w-3.5 h-3.5" />
                       <span>{userGeoLocation ? 'Refresh' : 'Enable'}</span>
@@ -867,7 +867,7 @@ export default function SearchPage() {
                     </p>
                     <button
                       onClick={requestUserLocation}
-                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-full transition-all active:scale-95 cursor-pointer"
+                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-full transition-all cursor-pointer"
                     >
                       Locate Nearby Friends
                     </button>

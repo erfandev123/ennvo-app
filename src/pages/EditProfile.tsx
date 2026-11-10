@@ -173,7 +173,7 @@ export default function EditProfile() {
       <div className="sticky top-0 z-30 pointer-events-none bg-transparent border-0 px-4 pt-[max(calc(env(safe-area-inset-top,0px)+8px),14px)] pb-2 flex items-center justify-between select-none [&>*]:pointer-events-auto">
         <button 
           onClick={() => setCurrentPage('profile')} 
-          className="w-10 h-10 rounded-full bg-white/75 dark:bg-black/60 hover:bg-white dark:hover:bg-black/80 backdrop-blur-md active:scale-95 flex items-center justify-center transition-all text-neutral-900 dark:text-white cursor-pointer border border-black/5 dark:border-white/15 shadow-sm"
+          className="w-10 h-10 rounded-full bg-white/75 dark:bg-black/60 hover:bg-white dark:hover:bg-black/80 backdrop-blur-md flex items-center justify-center transition-all text-neutral-900 dark:text-white cursor-pointer border border-black/5 dark:border-white/15 shadow-sm"
           title="Back"
         >
           <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
@@ -182,7 +182,7 @@ export default function EditProfile() {
         <button 
           onClick={handleSave}
           disabled={loading}
-          className="px-5 py-2 rounded-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs flex items-center space-x-1.5 transition-all active:scale-95 shadow-md shadow-blue-500/30 cursor-pointer border-0"
+          className="px-5 py-2 rounded-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs flex items-center space-x-1.5 transition-all shadow-md shadow-blue-500/30 cursor-pointer border-0"
           title="Save changes"
         >
           {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span>Save</span>}
@@ -202,7 +202,7 @@ export default function EditProfile() {
               isVideoMedia(bannerUrl) ? (
                 <video src={bannerUrl} className="w-full h-full object-cover" autoPlay loop muted playsInline />
               ) : (
-                <img src={bannerUrl} alt="Banner" className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300" />
+                <img src={bannerUrl} alt="Banner" className="w-full h-full object-cover transition-transform duration-300" />
               )
             ) : (
               <div className="w-full h-full bg-gradient-to-r from-blue-600/30 via-indigo-600/20 to-sky-500/20 flex items-center justify-center">
@@ -227,7 +227,7 @@ export default function EditProfile() {
                 isVideoMedia(avatar) ? (
                   <video src={avatar} className="w-full h-full object-cover" autoPlay loop muted playsInline />
                 ) : (
-                  <img src={avatar} alt="Avatar" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <img src={avatar} alt="Avatar" className="w-full h-full object-cover transition-transform duration-300" />
                 )
               ) : (
                 <div className="w-full h-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center text-neutral-400">

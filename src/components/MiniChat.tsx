@@ -242,7 +242,7 @@ export default function MiniChat() {
             <button
               type="button"
               onClick={() => setIsMinimized(false)}
-              className="w-14 h-14 rounded-full shadow-[0_12px_30px_rgba(0,0,0,0.25)] border-2 border-white dark:border-neutral-700 bg-white dark:bg-neutral-900 flex items-center justify-center relative cursor-pointer active:scale-95 transition-all overflow-hidden hover:scale-105"
+              className="w-14 h-14 rounded-full shadow-[0_12px_30px_rgba(0,0,0,0.25)] border-2 border-white dark:border-neutral-700 bg-white dark:bg-neutral-900 flex items-center justify-center relative cursor-pointer transition-all overflow-hidden"
               title={`Chat with ${miniChatUser.name}`}
             >
               <img
@@ -544,7 +544,7 @@ export default function MiniChat() {
                       </button>
                       <button 
                         onClick={finishRecording} 
-                        className="px-3 py-1 bg-blue-600 text-white rounded-full text-xs font-semibold active:scale-95 transition-transform cursor-pointer"
+                        className="px-3 py-1 bg-blue-600 text-white rounded-full text-xs font-semibold transition-transform cursor-pointer"
                       >
                         Send
                       </button>
@@ -578,7 +578,7 @@ export default function MiniChat() {
               {inputText.trim() ? (
                 <button 
                   onClick={handleSend}
-                  className="p-2 rounded-full bg-blue-600 text-white shadow-none hover:bg-blue-700 active:scale-90 transition-all cursor-pointer shrink-0"
+                  className="p-2 rounded-full bg-blue-600 text-white shadow-none hover:bg-blue-700 transition-all cursor-pointer shrink-0"
                 >
                   <Send className="w-3.5 h-3.5 fill-current" />
                 </button>
@@ -586,7 +586,7 @@ export default function MiniChat() {
                 <button 
                   onMouseDown={startRecording}
                   title="Hold to record voice"
-                  className="p-2 rounded-full bg-gray-100 dark:bg-black dark:border dark:border-white/20 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 active:scale-90 transition-all cursor-pointer shrink-0"
+                  className="p-2 rounded-full bg-gray-100 dark:bg-black dark:border dark:border-white/20 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 transition-all cursor-pointer shrink-0"
                 >
                   <Mic className="w-3.5 h-3.5 text-blue-500" />
                 </button>

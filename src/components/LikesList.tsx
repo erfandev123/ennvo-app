@@ -52,7 +52,7 @@ const UserRowWithFollow = ({ user, currentUser, onSelect }: { user: any; current
 
   return (
     <div 
-      className="flex items-center justify-between p-2.5 hover:bg-gray-50 rounded-2xl cursor-pointer transition-all active:scale-[0.98] group"
+      className="flex items-center justify-between p-2.5 hover:bg-gray-50 rounded-2xl cursor-pointer transition-all group"
       onClick={() => onSelect(user)}
     >
       <div className="flex items-center space-x-3 min-w-0 flex-1">
@@ -72,7 +72,7 @@ const UserRowWithFollow = ({ user, currentUser, onSelect }: { user: any; current
         <button 
           onClick={handleFollowToggle}
           disabled={loading}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all active:scale-95 shrink-0 ml-2 shadow-xs min-w-[85px] text-center ${
+          className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all  shrink-0 ml-2 shadow-xs min-w-[85px] text-center ${
             friendship.isFriend 
               ? 'bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-200' 
               : friendship.following 

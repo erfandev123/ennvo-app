@@ -375,7 +375,7 @@ export const VerificationScreen: React.FC<VerificationScreenProps> = ({ onBack }
               <button
                 type="submit"
                 disabled={isSubmitting || !agreeTerms}
-                className="w-full py-3.5 bg-gray-900 hover:bg-black text-white font-bold text-[15px] rounded-2xl transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center space-x-2 shadow-sm"
+                className="w-full py-3.5 bg-gray-900 hover:bg-black text-white font-bold text-[15px] rounded-2xl transition-all disabled:opacity-50 flex items-center justify-center space-x-2 shadow-sm"
               >
                 {isSubmitting ? (
                   <>

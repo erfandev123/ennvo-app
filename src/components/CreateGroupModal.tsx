@@ -134,7 +134,7 @@ export default function CreateGroupModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-10 h-10 rounded-full bg-black/[0.05] dark:bg-white/[0.08] hover:bg-black/[0.1] dark:hover:bg-white/[0.14] text-neutral-800 dark:text-neutral-200 transition-all active:scale-95 flex items-center justify-center cursor-pointer border border-black/[0.04] dark:border-white/10 backdrop-blur-md"
+                className="w-10 h-10 rounded-full bg-black/[0.05] dark:bg-white/[0.08] hover:bg-black/[0.1] dark:hover:bg-white/[0.14] text-neutral-800 dark:text-neutral-200 transition-all flex items-center justify-center cursor-pointer border border-black/[0.04] dark:border-white/10 backdrop-blur-md"
                 title="Back"
               >
                 <ArrowLeft className="w-5 h-5" strokeWidth={2.4} />
@@ -156,7 +156,7 @@ export default function CreateGroupModal({
               type="button"
               disabled={isCreating || selectedUserIds.length === 0}
               onClick={handleCreate}
-              className="px-5 py-2 rounded-full bg-gradient-to-r from-sky-500 via-blue-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold text-[13.5px] disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-md border-0"
+              className="px-5 py-2 rounded-full bg-gradient-to-r from-sky-500 via-blue-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold text-[13.5px] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-md border-0"
               title="Create Group"
             >
               {isCreating ? (
@@ -192,7 +192,7 @@ export default function CreateGroupModal({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-16 h-16 rounded-full bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/10 flex items-center justify-center relative active:scale-95 transition-all cursor-pointer shrink-0 group overflow-hidden"
+                className="w-16 h-16 rounded-full bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/10 flex items-center justify-center relative transition-all cursor-pointer shrink-0 group overflow-hidden"
               >
                 {groupAvatar ? (
                   <img src={groupAvatar} className="w-full h-full object-cover" alt="Group PFP" />
@@ -320,7 +320,7 @@ export default function CreateGroupModal({
                         );
                         setErrorMessage(null);
                       }}
-                      className={`flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all active:scale-[0.99] border backdrop-blur-sm ${
+                      className={`flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all  border backdrop-blur-sm ${
                         isSelected
                           ? "bg-sky-500/[0.12] dark:bg-sky-500/[0.16] border-sky-400/50 shadow-2xs"
                           : "bg-white/70 dark:bg-[#15161c]/70 hover:bg-white dark:hover:bg-[#15161c] border-black/[0.04] dark:border-white/[0.06]"
@@ -368,7 +368,7 @@ export default function CreateGroupModal({
                 type="button"
                 disabled={isCreating || selectedUserIds.length === 0}
                 onClick={handleCreate}
-                className="w-full bg-gradient-to-r from-sky-500 via-blue-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold py-3.5 rounded-2xl transition-all active:scale-[0.98] flex items-center justify-center space-x-2 text-[15px] cursor-pointer border-0 shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full bg-gradient-to-r from-sky-500 via-blue-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center space-x-2 text-[15px] cursor-pointer border-0 shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isCreating ? (
                   <div className="w-4.5 h-4.5 border-2 border-white border-t-transparent rounded-full animate-spin" />

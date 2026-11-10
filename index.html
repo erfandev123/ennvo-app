@@ -4,18 +4,31 @@
     <meta charset="UTF-8" />
     <!-- Android WebView & Mobile Touch Performance Optimizations -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
-    <meta name="theme-color" content="#7c3aed" />
+    <meta name="theme-color" content="#0ea5e9" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="msapplication-tap-highlight" content="no" />
+    <meta http-equiv="x-dns-prefetch-control" content="on" />
+
+    <!-- Theme is applied before the first paint so dark mode never flashes white -->
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem('ennvo_theme_mode') === 'dark') {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.backgroundColor = '#000000';
+          }
+        } catch (e) {}
+      })();
+    </script>
 
     <!-- ========================================================================= -->
     <!-- PRIMARY TECHNICAL SEO METADATA                                            -->
     <!-- ========================================================================= -->
     <title>Ennvo App – Social Media, Reels, Chat & Video Calls</title>
-    <meta name="description" content="Ennvo is an independent social platform by Erfan Sarker and co-developer Rita Akter. Share reels, chat, post stories, and make HD video calls â€” fast and free." />
+    <meta name="description" content="Ennvo is an independent social platform by Erfan Sarker and co-developer Rita Akter. Share reels, chat, post stories, and make HD video calls — fast and free." />
     <meta name="keywords" content="Ennvo, Ennvo app, Ennvo official, Ennvo social media, Ennvo reels, Ennvo chat, Ennvo video call, Ennvo stories, Erfan Sarker, Erfan Sarker Ennvo, Rita Akter, Rita Akter Ennvo, social media app, short video app, messaging app, video calling app, Bangladesh social media" />
     <link rel="canonical" href="https://ennvo.vercel.app/" />
     <link rel="author" href="https://ennvo.vercel.app/about" />
@@ -36,16 +49,16 @@
     <!-- OPEN GRAPH (OG) SOCIAL SHARING METADATA                                   -->
     <!-- ========================================================================= -->
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Ennvo App" />
-    <meta property="og:title" content="Ennvo Official App â€“ Social Media, Reels, Chat & Video Calls" />
-    <meta property="og:description" content="Ennvo is an independent social platform by Erfan Sarker and co-developer Rita Akter. Share reels, chat, post stories, and make HD video calls â€” fast and free." />
+    <meta property="og:site_name" content="Ennvo" />
+    <meta property="og:title" content="Ennvo Official App – Social Media, Reels, Chat & Video Calls" />
+    <meta property="og:description" content="Ennvo is an independent social platform by Erfan Sarker and co-developer Rita Akter. Share reels, chat, post stories, and make HD video calls — fast and free." />
     <meta property="og:url" content="https://ennvo.vercel.app/" />
-    <meta property="og:image" content="https://ennvo.vercel.app/og-image.jpg" />
-    <meta property="og:image:secure_url" content="https://ennvo.vercel.app/og-image.jpg" />
+    <meta property="og:image" content="https://ennvo.vercel.app/og-image.jpg?v=3" />
+    <meta property="og:image:secure_url" content="https://ennvo.vercel.app/og-image.jpg?v=3" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1376" />
     <meta property="og:image:height" content="768" />
-    <meta property="og:image:alt" content="Ennvo social platform by Erfan Sarker â€” reels, chat, stories and HD video calls" />
+    <meta property="og:image:alt" content="Ennvo — a modern social platform for reels, stories, chat and HD video calls, founded by Erfan Sarker" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:locale:alternate" content="bn_BD" />
 
@@ -53,17 +66,20 @@
     <!-- TWITTER / X CARD METADATA                                                 -->
     <!-- ========================================================================= -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Ennvo Official App â€“ Social Media, Reels, Chat & Video Calls" />
-    <meta name="twitter:description" content="Ennvo is an independent social platform by Erfan Sarker and co-developer Rita Akter. Share reels, chat, post stories, and make HD video calls â€” fast and free." />
-    <meta name="twitter:image" content="https://ennvo.vercel.app/og-image.jpg" />
+    <meta name="twitter:title" content="Ennvo Official App – Social Media, Reels, Chat & Video Calls" />
+    <meta name="twitter:description" content="Ennvo is an independent social platform by Erfan Sarker and co-developer Rita Akter. Share reels, chat, post stories, and make HD video calls — fast and free." />
+    <meta name="twitter:image" content="https://ennvo.vercel.app/og-image.jpg?v=3" />
     <meta name="twitter:image:alt" content="Ennvo social platform by Erfan Sarker" />
 
-    <!-- Icons & Manifest -->
-    <link rel="icon" href="/favicon.ico?v=2" sizes="any" />
-    <link rel="icon" type="image/png" sizes="96x96" href="/icon-96.png?v=2" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=2" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=2" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/icon-192.png?v=2" />
+    <!-- Icons & Manifest (stable URLs, sizes are multiples of 48px so Google can use them) -->
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48 64x64" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png" />
+    <link rel="icon" type="image/png" sizes="144x144" href="/favicon-144.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/favicon-192.png" />
+    <link rel="mask-icon" href="/favicon-192.png" color="#0ea5e9" />
     <link rel="manifest" href="/manifest.json" />
 
     <!-- Fonts load without blocking the first paint (critical on slow networks) -->
@@ -82,9 +98,11 @@
     <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://fcm.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://ennvo-6c01c.firebaseapp.com" crossorigin />
     <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
     <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
     <link rel="dns-prefetch" href="https://fcm.googleapis.com" />
+    <link rel="dns-prefetch" href="https://ui-avatars.com" />
 
     <!-- ========================================================================= -->
     <!-- GOOGLE STRUCTURED DATA (JSON-LD SCHEMA.ORG GRAPH)                        -->
@@ -110,9 +128,16 @@
           "image": {
             "@id": "https://ennvo.vercel.app/#logo"
           },
-          "description": "Ennvo is an independent social platform by Erfan Sarker and co-developer Rita Akter, featuring short video reels, stories, instant messaging, and HD audio/video calls.",
-          "slogan": "Social, without the noise.",
+          "description": "Ennvo is an independent social platform founded by Erfan Sarker (Founder, CEO & Owner), with a team of 10 people, featuring short video reels, stories, instant messaging, and HD audio/video calls.",
+          "slogan": "Connect. Share. Explore.",
+          "numberOfEmployees": {
+            "@type": "QuantitativeValue",
+            "value": 10
+          },
           "founder": {
+            "@id": "https://ennvo.vercel.app/#erfan-sarker"
+          },
+          "owner": {
             "@id": "https://ennvo.vercel.app/#erfan-sarker"
           },
           "employee": [
@@ -144,8 +169,8 @@
           "@type": "Person",
           "@id": "https://ennvo.vercel.app/#erfan-sarker",
           "name": "Erfan Sarker",
-          "jobTitle": "Founder & Software Engineer",
-          "description": "Erfan Sarker is the founder and software engineer behind Ennvo, a social platform for reels, messaging, and real-time video calls.",
+          "jobTitle": "Founder, CEO & Owner",
+          "description": "Erfan Sarker is the founder, CEO and owner of Ennvo, the social platform for reels, messaging, and real-time video calls. He leads the team of 10 people who build and run it.",
           "image": "https://ennvo.vercel.app/images/erfan.avif",
           "url": "https://ennvo.vercel.app/about",
           "sameAs": ["https://www.facebook.com/erfanbnp123"],
@@ -164,9 +189,42 @@
           "@type": "Person",
           "@id": "https://ennvo.vercel.app/#rita-akter",
           "name": "Rita Akter",
-          "jobTitle": "Co-Developer & Partner",
-          "description": "Rita Akter is a co-developer and partner at Ennvo, contributing to the platform's development alongside founder Erfan Sarker.",
+          "jobTitle": "Partner & Core Team",
+          "description": "Rita Akter is a partner and core team member at Ennvo, contributing to the platform's development alongside founder and CEO Erfan Sarker.",
           "image": "https://ennvo.vercel.app/images/rita.jpg",
+          "url": "https://ennvo.vercel.app/about#team",
+          "worksFor": {
+            "@id": "https://ennvo.vercel.app/#organization"
+          }
+        },
+        {
+          "@type": "Person",
+          "@id": "https://ennvo.vercel.app/#evan-sarker",
+          "name": "Evan Sarker",
+          "jobTitle": "Developer",
+          "description": "Evan Sarker is a developer on the Ennvo team, building and maintaining the platform alongside founder and CEO Erfan Sarker.",
+          "url": "https://ennvo.vercel.app/about#team",
+          "worksFor": {
+            "@id": "https://ennvo.vercel.app/#organization"
+          }
+        },
+        {
+          "@type": "Person",
+          "@id": "https://ennvo.vercel.app/#joi-akter",
+          "name": "Joi Akter",
+          "jobTitle": "Core Team",
+          "description": "Joi Akter is a core team member at Ennvo, part of the 10-person team led by founder and CEO Erfan Sarker.",
+          "url": "https://ennvo.vercel.app/about#team",
+          "worksFor": {
+            "@id": "https://ennvo.vercel.app/#organization"
+          }
+        },
+        {
+          "@type": "Person",
+          "@id": "https://ennvo.vercel.app/#junaid-mia",
+          "name": "Junaid Mia",
+          "jobTitle": "Core Team",
+          "description": "Junaid Mia is a core team member at Ennvo, part of the 10-person team led by founder and CEO Erfan Sarker.",
           "url": "https://ennvo.vercel.app/about#team",
           "worksFor": {
             "@id": "https://ennvo.vercel.app/#organization"
@@ -176,13 +234,13 @@
           "@type": "WebSite",
           "@id": "https://ennvo.vercel.app/#website",
           "url": "https://ennvo.vercel.app/",
-          "name": "Ennvo App",
+          "name": "Ennvo",
           "alternateName": ["Ennvo App", "Ennvoapp", "Ennvo Social", "Official Ennvo Website"],
-          "description": "Official website of Ennvo â€” a fast social platform with HD video calling, reels, stories, and real-time messaging.",
           "publisher": {
             "@id": "https://ennvo.vercel.app/#organization"
           },
           "inLanguage": ["en", "bn"],
+          "description": "Official website of Ennvo — a fast social platform with HD video calling, reels, stories, and real-time messaging.",
           "potentialAction": {
             "@type": "SearchAction",
             "target": "https://ennvo.vercel.app/search?q={search_term_string}",
@@ -193,7 +251,7 @@
           "@type": "WebPage",
           "@id": "https://ennvo.vercel.app/#webpage",
           "url": "https://ennvo.vercel.app/",
-          "name": "Ennvo Official App â€“ Social Media, Reels, Chat & Video Calls",
+          "name": "Ennvo Official App – Social Media, Reels, Chat & Video Calls",
           "description": "Ennvo is the independent social platform by Erfan Sarker and co-developer Rita Akter. Share reels, chat with friends, post stories, and make HD video calls.",
           "isPartOf": {
             "@id": "https://ennvo.vercel.app/#website"
@@ -265,6 +323,7 @@
         -moz-osx-font-smoothing: grayscale;
         text-rendering: optimizeLegibility;
       }
+      html.dark, html.dark body { background-color: #000000; }
       #root {
         width: 100%;
         height: 100%;
@@ -275,7 +334,8 @@
         transform: translateZ(0);
         will-change: transform, opacity;
       }
-    </style>
+
+</style>
   </head>
   <body>
     <div id="root"></div>
@@ -283,7 +343,7 @@
     <!-- No-Script Fallback for JavaScript-Disabled Browsers & Search Bots -->
     <noscript>
       <main style="max-width: 760px; margin: 0 auto; padding: 32px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; line-height: 1.6;">
-        <h1>Ennvo â€” Official Social Media App by Erfan Sarker</h1>
+        <h1>Ennvo — Official Social Media App by Erfan Sarker</h1>
         <p>Ennvo is a free social media platform for sharing short video reels, posting stories, chatting with friends, and making real-time HD audio and video calls. Ennvo was founded by <strong>Erfan Sarker</strong>, a software engineer from Bangladesh, with co-developer and partner <strong>Rita Akter</strong>.</p>
         <h2>What you can do on Ennvo</h2>
         <ul>
@@ -293,7 +353,7 @@
           <li>Make HD audio and video calls</li>
           <li>Discover creators, communities, and trending content</li>
         </ul>
-        <p><a href="https://ennvo.vercel.app/">Open Ennvo</a> Â· <a href="/landing">Landing</a> Â· <a href="/about">About Ennvo, founder Erfan Sarker and co-developer Rita Akter</a> Â· <a href="/blog">Blog</a> Â· <a href="/help">Help Center</a> Â· <a href="/feed">Watch reels</a> Â· <a href="/search">Discover creators</a></p>
+        <p><a href="https://ennvo.vercel.app/">Open Ennvo</a> · <a href="/landing">Landing</a> · <a href="/about">About Ennvo, founder Erfan Sarker and co-developer Rita Akter</a> · <a href="/blog">Blog</a> · <a href="/help">Help Center</a> · <a href="/feed">Watch reels</a> · <a href="/search">Discover creators</a></p>
         <p>Please enable JavaScript to use all interactive features of Ennvo.</p>
       </main>
     </noscript>

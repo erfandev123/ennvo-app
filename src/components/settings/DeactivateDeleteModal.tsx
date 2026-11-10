@@ -196,14 +196,14 @@ export const DeactivateDeleteModal: React.FC<DeactivateDeleteModalProps> = ({ is
               <button
                 type="button"
                 onClick={onClose}
-                className="w-1/2 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold text-xs rounded-2xl transition-colors active:scale-98"
+                className="w-1/2 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold text-xs rounded-2xl transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isLoading}
-                className={`w-1/2 py-3 font-extrabold text-xs rounded-2xl text-white shadow-md flex items-center justify-center space-x-1.5 transition-transform active:scale-98 disabled:opacity-70 ${
+                className={`w-1/2 py-3 font-extrabold text-xs rounded-2xl text-white shadow-md flex items-center justify-center space-x-1.5 transition-transform  disabled:opacity-70 ${
                   selectedAction === 'delete'
                     ? 'bg-red-600 hover:bg-red-700 shadow-red-500/20'
                     : 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/20'

@@ -543,7 +543,7 @@ export default function Auth() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full py-3.5 rounded-full bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-[0.98] text-white font-semibold text-sm shadow-[0_8px_20px_rgba(37,99,235,0.32)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3.5 rounded-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-sm shadow-[0_8px_20px_rgba(37,99,235,0.32)] transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : 'Log in'}
                   </button>
@@ -555,7 +555,7 @@ export default function Auth() {
                     type="button"
                     onClick={handleGoogleAuth}
                     disabled={isLoading}
-                    className="w-full py-3 rounded-full border border-slate-300 hover:bg-slate-50 active:scale-[0.98] text-slate-700 font-medium text-xs shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+                    className="w-full py-3 rounded-full border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium text-xs shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer"
                   >
                     <GoogleIcon className="w-4 h-4" />
                     <span>Continue with Google</span>
@@ -631,7 +631,7 @@ export default function Auth() {
                   type="button"
                   onClick={handleFacebookAuth}
                   disabled={isLoading}
-                  className="w-full py-3.5 px-6 rounded-full bg-[#1877F2] hover:bg-[#166FE5] text-white font-medium text-xs md:text-sm shadow-[0_6px_18px_rgba(24,119,242,0.28)] transition-all flex items-center justify-center gap-2.5 active:scale-[0.98] cursor-pointer"
+                  className="w-full py-3.5 px-6 rounded-full bg-[#1877F2] hover:bg-[#166FE5] text-white font-medium text-xs md:text-sm shadow-[0_6px_18px_rgba(24,119,242,0.28)] transition-all flex items-center justify-center gap-2.5 cursor-pointer"
                 >
                   <FacebookIcon className="w-4 h-4 fill-white" />
                   <span>Continue with Facebook</span>
@@ -642,7 +642,7 @@ export default function Auth() {
                   type="button"
                   onClick={handleGoogleAuth}
                   disabled={isLoading}
-                  className="w-full py-3.5 px-6 rounded-full border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium text-xs md:text-sm shadow-xs transition-all flex items-center justify-center gap-2.5 active:scale-[0.98] cursor-pointer"
+                  className="w-full py-3.5 px-6 rounded-full border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium text-xs md:text-sm shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer"
                 >
                   <GoogleIcon className="w-4 h-4" />
                   <span>Continue with Google</span>
@@ -652,7 +652,7 @@ export default function Auth() {
                 <button
                   type="button"
                   onClick={() => navigateAuth('signup')}
-                  className="w-full py-3.5 px-6 rounded-full border border-slate-300 hover:border-[#2563EB] hover:text-[#2563EB] text-slate-600 font-medium text-xs md:text-sm transition-all flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer"
+                  className="w-full py-3.5 px-6 rounded-full border border-slate-300 hover:border-[#2563EB] hover:text-[#2563EB] text-slate-600 font-medium text-xs md:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Mail className="w-4 h-4" />
                   <span>I'll use email or username</span>
@@ -664,7 +664,7 @@ export default function Auth() {
                 <button 
                   type="button" 
                   onClick={handleGoogleAuth}
-                  className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center shadow-xs text-slate-600 active:scale-95 transition-all"
+                  className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center shadow-xs text-slate-600 transition-all"
                   title="Google"
                 >
                   <GoogleIcon className="w-4 h-4" />
@@ -672,7 +672,7 @@ export default function Auth() {
                 <button 
                   type="button" 
                   onClick={handleFacebookAuth}
-                  className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center shadow-xs text-[#1877F2] active:scale-95 transition-all"
+                  className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center shadow-xs text-[#1877F2] transition-all"
                   title="Facebook"
                 >
                   <FacebookIcon className="w-4 h-4" />
@@ -815,7 +815,7 @@ export default function Auth() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full py-3.5 rounded-full bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-[0.98] text-white font-semibold text-sm shadow-[0_8px_20px_rgba(37,99,235,0.32)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3.5 rounded-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-sm shadow-[0_8px_20px_rgba(37,99,235,0.32)] transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : 'Sign up'}
                   </button>
@@ -826,7 +826,7 @@ export default function Auth() {
                   <button 
                     type="button" 
                     onClick={handleGoogleAuth}
-                    className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center shadow-xs text-slate-600 active:scale-95 transition-all"
+                    className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center shadow-xs text-slate-600 transition-all"
                     title="Google"
                   >
                     <GoogleIcon className="w-4 h-4" />
@@ -834,7 +834,7 @@ export default function Auth() {
                   <button 
                     type="button" 
                     onClick={handleFacebookAuth}
-                    className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center shadow-xs text-[#1877F2] active:scale-95 transition-all"
+                    className="w-10 h-10 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center shadow-xs text-[#1877F2] transition-all"
                     title="Facebook"
                   >
                     <FacebookIcon className="w-4 h-4" />
@@ -923,7 +923,7 @@ export default function Auth() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full py-3.5 rounded-full bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-[0.98] text-white font-semibold text-sm shadow-[0_8px_20px_rgba(37,99,235,0.32)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3.5 rounded-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-sm shadow-[0_8px_20px_rgba(37,99,235,0.32)] transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : 'Send Reset Link'}
                   </button>

@@ -272,7 +272,7 @@ export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ media, onClo
           <button 
             type="button"
             onClick={handleDownload} 
-            className="p-2.5 bg-blue-950/70 hover:bg-blue-600 active:scale-95 rounded-full transition-all text-blue-100 hover:text-white backdrop-blur-xl shadow-lg shadow-blue-950/40 cursor-pointer border border-blue-500/30"
+            className="p-2.5 bg-blue-950/70 hover:bg-blue-600 rounded-full transition-all text-blue-100 hover:text-white backdrop-blur-xl shadow-lg shadow-blue-950/40 cursor-pointer border border-blue-500/30"
             title="Download original"
           >
             <Download className="w-5 h-5" />
@@ -280,7 +280,7 @@ export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ media, onClo
           <button 
             type="button"
             onClick={onClose} 
-            className="p-2.5 bg-blue-950/70 hover:bg-red-600/90 active:scale-95 rounded-full transition-all text-blue-100 hover:text-white backdrop-blur-xl shadow-lg shadow-blue-950/40 cursor-pointer border border-blue-500/30"
+            className="p-2.5 bg-blue-950/70 hover:bg-red-600/90 rounded-full transition-all text-blue-100 hover:text-white backdrop-blur-xl shadow-lg shadow-blue-950/40 cursor-pointer border border-blue-500/30"
             title="Close viewer"
           >
             <X className="w-5 h-5" />
@@ -293,7 +293,7 @@ export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ media, onClo
         <button
           type="button"
           onClick={() => setCurrentIndex(prev => prev - 1)}
-          className="absolute left-3 md:left-6 z-40 p-3 rounded-full bg-blue-950/80 hover:bg-blue-600 active:scale-90 text-white backdrop-blur-xl border border-blue-400/30 shadow-[0_4px_24px_rgba(29,78,216,0.45)] transition-all cursor-pointer"
+          className="absolute left-3 md:left-6 z-40 p-3 rounded-full bg-blue-950/80 hover:bg-blue-600 text-white backdrop-blur-xl border border-blue-400/30 shadow-[0_4px_24px_rgba(29,78,216,0.45)] transition-all cursor-pointer"
           title="Previous photo"
         >
           <ChevronLeft className="w-6 h-6" />
@@ -304,7 +304,7 @@ export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ media, onClo
         <button
           type="button"
           onClick={() => setCurrentIndex(prev => prev + 1)}
-          className="absolute right-3 md:right-6 z-40 p-3 rounded-full bg-blue-950/80 hover:bg-blue-600 active:scale-90 text-white backdrop-blur-xl border border-blue-400/30 shadow-[0_4px_24px_rgba(29,78,216,0.45)] transition-all cursor-pointer"
+          className="absolute right-3 md:right-6 z-40 p-3 rounded-full bg-blue-950/80 hover:bg-blue-600 text-white backdrop-blur-xl border border-blue-400/30 shadow-[0_4px_24px_rgba(29,78,216,0.45)] transition-all cursor-pointer"
           title="Next photo"
         >
           <ChevronRight className="w-6 h-6" />
@@ -363,7 +363,7 @@ export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ media, onClo
               type="button"
               onClick={handleZoomOut}
               disabled={scale <= 1}
-              className="p-1.5 hover:bg-blue-600/40 active:scale-90 rounded-full transition-all disabled:opacity-30 cursor-pointer text-blue-200 hover:text-white"
+              className="p-1.5 hover:bg-blue-600/40 rounded-full transition-all disabled:opacity-30 cursor-pointer text-blue-200 hover:text-white"
               title="Zoom out (-)"
             >
               <ZoomOut className="w-4 h-4" />
@@ -372,7 +372,7 @@ export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ media, onClo
             <button
               type="button"
               onClick={handleResetZoom}
-              className="px-2.5 py-0.5 text-xs font-bold bg-blue-600/30 hover:bg-blue-600/50 active:scale-95 rounded-full transition-all cursor-pointer tabular-nums text-blue-100 border border-blue-400/25"
+              className="px-2.5 py-0.5 text-xs font-bold bg-blue-600/30 hover:bg-blue-600/50 rounded-full transition-all cursor-pointer tabular-nums text-blue-100 border border-blue-400/25"
               title="Click to reset (100%)"
             >
               {Math.round(scale * 100)}%
@@ -382,7 +382,7 @@ export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ media, onClo
               type="button"
               onClick={handleZoomIn}
               disabled={scale >= 4}
-              className="p-1.5 hover:bg-blue-600/40 active:scale-90 rounded-full transition-all disabled:opacity-30 cursor-pointer text-blue-200 hover:text-white"
+              className="p-1.5 hover:bg-blue-600/40 rounded-full transition-all disabled:opacity-30 cursor-pointer text-blue-200 hover:text-white"
               title="Zoom in (+)"
             >
               <ZoomIn className="w-4 h-4" />
@@ -392,7 +392,7 @@ export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ media, onClo
               <button
                 type="button"
                 onClick={handleResetZoom}
-                className="p-1.5 hover:bg-blue-600/40 active:scale-90 rounded-full transition-all ml-1 cursor-pointer text-sky-300 hover:text-white"
+                className="p-1.5 hover:bg-blue-600/40 rounded-full transition-all ml-1 cursor-pointer text-sky-300 hover:text-white"
                 title="Reset zoom"
               >
                 <RotateCcw className="w-3.5 h-3.5" />

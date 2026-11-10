@@ -191,7 +191,7 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
       {/* Top Ennvo Brand Logo */}
       <div 
         onClick={() => handleNavigate('home')}
-        className="w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-110 active:scale-95 mb-1 group relative"
+        className="w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer transition-transform duration-200 mb-1 group relative"
         title="Ennvo Home"
       >
         <div className="w-8 h-8 rounded-xl overflow-hidden shadow-xs border border-white/80 flex items-center justify-center bg-white/40 backdrop-blur-xs">
@@ -243,7 +243,7 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
                       className={`w-[25px] h-[25px] rounded-full object-cover border-2 transition-all duration-200 ${
                         isActive 
                           ? (isDarkDock ? 'border-white scale-110 ring-2 ring-white/30' : 'border-slate-900 scale-110 shadow-xs ring-2 ring-slate-900/10')
-                          : 'border-transparent group-hover:scale-110'
+                          : 'border-transparent '
                       }`}
                     />
                   </div>
@@ -254,7 +254,7 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
                     className={`ultra-glass-pc-icon ${
                       isActive || (item.id === 'create' && showCreateMenu)
                         ? (isDarkDock ? 'text-white stroke-white scale-110' : 'text-slate-950 stroke-slate-950 scale-110')
-                        : (isDarkDock ? 'text-white/60 stroke-white/60 group-hover:text-neutral-200 group-hover:scale-105' : 'text-slate-500 stroke-slate-500 group-hover:text-slate-900 group-hover:scale-105')
+                        : (isDarkDock ? 'text-white/60 stroke-white/60 group-hover:text-neutral-200 ' : 'text-slate-500 stroke-slate-500 group-hover:text-slate-900 ')
                     }`}
                   />
                 )}
@@ -350,8 +350,8 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
             size={22}
             className={`ultra-glass-pc-icon ${
               isDarkDock
-                ? (currentPage === 'settings' ? 'text-white stroke-white scale-110' : 'text-white/60 stroke-white/60 group-hover:text-neutral-200 group-hover:scale-105')
-                : (currentPage === 'settings' ? 'text-slate-950 stroke-slate-950 scale-110' : 'text-slate-500 stroke-slate-500 group-hover:text-slate-900 group-hover:scale-105')
+                ? (currentPage === 'settings' ? 'text-white stroke-white scale-110' : 'text-white/60 stroke-white/60 group-hover:text-neutral-200 ')
+                : (currentPage === 'settings' ? 'text-slate-950 stroke-slate-950 scale-110' : 'text-slate-500 stroke-slate-500 group-hover:text-slate-900 ')
             }`} 
           />
           <span className="absolute left-full ml-3 px-2.5 py-1 bg-slate-900/90 text-white text-[12px] font-medium rounded-xl pointer-events-none opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-200 shadow-md backdrop-blur-md whitespace-nowrap z-50">

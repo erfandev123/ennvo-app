@@ -382,7 +382,7 @@ export const AccountInfoScreen: React.FC<AccountInfoScreenProps> = ({ onBack }) 
                   type="button"
                   onClick={handleAutoDetectLocation}
                   disabled={isDetectingLocation}
-                  className="text-xs text-[#00a8b5] hover:text-[#008f9a] font-semibold flex items-center space-x-1 active:scale-95 transition-all"
+                  className="text-xs text-[#00a8b5] hover:text-[#008f9a] font-semibold flex items-center space-x-1 transition-all"
                 >
                   {isDetectingLocation ? (
                     <>
@@ -416,7 +416,7 @@ export const AccountInfoScreen: React.FC<AccountInfoScreenProps> = ({ onBack }) 
                 <button
                   type="button"
                   onClick={() => setShowDobPicker(true)}
-                  className="text-xs text-[#00a8b5] hover:text-[#008f9a] font-semibold flex items-center space-x-1 active:scale-95 transition-all cursor-pointer"
+                  className="text-xs text-[#00a8b5] hover:text-[#008f9a] font-semibold flex items-center space-x-1 transition-all cursor-pointer"
                 >
                   <Calendar className="w-3.5 h-3.5" />
                   <span>{dob ? 'Change Date' : 'Set Birthday'}</span>
@@ -473,7 +473,7 @@ export const AccountInfoScreen: React.FC<AccountInfoScreenProps> = ({ onBack }) 
             <button
               type="submit"
               disabled={isSaving || usernameStatus === 'taken' || usernameStatus === 'checking'}
-              className="w-full py-3.5 bg-gray-900 hover:bg-black text-white font-bold text-[15px] rounded-2xl transition-all active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center space-x-2 shadow-sm"
+              className="w-full py-3.5 bg-gray-900 hover:bg-black text-white font-bold text-[15px] rounded-2xl transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center space-x-2 shadow-sm"
             >
               {isSaving ? (
                 <>

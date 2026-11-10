@@ -297,7 +297,7 @@ export const TagPeopleModal: React.FC<TagPeopleModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="w-full py-3.5 rounded-full font-bold text-[14px] bg-blue-600 hover:bg-blue-500 active:scale-98 text-white shadow-sm shadow-blue-500/25 transition-all cursor-pointer border-0 text-center"
+              className="w-full py-3.5 rounded-full font-bold text-[14px] bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-500/25 transition-all cursor-pointer border-0 text-center"
             >
               Done ({taggedUsers.length} Tagged)
             </button>

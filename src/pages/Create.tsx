@@ -254,7 +254,7 @@ export default function Create() {
           type="button"
           onClick={handlePublish}
           disabled={!caption.trim() && files.length === 0}
-          className="px-5 py-2 rounded-full font-bold text-[13.5px] bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white shadow-xs shadow-blue-500/25 active:scale-95 transition-all cursor-pointer border-0"
+          className="px-5 py-2 rounded-full font-bold text-[13.5px] bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white shadow-xs shadow-blue-500/25 transition-all cursor-pointer border-0"
         >
           Share
         </button>
@@ -360,7 +360,7 @@ export default function Create() {
                     className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border-0 shadow-xs ${
                       isCustomBg
                         ? 'scale-110 ring-2 ring-blue-500 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900'
-                        : 'hover:scale-105'
+                        : ''
                     }`}
                     style={{ background: 'conic-gradient(from 180deg at 50% 50%, #f43f5e 0deg, #ec4899 60deg, #8b5cf6 120deg, #3b82f6 180deg, #10b981 240deg, #f59e0b 300deg, #f43f5e 360deg)' }}
                     title="Custom color picker"
@@ -382,7 +382,7 @@ export default function Create() {
                     } ${
                       (!isCustomBg && (preset.bg === selectedBg || (!preset.bg && !selectedBg))) 
                         ? 'scale-110 ring-2 ring-blue-500 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900' 
-                        : 'hover:scale-105'
+                        : ''
                     }`}
                     title={preset.label}
                   />
@@ -398,7 +398,7 @@ export default function Create() {
               onClick={() => fileInputRef.current?.click()}
               className="w-full py-7 px-4 rounded-[26px] bg-white/70 dark:bg-white/[0.05] backdrop-blur-md flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/90 dark:hover:bg-white/[0.08] transition-all border-0 shadow-xs group"
             >
-              <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform">
+              <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-2.5 transition-transform">
                 <ImageIcon className="w-6 h-6 stroke-[2]" />
               </div>
               <p className="text-[13.5px] font-bold text-neutral-800 dark:text-neutral-100 mb-0.5">
@@ -470,7 +470,7 @@ export default function Create() {
                       <button
                         type="button"
                         onClick={() => handleRemoveFile(index)}
-                        className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center cursor-pointer border-0 transition-transform active:scale-90"
+                        className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center cursor-pointer border-0 transition-transform"
                         title="Remove file"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

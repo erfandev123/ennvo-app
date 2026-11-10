@@ -423,8 +423,9 @@ video:not([controls]) {
     transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* Press feedback is handled by the instant tap-flash system (no zoom animation). */
 .glass-nav-item:active {
-    transform: scale(0.82);
+    transform: none;
 }
 
 .glass-nav-icon {
@@ -630,12 +631,8 @@ html.dark .ultra-glass-pc-dock,
   transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.ultra-glass-pc-item:hover {
-  transform: scale(1.12);
-}
-
 .ultra-glass-pc-item:active {
-  transform: scale(0.92);
+  transform: none;
 }
 
 .ultra-glass-pc-item.is-drag-hovered {
@@ -720,11 +717,10 @@ html.dark .ultra-glass-pc-dock .ultra-glass-pc-item.active .ultra-glass-pc-icon 
 
 .reels-pc-glass-btn:hover {
   background: #f4f4f5;
-  transform: scale(1.06);
 }
 
 .reels-pc-glass-btn:active {
-  transform: scale(0.90);
+  transform: translateZ(0);
 }
 
 html.dark .reels-pc-glass-btn {
@@ -1258,7 +1254,7 @@ html.dark {
 }
 
 .act-header-btn:active {
-  transform: scale(0.88);
+  transform: none;
 }
 
 /* Card Item - Ultra Optimized for 60/120 FPS on Low-End Devices */
@@ -1287,8 +1283,7 @@ html.dark {
 }
 
 .act-card-item:active {
-  transform: scale(0.965) translate3d(0, 0, 0) !important;
-  transition: transform 0.12s ease-out;
+  transform: translate3d(0, 0, 0) !important;
 }
 
 /* Badges */
@@ -1326,7 +1321,7 @@ html.dark {
 }
 
 .act-btn-pill:active {
-  transform: scale(0.92);
+  transform: none;
 }
 
 .act-btn-follow-back {
@@ -1430,7 +1425,7 @@ html:not(.dark) .act-btn-following {
 }
 
 .act-stack-handle-banner:active {
-  transform: scale(0.96);
+  transform: none;
 }
 
 .act-stack-pill-handle {
@@ -1510,7 +1505,7 @@ html.dark .act-glass-nav-pill {
 }
 
 .act-nav-btn:active {
-  transform: scale(0.93);
+  transform: none;
 }
 
 .act-nav-btn.active {
@@ -1536,3 +1531,92 @@ html.dark .act-glass-nav-pill {
 
 
 
+
+/* =========================================================================
+   ENNVO INSTANT TAP SYSTEM  (no zoom / no press animation, instant feedback)
+   Every button, text button, icon button and link reacts in one frame:
+   the element darkens a little while the finger is down (a light gray flash)
+   and nothing moves. Removed: every active:scale-* and hover:scale-* zoom.
+   ========================================================================= */
+:root {
+  --tap-flash-light: 0.90;
+  --tap-flash-dark: 1.18;
+}
+
+button,
+[role="button"],
+a,
+summary,
+label,
+.tap-target,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"] {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.075) !important;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  /* Transform/scale transitions are dropped on purpose: taps never animate. */
+  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, filter !important;
+  transition-duration: 0.12s !important;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+html.dark button,
+html.dark [role="button"],
+html.dark a,
+html.dark summary,
+html.dark label,
+html.dark .tap-target,
+html.dark input[type="button"],
+html.dark input[type="submit"],
+html.dark input[type="reset"] {
+  -webkit-tap-highlight-color: rgba(255, 255, 255, 0.11) !important;
+}
+
+/* Hard stop for any leftover Tailwind / motion press zoom. */
+button:active,
+[role="button"]:active,
+a:active,
+summary:active,
+label:active,
+.tap-target:active,
+.tap-target.is-pressed,
+button.is-pressed,
+a.is-pressed,
+[role="button"].is-pressed {
+  scale: 1 !important;
+  filter: brightness(var(--tap-flash-light)) !important;
+  transition-duration: 0s !important;
+}
+
+html.dark button:active,
+html.dark [role="button"]:active,
+html.dark a:active,
+html.dark summary:active,
+html.dark label:active,
+html.dark .tap-target:active,
+html.dark .tap-target.is-pressed,
+html.dark button.is-pressed,
+html.dark a.is-pressed,
+html.dark [role="button"].is-pressed {
+  scale: 1 !important;
+  filter: brightness(var(--tap-flash-dark)) !important;
+  transition-duration: 0s !important;
+}
+
+/* Disabled controls never flash. */
+button:disabled,
+button[aria-disabled="true"],
+[aria-disabled="true"]:active {
+  filter: none !important;
+}
+
+/* The flash must land on the next paint, never after it. */
+button,
+[role="button"],
+.tap-target {
+  -webkit-appearance: none;
+  backface-visibility: hidden;
+}

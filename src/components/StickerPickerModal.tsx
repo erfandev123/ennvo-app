@@ -156,7 +156,7 @@ export const StickerViewerModal: React.FC<StickerViewerModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-3.5 right-3.5 w-7 h-7 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-900 dark:hover:text-white flex items-center justify-center active:scale-90 transition-all border-0 cursor-pointer"
+            className="absolute top-3.5 right-3.5 w-7 h-7 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-900 dark:hover:text-white flex items-center justify-center transition-all border-0 cursor-pointer"
             title="Close"
           >
             <X className="w-4 h-4" />
@@ -198,7 +198,7 @@ export const StickerViewerModal: React.FC<StickerViewerModalProps> = ({
             <button
               type="button"
               onClick={handleToggleSave}
-              className={`w-full py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center justify-center space-x-2 transition-all active:scale-95 cursor-pointer border ${
+              className={`w-full py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center justify-center space-x-2 transition-all  cursor-pointer border ${
                 isSaved
                   ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300/40'
                   : 'bg-sky-500/15 hover:bg-sky-500/25 text-sky-700 dark:text-sky-300 border-sky-400/30'
@@ -212,7 +212,7 @@ export const StickerViewerModal: React.FC<StickerViewerModalProps> = ({
             <button
               type="button"
               onClick={handleShare}
-              className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 active:scale-95 text-white flex items-center justify-center space-x-2 transition-all cursor-pointer border-0 shadow-xs"
+              className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white flex items-center justify-center space-x-2 transition-all cursor-pointer border-0 shadow-xs"
             >
               <Send className="w-3.5 h-3.5" />
               <span>Share to Chat</span>
@@ -223,7 +223,7 @@ export const StickerViewerModal: React.FC<StickerViewerModalProps> = ({
               <button
                 type="button"
                 onClick={handleDelete}
-                className="w-full py-2 px-4 rounded-xl text-xs font-semibold bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 flex items-center justify-center space-x-1.5 active:scale-95 transition-all cursor-pointer"
+                className="w-full py-2 px-4 rounded-xl text-xs font-semibold bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 flex items-center justify-center space-x-1.5 transition-all cursor-pointer"
                 title="Delete your sticker"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -641,7 +641,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(true)}
-                  className="px-2.5 py-1 rounded-full bg-sky-500/15 hover:bg-sky-500/25 text-sky-600 dark:text-sky-300 border border-sky-400/30 flex items-center space-x-1 hover:scale-105 active:scale-95 transition-all text-xs font-semibold cursor-pointer"
+                  className="px-2.5 py-1 rounded-full bg-sky-500/15 hover:bg-sky-500/25 text-sky-600 dark:text-sky-300 border border-sky-400/30 flex items-center space-x-1 transition-all text-xs font-semibold cursor-pointer"
                   title="Create Sticker"
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -651,7 +651,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-7 h-7 bg-neutral-200/70 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 rounded-full transition-colors active:scale-90 flex items-center justify-center cursor-pointer border-0"
+                className="w-7 h-7 bg-neutral-200/70 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 rounded-full transition-colors flex items-center justify-center cursor-pointer border-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -741,7 +741,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setShowCreateModal(true)}
-                      className="px-3.5 py-1.5 bg-sky-500 hover:bg-sky-400 text-white rounded-full text-xs font-medium active:scale-95 transition-all cursor-pointer border-0"
+                      className="px-3.5 py-1.5 bg-sky-500 hover:bg-sky-400 text-white rounded-full text-xs font-medium transition-all cursor-pointer border-0"
                     >
                       + Create Sticker
                     </button>
@@ -751,7 +751,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                     {filteredAllStickers.map((stk) => (
                       <div
                         key={stk.id}
-                        className="group relative flex flex-col items-center justify-center p-1 rounded-2xl hover:bg-sky-50/50 dark:hover:bg-neutral-800/50 transition-all duration-150 cursor-pointer active:scale-90 select-none w-full"
+                        className="group relative flex flex-col items-center justify-center p-1 rounded-2xl hover:bg-sky-50/50 dark:hover:bg-neutral-800/50 transition-all duration-150 cursor-pointer select-none w-full"
                         onClick={() => {
                           onSelectSticker(stk.url, stk.type);
                           onClose();
@@ -774,7 +774,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                               alt={stk.title} 
                               loading="lazy" 
                               referrerPolicy="no-referrer"
-                              className="w-full h-full object-contain pointer-events-none drop-shadow-xs hover:scale-105 transition-transform" 
+                              className="w-full h-full object-contain pointer-events-none drop-shadow-xs transition-transform" 
                               onError={(e) => {
                                 const el = e.currentTarget;
                                 if (stk.url?.includes('/uploads/') && !el.dataset.retried) {
@@ -807,7 +807,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setShowCreateModal(true)}
-                      className="px-3.5 py-1.5 bg-sky-500 hover:bg-sky-400 text-white rounded-full text-xs font-medium active:scale-95 transition-all cursor-pointer border-0"
+                      className="px-3.5 py-1.5 bg-sky-500 hover:bg-sky-400 text-white rounded-full text-xs font-medium transition-all cursor-pointer border-0"
                     >
                       + Create Sticker
                     </button>
@@ -817,7 +817,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                     {myStickers.map((stk) => (
                       <div
                         key={stk.id}
-                        className="group relative flex flex-col items-center justify-center p-1 rounded-2xl hover:bg-sky-50/50 dark:hover:bg-neutral-800/50 transition-all cursor-pointer active:scale-90 select-none w-full"
+                        className="group relative flex flex-col items-center justify-center p-1 rounded-2xl hover:bg-sky-50/50 dark:hover:bg-neutral-800/50 transition-all cursor-pointer select-none w-full"
                         onClick={() => {
                           onSelectSticker(stk.url, stk.type);
                           onClose();
@@ -840,7 +840,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                               alt={stk.title} 
                               loading="lazy" 
                               referrerPolicy="no-referrer"
-                              className="w-full h-full object-contain pointer-events-none drop-shadow-xs hover:scale-105 transition-transform" 
+                              className="w-full h-full object-contain pointer-events-none drop-shadow-xs transition-transform" 
                               onError={(e) => {
                                 const el = e.currentTarget;
                                 if (stk.url?.includes('/uploads/') && !el.dataset.retried) {
@@ -876,7 +876,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                     {savedStickersList.map((stk) => (
                       <div
                         key={stk.id}
-                        className="group relative flex flex-col items-center justify-center p-1 rounded-2xl hover:bg-sky-50/50 dark:hover:bg-neutral-800/50 transition-all cursor-pointer active:scale-90 select-none w-full"
+                        className="group relative flex flex-col items-center justify-center p-1 rounded-2xl hover:bg-sky-50/50 dark:hover:bg-neutral-800/50 transition-all cursor-pointer select-none w-full"
                         onClick={() => {
                           onSelectSticker(stk.url, stk.type);
                           onClose();
@@ -899,7 +899,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                               alt={stk.title || 'Saved'} 
                               loading="lazy" 
                               referrerPolicy="no-referrer"
-                              className="w-full h-full object-contain pointer-events-none drop-shadow-xs hover:scale-105 transition-transform" 
+                              className="w-full h-full object-contain pointer-events-none drop-shadow-xs transition-transform" 
                               onError={(e) => {
                                 const el = e.currentTarget;
                                 if (stk.url?.includes('/uploads/') && !el.dataset.retried) {
@@ -941,7 +941,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                     setCreatorPreviewUrl(null);
                     setStickerCaption('');
                   }}
-                  className="p-2 rounded-full bg-sky-900/40 hover:bg-sky-800/60 text-sky-200 hover:text-white transition-all active:scale-90 border border-sky-400/30 cursor-pointer"
+                  className="p-2 rounded-full bg-sky-900/40 hover:bg-sky-800/60 text-sky-200 hover:text-white transition-all border border-sky-400/30 cursor-pointer"
                   title="Close Sticker Studio"
                 >
                   <X className="w-5 h-5" />
@@ -1065,7 +1065,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                       <button
                         type="button"
                         onClick={() => creatorFileInputRef.current?.click()}
-                        className="w-13 h-13 rounded-2xl bg-sky-500 hover:bg-sky-400 active:scale-90 text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-xs"
+                        className="w-13 h-13 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-xs"
                         title="Choose Photo"
                       >
                         <ImageIcon className="w-6 h-6" />
@@ -1074,7 +1074,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                       <button
                         type="button"
                         onClick={() => cameraFileInputRef.current?.click()}
-                        className="w-13 h-13 rounded-2xl bg-sky-900/50 hover:bg-sky-800/60 active:scale-90 text-sky-200 hover:text-white flex items-center justify-center border border-sky-400/30 transition-all cursor-pointer"
+                        className="w-13 h-13 rounded-2xl bg-sky-900/50 hover:bg-sky-800/60 text-sky-200 hover:text-white flex items-center justify-center border border-sky-400/30 transition-all cursor-pointer"
                         title="Take Photo with Camera"
                       >
                         <Camera className="w-6 h-6" />
@@ -1083,7 +1083,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                       <button
                         type="button"
                         onClick={() => videoFileInputRef.current?.click()}
-                        className="w-13 h-13 rounded-2xl bg-blue-600 hover:bg-blue-500 active:scale-90 text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-xs"
+                        className="w-13 h-13 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-all cursor-pointer border-0 shadow-xs"
                         title="Choose Video (5s Clip)"
                       >
                         <Video className="w-6 h-6" />
@@ -1102,7 +1102,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setRotationAngle((prev) => (prev + 90) % 360)}
-                        className="w-9 h-9 rounded-full bg-sky-800/40 hover:bg-sky-700/50 active:scale-90 text-sky-200 hover:text-white flex items-center justify-center transition-all cursor-pointer border border-sky-400/20"
+                        className="w-9 h-9 rounded-full bg-sky-800/40 hover:bg-sky-700/50 text-sky-200 hover:text-white flex items-center justify-center transition-all cursor-pointer border border-sky-400/20"
                         title="Rotate 90°"
                       >
                         <RotateCw className="w-4 h-4" />
@@ -1111,7 +1111,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setIsFlippedH((prev) => !prev)}
-                        className={`w-9 h-9 rounded-full active:scale-90 flex items-center justify-center transition-all cursor-pointer border ${
+                        className={`w-9 h-9 rounded-full  flex items-center justify-center transition-all cursor-pointer border ${
                           isFlippedH 
                             ? 'bg-sky-500 text-white border-sky-400 shadow-xs' 
                             : 'bg-sky-800/40 text-sky-200 border-sky-400/20 hover:bg-sky-700/50'
@@ -1125,7 +1125,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                         <button
                           type="button"
                           onClick={handleRemoveBackground}
-                          className="w-9 h-9 rounded-full bg-gradient-to-r from-sky-400/30 to-blue-500/30 hover:bg-sky-600/40 active:scale-90 text-sky-100 flex items-center justify-center transition-all cursor-pointer border border-sky-400/30"
+                          className="w-9 h-9 rounded-full bg-gradient-to-r from-sky-400/30 to-blue-500/30 hover:bg-sky-600/40 text-sky-100 flex items-center justify-center transition-all cursor-pointer border border-sky-400/30"
                           title="Magic Cutout (Remove Solid Background)"
                         >
                           <Wand2 className="w-4 h-4 text-sky-300" />
@@ -1138,7 +1138,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setZoomLevel((prev) => Math.max(1, +(prev - 0.25).toFixed(2)))}
-                        className="w-7 h-7 rounded-full hover:bg-sky-800/50 active:scale-90 text-sky-300 flex items-center justify-center cursor-pointer border-0"
+                        className="w-7 h-7 rounded-full hover:bg-sky-800/50 text-sky-300 flex items-center justify-center cursor-pointer border-0"
                         title="Zoom Out"
                       >
                         <ZoomOut className="w-3.5 h-3.5" />
@@ -1158,7 +1158,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setZoomLevel((prev) => Math.min(2.5, +(prev + 0.25).toFixed(2)))}
-                        className="w-7 h-7 rounded-full hover:bg-sky-800/50 active:scale-90 text-sky-300 flex items-center justify-center cursor-pointer border-0"
+                        className="w-7 h-7 rounded-full hover:bg-sky-800/50 text-sky-300 flex items-center justify-center cursor-pointer border-0"
                         title="Zoom In (Fill Rounded Box)"
                       >
                         <ZoomIn className="w-3.5 h-3.5" />
@@ -1168,7 +1168,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                     <button
                       type="button"
                       onClick={() => creatorFileInputRef.current?.click()}
-                      className="w-9 h-9 rounded-full bg-sky-800/40 hover:bg-sky-700/50 active:scale-90 text-sky-200 hover:text-white flex items-center justify-center transition-all cursor-pointer border border-sky-400/20"
+                      className="w-9 h-9 rounded-full bg-sky-800/40 hover:bg-sky-700/50 text-sky-200 hover:text-white flex items-center justify-center transition-all cursor-pointer border border-sky-400/20"
                       title="Choose Another Media"
                     >
                       <Upload className="w-4 h-4" />
@@ -1249,7 +1249,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                       type="button"
                       onClick={handleCreateStickerSubmit}
                       disabled={isUploadingSticker || isSendingDirectly}
-                      className="flex-1 py-2 px-3 rounded-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 text-xs font-semibold flex items-center justify-center space-x-1.5 active:scale-95 transition-all cursor-pointer"
+                      className="flex-1 py-2 px-3 rounded-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all cursor-pointer"
                       title="Save to My Stickers"
                     >
                       {isUploadingSticker ? (
@@ -1264,7 +1264,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
                       type="button"
                       onClick={handleSendDirectly}
                       disabled={isUploadingSticker || isSendingDirectly}
-                      className="flex-1 py-2 px-3 rounded-full bg-gradient-to-r from-sky-400 to-blue-600 hover:from-sky-500 hover:to-blue-700 text-white text-xs font-semibold flex items-center justify-center space-x-1.5 active:scale-95 transition-all cursor-pointer border-0 shadow-xs"
+                      className="flex-1 py-2 px-3 rounded-full bg-gradient-to-r from-sky-400 to-blue-600 hover:from-sky-500 hover:to-blue-700 text-white text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all cursor-pointer border-0 shadow-xs"
                       title="Share Sticker to Chat"
                     >
                       {isSendingDirectly ? (

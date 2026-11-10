@@ -284,7 +284,7 @@ export default function Reels() {
         <p className="text-gray-500 text-center mb-6">Be the first to share a reel!</p>
         <button 
           onClick={() => pushPage('create')}
-          className="bg-blue-500 hover:bg-blue-600 text-white font-normal px-8 py-3 rounded-full transition-all active:scale-95 shadow-lg shadow-blue-100"
+          className="bg-blue-500 hover:bg-blue-600 text-white font-normal px-8 py-3 rounded-full transition-all shadow-lg shadow-blue-100"
         >
           Create Reel
         </button>
@@ -362,7 +362,7 @@ export default function Reels() {
               <button
                 type="button"
                 onClick={handleDismissWelcome}
-                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-medium text-sm shadow-[0_10px_25px_rgba(56,189,248,0.35)] flex items-center justify-center space-x-2 cursor-pointer transition-all active:scale-[0.98]"
+                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-medium text-sm shadow-[0_10px_25px_rgba(56,189,248,0.35)] flex items-center justify-center space-x-2 cursor-pointer transition-all"
               >
                 <Play className="w-4 h-4 fill-white" />
                 <span>Start Watching Reels</span>
@@ -428,7 +428,7 @@ export default function Reels() {
       <div className={`absolute top-[max(calc(env(safe-area-inset-top,0px)+10px),16px)] right-4 md:right-8 z-40 transition-opacity duration-300 ${isReelsCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}>
         <button 
           onClick={() => pushPage('search')}
-          className="p-2 text-white md:text-gray-800 dark:md:text-white hover:opacity-80 transition-all active:scale-95 drop-shadow-sm flex items-center justify-center cursor-pointer"
+          className="p-2 text-white md:text-gray-800 dark:md:text-white hover:opacity-80 transition-all drop-shadow-sm flex items-center justify-center cursor-pointer"
           title="Search"
         >
           <Search className="w-5 h-5 text-white md:text-gray-800 dark:md:text-white stroke-[2.2]" />
@@ -442,7 +442,7 @@ export default function Reels() {
           onClick={handlePrevReel}
           title="Previous Reel (Arrow Up)"
           aria-label="Previous Reel"
-          className="w-9.5 h-9.5 rounded-full flex items-center justify-center text-gray-800 dark:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-all active:scale-90 cursor-pointer"
+          className="w-9.5 h-9.5 rounded-full flex items-center justify-center text-gray-800 dark:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-all cursor-pointer"
         >
           <ChevronUp className="w-5 h-5 stroke-[2.2]" />
         </button>
@@ -452,7 +452,7 @@ export default function Reels() {
           onClick={handleNextReel}
           title="Next Reel (Arrow Down)"
           aria-label="Next Reel"
-          className="w-9.5 h-9.5 rounded-full flex items-center justify-center text-gray-800 dark:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-all active:scale-90 cursor-pointer"
+          className="w-9.5 h-9.5 rounded-full flex items-center justify-center text-gray-800 dark:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-all cursor-pointer"
         >
           <ChevronDown className="w-5 h-5 stroke-[2.2]" />
         </button>

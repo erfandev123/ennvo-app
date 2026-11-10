@@ -37,6 +37,10 @@ try {
 export const db = initializeFirestore(app, {
   localCache: localCacheSetting,
   ignoreUndefinedProperties: true,
+  // Android WebView sometimes blocks the long-lived WebChannel stream on
+  // carrier networks. Autodetect falls back to long polling instead of
+  // hanging for 30+ seconds on the first query after a cold start.
+  experimentalAutoDetectLongPolling: true,
 });
 
 export const rtdb = getDatabase(app);

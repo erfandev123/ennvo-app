@@ -112,7 +112,7 @@ export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm rounded-full shadow-lg shadow-emerald-600/20 transition-transform active:scale-95"
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm rounded-full shadow-lg shadow-emerald-600/20 transition-transform"
                 >
                   Done
                 </button>
@@ -176,14 +176,14 @@ export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({
                     <button
                       type="button"
                       onClick={handleClose}
-                      className="w-1/2 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold text-xs rounded-full transition-colors active:scale-95"
+                      className="w-1/2 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold text-xs rounded-full transition-colors"
                     >
                       Maybe Later
                     </button>
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className="w-1/2 py-3.5 bg-[#5633D8] hover:bg-[#4828C8] text-white font-extrabold text-xs rounded-full shadow-lg shadow-purple-500/25 flex items-center justify-center space-x-1.5 transition-transform active:scale-95 disabled:opacity-70"
+                      className="w-1/2 py-3.5 bg-[#5633D8] hover:bg-[#4828C8] text-white font-extrabold text-xs rounded-full shadow-lg shadow-purple-500/25 flex items-center justify-center space-x-1.5 transition-transform disabled:opacity-70"
                     >
                       {isLoading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />

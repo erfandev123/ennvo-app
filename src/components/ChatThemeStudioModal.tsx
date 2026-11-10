@@ -302,7 +302,7 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsBlur(!isBlur)}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-full shadow-md border cursor-pointer transition-all duration-150 active:scale-95 ${
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-full shadow-md border cursor-pointer transition-all duration-150  ${
                     isBlur 
                       ? 'bg-neutral-900 text-white border-neutral-700' 
                       : 'bg-white/95 text-neutral-800 border-white/90'
@@ -321,7 +321,7 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowBrightnessSlider(!showBrightnessSlider)}
-                    className={`w-8.5 h-8.5 rounded-full shadow-md border flex items-center justify-center cursor-pointer transition-all active:scale-95 ${
+                    className={`w-8.5 h-8.5 rounded-full shadow-md border flex items-center justify-center cursor-pointer transition-all  ${
                       showBrightnessSlider
                         ? 'bg-neutral-900 text-white border-neutral-700'
                         : 'bg-white/95 text-neutral-800 border-white/90'
@@ -385,7 +385,7 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
                   type="button"
                   onClick={handleSave}
                   disabled={isApplying}
-                  className="px-6 py-2 rounded-full bg-[#FE2C55] hover:bg-[#E60045] active:scale-95 text-white font-semibold text-[13.5px] shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                  className="px-6 py-2 rounded-full bg-[#FE2C55] hover:bg-[#E60045] text-white font-semibold text-[13.5px] shadow-sm transition-all cursor-pointer disabled:opacity-50"
                 >
                   {isApplying ? 'Saving...' : 'Save Theme'}
                 </button>
@@ -463,7 +463,7 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
                         <div className={`w-full aspect-[3/4] rounded-[20px] overflow-hidden transition-all shadow-xs relative ${
                           isSelected
                             ? 'ring-3 ring-[#FE2C55] ring-offset-2 scale-[1.02]'
-                            : 'hover:opacity-90 active:scale-95'
+                            : 'hover:opacity-90 '
                         }`}>
                           <img
                             src={theme.thumbnail}
@@ -499,7 +499,7 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
                           className={`w-full aspect-[3/4] rounded-[20px] border-2 transition-all shadow-xs relative flex items-center justify-center ${
                             isSelected
                               ? 'border-[#FE2C55] ring-3 ring-[#FE2C55]/30 scale-[1.02]'
-                              : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-400 active:scale-95'
+                              : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-400 '
                           }`}
                           style={{ backgroundColor: col.colorHex }}
                         >
@@ -541,7 +541,7 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
             <button
               onClick={handleSave}
               disabled={isApplying}
-              className="px-5 py-1.5 rounded-full bg-[#FE2C55] hover:bg-[#E60045] active:scale-95 text-white font-semibold text-[14px] shadow-xs cursor-pointer disabled:opacity-50"
+              className="px-5 py-1.5 rounded-full bg-[#FE2C55] hover:bg-[#E60045] text-white font-semibold text-[14px] shadow-xs cursor-pointer disabled:opacity-50"
             >
               {isApplying ? 'Saving...' : 'Save'}
             </button>
@@ -557,7 +557,7 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
               <button
                 type="button"
                 onClick={() => setIsBlur(!isBlur)}
-                className={`flex items-center space-x-2.5 px-4 py-2 rounded-full shadow-lg border backdrop-blur-xl cursor-pointer transition-all duration-200 active:scale-95 ${
+                className={`flex items-center space-x-2.5 px-4 py-2 rounded-full shadow-lg border backdrop-blur-xl cursor-pointer transition-all duration-200  ${
                   isBlur 
                     ? 'bg-neutral-900 text-white border-neutral-700 shadow-black/20' 
                     : 'bg-white/95 text-neutral-800 border-white/90 shadow-black/10'
@@ -575,7 +575,7 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowBrightnessSlider(!showBrightnessSlider)}
-                  className={`w-10 h-10 rounded-full shadow-lg border backdrop-blur-xl flex items-center justify-center cursor-pointer transition-all active:scale-95 ${
+                  className={`w-10 h-10 rounded-full shadow-lg border backdrop-blur-xl flex items-center justify-center cursor-pointer transition-all  ${
                     showBrightnessSlider
                       ? 'bg-neutral-900 text-white border-neutral-700'
                       : 'bg-white/95 text-neutral-800 border-white/90'
@@ -668,7 +668,7 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
                     onClick={() => fileInputRef.current?.click()}
                     className="flex flex-col items-center cursor-pointer group"
                   >
-                    <div className="w-full aspect-[3/4] rounded-[20px] bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 active:scale-95 transition-all flex items-center justify-center shadow-2xs border border-neutral-200/60 dark:border-neutral-700">
+                    <div className="w-full aspect-[3/4] rounded-[20px] bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 transition-all flex items-center justify-center shadow-2xs border border-neutral-200/60 dark:border-neutral-700">
                       <ImageIcon className="w-7 h-7 text-neutral-700 dark:text-neutral-300" strokeWidth={2} />
                     </div>
                     <span className="text-[12px] font-medium text-neutral-800 dark:text-neutral-200 mt-1">
@@ -706,7 +706,7 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
                           className={`w-full aspect-[3/4] rounded-[20px] overflow-hidden transition-all shadow-2xs ${
                             isSelected
                               ? 'ring-3 ring-[#FE2C55] ring-offset-2 scale-[1.02]'
-                              : 'hover:opacity-90 active:scale-95'
+                              : 'hover:opacity-90 '
                           }`}
                         >
                           <img

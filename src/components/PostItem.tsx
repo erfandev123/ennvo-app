@@ -485,7 +485,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                 setTargetAnalyticsPostId(post.id);
                 setShowAnalytics(true);
               }}
-              className="p-1.5 text-neutral-400 hover:text-blue-500 dark:hover:text-blue-400 rounded-full transition-colors active:scale-90 cursor-pointer"
+              className="p-1.5 text-neutral-400 hover:text-blue-500 dark:hover:text-blue-400 rounded-full transition-colors cursor-pointer"
               title="Post Insights"
             >
               <BarChart2 className="w-4 h-4" />
@@ -495,7 +495,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
           <div className="relative">
             <button 
               onClick={() => setShowOptions(!showOptions)}
-              className="p-1.5 text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-white rounded-full transition-colors active:scale-90 cursor-pointer"
+              className="p-1.5 text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-white rounded-full transition-colors cursor-pointer"
               aria-label="Post options"
             >
               <MoreHorizontal className="w-5 h-5" />
@@ -595,7 +595,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                 e.stopPropagation();
                 togglePostAudio((post as any).songUrl);
               }}
-              className="w-6 h-6 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center active:scale-90 transition-transform cursor-pointer shrink-0 shadow-xs border-0"
+              className="w-6 h-6 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 flex items-center justify-center transition-transform cursor-pointer shrink-0 shadow-xs border-0"
               title={isPlayingPostAudio ? "Pause" : "Play"}
             >
               {isPlayingPostAudio ? (
@@ -711,14 +711,14 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                   <div className="absolute bottom-3 right-3 flex items-center space-x-2 z-20">
                     <button 
                       onClick={toggleMute}
-                      className="p-2 bg-black/60 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-transform active:scale-90"
+                      className="p-2 bg-black/60 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-transform"
                       aria-label="Mute toggle"
                     >
                       {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                     </button>
                     <button 
                       onClick={toggleVideoPlayback}
-                      className="p-2 bg-black/60 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-transform active:scale-90"
+                      className="p-2 bg-black/60 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-transform"
                       aria-label="Play pause toggle"
                     >
                       {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white" />}
@@ -732,7 +732,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                   loading="lazy" 
                   decoding="async" 
                   referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover block cursor-pointer transition-transform duration-300 hover:scale-[1.01]" 
+                  className="w-full h-full object-cover block cursor-pointer transition-transform duration-300" 
                   onClick={(e) => {
                     e.stopPropagation();
                     setViewingMedia({ type: 'post', url: post.media[0], user: { name: post.authorName, avatar: post.authorAvatar } });
@@ -760,7 +760,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                     loading="lazy" 
                     decoding="async"
                     referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover transition-transform duration-300"
                   />
                 </div>
               ))}
@@ -784,7 +784,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                   loading="lazy" 
                   decoding="async"
                   referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-cover transition-transform duration-300"
                 />
               </div>
 
@@ -803,7 +803,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                     loading="lazy" 
                     decoding="async"
                     referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover transition-transform duration-300"
                   />
                 </div>
                 <div 
@@ -819,7 +819,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                     loading="lazy" 
                     decoding="async"
                     referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover transition-transform duration-300"
                   />
                 </div>
               </div>
@@ -843,7 +843,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                   loading="lazy" 
                   decoding="async"
                   referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-cover transition-transform duration-300"
                 />
               </div>
 
@@ -862,7 +862,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                     loading="lazy" 
                     decoding="async"
                     referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover transition-transform duration-300"
                   />
                 </div>
 
@@ -879,7 +879,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                     loading="lazy" 
                     decoding="async"
                     referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover transition-transform duration-300"
                   />
                   {post.media.length > 3 && (
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center text-white font-extrabold text-xl group-hover:bg-black/50 transition-colors">
@@ -899,7 +899,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
           {/* Like */}
           <button 
             onClick={handleLike} 
-            className="flex items-center space-x-1.5 active:scale-90 transition-transform cursor-pointer group"
+            className="flex items-center space-x-1.5 transition-transform cursor-pointer group"
             title="Like"
             aria-label="Like post"
           >
@@ -921,7 +921,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
           {/* Repost */}
           <button 
             onClick={handleRepost} 
-            className={`flex items-center space-x-1.5 active:scale-90 transition-transform cursor-pointer group ${
+            className={`flex items-center space-x-1.5  transition-transform cursor-pointer group ${
               reposted ? 'text-blue-500 dark:text-blue-400' : 'text-neutral-700 dark:text-neutral-300'
             }`}
             title={reposted ? "Undo Repost" : "Repost"}
@@ -953,7 +953,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
           {/* Comment */}
           <button 
             onClick={() => setShowCommentsModal(true)} 
-            className="flex items-center space-x-1.5 active:scale-90 transition-transform cursor-pointer group hover:text-blue-500"
+            className="flex items-center space-x-1.5 transition-transform cursor-pointer group hover:text-blue-500"
             title="Comments"
             aria-label="Comments"
           >
@@ -967,7 +967,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
         {/* Share Arrow */}
         <button 
           onClick={() => setShowShareModal(true)} 
-          className="p-1 active:scale-90 transition-transform cursor-pointer text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
+          className="p-1 transition-transform cursor-pointer text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
           title="Share"
           aria-label="Share post"
         >
@@ -1007,13 +1007,13 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
               <button 
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 rounded-xl transition-all active:scale-95 disabled:opacity-50 text-[14px]"
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 rounded-xl transition-all disabled:opacity-50 text-[14px]"
               >
                 {isDeleting ? 'Deleting...' : 'Delete'}
               </button>
               <button 
                 onClick={() => setShowDeleteConfirm(false)}
-                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 rounded-xl transition-all active:scale-95 text-[14px]"
+                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 rounded-xl transition-all text-[14px]"
               >
                 Cancel
               </button>
