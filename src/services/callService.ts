@@ -70,16 +70,50 @@ export const notifyStreamChanges = () => {
   streamListeners.forEach(l => l(localStream, remoteStream));
 };
 
+const STUN_SERVERS: RTCIceServer[] = [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
+  { urls: ['stun:global.stun.twilio.com:3478'] },
+  { urls: ['stun:stun.services.mozilla.com'] },
+];
+
+/**
+ * Calls between two phones on mobile data only worked when both peers happened
+ * to be reachable directly. Behind carrier NAT (most 4G/5G networks) the ICE
+ * negotiation never completes, so the call "rings" but there is no audio.
+ * A TURN relay fixes that. Set VITE_TURN_URL / VITE_TURN_USERNAME /
+ * VITE_TURN_CREDENTIAL to your own relay, otherwise the public Open Relay
+ * fallback below is used.
+ */
+const turnServers = (): RTCIceServer[] => {
+  const env = (import.meta as any)?.env || {};
+  const url = env.VITE_TURN_URL as string | undefined;
+  const username = env.VITE_TURN_USERNAME as string | undefined;
+  const credential = env.VITE_TURN_CREDENTIAL as string | undefined;
+
+  if (url) {
+    const urls = url.split(',').map((u) => u.trim()).filter(Boolean);
+    return [{ urls, username, credential }];
+  }
+
+  return [
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turns:openrelay.metered.ca:443?transport=tcp',
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+  ];
+};
+
 const getEffectiveIceServers = (): RTCIceServer[] => {
   const config = getCachedAppConfig();
   if (config?.rtc?.iceServers && config.rtc.iceServers.length > 0) {
     return config.rtc.iceServers;
   }
-  return [
-    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
-    { urls: ['stun:global.stun.twilio.com:3478'] },
-    { urls: ['stun:stun.services.mozilla.com'] }
-  ];
+  return [...STUN_SERVERS, ...turnServers()];
 };
 
 /**
