@@ -58,6 +58,48 @@
       "destination": "/index.html"
     }
   ],
+  "redirects": [
+    {
+      "source": "/Ennvo.png",
+      "destination": "/icon-192.png?v=3",
+      "permanent": true
+    },
+    {
+      "source": "/Ennvoold.png",
+      "destination": "/icon-192.png?v=3",
+      "permanent": true
+    },
+    {
+      "source": "/favicon.png",
+      "destination": "/icon-192.png?v=3",
+      "permanent": true
+    },
+    {
+      "source": "/images/ennvo-icon.png",
+      "destination": "/icon-192.png?v=3",
+      "permanent": true
+    },
+    {
+      "source": "/earth-globe.jpg",
+      "destination": "/og-banner-1200x630.jpg?v=3",
+      "permanent": true
+    },
+    {
+      "source": "/Ringtone.wav",
+      "destination": "/Ringtone.mp3",
+      "permanent": true
+    },
+    {
+      "source": "/Calling.wav",
+      "destination": "/Calling.mp3",
+      "permanent": true
+    },
+    {
+      "source": "/notifecetion.wav",
+      "destination": "/notifecetion.mp3",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",
