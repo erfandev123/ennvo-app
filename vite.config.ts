@@ -35,17 +35,27 @@ export default defineConfig(({mode}) => {
           manualChunks(id) {
             if (!id.includes('node_modules')) return undefined;
 
+            // Normalise Windows separators so the rules behave the same on every OS.
+            const normId = id.split(String.fromCharCode(92)).join('/');
+
             // Every Firebase package MUST stay in one chunk. Splitting firebase/app
             // away from firebase/firestore creates a circular import between the
             // chunks and the app dies at boot with
             //   "ReferenceError: Cannot access 'X' before initialization"
             // which shows up as a completely white screen.
-            if (/[\\/]node_modules[\\/](firebase|@firebase)[\\/]/.test(id)) return 'firebase-vendor';
+            if (normId.includes('/node_modules/firebase/') || normId.includes('/node_modules/@firebase/')) {
+              // Realtime Database and Storage are imported lazily (presence/typing and
+              // media uploads), so they keep their own on-demand chunk and stay out
+              // of the eager vendor bundle.
+              if (normId.includes('/firebase/database/') || normId.includes('/@firebase/database/')) return 'firebase-rtdb';
+              if (normId.includes('/firebase/storage/') || normId.includes('/@firebase/storage/')) return 'firebase-storage';
+              return 'firebase-vendor';
+            }
 
-            if (/[\\/]node_modules[\\/](react|react-dom|scheduler|use-sync-external-store)[\\/]/.test(id)) return 'react-vendor';
-            if (/[\\/]node_modules[\\/](motion|framer-motion|motion-dom|motion-utils)[\\/]/.test(id)) return 'motion-vendor';
-            if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(id)) return 'icons-vendor';
-            if (/[\\/]node_modules[\\/]@capacitor[\\/]/.test(id)) return 'capacitor-vendor';
+            if (normId.includes('/node_modules/react-dom/') || normId.includes('/node_modules/react/') || normId.includes('/node_modules/scheduler/') || normId.includes('/node_modules/use-sync-external-store/')) return 'react-vendor';
+            if (normId.includes('/node_modules/motion/') || normId.includes('/node_modules/framer-motion/') || normId.includes('/node_modules/motion-dom/') || normId.includes('/node_modules/motion-utils/')) return 'motion-vendor';
+            if (normId.includes('/node_modules/lucide-react/')) return 'icons-vendor';
+            if (normId.includes('/node_modules/@capacitor/')) return 'capacitor-vendor';
 
             return undefined;
           },
