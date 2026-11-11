@@ -1,22 +1,21 @@
 {
   "rules": {
-    ".read": "auth != null",
-    ".write": "auth != null",
+    ".read": false,
+    ".write": false,
     "presence": {
       "$uid": {
-        ".write": "auth != null && auth.uid == $uid"
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $uid",
+        ".validate": "newData.hasChildren(['isOnline', 'lastSeen'])"
       }
     },
     "typing": {
       "$chatId": {
+        ".read": "auth != null",
         "$uid": {
-          ".write": "auth != null && auth.uid == $uid"
+          ".write": "auth != null && auth.uid == $uid",
+          ".validate": "newData.isBoolean()"
         }
-      }
-    },
-    "messages": {
-      "$chatId": {
-        ".indexOn": ["timestamp"]
       }
     }
   }

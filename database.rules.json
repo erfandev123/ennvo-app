@@ -1,26 +1,20 @@
 {
   "rules": {
+    ".read": false,
+    ".write": false,
     "presence": {
       "$uid": {
         ".read": "auth != null",
-        ".write": "auth != null && auth.uid == $uid"
+        ".write": "auth != null && auth.uid == $uid",
+        ".validate": "newData.hasChildren(['isOnline', 'lastSeen'])"
       }
     },
     "typing": {
-      "$conversationId": {
+      "$chatId": {
         ".read": "auth != null",
         "$uid": {
-          ".write": "auth != null && auth.uid == $uid"
-        }
-      }
-    },
-    "messageStatus": {
-      "$conversationId": {
-        ".read": "auth != null",
-        "$messageId": {
-          "$uid": {
-            ".write": "auth != null && auth.uid == $uid"
-          }
+          ".write": "auth != null && auth.uid == $uid",
+          ".validate": "newData.isBoolean()"
         }
       }
     }

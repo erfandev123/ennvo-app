@@ -6,8 +6,8 @@ import {
   persistentSingleTabManager, 
   memoryLocalCache 
 } from 'firebase/firestore';
-import { getDatabase } from 'firebase/database';
-import { getStorage } from 'firebase/storage';
+import type { Database } from 'firebase/database';
+import type { FirebaseStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDhDRjiwHb5aeC8YJ6-JQDmxlSAVKZQzd0",
@@ -43,8 +43,28 @@ export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
 });
 
-export const rtdb = getDatabase(app);
-export const storage = getStorage(app);
+/**
+ * Realtime Database and Storage SDKs are loaded only when they are actually
+ * needed (presence/typing and media uploads). Keeping them out of the boot
+ * bundle saves ~50 kB gzip and a chunk parse on low-end phones.
+ */
+let rtdbInstance: Database | null = null;
+export const getRtdbInstance = async (): Promise<Database> => {
+  if (!rtdbInstance) {
+    const { getDatabase } = await import('firebase/database');
+    rtdbInstance = getDatabase(app);
+  }
+  return rtdbInstance;
+};
+
+let storageInstance: FirebaseStorage | null = null;
+export const getStorageInstance = async (): Promise<FirebaseStorage> => {
+  if (!storageInstance) {
+    const { getStorage } = await import('firebase/storage');
+    storageInstance = getStorage(app);
+  }
+  return storageInstance;
+};
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 import { FacebookAuthProvider } from 'firebase/auth';

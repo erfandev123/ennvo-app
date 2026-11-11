@@ -17,3 +17,6 @@ ios/
 *.jks
 *.keystore
 secret-values.txt
+
+# compiled express server (never published)
+server-build/

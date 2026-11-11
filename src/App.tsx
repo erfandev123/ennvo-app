@@ -18,7 +18,10 @@ const Create = lazy(() => import('./pages/Create'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const Settings = lazy(() => import('./pages/Settings'));
 import Auth from './pages/Auth';
-const AdminApp = lazy(() => import('../admin/src/AdminApp'));
+// The admin console lives in its own folder (admin-console/) and is only ever
+// downloaded when an administrator opens the admin screen. Normal users never
+// receive this code, which keeps the app bundle small and the panel separate.
+const AdminApp = lazy(() => import('../admin-console/src/AdminApp'));
 
 import { CallOverlay } from './components/CallOverlay';
 import { AccountSwitcherModal } from './components/AccountSwitcherModal';

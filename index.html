@@ -13,16 +13,8 @@
     <meta http-equiv="x-dns-prefetch-control" content="on" />
 
     <!-- Theme is applied before the first paint so dark mode never flashes white -->
-    <script>
-      (function () {
-        try {
-          if (localStorage.getItem('ennvo_theme_mode') === 'dark') {
-            document.documentElement.classList.add('dark');
-            document.documentElement.style.backgroundColor = '#000000';
-          }
-        } catch (e) {}
-      })();
-    </script>
+    <link rel="preload" href="/boot.js" as="script" />
+    <script src="/boot.js"></script>
 
     <!-- ========================================================================= -->
     <!-- PRIMARY TECHNICAL SEO METADATA                                            -->
@@ -90,8 +82,8 @@
     <link
       rel="preload"
       as="style"
+      data-async-css="1"
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@600;700;800;900&display=swap"
-      onload="this.onload=null;this.rel='stylesheet'"
     />
     <noscript>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@600;700;800;900&display=swap" />

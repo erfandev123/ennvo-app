@@ -1,6 +1,5 @@
 import axios from 'axios';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { storage } from '../firebase';
+import { getStorageInstance } from '../firebase';
 import { getApiEndpoint, formatMediaUrl } from '../utils';
 import { uploadDirectToR2 } from './r2Client';
 
@@ -80,8 +79,12 @@ export const uploadMedia = async (
     }
   }
 
-  // 3. Fallback: Firebase Storage
+  // 3. Fallback: Firebase Storage (SDK loaded on demand)
   try {
+    const [{ ref, uploadBytesResumable, getDownloadURL }, storage] = await Promise.all([
+      import('firebase/storage'),
+      getStorageInstance(),
+    ]);
     const storageRef = ref(storage, targetKey);
     const uploadTask = uploadBytesResumable(storageRef, fileToUpload);
 
@@ -168,7 +171,10 @@ export const deleteMedia = async (urlOrPath: string): Promise<boolean> => {
   try {
     if (!urlOrPath) return false;
     if (urlOrPath.includes('firebasestorage.googleapis.com')) {
-      const { ref, deleteObject } = await import('firebase/storage');
+      const [{ ref, deleteObject }, storage] = await Promise.all([
+        import('firebase/storage'),
+        getStorageInstance(),
+      ]);
       const storageRef = ref(storage, urlOrPath);
       await deleteObject(storageRef);
       return true;
