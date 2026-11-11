@@ -20,3 +20,6 @@ secret-values.txt
 
 # compiled express server (never published)
 server-build/
+
+# compiled cloud functions
+functions/lib/

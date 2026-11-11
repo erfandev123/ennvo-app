@@ -40,11 +40,14 @@ jobs:
 
       - name: Install function dependencies
         run: |
+          test -f firebase.json || { echo "::error::firebase.json is missing from the repository root"; exit 1; }
           cd functions
           npm install --no-audit --no-fund
+          npm run build
 
       - name: Deploy Cloud Functions (real-time push for messages and calls)
         run: |
+          npx --yes firebase-tools@13 --version
           npx --yes firebase-tools@13 deploy --only functions --project ennvo-6c01c --non-interactive --force
 
       - name: Deploy security rules
