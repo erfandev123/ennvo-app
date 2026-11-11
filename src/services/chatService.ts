@@ -117,47 +117,48 @@ export const createConversation = async (
     // Check if conversation already exists using current user ID for Firestore rule compliance
     const currentUid = auth.currentUser?.uid || participantIds[0];
 
-    // Privacy and blocking validation for direct chats
-    if (participantIds.length === 2) {
-      const otherId = participantIds.find(id => id !== currentUid);
-      if (otherId) {
-        try {
-          const theirBlockedSnap = await getDoc(doc(db, 'users', otherId, 'blockedUsers', currentUid));
-          if (theirBlockedSnap.exists()) {
-            throw new Error("You cannot send messages to this account.");
-          }
-          const myBlockedSnap = await getDoc(doc(db, 'users', currentUid, 'blockedUsers', otherId));
-          if (myBlockedSnap.exists()) {
-            throw new Error("You have blocked this user. Unblock them first to send a message.");
-          }
+    // Everything below used to run one after another: up to six network round
+    // trips before the chat screen could open, which is why "Message" felt dead
+    // on mobile data. The conversation lookup and all privacy reads now start at
+    // the same time, so the whole thing finishes in one round trip.
+    const otherId = participantIds.length === 2
+      ? participantIds.find((id) => id !== currentUid)
+      : undefined;
 
-          const targetSnap = await getDoc(doc(db, 'users', otherId));
-          if (targetSnap.exists()) {
-            const tData = targetSnap.data();
-            if (tData.whoCanMessage === 'no_one') {
-              throw new Error("This user doesn't allow direct messages.");
-            }
-            if (tData.whoCanMessage === 'friends') {
-              const myFollow = await getDoc(doc(db, 'users', currentUid, 'following', otherId));
-              const theirFollow = await getDoc(doc(db, 'users', otherId, 'following', currentUid));
-              if (!myFollow.exists() || !theirFollow.exists()) {
-                throw new Error("Only friends can send direct messages to this user.");
-              }
-            }
-          }
-        } catch (privErr: any) {
-          if (privErr.message?.includes('cannot') || privErr.message?.includes('blocked') || privErr.message?.includes('messages')) {
-            throw privErr;
-          }
+    const conversationsQuery = getDocs(
+      query(collection(db, 'conversations'), where('participantIds', 'array-contains', currentUid))
+    ).catch(() => null);
+
+    const privacyCheck = (async () => {
+      if (!otherId) return;
+      const [theirBlockedSnap, myBlockedSnap, targetSnap] = await Promise.all([
+        getDoc(doc(db, 'users', otherId, 'blockedUsers', currentUid)).catch(() => null),
+        getDoc(doc(db, 'users', currentUid, 'blockedUsers', otherId)).catch(() => null),
+        getDoc(doc(db, 'users', otherId)).catch(() => null),
+      ]);
+      if (theirBlockedSnap?.exists?.()) throw new Error('You cannot send messages to this account.');
+      if (myBlockedSnap?.exists?.()) throw new Error('You have blocked this user. Unblock them first to send a message.');
+      const tData = targetSnap?.exists?.() ? targetSnap.data() : null;
+      if (!tData) return;
+      if (tData.whoCanMessage === 'no_one') throw new Error("This user doesn't allow direct messages.");
+      if (tData.whoCanMessage === 'friends') {
+        const [myFollow, theirFollow] = await Promise.all([
+          getDoc(doc(db, 'users', currentUid, 'following', otherId)).catch(() => null),
+          getDoc(doc(db, 'users', otherId, 'following', currentUid)).catch(() => null),
+        ]);
+        if (!myFollow?.exists?.() || !theirFollow?.exists?.()) {
+          throw new Error('Only friends can send direct messages to this user.');
         }
       }
-    }
+    })().catch((privErr: any) => {
+      if (privErr?.message?.includes('cannot') || privErr?.message?.includes('blocked') || privErr?.message?.includes('messages') || privErr?.message?.includes('friends')) {
+        throw privErr;
+      }
+    });
 
-    const q = query(
-      collection(db, 'conversations'), 
-      where('participantIds', 'array-contains', currentUid)
-    );
-    const querySnapshot = await getDocs(q);
+    await privacyCheck;
+    const querySnapshot = await conversationsQuery;
+    if (!querySnapshot) throw new Error('Could not load conversations. Check your connection.');
     // If bad networks already produced duplicate threads, always reuse the
     // one that actually has messages (and then the most recent one).
     const existing = querySnapshot.docs

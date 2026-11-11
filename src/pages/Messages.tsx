@@ -5196,8 +5196,11 @@ export default function Messages() {
                         loading="eager"
                         decoding="sync"
                         fetchPriority="high"
-                        className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none object-cover object-top transition-all duration-300"
+                        className="absolute left-0 right-0 top-0 w-full pointer-events-none z-0 select-none object-cover object-top"
                         style={{
+                          // 100lvh = tallest viewport. The chat pane itself shrinks when
+                          // the keyboard opens, but the wallpaper keeps its full size.
+                          height: '100lvh',
                           filter: activeConvThemeBlur ? `blur(18px) brightness(${activeConvThemeBrightness})` : `brightness(${activeConvThemeBrightness})`,
                           transform: activeConvThemeBlur ? 'scale(1.10)' : 'scale(1)',
                         }}

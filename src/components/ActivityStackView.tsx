@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Notification } from '../types';
 import { formatTime } from '../utils';
+import { activityBody } from '../utils/activityText';
 
 interface ActivityStackViewProps {
   items: Notification[];
@@ -63,26 +64,12 @@ function DraggableActivityCard({
   const isFriend = isFollowing && isFollower;
 
   const getActionLabel = () => {
-    switch (notif.type) {
-      case 'like':
-        return 'liked your post/reel';
-      case 'comment':
-        return `commented: "${(notif as any).commentText || notif.content || ''}"`;
-      case 'reply':
-        return `replied: "${(notif as any).commentText || notif.content || ''}"`;
-      case 'follow':
-        return 'started following you';
-      case 'mention':
-        return 'mentioned you';
-      case 'comment_like':
-        return 'liked your comment';
-      case 'repost':
-        return 'reposted your video';
-      case 'favorite':
-        return 'saved your post';
-      default:
-        return notif.content || 'interacted with you';
+    const label = activityBody(notif.type, notif);
+    // comments and replies read better with the real text attached
+    if ((notif.type === 'comment' || notif.type === 'reply') && (notif as any).commentText) {
+      return `${label}: "${(notif as any).commentText}"`;
     }
+    return label;
   };
 
   const scale = 1 - Math.min(index, 3) * 0.04;

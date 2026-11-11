@@ -7,6 +7,7 @@ import { collection, onSnapshot, query, where, limit, orderBy, Unsubscribe } fro
 import { db } from '../firebase';
 import { bridge } from '../native/bridge';
 import { playNotificationSound } from './soundService';
+import { activityBody } from '../utils/activityText';
 
 interface NotificationCenterState {
   currentUid: string | null;
@@ -180,15 +181,7 @@ export const startNotificationCenter = (uid: string) => {
 
         if (createdAtMillis >= state.appStartTime - 10000) {
           const actorName = data.actorName || 'Someone';
-          let body = data.content || 'New activity';
-          if (data.type === 'like') body = 'liked your video.';
-          else if (data.type === 'comment') body = data.content ? `commented: "${data.content}"` : 'commented on your video.';
-          else if (data.type === 'reply') body = data.content ? `replied: "${data.content}"` : 'replied to your comment.';
-          else if (data.type === 'repost') body = 'reposted your video.';
-          else if (data.type === 'favorite') body = 'saved your video to favorites.';
-          else if (data.type === 'mention') body = data.content ? `mentioned you: "${data.content}"` : 'mentioned you in a post.';
-          else if (data.type === 'comment_like') body = 'liked your comment.';
-          else if (data.type === 'follow') body = 'started following you.';
+          const body = activityBody(data.type, data);
 
           const typingNow = isUserActivelyTyping();
 

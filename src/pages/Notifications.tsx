@@ -606,7 +606,7 @@ export default function Notifications({ onBack, isModal = false }: Notifications
 
   return (
     <div 
-      className={`h-[100dvh] w-full overflow-hidden bg-[#f2f2f7] dark:bg-black text-black dark:text-white flex flex-col ${isModal ? '' : 'md:pl-28 lg:pl-32'} select-none relative transition-colors duration-400 font-sans`}
+      className={`h-[100dvh] w-full overflow-hidden bg-[#F3F8FF] dark:bg-black text-black dark:text-white flex flex-col ${isModal ? '' : 'md:pl-28 lg:pl-32'} select-none relative transition-colors duration-400 font-sans`}
     >
       {/* Ambient Soft Lighting Glow at Top */}
       <div className="act-ambient-glow" />

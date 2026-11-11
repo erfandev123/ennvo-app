@@ -412,18 +412,9 @@ export default function App() {
   const [pendingShare, setPendingShare] = useState<PendingSharePayload | null>(null);
   const [showBatteryPrompt, setShowBatteryPrompt] = useState(false);
 
-  // Prompt background battery exemption for incoming calls/messages on first login
-  useEffect(() => {
-    if (isAuthenticated && currentUser) {
-      const prompted = localStorage.getItem('ennvo_battery_prompt_done');
-      if (!prompted) {
-        const timer = setTimeout(() => {
-          setShowBatteryPrompt(true);
-        }, 3500);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [isAuthenticated, currentUser]);
+  // The "let Ennvo run in the background" popup is gone: it appeared on every
+  // fresh install and felt like an ad. The app keeps its foreground service for
+  // calls, and the setting is still available manually in Settings.
 
   // 1. Initialize Error Handlers, Deep Links & Notify App Ready
   useEffect(() => {
@@ -927,7 +918,7 @@ export default function App() {
       )}
 
       {/* Battery Optimization / Background Alerts Dialog */}
-      {showBatteryPrompt && (
+      {false && showBatteryPrompt && (
         <div className="fixed inset-0 z-[400] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200 font-sans">
           <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center space-y-4">
             <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-100 dark:bg-purple-950/60 flex items-center justify-center text-purple-600 dark:text-purple-400">
