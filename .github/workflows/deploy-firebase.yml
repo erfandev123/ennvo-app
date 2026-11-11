@@ -35,7 +35,12 @@ jobs:
             exit 1
           fi
           printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
-          node -e "JSON.parse(require('fs').readFileSync(process.env.RUNNER_TEMP + '/sa.json','utf8')); console.log('service account json is valid')"
+          node -e "
+            const sa = JSON.parse(require('fs').readFileSync(process.env.RUNNER_TEMP + '/sa.json','utf8'));
+            console.log('service account :', sa.client_email);
+            console.log('project         :', sa.project_id);
+            console.log('::notice::Deploying as ' + sa.client_email + ' on ' + sa.project_id);
+          "
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
 
       - name: Install function dependencies
@@ -46,11 +51,36 @@ jobs:
           npm run build
 
       - name: Deploy Cloud Functions (real-time push for messages and calls)
+        id: deploy_functions
+        continue-on-error: true
         run: |
           npx --yes firebase-tools@13 --version
-          npx --yes firebase-tools@13 deploy --only functions --project ennvo-6c01c --non-interactive --force
+          npx --yes firebase-tools@13 deploy --only functions --project ennvo-6c01c --non-interactive --force 2>&1 | tee /tmp/deploy.log
+
+      - name: Explain a permission failure
+        if: steps.deploy_functions.outcome == 'failure'
+        run: |
+          SA_EMAIL=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS,'utf8')).client_email)")
+          if grep -q "Permission denied to get service" /tmp/deploy.log; then
+            echo "::error::The service account $SA_EMAIL cannot read/enable Google Cloud APIs. It needs the 'Editor' role (or the four roles listed below) on project ennvo-6c01c."
+            echo ""
+            echo "Fix it once, in this order:"
+            echo " 1) Open https://console.cloud.google.com/iam-admin/iam?project=ennvo-6c01c"
+            echo " 2) Find $SA_EMAIL and press the pencil (Edit principal)"
+            echo " 3) Add role: Editor   (or: Service Usage Consumer + Cloud Functions Admin +") 
+            echo "                       Service Account User + Cloud Build Editor + Artifact Registry Admin)"
+            echo " 4) Save, then run this workflow again."
+            echo ""
+            echo "One-line option with gcloud (if you have gcloud locally):"
+            echo " gcloud projects add-iam-policy-binding ennvo-6c01c \\"
+            echo "   --member=\"serviceAccount:$SA_EMAIL\" --role=roles/editor"
+          else
+            echo "::error::Firebase deploy failed. See the log above."
+            tail -25 /tmp/deploy.log
+          fi
+          exit 1
 
       - name: Deploy security rules
-        if: ${{ inputs.also_rules }}
+        if: ${{ inputs.also_rules && steps.deploy_functions.outcome == 'success' }}
         run: |
           npx --yes firebase-tools@13 deploy --only firestore:rules,database --project ennvo-6c01c --non-interactive --force
