@@ -78,6 +78,21 @@ if (container) {
   createRoot(container).render(<App />);
 }
 
+/* Remove the black boot screen as soon as React has painted a frame. */
+const hideBoot = () => {
+  const boot = document.getElementById('ennvo-boot');
+  if (!boot) return;
+  boot.classList.add('is-hidden');
+  setTimeout(() => boot.remove(), 260);
+};
+if (typeof requestAnimationFrame === 'function') {
+  requestAnimationFrame(() => requestAnimationFrame(hideBoot));
+} else {
+  setTimeout(hideBoot, 60);
+}
+// Safety net: never let the boot screen trap the user.
+setTimeout(hideBoot, 2500);
+
 /* ------------------------------------------------------------------ *
  * 6. Service worker: web only (a Capacitor WebView is already offline
  *    capable and registering there only wastes startup time).

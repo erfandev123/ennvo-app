@@ -597,9 +597,20 @@ export default function App() {
         }
       }
 
-      // 6. Main Navigation Tabs (if on any tab other than 'home' -> go directly to 'home')
+      // 6. Walk back through the real page stack first (profile -> settings ->
+      //    the tab the user came from ...), then fall through to home, then exit.
+      //    This is how Android back behaves in the app: it never jumps straight
+      //    to home and it never returns to a page the user already left.
+      const stack: string[] = (store.navigationStack || ['home']).filter(Boolean);
+      if (stack.length > 1) {
+        store.backPage();
+        window.history.pushState({ page: 'init' }, '');
+        return;
+      }
+
+      // 7. Main Navigation Tabs (server tabs other than the Reels/home tab)
       if (store.currentPage !== 'home') {
-        store.setCurrentPage('home');
+        store.backPage();
         window.history.pushState({ page: 'init' }, '');
         return;
       }

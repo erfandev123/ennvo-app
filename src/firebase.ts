@@ -34,13 +34,19 @@ try {
   localCacheSetting = memoryLocalCache();
 }
 
+const isNativeShell =
+  typeof window !== 'undefined' && !!((window as any).Android || (window as any).AndroidInterface);
+
 export const db = initializeFirestore(app, {
   localCache: localCacheSetting,
   ignoreUndefinedProperties: true,
-  // Android WebView sometimes blocks the long-lived WebChannel stream on
-  // carrier networks. Autodetect falls back to long polling instead of
-  // hanging for 30+ seconds on the first query after a cold start.
-  experimentalAutoDetectLongPolling: true,
+  // Inside the Android WebView the HTTP/2 WebChannel stream is frequently
+  // dropped by carrier networks or by the WebView itself. That is what makes
+  // chat look "not connected": new messages never arrive and old chats never
+  // load. Long polling is the transport that always works there, so the native
+  // app uses it directly instead of waiting for a 30 second auto-detect.
+  experimentalForceLongPolling: isNativeShell,
+  experimentalAutoDetectLongPolling: !isNativeShell,
 });
 
 /**

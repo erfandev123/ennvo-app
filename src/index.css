@@ -1533,15 +1533,11 @@ html.dark .act-glass-nav-pill {
 
 
 /* =========================================================================
-   ENNVO INSTANT TAP SYSTEM  (no zoom / no press animation, instant feedback)
-   Every button, text button, icon button and link reacts in one frame:
-   the element darkens a little while the finger is down (a light gray flash)
-   and nothing moves. Removed: every active:scale-* and hover:scale-* zoom.
+   ENNVO TAP SYSTEM  (no zoom, no press animation, no grey tap box)
+   Every button, text button, icon button and link reacts instantly and
+   NOTHING moves or dims. The native grey highlight rectangle is disabled too,
+   so tapping a button looks exactly like a native Android view.
    ========================================================================= */
-:root {
-  --tap-flash-light: 0.90;
-  --tap-flash-dark: 1.18;
-}
 
 button,
 [role="button"],
@@ -1554,7 +1550,7 @@ input[type="submit"],
 input[type="reset"],
 input[type="checkbox"],
 input[type="radio"] {
-  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.075) !important;
+  -webkit-tap-highlight-color: transparent !important;
   -webkit-touch-callout: none;
   touch-action: manipulation;
   /* Transform/scale transitions are dropped on purpose: taps never animate. */
@@ -1572,7 +1568,7 @@ html.dark .tap-target,
 html.dark input[type="button"],
 html.dark input[type="submit"],
 html.dark input[type="reset"] {
-  -webkit-tap-highlight-color: rgba(255, 255, 255, 0.11) !important;
+  -webkit-tap-highlight-color: transparent !important;
 }
 
 /* Hard stop for any leftover Tailwind / motion press zoom. */
@@ -1587,7 +1583,6 @@ button.is-pressed,
 a.is-pressed,
 [role="button"].is-pressed {
   scale: 1 !important;
-  filter: brightness(var(--tap-flash-light)) !important;
   transition-duration: 0s !important;
 }
 
@@ -1602,21 +1597,27 @@ html.dark button.is-pressed,
 html.dark a.is-pressed,
 html.dark [role="button"].is-pressed {
   scale: 1 !important;
-  filter: brightness(var(--tap-flash-dark)) !important;
   transition-duration: 0s !important;
 }
 
-/* Disabled controls never flash. */
+/* Disabled controls never react at all. */
 button:disabled,
 button[aria-disabled="true"],
 [aria-disabled="true"]:active {
   filter: none !important;
 }
 
-/* The flash must land on the next paint, never after it. */
+/* Feedback (if any) must land on the next paint, never after it. */
 button,
 [role="button"],
 .tap-target {
   -webkit-appearance: none;
   backface-visibility: hidden;
+}
+
+/* Reels: rows that are off screen are not laid out or painted, so long feeds
+   keep scrolling at 60/120fps instead of slowing down after a few dozen reels. */
+.reel-cv {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100vh;
 }

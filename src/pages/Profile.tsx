@@ -925,7 +925,7 @@ export default function Profile() {
                 <div className="absolute bottom-0 left-0 right-0 h-14 pointer-events-none bg-gradient-to-t from-white via-white/60 to-transparent" />
 
                 {/* Floating Top Navigation Bar */}
-                <div className="absolute top-0 left-0 right-0 px-3 pt-5 sm:pt-6 pb-2 z-30 flex items-center justify-between pointer-events-auto">
+                <div className="absolute top-0 left-0 right-0 px-3 pt-[max(calc(env(safe-area-inset-top,0px)+18px),26px)] sm:pt-8 pb-2 z-30 flex items-center justify-between pointer-events-auto">
                   {!isCurrentUser ? (
                     <button 
                       onClick={() => popPage()} 
@@ -976,7 +976,7 @@ export default function Profile() {
               </div>
             ) : (
               /* Compact Top Navigation Bar when NO banner is set (NO empty gap at the top!) */
-              <div className="w-full px-3 pt-5 sm:pt-6 pb-1 flex items-center justify-between">
+              <div className="w-full px-3 pt-[max(calc(env(safe-area-inset-top,0px)+18px),26px)] sm:pt-8 pb-1 flex items-center justify-between">
                 {!isCurrentUser ? (
                   <button 
                     onClick={() => popPage()} 

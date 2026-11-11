@@ -554,9 +554,15 @@ jobs:
             // Round splash logo. The picture is cut to a circle that is exactly the size of the Android 12+ splash mask
             // (two thirds of the icon canvas), so every Android version shows the same round logo.
             if (web) {
-              const S = 1024, D = Math.round(S * 2 / 3), L = fill ? D : Math.round(D * 0.7);
-              const mark = await sharp(logo).resize(L, L, { fit: fill ? 'cover' : 'contain', background: T }).png().toBuffer();
-              const disc = await sharp({ create: { width: D, height: D, channels: 4, background: rgb(e.ICON_BG) } })
+              // A separate splash mark (splash.img) can be supplied: a plain white symbol
+              // on transparency. It is drawn straight onto the splash background colour,
+              // which gives a clean "symbol on black" launch screen instead of a blue disc.
+              const splashSrc = path.join(ws, 'splash.img');
+              const useSplashMark = fs.existsSync(splashSrc);
+              const source = useSplashMark ? splashSrc : logo;
+              const S = 1024, D = Math.round(S * 2 / 3), L = useSplashMark ? Math.round(D * 0.86) : (fill ? D : Math.round(D * 0.7));
+              const mark = await sharp(source).resize(L, L, { fit: useSplashMark ? 'contain' : (fill ? 'cover' : 'contain'), background: T }).png().toBuffer();
+              const disc = await sharp({ create: { width: D, height: D, channels: 4, background: useSplashMark ? rgb(e.THEME_COLOR) : rgb(e.ICON_BG) } })
                 .composite([{ input: mark, left: Math.floor((D - L) / 2), top: Math.floor((D - L) / 2) }]).png().toBuffer();
               const round = await sharp(disc).composite([{ input: circle(D), blend: 'dest-in' }]).png().toBuffer();
               fs.mkdirSync(path.join(res, 'drawable-nodpi'), { recursive: true });

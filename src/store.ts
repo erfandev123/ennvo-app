@@ -56,6 +56,7 @@ type AppState = {
   setIsAuthLoading: (val: boolean) => void;
   navigationStack: PageType[];
   pushPage: (page: PageType) => void;
+  backPage: () => void;
   popPage: () => void;
   highlightedCommentId: string | null;
   setHighlightedCommentId: (id: string | null) => void;
@@ -173,10 +174,8 @@ const getInitialPage = (): PageType => {
     if (urlPages[first]) return urlPages[first];
     if (first) return 'home';
   }
-  try {
-    const last = sessionStorage.getItem('lastVisitedPage');
-    if (last === 'home' || last === 'reels') return last as PageType;
-  } catch (e) {}
+  // The app always opens on the Reels feed (like Instagram/TikTok). Only a real
+  // URL/deep link above can send the user somewhere else.
   return 'home';
 };
 
@@ -388,15 +387,38 @@ export const useAppStore = create<AppState>((set) => ({
   isAuthLoading: false,
   setIsAuthLoading: (val) => set({ isAuthLoading: val }),
   navigationStack: ['home'],
+  // Real history stack: every push keeps the pages underneath it, so the Android
+  // back button walks back exactly the way the user came in (page -> previous
+  // page -> navigation tab -> home -> exit).
   pushPage: (page) => set((state) => {
-    sessionStorage.setItem('lastVisitedPage', page);
     if (state.currentPage === page) return state;
     syncUrl(page, state.viewingUser, state.activeChat);
-    const newStack: PageType[] = page === 'home' ? ['home'] : ['home', page];
-    return { 
-      currentPage: page, 
-      navigationStack: newStack 
+    const stack = (state.navigationStack || ['home']).filter(Boolean);
+    let newStack: PageType[];
+    if (page === 'home') {
+      newStack = ['home'];
+    } else if (stack.length === 0) {
+      newStack = ['home', page];
+    } else if (stack[stack.length - 1] === page) {
+      newStack = stack;
+    } else {
+      newStack = [...stack, page];
+    }
+    return {
+      currentPage: page,
+      navigationStack: newStack,
     };
+  }),
+  // Step back one page in the stack without ever landing twice on the same page.
+  backPage: () => set((state) => {
+    const stack: PageType[] = (state.navigationStack || ['home']).filter(Boolean);
+    const next: PageType[] = stack.length > 1 ? stack.slice(0, -1) : ['home'];
+    const target: PageType = next[next.length - 1] || 'home';
+    if (target === state.currentPage) {
+      return { navigationStack: next };
+    }
+    syncUrl(target, state.viewingUser, state.activeChat);
+    return { currentPage: target, navigationStack: next };
   }),
   popPage: () => set((state) => {
     if (state.currentPage === 'edit-profile') {

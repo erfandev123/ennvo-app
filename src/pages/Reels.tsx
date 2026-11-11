@@ -58,6 +58,9 @@ export default function Reels() {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [visibleCount, setVisibleCount] = useState(6);
+  // Each mounted reel owns a <video>. Keeping that list bounded is what keeps
+  // scrolling smooth after the user has watched dozens of reels.
+  const MAX_MOUNTED_REELS = 24;
   const [seenIds, setSeenIds] = useState<Set<string>>(getSeenReelIds);
   const reelsContainerRef = useRef<HTMLDivElement>(null);
   const initialLoadDone = useRef(false);
@@ -479,7 +482,11 @@ export default function Reels() {
           </div>
         ) : (
           filteredReels.slice(0, visibleCount).map((reel) => (
-            <div key={reel.id} className="reel-snap-item w-full h-full shrink-0 transform-gpu will-change-transform" style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}>
+            <div
+              key={reel.id}
+              className="reel-snap-item w-full h-full shrink-0 reel-cv"
+              style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
+            >
               <ReelItem reel={reel} />
             </div>
           ))

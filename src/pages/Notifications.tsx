@@ -612,7 +612,7 @@ export default function Notifications({ onBack, isModal = false }: Notifications
       <div className="act-ambient-glow" />
 
       {/* Header with Back, Dynamic Title & Theme Toggle */}
-      <header className="h-[52px] px-4 pt-2.5 flex items-center justify-between z-50 shrink-0">
+      <header className="h-[56px] px-4 pt-[max(calc(env(safe-area-inset-top,0px)+10px),16px)] flex items-center justify-between z-50 shrink-0">
         {!isModal ? (
           <>
             <button 

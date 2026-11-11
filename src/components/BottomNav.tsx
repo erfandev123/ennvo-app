@@ -49,10 +49,10 @@ const BottomNav = memo(() => {
     }
 
     if (id === 'profile') {
+      // Tapping Profile always opens the profile page. The account switcher used
+      // to hijack this tap (including double taps), which felt like a broken menu.
+      // Switch account now lives in Settings -> Switch account.
       setViewingUser(null);
-      if (currentPage === 'profile' || isDoubleClick) {
-        setShowAccountSwitcherModal(true);
-      }
     }
 
     if (id === 'home' && currentPage === 'home') {
