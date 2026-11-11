@@ -1,70 +1,117 @@
 /**
- * Ennvo push gateway (Vercel serverless function).
+ * Ennvo push gateway (Vercel serverless function, no SDK dependencies).
  *
- * Sends the real FCM push that wakes a closed Android app: chat messages and
- * incoming calls. Runs on Vercel, so no Cloud Functions / Blaze plan is needed.
- * Device tokens are read from the user document the app already writes
- * (`users/{uid}.fcmTokens`), so there is no extra database.
+ * Why REST instead of firebase-admin: firebase-admin 14 pulls an ESM-only
+ * "jose" package that cannot be require()d from a CommonJS serverless function,
+ * which made every push fail at load time. Everything here is plain HTTPS plus
+ * Node's built-in crypto, so a dependency bump cannot break it again.
  *
- * Security: only a signed-in Ennvo user can call it, only "message" and "call"
- * are accepted, and a call push is only allowed for the real caller.
+ * Security
+ *  - the caller's Firebase ID token is verified with Identity Toolkit
+ *  - only "message" and "call" are accepted
+ *  - a call push is only allowed for the real caller of the call document
  *
- * Everything is imported lazily so a missing dependency or a missing
- * environment variable returns a readable JSON error instead of a blank 500.
+ * GET  /api/push -> { ok, configured, tokenOk } health check
+ * POST /api/push -> sends the data-only FCM message the Android app handles
  */
+import crypto from 'node:crypto';
 
 const PROJECT_ID = 'ennvo-6c01c';
+const WEB_API_KEY = 'AIzaSyDhDRjiwHb5aeC8YJ6-JQDmxlSAVKZQzd0';
+const FIRESTORE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
-let cached = null;
-
-async function getServices() {
-  if (cached) return cached;
-
+const serviceAccount = () => {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!raw) {
-    const err = new Error('FIREBASE_SERVICE_ACCOUNT is not set on this deployment');
-    err.status = 503;
-    throw err;
+  if (!raw) return null;
+  const sa = JSON.parse(raw);
+  if (sa.private_key && typeof sa.private_key === 'string') {
+    sa.private_key = sa.private_key.replace(/\\n/g, '\n');
   }
+  return sa;
+};
 
-  const [{ initializeApp, getApps, cert }, { getFirestore, FieldValue }, { getMessaging }, { getAuth }] =
-    await Promise.all([
-      import('firebase-admin/app'),
-      import('firebase-admin/firestore'),
-      import('firebase-admin/messaging'),
-      import('firebase-admin/auth'),
-    ]);
+/* Google access token: service account JWT -> OAuth */
+let cachedToken = { value: null, exp: 0 };
 
-  if (!getApps().length) {
-    let serviceAccount;
-    try {
-      serviceAccount = JSON.parse(raw);
-    } catch (e) {
-      const err = new Error('FIREBASE_SERVICE_ACCOUNT is not valid JSON');
-      err.status = 503;
-      throw err;
-    }
-    initializeApp({ credential: cert(serviceAccount), projectId: PROJECT_ID });
-  }
+async function getAccessToken() {
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedToken.value && cachedToken.exp - 60 > now) return cachedToken.value;
 
-  cached = { db: getFirestore(), messaging: getMessaging(), auth: getAuth(), FieldValue };
-  return cached;
+  const sa = serviceAccount();
+  if (!sa) throw Object.assign(new Error('FIREBASE_SERVICE_ACCOUNT is not set'), { status: 503 });
+
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+  const claim = Buffer.from(
+    JSON.stringify({
+      iss: sa.client_email,
+      scope: 'https://www.googleapis.com/auth/firebase.messaging https://www.googleapis.com/auth/datastore',
+      aud: 'https://oauth2.googleapis.com/token',
+      iat: now,
+      exp: now + 3600,
+    }),
+  ).toString('base64url');
+
+  const signature = crypto.createSign('RSA-SHA256').update(`${header}.${claim}`).sign(sa.private_key, 'base64url');
+
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: `${header}.${claim}.${signature}`,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw Object.assign(new Error(data.error_description || 'token exchange failed'), { status: 500 });
+
+  cachedToken = { value: data.access_token, exp: now + (data.expires_in || 3600) };
+  return cachedToken.value;
 }
 
-const preview = (body) => String(body || '').slice(0, 160);
+/* Firebase ID token verification (Identity Toolkit REST) */
+async function verifyCaller(idToken) {
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${WEB_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+  });
+  const data = await res.json().catch(() => ({}));
+  const uid = data && data.users && data.users[0] && data.users[0].localId;
+  if (!uid) throw Object.assign(new Error('Invalid auth token'), { status: 401 });
+  return uid;
+}
+
+/* Firestore REST helpers */
+async function readDoc(path) {
+  const token = await getAccessToken();
+  const res = await fetch(`${FIRESTORE}/${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+const toArray = (field) =>
+  (field && field.arrayValue && Array.isArray(field.arrayValue.values) ? field.arrayValue.values : [])
+    .map((v) => v.stringValue)
+    .filter(Boolean);
+
+const toStr = (field) => (field && field.stringValue) || '';
 
 export default async function handler(req, res) {
-  // simple health check: GET /api/push
   if (req.method === 'GET') {
-    let configured = !!process.env.FIREBASE_SERVICE_ACCOUNT;
-    let sdk = false;
+    let configured = false;
+    let tokenOk = false;
     try {
-      await getServices();
-      sdk = true;
+      configured = !!serviceAccount();
+      if (configured) {
+        await getAccessToken();
+        tokenOk = true;
+      }
+      return res.status(200).json({ ok: true, configured, tokenOk });
     } catch (err) {
-      return res.status(200).json({ ok: true, configured, sdk, detail: String(err.message || err).slice(0, 200) });
+      return res
+        .status(200)
+        .json({ ok: true, configured, tokenOk, detail: String(err.message || err).slice(0, 160) });
     }
-    return res.status(200).json({ ok: true, configured, sdk });
   }
 
   if (req.method !== 'POST') {
@@ -73,101 +120,81 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { db, messaging, auth, FieldValue } = await getServices();
-
-    // ---- the caller must be a signed in Ennvo user ----
-    const header = req.headers.authorization || '';
-    const idToken = header.replace(/^Bearer\s+/i, '').trim();
+    const idToken = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
     if (!idToken) return res.status(401).json({ error: 'Missing auth token' });
+    const callerUid = await verifyCaller(idToken);
 
-    let callerUid;
-    try {
-      callerUid = (await auth.verifyIdToken(idToken)).uid;
-    } catch (e) {
-      return res.status(401).json({ error: 'Invalid auth token' });
-    }
-
-    // ---- validate the payload ----
     const body = req.body || {};
     const targetUserId = body.targetUserId;
     const type = body.type;
     if (!targetUserId || !type) return res.status(400).json({ error: 'targetUserId and type are required' });
-    if (!['message', 'call'].includes(type)) return res.status(400).json({ error: 'Unsupported type' });
+    if (['message', 'call'].indexOf(type) === -1) return res.status(400).json({ error: 'Unsupported type' });
 
     if (type === 'call') {
       const callId = String(body.callId || '');
       if (!callId) return res.status(400).json({ error: 'callId is required' });
-      const call = (await db.collection('calls').doc(callId).get()).data();
-      if (!call || String(call.callerId) !== callerUid) {
-        return res.status(403).json({ error: 'Not the caller of this call' });
-      }
+      const callDoc = await readDoc('calls/' + callId);
+      const callerId = toStr(callDoc && callDoc.fields && callDoc.fields.callerId);
+      if (callerId !== callerUid) return res.status(403).json({ error: 'Not the caller of this call' });
     }
 
-    // ---- device tokens + notification mode ----
-    const userSnap = await db.collection('users').doc(String(targetUserId)).get();
-    const userData = userSnap.data() || {};
-    const tokens = Array.isArray(userData.fcmTokens) ? [...new Set(userData.fcmTokens.filter(Boolean))] : [];
-    const mode = typeof userData.notifMode === 'string' ? userData.notifMode : 'on';
+    const userDoc = await readDoc('users/' + targetUserId);
+    const fields = (userDoc && userDoc.fields) || {};
+    const tokens = Array.from(new Set(toArray(fields.fcmTokens)));
+    const mode = toStr(fields.notifMode) || 'on';
 
     if (!tokens.length) return res.json({ success: true, sent: 0, reason: 'no device tokens' });
     if (type === 'message' && mode === 'off') return res.json({ success: true, sent: 0, reason: 'notifications off' });
 
-    // ---- the data-only message the native service expects ----
-    let data;
-    let ttl;
-    if (type === 'message') {
-      const secret = mode === 'secret';
-      data = {
-        type: 'message',
-        title: secret ? 'Ennvo' : String(body.title || 'Ennvo'),
-        body: secret ? 'New notification' : preview(body.body),
-        avatar: secret ? '' : String(body.avatar || ''),
-        convId: String(body.convId || ''),
-      };
-      ttl = 60 * 60 * 1000;
-    } else {
-      data = {
-        type: 'call',
-        name: String(body.name || body.title || 'Caller'),
-        avatar: String(body.avatar || ''),
-        callType: String(body.callType || 'voice'),
-        callId: String(body.callId || ''),
-      };
-      ttl = 30 * 1000;
-    }
-
-    // ---- send ----
-    let sent = 0;
-    const dead = [];
-    for (let i = 0; i < tokens.length; i += 500) {
-      const batch = tokens.slice(i, i + 500);
-      try {
-        const result = await messaging.sendEachForMulticast({ tokens: batch, data, android: { priority: 'high', ttl } });
-        sent += result.successCount;
-        result.responses.forEach((r, idx) => {
-          const code = r.error?.code || '';
-          if (
-            code === 'messaging/registration-token-not-registered' ||
-            code === 'messaging/invalid-registration-token' ||
-            code === 'messaging/invalid-argument'
-          ) {
-            dead.push(batch[idx]);
+    const secret = mode === 'secret';
+    const data =
+      type === 'message'
+        ? {
+            type: 'message',
+            title: secret ? 'Ennvo' : String(body.title || 'Ennvo'),
+            body: secret ? 'New notification' : String(body.body || '').slice(0, 160),
+            avatar: secret ? '' : String(body.avatar || ''),
+            convId: String(body.convId || ''),
           }
+        : {
+            type: 'call',
+            name: String(body.name || body.title || 'Caller'),
+            avatar: String(body.avatar || ''),
+            callType: String(body.callType || 'voice'),
+            callId: String(body.callId || ''),
+          };
+
+    const ttl = type === 'call' ? '30s' : '3600s';
+    const accessToken = await getAccessToken();
+
+    let sent = 0;
+    let failed = 0;
+    for (const token of tokens) {
+      try {
+        const r = await fetch(`https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: {
+              token,
+              data,
+              android: { priority: 'high', ttl, direct_boot_ok: true },
+            },
+          }),
         });
+        if (r.ok) {
+          sent += 1;
+        } else {
+          failed += 1;
+        }
       } catch (err) {
-        console.warn('[push] batch failed:', err?.message);
+        failed += 1;
       }
     }
 
-    if (dead.length) {
-      try {
-        await db.collection('users').doc(String(targetUserId)).update({ fcmTokens: FieldValue.arrayRemove(...dead) });
-      } catch (e) {}
-    }
-
-    return res.json({ success: true, sent, failed: dead.length });
+    return res.json({ success: true, sent, failed });
   } catch (err) {
-    console.error('[push] failed:', err);
-    return res.status(err.status || 500).json({ error: String(err.message || err) });
+    console.error('[push] error:', err);
+    return res.status(err.status || 500).json({ error: String(err.message || err).slice(0, 200) });
   }
 }
