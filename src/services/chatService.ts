@@ -17,6 +17,7 @@ import {
   writeBatch,
   limit
 } from 'firebase/firestore';
+import { notifyUser } from './pushGateway';
 import { db, auth } from '../firebase';
 import { Conversation, Message } from '../types';
 
@@ -442,18 +443,15 @@ export const sendMessage = async (
         const otherParticipants = (convData.participantIds || []).filter((id: string) => id !== senderId);
 
         otherParticipants.forEach((otherId: string) => {
-          fetch('/api/native/send-push', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              targetUserId: otherId,
-              type: 'message',
-              title: senderName,
-              body: lastMsgLabel,
-              avatar: senderAvatar,
-              convId: conversationId
-            })
-          }).catch((err) => console.warn('[Chat] Failed triggering push:', err));
+          notifyUser({
+            targetUserId: otherId,
+            type: 'message',
+            title: senderName,
+            body: lastMsgLabel,
+            messageType: type,
+            avatar: senderAvatar,
+            convId: conversationId,
+          });
         });
       }
     } catch (updateErr) {

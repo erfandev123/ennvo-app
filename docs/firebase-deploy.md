@@ -62,3 +62,35 @@ notification supports quick reply.
 If you prefer your own server, `server.ts` already exposes
 `POST /api/native/send-push`. Run it somewhere always-on, and point the client
 at it. Firebase Cloud Functions is simply the version that needs no server.
+
+---
+
+# Push without Cloud Functions (default, no Blaze plan)
+
+Cloud Functions require Firebase **Blaze (pay as you go)**. Ennvo no longer
+needs it: the push sender runs as a Vercel serverless function.
+
+* `api/push.js` — verifies the caller's Firebase ID token, reads
+  `users/{uid}.fcmTokens`, and sends the data-only FCM message the Android app
+  already handles (chat + incoming call, with On / Off / Secret support).
+* `src/services/pushGateway.ts` — the client calls it with the user's ID token.
+  It always targets the public deployment, so it also works inside the APK.
+
+## One setting on Vercel
+
+Vercel → Project → **Settings → Environment Variables**:
+
+| Name | Value |
+| --- | --- |
+| `FIREBASE_SERVICE_ACCOUNT` | the same service account JSON you put in GitHub |
+
+Then redeploy (Vercel does that automatically on the next push).
+
+Nothing else is needed — no billing upgrade, no Cloud Functions, no server to
+keep alive.
+
+## Optional: publish the security rules
+
+The rules deploy needs the `Firebase Rules Admin` role on the service account.
+If you do not need to change the rules right now you can simply ignore that
+step; the workflow only warns.

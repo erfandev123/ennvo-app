@@ -15,6 +15,7 @@ import {
   limit,
   Unsubscribe
 } from 'firebase/firestore';
+import { notifyUser } from './pushGateway';
 import { db } from '../firebase';
 import { bridge } from '../native/bridge';
 import { getCachedAppConfig } from './appConfigService';
@@ -429,18 +430,14 @@ export const initiateCall = async (
   activeCallId = callId;
 
   // Dispatch High-Priority DATA-ONLY Call Push for native notification (rings even when app is closed)
-  fetch('/api/native/send-push', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      targetUserId: receiver.uid,
-      type: 'call',
-      name: caller.name || 'Caller',
-      avatar: caller.avatar || '',
-      callType: type,
-      callId
-    })
-  }).catch((err) => console.warn('[Call] Failed triggering call push:', err));
+  notifyUser({
+    targetUserId: receiver.uid,
+    type: 'call',
+    name: caller.name || 'Caller',
+    avatar: caller.avatar || '',
+    callType: type,
+    callId,
+  });
 
   // 3. Batch Trickle ICE Candidates
   const callerCandidatesCol = collection(db, 'calls', callId, 'callerCandidates');
