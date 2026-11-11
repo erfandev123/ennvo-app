@@ -3437,7 +3437,7 @@ export const CommentsPortal = ({ postId, onClose, authorId, authorName, authorAv
         />
 
         {/* Input & Action Controls Form - Clean White & Sky Blue */}
-        <form onSubmit={handleSubmit} style={{ transform: 'translateZ(0)' }} className="p-3 border-t border-sky-100/80 dark:border-sky-900/40 flex flex-col space-y-2 bg-white/95 dark:bg-[#0c121e]/95 backdrop-blur-md sticky bottom-0 z-20 shrink-0 shadow-[0_-2px_12px_rgba(14,165,233,0.05)] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <form onSubmit={handleSubmit} style={{ transform: 'translateZ(0)' }} className="p-3 border-t border-sky-100/80 dark:border-sky-900/40 flex flex-col space-y-2 bg-white dark:bg-[#0c121e] sticky bottom-0 z-20 shrink-0 shadow-[0_-2px_12px_rgba(14,165,233,0.05)] pb-[max(1.35rem,calc(env(safe-area-inset-bottom)+0.7rem))]">
           {/* Replying Banner */}
           {replyingTo && (
             <div className="flex items-center justify-between text-[11px] bg-sky-50 dark:bg-sky-950/50 px-3 py-1.5 rounded-xl border border-sky-100 dark:border-sky-900/50">

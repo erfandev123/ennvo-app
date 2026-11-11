@@ -385,36 +385,36 @@ export default function SearchPage() {
 
     const delayDebounceFn = setTimeout(async () => {
       try {
-        const usersNameQ = query(
-          collection(db, 'users'),
-          where('name', '>=', searchTerm),
-          where('name', '<=', searchTerm + '\uf8ff'),
-          limit(12)
-        );
-        
-        const usersUsernameQ = query(
-          collection(db, 'users'),
-          where('username', '>=', term),
-          where('username', '<=', term + '\uf8ff'),
-          limit(12)
-        );
-
-        const postsQ = query(
-          collection(db, 'posts'),
-          where('text', '>=', term),
-          where('text', '<=', term + '\uf8ff'),
-          limit(24)
-        );
-
-        const [nameSnap, usernameSnap, postsSnap] = await Promise.all([
-          getDocs(usersNameQ).catch(() => ({ docs: [] })),
-          getDocs(usersUsernameQ).catch(() => ({ docs: [] })),
-          getDocs(postsQ).catch(() => ({ docs: [] }))
-        ]);
+        // Firestore range queries are case sensitive, so "erfan" never matched
+        // "Erfan Sarker" - that is exactly why search looked broken in the app.
+        // Each query now runs for a few case variants and the results are merged.
+        const raw = searchTerm.trim();
+        const variants = Array.from(new Set([
+          raw,
+          raw.toLowerCase(),
+          raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase(),
+          raw.toUpperCase(),
+        ].filter(Boolean))).slice(0, 4);
 
         const userMap = new Map();
-        nameSnap.docs.forEach((doc: any) => userMap.set(doc.id, { uid: doc.id, ...doc.data() }));
-        usernameSnap.docs.forEach((doc: any) => userMap.set(doc.id, { uid: doc.id, ...doc.data() }));
+        const postMap = new Map();
+
+        await Promise.all(
+          variants.flatMap((v) => {
+            const lower = v.toLowerCase();
+            return [
+              getDocs(query(collection(db, 'users'), where('name', '>=', v), where('name', '<=', v + ''), limit(12)))
+                .then((snap) => snap.docs.forEach((d: any) => userMap.set(d.id, { uid: d.id, ...d.data() })))
+                .catch(() => {}),
+              getDocs(query(collection(db, 'users'), where('username', '>=', lower), where('username', '<=', lower + ''), limit(12)))
+                .then((snap) => snap.docs.forEach((d: any) => userMap.set(d.id, { uid: d.id, ...d.data() })))
+                .catch(() => {}),
+              getDocs(query(collection(db, 'posts'), where('text', '>=', v), where('text', '<=', v + ''), limit(24)))
+                .then((snap) => snap.docs.forEach((d: any) => postMap.set(d.id, { id: d.id, ...d.data() })))
+                .catch(() => {}),
+            ];
+          })
+        );
         
         let userResults = Array.from(userMap.values());
         if (currentUser?.uid) {
@@ -428,7 +428,7 @@ export default function SearchPage() {
             userResults = userResults.filter((u: any) => u.uid !== currentUser.uid);
           }
         }
-        const rawPostResults = postsSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        const rawPostResults = Array.from(postMap.values());
         
         searchCacheMap.set(term, { users: userResults, posts: rawPostResults });
 

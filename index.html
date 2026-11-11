@@ -327,7 +327,8 @@
         overflow: hidden;
         position: relative;
       }
-      /* Branded boot screen: black, the Ennvo symbol and the wordmark.
+      /* Boot screen: pure black with the Ennvo symbol, exactly like the native
+         Android launch screen, so the two match and it feels like ONE screen.
          It is removed the moment React renders, so it never blocks the UI. */
       #ennvo-boot {
         position: fixed;
@@ -349,14 +350,6 @@
         animation: boot-breathe 1.6s ease-in-out infinite;
         will-change: transform, opacity;
       }
-      #ennvo-boot .boot-name {
-        font-family: 'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-        font-size: 30px;
-        font-weight: 800;
-        letter-spacing: -0.02em;
-        color: #ffffff;
-        line-height: 1;
-      }
       @keyframes boot-breathe {
         0%, 100% { transform: scale(1); opacity: 0.92; }
         50% { transform: scale(1.045); opacity: 1; }
@@ -375,7 +368,6 @@
   <body>
     <div id="ennvo-boot" aria-hidden="true">
       <img class="boot-mark" src="/ennvo-symbol-white.png" alt="" width="132" height="132" />
-      <div class="boot-name">Ennvo</div>
     </div>
     <div id="root"></div>
 
