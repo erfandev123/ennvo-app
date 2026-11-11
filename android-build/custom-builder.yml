@@ -1026,8 +1026,13 @@ jobs:
                       // Tapping a message notification opens that chat; tapping Answer or the call screen opens the call.
                       String oc = it.getStringExtra("open_conv");
                       String on = it.getStringExtra("open_name");
+                      boolean isActivity = "__activity__".equals(oc);
                       if ((oc != null && !oc.isEmpty()) || (on != null && !on.isEmpty())) {
-                          pendingOpen = new JSONObject().put("c", oc == null ? "" : oc).put("n", on == null ? "" : on).toString();
+                          pendingOpen = new JSONObject()
+                              .put("c", isActivity ? "" : (oc == null ? "" : oc))
+                              .put("n", on == null ? "" : on)
+                              .put("type", isActivity ? "activity" : "chat")
+                              .toString();
                           it.removeExtra("open_conv");
                           it.removeExtra("open_name");
                           runJs("window.onNativeOpen&&window.onNativeOpen()");
@@ -1768,7 +1773,7 @@ jobs:
                           .setCategory(NotificationCompat.CATEGORY_SOCIAL)
                           .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                           .setAutoCancel(true)
-                          .setContentIntent(open(ctx, 8001, "", ""));
+                          .setContentIntent(open(ctx, 8001, "__activity__", ""));
                       if (av != null) b.setLargeIcon(av);
                       ((NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE))
                           .notify((int) (System.currentTimeMillis() % 100000) + 20000, b.build());

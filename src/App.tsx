@@ -351,6 +351,54 @@ export default function App() {
       store.setActiveChat(convId);
     };
 
+    // The native side calls window.onNativeOpen() when a notification is tapped
+    // (see MainActivity.handleIntent -> runJs("window.onNativeOpen&&...")). It was
+    // never defined, so tapping a notification only opened the app on the reels
+    // feed. Now it jumps straight to the right screen.
+    (window as any).onNativeOpen = () => {
+      try {
+        const pending = bridge.getPendingOpen() as any;
+        if (!pending) return;
+        const store = useAppStore.getState();
+        if (pending.type === 'activity' || pending.page === 'activity' || (!pending.convId && pending.screen === 'activity')) {
+          store.setCurrentPage('notifications');
+          return;
+        }
+        const convId = pending.convId || pending.conversationId || pending.c;
+        if (convId) {
+          store.pushPage('messages');
+          store.setActiveChat(convId);
+          return;
+        }
+        if (pending.page) store.setCurrentPage(pending.page);
+      } catch (e) {
+        console.warn('[Native] onNativeOpen error:', e);
+      }
+    };
+
+    // A notification that carries a deep link (activity, profile, post ...) is
+    // routed through the normal in-app router instead of reloading the app.
+    (window as any).onNativeDeepLink = (url: string) => {
+      if (!url) return;
+      import('./services/deepLinkService')
+        .then((m) => m.openFromLink(url))
+        .catch(() => {});
+    };
+
+    // Cold start: the native intent was handled before React mounted, so the
+    // pending payload is still waiting. Consume it now that the handlers exist -
+    // this is what makes a notification tap open the right chat / activity page
+    // instead of the reels feed.
+    const consumePending = () => {
+      try {
+        (window as any).onNativeOpen();
+        const callAction = (window as any).onNativeCallAction;
+        if (typeof callAction === 'function') callAction();
+      } catch (e) {}
+    };
+    setTimeout(consumePending, 350);
+    setTimeout(consumePending, 1600);
+
     (window as any).handleIncomingCall = (callerName: string, callerAvatar: string, type: string, callId: string) => {
       // Trigger in-app incoming call overlay
       window.dispatchEvent(new CustomEvent('nativeIncomingCall', {

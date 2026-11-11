@@ -1,6 +1,8 @@
 import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, getDoc, doc, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Notification, User } from '../types';
+import { notifyUser } from './pushGateway';
+import { activityBody } from '../utils/activityText';
 
 export const sendNotification = async (
   userId: string | undefined | null, 
@@ -46,6 +48,17 @@ export const sendNotification = async (
       isRead: false,
       createdAt: serverTimestamp(),
     });
+
+    // Wake the recipient's phone even when the app is closed. The native service
+    // renders this with Notifier.showActivity, so liking/commenting/following now
+    // reaches the device exactly like a chat message does.
+    notifyUser({
+      targetUserId: targetUid,
+      type: 'activity',
+      title: actor.name || 'Ennvo',
+      body: activityBody(type, { postMedia, content, targetType: postMedia ? 'post' : undefined }),
+      avatar: actor.avatar || '',
+    } as any);
   } catch (error: any) {
     console.warn('[NotificationService] sendNotification error:', error);
   }

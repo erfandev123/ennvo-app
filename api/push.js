@@ -128,7 +128,7 @@ export default async function handler(req, res) {
     const targetUserId = body.targetUserId;
     const type = body.type;
     if (!targetUserId || !type) return res.status(400).json({ error: 'targetUserId and type are required' });
-    if (['message', 'call'].indexOf(type) === -1) return res.status(400).json({ error: 'Unsupported type' });
+    if (['message', 'call', 'activity'].indexOf(type) === -1) return res.status(400).json({ error: 'Unsupported type' });
 
     if (type === 'call') {
       const callId = String(body.callId || '');
@@ -148,7 +148,14 @@ export default async function handler(req, res) {
 
     const secret = mode === 'secret';
     const data =
-      type === 'message'
+      type === 'activity'
+        ? {
+            type: 'activity',
+            title: secret ? 'Ennvo' : String(body.title || 'Ennvo'),
+            body: secret ? 'New notification' : String(body.body || '').slice(0, 160),
+            avatar: secret ? '' : String(body.avatar || ''),
+          }
+      : type === 'message'
         ? {
             type: 'message',
             title: secret ? 'Ennvo' : String(body.title || 'Ennvo'),

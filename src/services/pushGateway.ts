@@ -27,7 +27,7 @@ const gatewayBase = (): string => {
 
 export type PushPayload = {
   targetUserId: string;
-  type: 'message' | 'call';
+  type: 'message' | 'call' | 'activity';
   title?: string;
   body?: string;
   messageType?: string;
