@@ -62,7 +62,7 @@ export default async function handler(req, res) {
       await getServices();
       sdk = true;
     } catch (err) {
-      return res.status(200).json({ ok: true, configured, sdk, detail: String(err.message || err) });
+      return res.status(200).json({ ok: true, configured, sdk, detail: String(err.message || err).slice(0, 200) });
     }
     return res.status(200).json({ ok: true, configured, sdk });
   }
