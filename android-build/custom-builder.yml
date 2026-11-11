@@ -1402,14 +1402,6 @@ jobs:
                   }
 
                   @JavascriptInterface
-                  public void shareText(String title, String text) {
-                      try {
-                          Intent s = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text == null ? "" : text);
-                          startActivity(Intent.createChooser(s, title == null ? "Share" : title).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-                      } catch (Exception ignored) { }
-                  }
-
-                  @JavascriptInterface
                   public void setKeepScreenOn(boolean on) {
                       final boolean keep = on;
                       runOnUiThread(() -> {
