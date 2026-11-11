@@ -394,7 +394,7 @@ export default function Auth() {
           <h1 className="text-white text-3xl font-extrabold tracking-tight mt-0.5">{title}</h1>
         </div>
         <img
-          src="/icon-192.png?v=3"
+          src="/icon-192.png?v=5"
           alt="Ennvo logo"
           className="w-11 h-11 rounded-full object-cover ring-2 ring-white/70 shadow-[0_8px_24px_rgba(0,0,0,0.28)] mt-0.5 shrink-0"
         />
@@ -425,7 +425,7 @@ export default function Auth() {
         <div className="relative z-10 my-auto py-8">
           <p className="text-white/80 text-xl font-light tracking-wide mb-3">Welcome to</p>
           <div className="w-24 h-24 rounded-full bg-white shadow-[0_20px_50px_rgba(0,0,0,0.25)] overflow-hidden flex items-center justify-center mb-5 border border-white/20">
-            <img src="/icon-192.png?v=3" alt="Ennvo Logo" className="w-full h-full object-cover rounded-full" />
+            <img src="/icon-192.png?v=5" alt="Ennvo Logo" className="w-full h-full object-cover rounded-full" />
           </div>
           <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-white mb-3">Ennvo</h2>
           <p className="text-white/80 text-sm max-w-sm leading-relaxed">
@@ -615,7 +615,7 @@ export default function Auth() {
             {/* Top Logo Emblem */}
             <div className="flex flex-col items-center justify-center pt-4 md:pt-8 select-none">
               <div className="w-24 h-24 rounded-full bg-white shadow-[0_12px_30px_rgba(37,99,235,0.22)] border border-slate-100 flex items-center justify-center overflow-hidden p-0">
-                <img src="/icon-192.png?v=3" alt="Ennvo Emblem" className="w-full h-full object-cover rounded-full" />
+                <img src="/icon-192.png?v=5" alt="Ennvo Emblem" className="w-full h-full object-cover rounded-full" />
               </div>
               <h2 className="text-base font-extrabold tracking-widest text-[#2563EB] uppercase mt-3">ENNVO</h2>
             </div>

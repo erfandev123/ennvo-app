@@ -1354,7 +1354,7 @@ export default function Home() {
               }}
               className="font-brand text-[28px] sm:text-[30px] font-[900] tracking-[-0.05em] text-neutral-900 dark:text-white lowercase select-none cursor-pointer text-center leading-none inline-flex items-center gap-2"
             >
-              <img src="/icon-96.png?v=3" alt="Ennvo logo" className="w-7 h-7 rounded-full object-cover shadow-[0_2px_8px_rgba(14,165,233,0.35)]" />
+              <img src="/icon-96.png?v=5" alt="Ennvo logo" className="w-7 h-7 rounded-full object-cover shadow-[0_2px_8px_rgba(14,165,233,0.35)]" />
               <span>ennvo</span>
               <span className="w-1.5 h-1.5 rounded-full bg-violet-600 dark:bg-violet-400 mb-0.5 self-end" />
             </h1>

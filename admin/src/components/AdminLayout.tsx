@@ -136,7 +136,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           {/* Brand Logo & Header */}
           <div className="p-5 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <img src="/icon-192.png?v=3" alt="Ennvo" className="w-9 h-9 rounded-full object-cover shadow-md" />
+              <img src="/icon-192.png?v=5" alt="Ennvo" className="w-9 h-9 rounded-full object-cover shadow-md" />
               <div>
                 <h2 className="font-black text-sm tracking-wide text-gray-900 dark:text-white">
                   Ennvo Admin
@@ -274,7 +274,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             {/* Staff User Avatar Pill */}
             <div className="flex items-center space-x-2 pl-2 border-l border-gray-200 dark:border-white/10">
               <img
-                src="/icon-192.png?v=3"
+                src="/icon-192.png?v=5"
                 alt="Staff"
                 className="w-7 h-7 rounded-full object-cover border border-purple-500"
               />

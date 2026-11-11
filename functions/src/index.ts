@@ -264,7 +264,7 @@ export const adminSendPush = onCall(async (request) => {
         type: 'announcement',
         title,
         body,
-        avatar: avatar || 'https://ennvo.vercel.app/icon-192.png',
+        avatar: avatar || 'https://ennvo.vercel.app/icon-192.png?v=5',
         convId: convId || '',
         deepLink: deepLink || 'https://ennvo.vercel.app'
       },

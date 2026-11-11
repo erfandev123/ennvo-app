@@ -323,7 +323,7 @@ export default function Reels() {
               <div className="relative">
                 <div className="w-19 h-19 rounded-full bg-gradient-to-tr from-sky-400 via-indigo-500 to-pink-500 p-[1.5px] shadow-[0_8px_25px_rgba(56,189,248,0.35)]">
                   <div className="w-full h-full bg-[#0a0f1d] rounded-full flex items-center justify-center overflow-hidden">
-                    <img src="/icon-192.png?v=3" alt="Ennvo" className="w-13 h-13 rounded-full object-cover" />
+                    <img src="/icon-192.png?v=5" alt="Ennvo" className="w-13 h-13 rounded-full object-cover" />
                   </div>
                 </div>
                 <div className="absolute -top-1 -right-1 text-amber-300">

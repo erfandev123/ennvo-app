@@ -175,7 +175,7 @@ const InAppToaster = memo(() => {
           <div className="flex items-center justify-between px-0.5 mb-2 pointer-events-none">
             <div className="flex items-center space-x-1.5">
               <img 
-                src="/icon-192.png?v=3" 
+                src="/icon-192.png?v=5" 
                 alt="Ennvo" 
                 className="w-4 h-4 rounded-full object-cover ring-1 ring-sky-300/40 shadow-xs" 
               />
@@ -678,7 +678,7 @@ export default function App() {
           deviceNotification.show({
             title: nData.senderName || 'Ennvo Notification',
             body: nData.message || nData.text || 'You have a new notification',
-            icon: nData.senderAvatar || '/icon-192.png?v=3',
+            icon: nData.senderAvatar || '/icon-192.png?v=5',
             type: 'activity',
           });
         }

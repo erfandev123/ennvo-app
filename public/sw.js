@@ -1,12 +1,12 @@
 // Ennvo Background Service Worker for Real-Time Push & Desktop Notifications
 // Also caches the app shell so repeat opens are instant on slow networks.
-const STATIC_CACHE = 'ennvo-static-v15';
-const RUNTIME_CACHE = 'ennvo-runtime-v15';
+const STATIC_CACHE = 'ennvo-static-v16';
+const RUNTIME_CACHE = 'ennvo-runtime-v16';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE)
-      .then((cache) => cache.addAll(['/', '/icon-192.png', '/icon-96.png', '/manifest.json']))
+      .then((cache) => cache.addAll(['/', '/icon-192.png?v=5', '/icon-96.png?v=5', '/manifest.json', '/favicon.ico?v=5']))
       .catch(() => {})
       .then(() => self.skipWaiting())
   );
@@ -139,8 +139,8 @@ self.addEventListener('push', (event) => {
 
     const options = {
       body: data.body || '',
-      icon: data.icon || '/icon-192.png',
-      badge: '/icon-96.png',
+      icon: data.icon || '/icon-192.png?v=5',
+      badge: '/icon-96.png?v=5',
       tag: data.tag || `ennvo-${Date.now()}`,
       data: data.data || {},
       renotify: true,
@@ -156,8 +156,8 @@ self.addEventListener('push', (event) => {
     event.waitUntil(
       self.registration.showNotification('Ennvo', {
         body: text,
-        icon: '/icon-192.png',
-        badge: '/icon-96.png'
+        icon: '/icon-192.png?v=5',
+        badge: '/icon-96.png?v=5'
       })
     );
   }

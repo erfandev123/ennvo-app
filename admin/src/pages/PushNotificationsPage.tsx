@@ -187,7 +187,7 @@ export const PushNotificationsPage: React.FC<{ lang: Language }> = ({ lang }) =>
               {/* Notification Banner */}
               <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/10 shadow-lg space-y-1">
                 <div className="flex items-center space-x-2 mb-1">
-                  <img src="/icon-192.png?v=3" alt="Ennvo" className="w-4 h-4 rounded-full" />
+                  <img src="/icon-192.png?v=5" alt="Ennvo" className="w-4 h-4 rounded-full" />
                   <span className="text-[10px] font-bold text-gray-300">Ennvo • Just now</span>
                 </div>
                 <div className="font-bold text-xs text-white truncate">

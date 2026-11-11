@@ -61,22 +61,22 @@
   "redirects": [
     {
       "source": "/Ennvo.png",
-      "destination": "/icon-192.png?v=3",
+      "destination": "/icon-192.png?v=5",
       "permanent": true
     },
     {
       "source": "/Ennvoold.png",
-      "destination": "/icon-192.png?v=3",
+      "destination": "/icon-192.png?v=5",
       "permanent": true
     },
     {
       "source": "/favicon.png",
-      "destination": "/icon-192.png?v=3",
+      "destination": "/icon-192.png?v=5",
       "permanent": true
     },
     {
       "source": "/images/ennvo-icon.png",
-      "destination": "/icon-192.png?v=3",
+      "destination": "/icon-192.png?v=5",
       "permanent": true
     },
     {

@@ -191,18 +191,16 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
       {/* Top Ennvo Brand Logo */}
       <div 
         onClick={() => handleNavigate('home')}
-        className="w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer transition-transform duration-200 mb-1 group relative"
+        className="w-10 h-10 rounded-full flex items-center justify-center cursor-pointer transition-transform duration-200 mb-1 group relative"
         title="Ennvo Home"
       >
-        <div className="w-8 h-8 rounded-full overflow-hidden shadow-xs border border-white/80 flex items-center justify-center bg-white/40 backdrop-blur-xs">
-          <img 
-            src="/icon-192.png?v=3" 
-            alt="Ennvo" 
-            loading="lazy" 
-            decoding="async" 
-            className="w-full h-full object-cover" 
-          />
-        </div>
+        <img 
+          src="/icon-192.png?v=5" 
+          alt="Ennvo" 
+          loading="eager" 
+          decoding="async" 
+          className="w-10 h-10 rounded-full object-cover shadow-xs ring-1 ring-white/80 bg-white" 
+        />
         <span className="absolute left-full ml-3 px-2.5 py-1 bg-slate-900/90 text-white text-[11px] font-medium rounded-xl pointer-events-none opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-200 shadow-md backdrop-blur-md whitespace-nowrap z-50">
           Ennvo
         </span>
