@@ -2842,7 +2842,28 @@ export default function Messages() {
             }
           });
 
-          return { ...prev, [activeChat]: merged };
+          // Keep a stable chronological order. Server messages are sorted by
+          // createdAt; optimistic (not yet acknowledged) messages always stay at
+          // the bottom. Without this the list re-ordered itself on every snapshot
+          // and messages visibly jumped around.
+          const isPending = (m: any) => Boolean(m?.pending) || String(m?.id || '').startsWith('temp_');
+          const timeOf = (m: any) => {
+            const c = m?.createdAt;
+            if (!c) return 0;
+            if (typeof c?.toMillis === 'function') return c.toMillis();
+            if (typeof c?.seconds === 'number') return c.seconds * 1000;
+            if (typeof c === 'number') return c;
+            const parsed = Date.parse(String(c));
+            return Number.isFinite(parsed) ? parsed : 0;
+          };
+          const confirmed = merged.filter((m: any) => !isPending(m));
+          const pending = merged.filter((m: any) => isPending(m));
+          confirmed.sort((a: any, b: any) => {
+            const diff = timeOf(a) - timeOf(b);
+            if (diff !== 0) return diff;
+            return String(a.id || a.tempId || '').localeCompare(String(b.id || b.tempId || ''));
+          });
+          return { ...prev, [activeChat]: [...confirmed, ...pending] };
         });
         if (currentUser && newMsgs.some(m => m.senderId !== currentUser.uid && m.status !== 'seen')) {
           import("../services/chatService").then((m) =>

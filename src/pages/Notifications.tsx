@@ -18,6 +18,7 @@ import { followUser, unfollowUser } from '../services/followService';
 import { Notification } from '../types';
 import { formatTime } from '../utils';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, limit } from 'firebase/firestore';
+import { activityBody } from '../utils/activityText';
 import { db } from '../firebase';
 
 // Light haptic feedback helper
@@ -189,14 +190,16 @@ const ActivityCard = React.memo(({
           <span className="font-bold mr-1 text-neutral-950 dark:text-white cursor-pointer hover:underline" onClick={handleActorClick}>
             {notif.actorName || 'User'}
           </span>
-          {notif.type === 'like' && 'liked your video.'}
-          {notif.type === 'comment' && `commented: "${notif.content || ''}"`}
-          {notif.type === 'reply' && `replied: "${notif.content || ''}"`}
-          {notif.type === 'repost' && 'reposted your video.'}
-          {notif.type === 'favorite' && 'saved your video to favorites.'}
-          {notif.type === 'follow' && 'started following you.'}
-          {notif.type === 'mention' && (notif.content ? `mentioned you: "${notif.content}"` : 'mentioned you in a post.')}
-          {notif.type === 'comment_like' && 'liked your comment.'}
+          {(() => {
+            // One shared wording for every surface (toast, push and this list):
+            // liked your comment / replied to your repost / saved your video ...
+            const label = activityBody(notif.type, notif);
+            const text = (notif as any).content || (notif as any).commentText;
+            if ((notif.type === 'comment' || notif.type === 'reply' || notif.type === 'mention') && text) {
+              return `${label}: "${text}"`;
+            }
+            return label;
+          })()}
         </div>
         <div className="text-[0.74rem] text-neutral-500 dark:text-neutral-400 font-medium mt-0.5 flex items-center gap-1">
           <span className="w-1 h-1 rounded-full bg-[#007aff] inline-block shrink-0" />
