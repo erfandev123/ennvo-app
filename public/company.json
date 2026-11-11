@@ -1,13 +1,19 @@
 {
   "name": "Ennvo App",
   "alternateName": [
+    "Ennvo",
     "Ennvo App",
     "Ennvoapp",
     "Ennvo Social",
+    "Ennvo Social Media",
+    "Envo",
+    "Envo Social Media",
+    "Enovo",
+    "Enovo Imbo",
     "Ennvo Platform"
   ],
   "url": "https://ennvo.vercel.app/",
-  "logo": "https://ennvo.vercel.app/icon-512.png",
+  "logo": "https://ennvo.vercel.app/icon-512.png?v=3",
   "description": "Ennvo is an independent social platform owned and led by founder & CEO Erfan Sarker, with a team of 10 people. It brings short video reels, stories, instant messaging, and HD audio and video calls into one fast, simple experience.",
   "slogan": "Connect. Share. Explore.",
   "foundingDate": "2026",

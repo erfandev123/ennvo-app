@@ -10,9 +10,9 @@ let activeRingtoneInterval: any = null;
 const preloadedAudioCache: Record<string, HTMLAudioElement> = {};
 
 const SOUND_PATHS = {
-  notification: '/notifecetion.wav',
-  ringtone: '/Ringtone.wav',
-  calling: '/Calling.wav'
+  notification: '/notifecetion.mp3',
+  ringtone: '/Ringtone.mp3',
+  calling: '/Calling.mp3'
 };
 
 // Pre-initialize audio files on module load

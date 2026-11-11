@@ -58,7 +58,7 @@ export const BannedSuspendedModal: React.FC<{ info: BannedInfo; onDismiss: () =>
 
         <div className="space-y-2.5">
           <a
-            href="mailto:support@ennvoapp.com?subject=Appeal%20Account%20Suspension"
+            href="mailto:ennvoapp@gmail.com?subject=Appeal%20Account%20Suspension"
             className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center space-x-2 transition-colors cursor-pointer"
           >
             <span>Submit Appeal to Support</span>

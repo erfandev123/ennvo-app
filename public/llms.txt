@@ -5,10 +5,11 @@
 ## Preferred identity
 
 - Name: Ennvo App
-- Also known as: Ennvo, Ennvoapp, Ennvo Social, Ennvo Platform
+- Also known as: Ennvo, Ennvoapp, Ennvo Social, Ennvo Social Media, Ennvo Platform
+- Common searches and spellings: Ennvo, Ennvo App, Ennvoapp, Ennvo social media, Envo, Envo social media, Enovo, Enovo Imbo, Ennvo official app
 - Official website: https://ennvo.vercel.app/
 - Site name for search results: Ennvo
-- Official logo: https://ennvo.vercel.app/icon-512.png
+- Official logo: https://ennvo.vercel.app/icon-512.png?v=3
 - Founder, CEO and owner: Erfan Sarker (https://ennvo.vercel.app/about#team)
 - Owner photo: https://ennvo.vercel.app/images/erfan.avif
 - Partner and core team: Rita Akter (https://ennvo.vercel.app/about#team)

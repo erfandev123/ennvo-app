@@ -2108,9 +2108,9 @@ export default function Messages() {
 
   const [offlineWallpaperUrl, setOfflineWallpaperUrl] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("ennvo_offline_wallpaper_b64") || "/chat-background.png";
+      return localStorage.getItem("ennvo_offline_wallpaper_b64") || "/chat-background.jpg";
     }
-    return "/chat-background.png";
+    return "/chat-background.jpg";
   });
 
   useEffect(() => {
@@ -2118,7 +2118,7 @@ export default function Messages() {
     if (typeof window !== "undefined") {
       const cachedB64 = localStorage.getItem("ennvo_offline_wallpaper_b64");
       if (!cachedB64) {
-        fetch("/chat-background.png")
+        fetch("/chat-background.jpg")
           .then((res) => res.blob())
           .then((blob) => {
             const reader = new FileReader();
@@ -3589,7 +3589,7 @@ export default function Messages() {
   const activeConvTheme = themeOverride?.theme || 
     (activeConversation as any)?.theme || 
     (activeChat === "jarvis" ? (localStorage.getItem("jarvis_chat_theme") || chatTheme) : chatTheme) || 
-    "/chat-background.png";
+    "/chat-background.jpg";
   const activeConvThemeBlur = themeOverride?.blur !== undefined
     ? Boolean(themeOverride.blur)
     : Boolean((activeConversation as any)?.themeBlur);
@@ -5178,7 +5178,7 @@ export default function Messages() {
               {(() => {
                 const isImage = 
                   activeConvTheme === 'bg-image' || 
-                  activeConvTheme === '/chat-background.png' ||
+                  activeConvTheme === '/chat-background.jpg' ||
                   activeConvTheme.startsWith('http') || 
                   activeConvTheme.startsWith('/') || 
                   activeConvTheme.startsWith('data:') ||
@@ -5191,7 +5191,7 @@ export default function Messages() {
                     {/* Background Layer: Image Wallpaper or Gradient Theme */}
                     {isImage ? (
                       <img
-                        src={activeConvTheme === 'bg-image' ? '/chat-background.png' : activeConvTheme}
+                        src={activeConvTheme === 'bg-image' ? '/chat-background.jpg' : activeConvTheme}
                         alt=""
                         loading="eager"
                         decoding="sync"
@@ -5221,7 +5221,7 @@ export default function Messages() {
               {(() => {
                 const isThemeImage = 
                   activeConvTheme === 'bg-image' || 
-                  activeConvTheme === '/chat-background.png' ||
+                  activeConvTheme === '/chat-background.jpg' ||
                   activeConvTheme.startsWith('http') || 
                   activeConvTheme.startsWith('/') || 
                   activeConvTheme.startsWith('data:') ||
@@ -5231,7 +5231,7 @@ export default function Messages() {
                   activeConvTheme.includes('background') ||
                   activeConvTheme.includes('wallpaper');
                 const wallpaperImgSrc = isThemeImage 
-                  ? (activeConvTheme === 'bg-image' ? '/chat-background.png' : activeConvTheme) 
+                  ? (activeConvTheme === 'bg-image' ? '/chat-background.jpg' : activeConvTheme) 
                   : offlineWallpaperUrl;
 
                 return (

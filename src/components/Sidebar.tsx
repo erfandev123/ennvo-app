@@ -194,9 +194,9 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
         className="w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer transition-transform duration-200 mb-1 group relative"
         title="Ennvo Home"
       >
-        <div className="w-8 h-8 rounded-xl overflow-hidden shadow-xs border border-white/80 flex items-center justify-center bg-white/40 backdrop-blur-xs">
+        <div className="w-8 h-8 rounded-full overflow-hidden shadow-xs border border-white/80 flex items-center justify-center bg-white/40 backdrop-blur-xs">
           <img 
-            src="/icon-192.png" 
+            src="/icon-192.png?v=3" 
             alt="Ennvo" 
             loading="lazy" 
             decoding="async" 

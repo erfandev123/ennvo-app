@@ -857,9 +857,9 @@ export default function Profile() {
               {/* PFP with Ennvo profile icon logo */}
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full p-1 bg-gradient-to-tr from-neutral-200 to-neutral-300 dark:from-neutral-700 dark:to-neutral-800 shadow-md mb-4 flex items-center justify-center overflow-hidden">
                 <img 
-                  src="/icon-192.png" 
+                  src="/icon-192.png?v=3" 
                   alt="Ennvo Logo" 
-                  className="w-16 h-16 sm:w-18 sm:h-18 object-contain opacity-80"
+                  className="w-16 h-16 sm:w-18 sm:h-18 rounded-full object-cover opacity-90"
                   onError={(e) => {
                     (e.target as HTMLElement).style.display = 'none';
                   }}

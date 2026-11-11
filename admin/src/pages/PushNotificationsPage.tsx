@@ -17,7 +17,7 @@ export const PushNotificationsPage: React.FC<{ lang: Language }> = ({ lang }) =>
   const [targetUid, setTargetUid] = useState('');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [deepLink, setDeepLink] = useState('https://ennvoapp.com');
+  const [deepLink, setDeepLink] = useState('https://ennvo.vercel.app');
   const [reason, setReason] = useState('');
   const [sending, setSending] = useState(false);
   const [sentSuccess, setSentSuccess] = useState(false);
@@ -140,7 +140,7 @@ export const PushNotificationsPage: React.FC<{ lang: Language }> = ({ lang }) =>
               type="text"
               value={deepLink}
               onChange={(e) => setDeepLink(e.target.value)}
-              placeholder="https://ennvoapp.com/post/xyz or https://ennvoapp.com/account/erfan"
+              placeholder="https://ennvo.vercel.app/post/xyz or https://ennvo.vercel.app/account/erfan"
               className="w-full p-2.5 bg-gray-50 dark:bg-gray-800 rounded-xl text-xs border border-gray-200 dark:border-white/10 font-mono"
             />
           </div>
@@ -187,7 +187,7 @@ export const PushNotificationsPage: React.FC<{ lang: Language }> = ({ lang }) =>
               {/* Notification Banner */}
               <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/10 shadow-lg space-y-1">
                 <div className="flex items-center space-x-2 mb-1">
-                  <img src="/Ennvo.png" alt="Ennvo" className="w-4 h-4 rounded-full" />
+                  <img src="/icon-192.png?v=3" alt="Ennvo" className="w-4 h-4 rounded-full" />
                   <span className="text-[10px] font-bold text-gray-300">Ennvo • Just now</span>
                 </div>
                 <div className="font-bold text-xs text-white truncate">

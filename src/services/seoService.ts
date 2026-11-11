@@ -19,12 +19,12 @@ const DEFAULT_CANONICAL = 'https://ennvo.vercel.app/';
 const DEFAULT_OG_IMAGE = 'https://ennvo.vercel.app/og-image.jpg';
 
 export const OFFICIAL_BRAND_SEO: PageSEOConfig = {
-  title: 'Ennvo Official App – Social Media, Reels, Chat & Video Calls',
-  description: 'Ennvo is the official social media app by Erfan Sarker and co-developer Rita Akter. Share reels, chat, post stories, and make HD video calls — fast and free.',
+  title: 'Ennvo',
+  description: 'Ennvo is a free social app for reels, stories, messaging and HD video calls. Fast, simple and built for everyone.',
   canonical: DEFAULT_CANONICAL,
   robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
-  ogTitle: 'Ennvo Official App – Social Media, Reels, Chat & Video Calls',
-  ogDescription: 'Ennvo is the official social media app by Erfan Sarker and co-developer Rita Akter. Share reels, chat, post stories, and make HD video calls — fast and free.',
+  ogTitle: 'Ennvo',
+  ogDescription: 'Ennvo is a free social app for reels, stories, messaging and HD video calls. Fast, simple and built for everyone.',
   ogUrl: DEFAULT_CANONICAL,
   ogImage: DEFAULT_OG_IMAGE,
 };
@@ -91,6 +91,7 @@ export function applyRouteSEO(page: string, params?: { userName?: string; isAuth
   switch (page) {
     case 'home':
     case 'welcome':
+    case 'auth':
       updatePageSEO(OFFICIAL_BRAND_SEO);
       break;
 
@@ -128,25 +129,6 @@ export function applyRouteSEO(page: string, params?: { userName?: string; isAuth
       }
       break;
 
-    case 'auth':
-      if (params?.authScreen === 'signup') {
-        updatePageSEO({
-          title: 'Create Account • Ennvo Official Platform',
-          description: 'Join Ennvo today. Connect with friends, create and watch short video reels, enjoy instant real-time messaging and HD audio/video calls.',
-          canonical: 'https://ennvo.vercel.app/signup',
-          robots: 'index, follow',
-        });
-      } else {
-        updatePageSEO({
-          title: 'Sign In • Ennvo Official Platform',
-          description: 'Sign in to Ennvo for instant messaging, short reels, and real-time HD audio & video calls.',
-          canonical: 'https://ennvo.vercel.app/signin',
-          robots: 'index, follow',
-        });
-      }
-      break;
-
-    // Strict noindex for private authenticated areas
     case 'messages':
       updatePageSEO({
         title: 'Private Messages • Ennvo',

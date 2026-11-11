@@ -1,7 +1,7 @@
 // Ennvo Background Service Worker for Real-Time Push & Desktop Notifications
 // Also caches the app shell so repeat opens are instant on slow networks.
-const STATIC_CACHE = 'ennvo-static-v14';
-const RUNTIME_CACHE = 'ennvo-runtime-v14';
+const STATIC_CACHE = 'ennvo-static-v15';
+const RUNTIME_CACHE = 'ennvo-runtime-v15';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

@@ -6,7 +6,6 @@ import {
   AlertCircle, 
   Loader2, 
   ArrowLeft,
-  Lock,
   Mail,
   User as UserIcon,
   Sparkles
@@ -389,9 +388,16 @@ export default function Auth() {
         />
       </svg>
       {/* Header Text cleanly overlayed inside the blue area */}
-      <div className="absolute top-0 left-0 right-0 pt-8 sm:pt-9 px-6 sm:px-7 z-10 pointer-events-none">
-        <p className="text-white/90 text-[13px] font-medium tracking-wide">{subtitle}</p>
-        <h1 className="text-white text-3xl font-extrabold tracking-tight mt-0.5">{title}</h1>
+      <div className="absolute top-0 left-0 right-0 pt-8 sm:pt-9 px-6 sm:px-7 z-10 pointer-events-none flex items-start justify-between gap-4">
+        <div>
+          <p className="text-white/90 text-[13px] font-medium tracking-wide">{subtitle}</p>
+          <h1 className="text-white text-3xl font-extrabold tracking-tight mt-0.5">{title}</h1>
+        </div>
+        <img
+          src="/icon-192.png?v=3"
+          alt="Ennvo logo"
+          className="w-11 h-11 rounded-full object-cover ring-2 ring-white/70 shadow-[0_8px_24px_rgba(0,0,0,0.28)] mt-0.5 shrink-0"
+        />
       </div>
     </div>
   );
@@ -418,8 +424,8 @@ export default function Auth() {
         {/* Center Presentation Emblem & Slogan */}
         <div className="relative z-10 my-auto py-8">
           <p className="text-white/80 text-xl font-light tracking-wide mb-3">Welcome to</p>
-          <div className="w-24 h-24 rounded-3xl bg-white shadow-[0_20px_50px_rgba(0,0,0,0.25)] overflow-hidden flex items-center justify-center mb-5 border border-white/20">
-            <img src="/icon-192.png" alt="Ennvo Logo" className="w-full h-full object-cover rounded-3xl" />
+          <div className="w-24 h-24 rounded-full bg-white shadow-[0_20px_50px_rgba(0,0,0,0.25)] overflow-hidden flex items-center justify-center mb-5 border border-white/20">
+            <img src="/icon-192.png?v=3" alt="Ennvo Logo" className="w-full h-full object-cover rounded-full" />
           </div>
           <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-white mb-3">Ennvo</h2>
           <p className="text-white/80 text-sm max-w-sm leading-relaxed">
@@ -511,9 +517,12 @@ export default function Auth() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showPassword}
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
                     >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
@@ -576,7 +585,7 @@ export default function Auth() {
               </div>
 
               {/* Public SEO / brand page link */}
-              <div className="text-center mt-3 text-[10px] font-medium text-slate-400">
+              <div className="text-center mt-3 text-[11px] font-medium text-slate-500">
                 <a href="/landing" className="hover:text-slate-600 hover:underline">Landing</a>
                 <span aria-hidden="true"> · </span>
                 <a href="/about" className="hover:text-slate-600 hover:underline">About Ennvo &amp; team</a>
@@ -605,8 +614,8 @@ export default function Auth() {
           <div className="w-full flex-1 flex flex-col justify-between py-10 px-6 md:px-12 lg:px-20 max-w-md mx-auto">
             {/* Top Logo Emblem */}
             <div className="flex flex-col items-center justify-center pt-4 md:pt-8 select-none">
-              <div className="w-24 h-24 rounded-3xl bg-white shadow-[0_12px_30px_rgba(37,99,235,0.22)] border border-slate-100 flex items-center justify-center overflow-hidden p-0">
-                <img src="/icon-192.png" alt="Ennvo Emblem" className="w-full h-full object-cover rounded-3xl" />
+              <div className="w-24 h-24 rounded-full bg-white shadow-[0_12px_30px_rgba(37,99,235,0.22)] border border-slate-100 flex items-center justify-center overflow-hidden p-0">
+                <img src="/icon-192.png?v=3" alt="Ennvo Emblem" className="w-full h-full object-cover rounded-full" />
               </div>
               <h2 className="text-base font-extrabold tracking-widest text-[#2563EB] uppercase mt-3">ENNVO</h2>
             </div>
@@ -631,7 +640,7 @@ export default function Auth() {
                   type="button"
                   onClick={handleFacebookAuth}
                   disabled={isLoading}
-                  className="w-full py-3.5 px-6 rounded-full bg-[#1877F2] hover:bg-[#166FE5] text-white font-medium text-xs md:text-sm shadow-[0_6px_18px_rgba(24,119,242,0.28)] transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+                  className="w-full py-3.5 px-6 rounded-full bg-[#166FE5] hover:bg-[#125FCB] text-white font-medium text-xs md:text-sm shadow-[0_6px_18px_rgba(24,119,242,0.28)] transition-all flex items-center justify-center gap-2.5 cursor-pointer"
                 >
                   <FacebookIcon className="w-4 h-4 fill-white" />
                   <span>Continue with Facebook</span>
@@ -778,9 +787,12 @@ export default function Auth() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showPassword}
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
                     >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>

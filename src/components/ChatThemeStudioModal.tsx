@@ -142,7 +142,7 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
   onApplyTheme,
 }) => {
   const [selectedThemeValue, setSelectedThemeValue] = useState<string>(
-    currentTheme || '/chat-background.png'
+    currentTheme || '/chat-background.jpg'
   );
   const [isBlur, setIsBlur] = useState<boolean>(initialBlur);
   const [brightness, setBrightness] = useState<number>(initialBrightness);
@@ -156,7 +156,7 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
   // Sync state whenever modal opens or initial props change
   useEffect(() => {
     if (isOpen) {
-      const theme = currentTheme || '/chat-background.png';
+      const theme = currentTheme || '/chat-background.jpg';
       setSelectedThemeValue(theme);
       setIsBlur(Boolean(initialBlur));
       setBrightness(typeof initialBrightness === 'number' ? initialBrightness : 1);
@@ -436,11 +436,11 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
                 <div className="grid grid-cols-4 gap-4">
                   {/* Default Wallpaper */}
                   <div
-                    onClick={() => setSelectedThemeValue('/chat-background.png')}
+                    onClick={() => setSelectedThemeValue('/chat-background.jpg')}
                     className="flex flex-col items-center cursor-pointer group"
                   >
                     <div className={`w-full aspect-[3/4] rounded-[20px] bg-white dark:bg-neutral-800 border-2 transition-all flex items-center justify-center shadow-xs ${
-                      selectedThemeValue === '/chat-background.png'
+                      selectedThemeValue === '/chat-background.jpg'
                         ? 'border-[#FE2C55] ring-2 ring-[#FE2C55]/30 scale-[1.02]'
                         : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-400'
                     }`}>
@@ -678,11 +678,11 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
 
                   {/* Card 2: Default */}
                   <div
-                    onClick={() => setSelectedThemeValue('/chat-background.png')}
+                    onClick={() => setSelectedThemeValue('/chat-background.jpg')}
                     className="flex flex-col items-center cursor-pointer group"
                   >
                     <div className={`w-full aspect-[3/4] rounded-[20px] bg-white dark:bg-neutral-800 border-2 transition-all shadow-2xs flex items-center justify-center ${
-                      selectedThemeValue === '/chat-background.png'
+                      selectedThemeValue === '/chat-background.jpg'
                         ? 'border-[#FE2C55] ring-2 ring-[#FE2C55]/30 scale-[1.02]'
                         : 'border-neutral-300 dark:border-neutral-700'
                     }`}>
