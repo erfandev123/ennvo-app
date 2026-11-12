@@ -15,7 +15,8 @@ import {
   increment,
   getDocs,
   writeBatch,
-  limit
+  limit,
+  startAfter
 } from 'firebase/firestore';
 import { notifyUser } from './pushGateway';
 import { db, auth } from '../firebase';
@@ -587,6 +588,35 @@ export const markConversationRead = async (conversationId: string, userId: strin
     }, 700);
   } catch (error: any) {
     console.error(error);
+  }
+};
+
+/**
+ * Loads the messages that come before the oldest one on screen.
+ *
+ * The live subscription always listens to the newest messages. Older ones are
+ * fetched with a cursor, so scrolling back does not re-download the whole
+ * history and does not re-register the listener.
+ */
+export const loadOlderMessages = async (
+  conversationId: string,
+  beforeCreatedAt: number,
+  count = 20
+): Promise<Message[]> => {
+  try {
+    const q = query(
+      collection(db, 'conversations', conversationId, 'messages'),
+      orderBy('createdAt', 'desc'),
+      startAfter(beforeCreatedAt),
+      limit(count)
+    );
+    const snap = await getDocs(q);
+    return snap.docs
+      .map((d) => ({ id: d.id, ...d.data() } as Message))
+      .reverse();
+  } catch (e) {
+    console.warn('[ChatService] Older messages could not be loaded:', e);
+    return [];
   }
 };
 

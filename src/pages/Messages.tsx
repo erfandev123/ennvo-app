@@ -2888,7 +2888,16 @@ export default function Messages() {
             if (diff !== 0) return diff;
             return String(a.id || a.tempId || '').localeCompare(String(b.id || b.tempId || ''));
           });
-          return { ...prev, [activeChat]: [...confirmed, ...pending] };
+
+          // The live subscription only knows the newest messages. The older
+          // ones that were loaded with the "load older" action are kept, so
+          // scrolling back through the history does not throw them away.
+          const oldestLoaded = confirmed.length ? timeOf(confirmed[0]) : Number.MAX_SAFE_INTEGER;
+          const older = currentCached.filter(
+            (m: any) => !isPending(m) && timeOf(m) < oldestLoaded
+          );
+
+          return { ...prev, [activeChat]: [...older, ...confirmed, ...pending] };
         });
         if (currentUser) {
           // Only the messages that actually need it are marked as seen. The
@@ -5469,10 +5478,28 @@ export default function Messages() {
                     const target = e.currentTarget;
                     if (target.scrollTop < 60 && !isPagingRef.current) {
                       isPagingRef.current = true;
-                      setMessageLimit((prev: number) => prev + 20);
+                      // Older messages are fetched with a cursor. Bumping the
+                      // limit of the live query re-downloaded the whole
+                      // history and re-registered the listener every time.
+                      const oldest = messages[0];
+                      const oldestTime = oldest?.createdAt?.toMillis?.() ?? (oldest?.createdAt ?? 0);
+                      if (oldest && oldestTime) {
+                        import("../services/chatService").then((m) =>
+                          m.loadOlderMessages(activeChat, oldestTime, 25).then((older) => {
+                            if (!older || older.length === 0) return;
+                            setMessagesCache((prev) => {
+                              const current = prev[activeChat] || [];
+                              const known = new Set(current.map((c: any) => c.id));
+                              const fresh = older.filter((o: any) => !known.has(o.id));
+                              if (!fresh.length) return prev;
+                              return { ...prev, [activeChat]: [...fresh, ...current] };
+                            });
+                          })
+                        );
+                      }
                       setTimeout(() => {
                         isPagingRef.current = false;
-                      }, 600);
+                      }, 800);
                     }
                     const { scrollTop, scrollHeight, clientHeight } = target;
                     shouldAutoScrollRef.current =
