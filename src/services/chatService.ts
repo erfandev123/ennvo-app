@@ -628,6 +628,27 @@ export const loadOlderMessages = async (
   }
 };
 
+/**
+ * Fetches the newest messages once.
+ *
+ * The live stream can take a moment to connect after a cold start (the app
+ * was opened from a notification). This fetch shows the history right away
+ * instead of an empty chat.
+ */
+export const refreshMessages = async (conversationId: string, count = 30): Promise<Message[]> => {
+  try {
+    const q = query(
+      collection(db, 'conversations', conversationId, 'messages'),
+      orderBy('createdAt', 'desc'),
+      limit(count)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Message)).reverse();
+  } catch (e) {
+    return [];
+  }
+};
+
 export const subscribeMessages = (conversationId: string, callback: (messages: Message[]) => void, limitCount: number = 20) => {
   // 1. Instant Offline Cache Load
   try {

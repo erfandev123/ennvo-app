@@ -123,19 +123,20 @@ public class CallActivity extends BridgeActivity {
             web.addJavascriptInterface(new CallBridge(), "AndroidCallScreen");
         } catch (Exception ignored) { }
 
-        // The system bars are visible, so the call page is padded by them and
-        // only the extra cutout height is published to the web layer.
+        // The call page fills the whole screen, the phone's bars are drawn on
+        // top of it. The web layer pads its own content with the published
+        // inset.
         View content = findViewById(android.R.id.content);
         if (content != null) {
             ViewCompat.setOnApplyWindowInsetsListener(content, (v, insets) -> {
                 Insets cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout());
                 Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
-                int extraTop = Math.max(0, cutout.top - bars.top);
+                v.setPadding(bars.left, 0, bars.right, 0);
+                int cssTop = bars.top + Math.max(0, cutout.top - bars.top);
                 float density = getResources().getDisplayMetrics().density;
                 runJs("(function(){var s=document.documentElement.style;"
-                        + "s.setProperty('--safe-area-inset-top','" + (extraTop / density) + "px');"
-                        + "s.setProperty('--safe-area-inset-bottom','0px');})()");
+                        + "s.setProperty('--safe-area-inset-top','" + (cssTop / density) + "px');"
+                        + "s.setProperty('--safe-area-inset-bottom','" + (bars.bottom / density) + "px');})()");
                 return insets;
             });
             content.requestApplyInsets();

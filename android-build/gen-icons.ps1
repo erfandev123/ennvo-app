@@ -92,7 +92,7 @@ function Save-FlatIcon {
         [System.Drawing.Color]::FromArgb(255, 20, 121, 214))
     $g.FillRectangle($brush, 0, 0, $size, $size)
 
-    $inner = [int]($size * 0.62)
+    $inner = [int]($size * 0.58)
     $off = [int](($size - $inner) / 2)
     $g.DrawImage($mark, (New-Object System.Drawing.Rectangle($off, $off, $inner, $inner)))
 
@@ -133,7 +133,7 @@ foreach ($key in $sizes.Keys) {
     $fgp.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
     $fgp.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
     $fgp.Clear([System.Drawing.Color]::Transparent)
-    $inner = [int]($fg * 0.58)
+    $inner = [int]($fg * 0.42)
     $off = [int](($fg - $inner) / 2)
     $fgp.DrawImage($mark, (New-Object System.Drawing.Rectangle($off, $off, $inner, $inner)))
     $fgp.Dispose()
@@ -154,7 +154,7 @@ function Save-JpegOnBlack {
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
     $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
     $g.Clear([System.Drawing.Color]::Black)
-    $inner = [int]($w * 0.62)
+    $inner = [int]($w * 0.55)
     $off = [int](($w - $inner) / 2)
     $g.DrawImage($mark, (New-Object System.Drawing.Rectangle($off, $off, $inner, $inner)))
     $g.Dispose()

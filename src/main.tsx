@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { initAppLinks } from './services/appLinks';
+import { applyPendingOpen } from './services/pendingOpen';
 
 /* ------------------------------------------------------------------ *
  * 1. Theme first, before anything paints (no white flash in dark mode)
@@ -75,6 +76,12 @@ warmUp();
  * ------------------------------------------------------------------ */
 const container = document.getElementById('root');
 if (container) {
+  // A notification tap is applied before the first render: the app opens
+  // straight in the chat or on the activity instead of showing the reels feed
+  // for a moment first.
+  try {
+    applyPendingOpen();
+  } catch (e) {}
   createRoot(container).render(<App />);
 }
 

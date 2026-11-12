@@ -111,6 +111,8 @@ const isUserInRollout = (uid: string, percent: number): boolean => {
 };
 
 // OTA Updater helper
+const OTA_VERSION_KEY = 'ennvo_ota_version';
+
 export const handleOtaUpdate = async (config: AndroidAppConfig, uid: string = 'guest') => {
   if (!config.ota?.enabled || !config.ota.bundleUrl) return;
 
@@ -121,6 +123,12 @@ export const handleOtaUpdate = async (config: AndroidAppConfig, uid: string = 'g
     if (nativeCode < config.ota.minNativeVersionCode) {
       return; // Native APK too old for this web bundle
     }
+
+    // Already applied this bundle: nothing to do.
+    try {
+      const applied = localStorage.getItem(OTA_VERSION_KEY);
+      if (applied && applied === config.ota.version) return;
+    } catch (e) {}
 
     if (!isUserInRollout(uid, config.ota.rolloutPercent)) {
       return;
@@ -140,8 +148,20 @@ export const handleOtaUpdate = async (config: AndroidAppConfig, uid: string = 'g
       });
 
       if (downloaded) {
-        console.log('[OTA] Downloaded bundle successfully, queuing for next reload:', config.ota.version);
-        // Will be applied automatically or on next cold launch
+        console.log('[OTA] Bundle downloaded, applying it now:', config.ota.version);
+        try { localStorage.setItem(OTA_VERSION_KEY, config.ota.version || ''); } catch (e) {}
+        // The new bundle is used right away, so an update is live after a
+        // restart instead of after the next app update from the store.
+        try {
+          if (downloaded?.id && typeof CapacitorUpdater.set === 'function') {
+            // set() switches to the bundle and reloads the app.
+            await CapacitorUpdater.set({ id: downloaded.id });
+          } else if (typeof CapacitorUpdater.reload === 'function') {
+            setTimeout(() => CapacitorUpdater.reload(), 400);
+          }
+        } catch (e) {
+          console.warn('[OTA] Applying the bundle failed, it will be used on the next start:', e);
+        }
       }
     }
   } catch (e) {

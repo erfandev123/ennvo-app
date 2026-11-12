@@ -470,12 +470,18 @@ function wireUi() {
 
   const muteBtn = $<HTMLButtonElement>('mute');
   let muted = false;
+  const showIcon = (el: Element | null | undefined, visible: boolean) => {
+    if (!el) return;
+    // "hidden" is a boolean attribute: hidden="false" still hides the icon.
+    if (visible) el.removeAttribute('hidden');
+    else el.setAttribute('hidden', '');
+  };
   muteBtn.onclick = () => {
     muted = !muted;
     setAudioMuted(muted);
     muteBtn.classList.toggle('is-on', muted);
-    muteBtn.querySelector('.icon-mic')?.setAttribute('hidden', muted ? '' : 'false');
-    muteBtn.querySelector('.icon-mic-off')?.setAttribute('hidden', muted ? 'false' : '');
+    showIcon(muteBtn.querySelector('.icon-mic'), !muted);
+    showIcon(muteBtn.querySelector('.icon-mic-off'), muted);
     muteBtn.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
     (muteBtn.parentElement?.querySelector('.label') as HTMLElement).textContent = muted
       ? 'Unmute'
@@ -502,8 +508,8 @@ function wireUi() {
     cameraOff = !cameraOff;
     setVideoDisabled(cameraOff);
     cameraBtn.classList.toggle('is-on', cameraOff);
-    cameraBtn.querySelector('.icon-cam')?.setAttribute('hidden', cameraOff ? '' : 'false');
-    cameraBtn.querySelector('.icon-cam-off')?.setAttribute('hidden', cameraOff ? 'false' : '');
+    showIcon(cameraBtn.querySelector('.icon-cam'), !cameraOff);
+    showIcon(cameraBtn.querySelector('.icon-cam-off'), cameraOff);
     (cameraBtn.parentElement?.querySelector('.label') as HTMLElement).textContent =
       cameraOff ? 'Cam off' : 'Camera';
   };

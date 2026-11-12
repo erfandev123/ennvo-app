@@ -154,6 +154,19 @@ jobs:
           "$BT/apksigner" verify --print-certs "$RUNNER_TEMP/out/Ennvo-1.9.0.apk" | grep -i "SHA-256" || true
           ls -lh "$RUNNER_TEMP/out"
 
+      - name: Publish the web bundle for the in-app updater
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          # The installed app updates itself: the web build is uploaded and the
+          # app config in Firestore points to it, so a new version is live
+          # without a new APK from the store.
+          (cd dist && zip -qr "$RUNNER_TEMP/ennvo-web.zip" .)
+          VERSION_NAME=$(grep -oP 'versionName\s+"\K[^"]+' android/app/build.gradle | head -n 1)
+          CODE=$(grep -oP 'versionCode\s+\K[0-9]+' android/app/build.gradle | head -n 1)
+          node scripts/publish-ota.mjs "$RUNNER_TEMP/ennvo-web.zip" "${VERSION_NAME}+${GITHUB_SHA::7}" "${CODE:-1}"
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:

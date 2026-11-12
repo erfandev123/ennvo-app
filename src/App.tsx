@@ -63,6 +63,7 @@ import {
 } from './services/notificationCenter';
 import { registerNativePushAndReplies, unregisterNativePush } from './services/nativePushReplies';
 import { initDeepLinkListeners, openFromLink } from './services/deepLinkService';
+import { applyPendingOpen } from './services/pendingOpen';
 import { subscribeAppConfig, AndroidAppConfig, notifyAppReady } from './services/appConfigService';
 import { ErrorBoundary, initGlobalErrorHandlers } from './components/ErrorBoundary';
 import { 
@@ -366,6 +367,15 @@ export default function App() {
     };
   }, []);
 
+  // Tell the pages that are still mounted (the reels feed for example) that
+  // they are not visible any more, so they can stop their sound.
+  useEffect(() => {
+    if (currentPage === 'home') return;
+    try {
+      window.dispatchEvent(new CustomEvent('ennvo:page-hidden'));
+    } catch (e) {}
+  }, [currentPage]);
+
   // The notification center watches the conversations and the activities while
   // the app is open: it plays the sound and shows the in-app toast. Without
   // this, no in-app notification ever appears.
@@ -395,36 +405,9 @@ export default function App() {
     // The native side calls window.onNativeOpen() when a notification is tapped
     // (see MainActivity.handleIntent -> runJs("window.onNativeOpen&&...")).
     (window as any).onNativeOpen = () => {
-      try {
-        const pending = bridge.consumePendingOpen();
-        if (!pending) return;
-        const store = useAppStore.getState();
-
-        // Activity notification with a direct target (post/reel/story/profile).
-        // Route through the in-app deep-link router so Back closes the overlay
-        // instead of reloading the app.
-        if (pending.url) {
-          import('./services/deepLinkService')
-            .then((m) => m.openFromLink(pending.url as string))
-            .catch(() => {});
-          return;
-        }
-
-        if (pending.type === 'activity' || pending.page === 'activity') {
-          store.setCurrentPage('notifications');
-          return;
-        }
-
-        if (pending.convId) {
-          store.pushPage('messages');
-          store.setActiveChat(pending.convId);
-          return;
-        }
-
-        if (pending.page) store.setCurrentPage(pending.page as any);
-      } catch (e) {
-        console.warn('[Native] onNativeOpen error:', e);
-      }
+      // The same helper that runs before the first render, so a warm start
+      // opens the chat / activity just as fast.
+      applyPendingOpen(true);
     };
 
     // A notification that carries a deep link (activity, profile, post ...) is

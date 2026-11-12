@@ -34,6 +34,18 @@ const config: CapacitorConfig = {
     },
     StatusBar: {
       overlaysWebView: true
+    },
+    // The app updates itself: the bundle is downloaded from the config in
+    // Firestore and applied right away, so a new version is live without
+    // waiting for a new APK from the store.
+    CapacitorUpdater: {
+      appId: 'ennvo-android',
+      autoUpdate: false,
+      directUpdate: false,
+      keepUrlPathAfterReload: false,
+      autoDeleteFailed: true,
+      autoDeletePrevious: true,
+      periodCheckDelay: 0
     }
   }
 };

@@ -216,19 +216,7 @@ button:focus-visible {
 }
 
 .avatar-ring {
-  position: absolute;
-  z-index: 1;
-  inset: -4px;
-  border-radius: 999px;
-  border: 2px solid rgba(125, 211, 252, 0.45);
-  opacity: 0;
-  transform: scale(0.94);
-}
-
-/* Ringing: the avatar gently breathes and the ring pulses. */
-.call.is-incoming .avatar-ring {
-  opacity: 1;
-  animation: ringPulse 2s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+  display: none;
 }
 
 .call.is-incoming .avatar-wrap {

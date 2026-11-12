@@ -219,6 +219,29 @@ export default function Reels() {
     return () => unsubscribe();
   }, [currentUser, setCachedReels]);
 
+  // The page stays mounted when the user opens another screen, so the sound
+  // has to be stopped explicitly. Otherwise the reels keep playing in the
+  // background.
+  useEffect(() => {
+    const stopAll = () => {
+      try {
+        document.querySelectorAll('video').forEach((v) => {
+          try { v.pause(); } catch (e) {}
+        });
+        document.querySelectorAll('audio').forEach((a) => {
+          try { a.pause(); } catch (e) {}
+        });
+      } catch (e) {}
+    };
+    window.addEventListener('ennvo:page-hidden', stopAll);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stopAll();
+    });
+    return () => {
+      window.removeEventListener('ennvo:page-hidden', stopAll);
+    };
+  }, []);
+
   const filteredReels = useMemo(() => {
     const notInterested = getNotInterestedIds();
     // 1. Filter out private and not-interested items

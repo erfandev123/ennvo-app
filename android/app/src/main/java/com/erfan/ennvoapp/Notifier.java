@@ -108,10 +108,10 @@ public class Notifier {
         calls.setBypassDnd(true);
         nm.createNotificationChannel(calls);
 
-        // Activity notifications (likes, comments, follows) make a quiet
-        // sound but never cover the app the user is in: a heads-up card is
-        // only shown for calls and chat messages.
-        NotificationChannel activityChannel = new NotificationChannel(ACT_CH, "Activity", NotificationManager.IMPORTANCE_DEFAULT);
+        // Activity notifications (likes, comments, follows) play a quiet sound
+        // but never cover the app the user is in: a heads-up card is only
+        // shown for calls and chat messages.
+        NotificationChannel activityChannel = new NotificationChannel(ACT_CH, "Activity", NotificationManager.IMPORTANCE_LOW);
         activityChannel.enableVibration(true);
         activityChannel.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), null);
         activityChannel.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
@@ -402,7 +402,7 @@ public class Notifier {
                     .setContentTitle(secret ? APP : clean(title == null ? APP : title))
                     .setContentText(secret ? "You have a new notification" : (body == null ? "" : body))
                     .setCategory(NotificationCompat.CATEGORY_SOCIAL)
-                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
                     .setAutoCancel(true)
                     .setOnlyAlertOnce(false)
                     .setContentIntent(open(ctx, requestCode, "", "", safeUrl));

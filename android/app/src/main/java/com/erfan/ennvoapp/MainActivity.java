@@ -258,27 +258,28 @@ public class MainActivity extends BridgeActivity {
             Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
             boolean keyboard = insets.isVisible(WindowInsetsCompat.Type.ime()) && ime.bottom > 0;
 
-            // The status bar and the navigation bar are visible, so the
-            // content is padded by them. The keyboard replaces the navigation
-            // bar when it is open.
-            int top = bars.top;
+            // The app fills the whole screen and the phone's own bars are drawn
+            // on top of it: the status bar with the clock and the navigation
+            // bar with back / home / recents stay visible, but the app draws
+            // behind them. The web app pads its own headers with the published
+            // inset, so nothing ends up under the bars.
             int left = Math.max(cutout.left, bars.left);
             int right = Math.max(cutout.right, bars.right);
-            int bottom = keyboard ? ime.bottom : bars.bottom;
+            int bottom = keyboard ? ime.bottom : 0;
 
-            v.setPadding(left, top, right, bottom);
+            v.setPadding(left, 0, right, bottom);
 
             float density = getResources().getDisplayMetrics().density;
-            // Only the part of the cutout that the status bar does not already
-            // cover is published, so the web app does not add the same inset
-            // twice.
-            int extraTop = Math.max(0, cutout.top - bars.top);
-            if (extraTop != lastBarsTop || bottom != lastBarsBottom) {
-                lastBarsTop = extraTop;
-                lastBarsBottom = bottom;
+            // The full height of the status bar (plus the part of the cutout
+            // that the bar does not cover) and of the navigation bar.
+            int cssTop = bars.top + Math.max(0, cutout.top - bars.top);
+            int cssBottom = keyboard ? 0 : bars.bottom;
+            if (cssTop != lastBarsTop || cssBottom != lastBarsBottom) {
+                lastBarsTop = cssTop;
+                lastBarsBottom = cssBottom;
                 runJs("(function(){var s=document.documentElement.style;"
-                        + "s.setProperty('--safe-area-inset-top','" + (extraTop / density) + "px');"
-                        + "s.setProperty('--safe-area-inset-bottom','0px');"
+                        + "s.setProperty('--safe-area-inset-top','" + (cssTop / density) + "px');"
+                        + "s.setProperty('--safe-area-inset-bottom','" + (cssBottom / density) + "px');"
                         + "s.setProperty('--safe-area-inset-left','" + (left / density) + "px');"
                         + "s.setProperty('--safe-area-inset-right','" + (right / density) + "px');"
                         + "s.setProperty('--keyboard-inset','" + (bottom / density) + "px');})()");

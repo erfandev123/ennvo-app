@@ -2826,6 +2826,21 @@ export default function Messages() {
       );
     }
 
+    // The chat was opened from a notification: fetch the history once right
+    // away so the conversation is never empty while the live stream connects.
+    import("../services/chatService").then((m) =>
+      m.refreshMessages(activeChat, 30).then((fresh) => {
+        if (!fresh || fresh.length === 0) return;
+        setMessagesCache((prev) => {
+          const current = prev[activeChat] || [];
+          const known = new Set(current.map((c: any) => c.id));
+          const missing = fresh.filter((f: any) => !known.has(f.id));
+          if (!missing.length) return prev;
+          return { ...prev, [activeChat]: [...missing, ...current] };
+        });
+      })
+    );
+
     const unsubscribe = subscribeMessages(
       activeChat,
       (newMsgs) => {
@@ -5271,11 +5286,11 @@ export default function Messages() {
                         loading="eager"
                         decoding="async"
                         fetchPriority="high"
-                        className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none object-cover object-center"
+                        className="absolute left-0 right-0 top-0 w-full pointer-events-none z-0 select-none object-cover object-top"
                         style={{
-                          // The wallpaper always fills the chat pane. It used to be
-                          // pinned to 100lvh, so it was cut off as soon as the
-                          // keyboard shrank the pane.
+                          // 100lvh = the largest viewport. The wallpaper keeps its
+                          // size when the keyboard opens, so it is never cut.
+                          height: '100lvh',
                           filter: activeConvThemeBlur ? `blur(18px) brightness(${activeConvThemeBrightness})` : `brightness(${activeConvThemeBrightness})`,
                           transform: activeConvThemeBlur ? 'scale(1.10)' : 'scale(1)',
                         }}
