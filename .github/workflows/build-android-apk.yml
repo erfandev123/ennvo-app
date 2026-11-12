@@ -154,20 +154,13 @@ jobs:
           "$BT/apksigner" verify --print-certs "$RUNNER_TEMP/out/Ennvo-1.9.0.apk" | grep -i "SHA-256" || true
           ls -lh "$RUNNER_TEMP/out"
 
-      - name: Publish the web bundle for the in-app updater
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          OTA_BACKEND_URL: ${{ secrets.OTA_BACKEND_URL }}
+      - name: Prepare the web bundle for the in-app updater
         run: |
-          set -uo pipefail
-          # The installed app updates itself: the web build is uploaded and the
-          # app config in Firestore points to it, so a new version is live
-          # without a new APK from the store. A failure here must not stop the
-          # APK release.
-          (cd dist && zip -qr "$RUNNER_TEMP/ennvo-web.zip" .)
-          VERSION_NAME=$(grep -oP 'versionName\s+"\K[^"]+' android/app/build.gradle | head -n 1)
-          CODE=$(grep -oP 'versionCode\s+\K[0-9]+' android/app/build.gradle | head -n 1)
-          node scripts/publish-ota.mjs "$RUNNER_TEMP/ennvo-web.zip" "${VERSION_NAME}+${GITHUB_SHA::7}" "${CODE:-1}" || echo "::warning::The OTA bundle was not published."
+          set -euo pipefail
+          # The installed app updates itself: the web build is published next
+          # to the APK and the app config in Firestore points to it.
+          (cd dist && zip -qr "$RUNNER_TEMP/out/Ennvo-web-1.9.0.zip" .)
+          ls -lh "$RUNNER_TEMP/out"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -185,6 +178,19 @@ jobs:
           make_latest: true
           generate_release_notes: true
           fail_on_unmatched_files: true
-          files: ${{ runner.temp }}/out/Ennvo-1.9.0.apk
+          files: |
+            ${{ runner.temp }}/out/Ennvo-1.9.0.apk
+            ${{ runner.temp }}/out/Ennvo-web-1.9.0.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Announce the web bundle to the installed apps
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -uo pipefail
+          # The app reads this config, downloads the bundle and switches to it.
+          VERSION_NAME=$(grep -oP 'versionName\s+"\K[^"]+' android/app/build.gradle | head -n 1)
+          CODE=$(grep -oP 'versionCode\s+\K[0-9]+' android/app/build.gradle | head -n 1)
+          URL="https://github.com/${{ github.repository }}/releases/download/v1.9.0/Ennvo-web-1.9.0.zip"
+          node scripts/publish-ota.mjs "${VERSION_NAME}+${GITHUB_SHA::7}" "$URL" "${CODE:-1}" || echo "::warning::The OTA bundle was not announced."
