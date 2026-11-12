@@ -38,6 +38,27 @@ public class CallActivity extends BridgeActivity {
     static volatile CallActivity active = null;
 
     private final Handler ui = new Handler(Looper.getMainLooper());
+
+    /**
+     * Capacitor's BridgeActivity forces its own AppTheme in onCreate, which
+     * would replace the call theme from the manifest and flash a light
+     * background before the WebView paints. Keep ours.
+     */
+    @Override
+    public void setTheme(int resid) {
+        if (isCapacitorTheme(resid)) return;
+        super.setTheme(resid);
+    }
+
+    private boolean isCapacitorTheme(int resid) {
+        try {
+            String name = getResources().getResourceEntryName(resid);
+            if (!"AppTheme_NoActionBar".equals(name)) return false;
+            return !getPackageName().equals(getResources().getResourcePackageName(resid));
+        } catch (Exception e) {
+            return false;
+        }
+    }
     private volatile String callId = "";
     private volatile String callName = "";
     private volatile String callType = "voice";
@@ -271,6 +292,15 @@ public class CallActivity extends BridgeActivity {
                 : new String[]{Manifest.permission.RECORD_AUDIO};
     }
 
+    private boolean hasCallPermissions() {
+        for (String permission : neededCallPermissions()) {
+            if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public class CallBridge {
         @JavascriptInterface
         public String getCallInfo() {
@@ -294,12 +324,7 @@ public class CallActivity extends BridgeActivity {
 
         @JavascriptInterface
         public boolean hasCallPermissions() {
-            for (String permission : neededCallPermissions()) {
-                if (ContextCompat.checkSelfPermission(CallActivity.this, permission) != PackageManager.PERMISSION_GRANTED) {
-                    return false;
-                }
-            }
-            return true;
+            return CallActivity.this.hasCallPermissions();
         }
 
         @JavascriptInterface

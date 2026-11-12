@@ -8,6 +8,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
@@ -68,19 +69,44 @@ public class MainActivity extends BridgeActivity {
 
     private final Runnable splashTimeout = () -> splashHold = false;
 
+    /**
+     * Capacitor's BridgeActivity forces its own AppTheme in onCreate. That
+     * theme drops the native splash background and the transparent system bars
+     * this app relies on, so it is ignored and the theme from the manifest
+     * (AppTheme.NoActionBarLaunch) stays in place.
+     */
+    @Override
+    public void setTheme(int resid) {
+        if (isCapacitorTheme(resid)) return;
+        super.setTheme(resid);
+    }
+
+    private boolean isCapacitorTheme(int resid) {
+        try {
+            String name = getResources().getResourceEntryName(resid);
+            if (!"AppTheme_NoActionBar".equals(name)) return false;
+            return !getPackageName().equals(getResources().getResourcePackageName(resid));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     @Override
     public void onCreate(Bundle saved) {
         // Fast native splash. The web page calls Android.appReady() after its
         // first painted frame, so the hand-off is seamless and there is no
         // second splash drawn by the web app.
         SplashScreen splash = SplashScreen.installSplashScreen(this);
+
+        super.onCreate(saved);
+
+        // The keep-on-screen condition needs the content view, so it can only
+        // be installed once super.onCreate() has built the layout.
         splash.setKeepOnScreenCondition(() -> splashHold);
         splash.setOnExitAnimationListener(vp -> vp.getView().animate().alpha(0f).setDuration(120)
                 .withEndAction(() -> vp.remove()).start());
 
-        super.onCreate(saved);
-
-        // Never keep the native splash longer than 1.2 seconds, even if a page
+        // Never keep the native splash longer than 3.5 seconds, even if a page
         // fails to report ready.
         ui.postDelayed(splashTimeout, 3500);
 
@@ -88,6 +114,9 @@ public class MainActivity extends BridgeActivity {
         Notifier.channels(this);
 
         Window window = getWindow();
+        // Black window background: the web app is dark, so a white frame
+        // between the splash and the first painted pixel is never visible.
+        window.setBackgroundDrawable(new ColorDrawable(Color.BLACK));
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         WindowCompat.setDecorFitsSystemWindows(window, false);
         window.setStatusBarColor(Color.TRANSPARENT);

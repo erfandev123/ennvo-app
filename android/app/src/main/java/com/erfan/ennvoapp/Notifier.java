@@ -320,8 +320,10 @@ public class Notifier {
             String caller = name == null ? "Ennvo User" : name;
             String id = callId == null ? "" : callId;
 
-            PendingIntent screen = callIntent(ctx, 77, "open", id, caller, type, avatar);
-            PendingIntent answer = callIntent(ctx, 78, "answer", id, caller, type, avatar);
+            // The intent carries the avatar URL (the call page renders it as an
+            // image); the downloaded bitmap is only used for the notification.
+            PendingIntent screen = callIntent(ctx, 77, "open", id, caller, type, avatarUrl);
+            PendingIntent answer = callIntent(ctx, 78, "answer", id, caller, type, avatarUrl);
             PendingIntent decline = PendingIntent.getBroadcast(ctx, 79,
                     new Intent(ctx, ReplyReceiver.class)
                             .setAction("decline_native")
