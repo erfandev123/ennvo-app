@@ -47,12 +47,32 @@ export const notifyUser = (payload: PushPayload): void => {
       const user = auth.currentUser;
       if (!user) return;
       const token = await user.getIdToken();
-      await fetch(`${gatewayBase()}/api/push`, {
+      const res = await fetch(`${gatewayBase()}/api/push`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),
         keepalive: true,
       });
+
+      if (!res.ok) {
+        console.warn('[push] the gateway answered', res.status);
+        return;
+      }
+
+      const data = await res.json().catch(() => null);
+      if (data && data.sent === 0) {
+        // The other phone has no device token (yet). It registers itself when
+        // the app starts, so the push is sent once more a moment later.
+        console.warn('[push] no device took the push, retrying once:', data.reason || '');
+        setTimeout(() => {
+          fetch(`${gatewayBase()}/api/push`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify(payload),
+            keepalive: true,
+          }).catch(() => {});
+        }, 4000);
+      }
     } catch (err) {
       console.warn('[push] gateway notice:', err);
     }

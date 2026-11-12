@@ -134,10 +134,10 @@ const BottomNav = memo(() => {
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-          className={`pointer-events-auto select-none flex items-center justify-between h-[52px] w-auto min-w-[285px] max-w-[330px] px-2 py-1 rounded-full backdrop-blur-2xl transition-colors duration-200 touch-none ${
+          className={`pointer-events-auto select-none flex items-center justify-between h-[56px] w-auto min-w-[292px] max-w-[340px] px-2 py-1 rounded-full backdrop-blur-2xl transition-colors duration-200 touch-none ${
             isDarkNav
-              ? 'bg-black/80 border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.15)] text-white'
-              : 'bg-white/90 border border-sky-100 shadow-[0_8px_30px_rgba(14,165,233,0.12),0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_1.5px_rgba(255,255,255,0.95)] text-slate-800'
+              ? 'bg-black/82 border border-white/15 shadow-[0_10px_38px_rgba(0,0,0,0.55),inset_0_1px_1px_rgba(255,255,255,0.18)] text-white'
+              : 'bg-white/92 border border-sky-100 shadow-[0_10px_34px_rgba(14,165,233,0.14),0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_1.5px_rgba(255,255,255,0.95)] text-slate-800'
           }`}
         >
           {navItems.map((item) => {
@@ -149,7 +149,7 @@ const BottomNav = memo(() => {
                 key={item.id}
                 type="button"
                 onClick={() => handleItemClick(item.id)}
-                className="relative flex-1 h-full flex items-center justify-center px-1 rounded-full cursor-pointer transition-transform"
+                className="relative flex-1 h-full flex items-center justify-center px-1 rounded-full cursor-pointer transition-transform active:scale-95"
                 title={item.label}
               >
                 {/* iPhone Smooth Fluid Pill with Haptic Spring */}
@@ -159,7 +159,7 @@ const BottomNav = memo(() => {
                     transition={{ type: 'spring', stiffness: 520, damping: 38 }}
                     className={`absolute inset-1 rounded-full ${
                       isDarkNav 
-                        ? 'bg-white/20 border border-white/25 shadow-xs' 
+                        ? 'bg-white/18 border border-white/25 shadow-xs' 
                         : 'bg-sky-500/12 border border-sky-300/50 shadow-xs'
                     }`}
                   />
@@ -216,10 +216,10 @@ const BottomNav = memo(() => {
   }
 
   // Classic Standard Navigation Bar (Uniform styling across all pages, zero purple)
-  const classicNavBgClass = isDarkNav ? 'bg-black border-white/10 text-white' : 'bg-white border-gray-100 shadow-md text-gray-900';
+  const classicNavBgClass = isDarkNav ? 'bg-black/92 border-white/10 text-white' : 'bg-white/92 border-gray-100/90 shadow-[0_-2px_18px_rgba(0,0,0,0.06)] text-gray-900';
 
   return (
-    <div className={`md:hidden fixed bottom-0 left-0 right-0 bottom-nav-classic ${classicNavBgClass} backdrop-blur-xl border-t flex items-center justify-around h-[calc(54px+var(--app-safe-bottom))] pb-[var(--app-safe-bottom)] z-[60] px-3 select-none gpu-accelerated`}>
+    <div className={`md:hidden fixed bottom-0 left-0 right-0 bottom-nav-classic ${classicNavBgClass} backdrop-blur-2xl border-t flex items-center justify-around h-[calc(58px+var(--app-safe-bottom))] pb-[var(--app-safe-bottom)] z-[60] px-3 select-none gpu-accelerated`}>
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = currentPage === item.id && (item.id !== 'profile' || viewingUser === null);
@@ -235,14 +235,22 @@ const BottomNav = memo(() => {
           <button
             key={item.id}
             onClick={() => handleItemClick(item.id)}
-            className="flex items-center justify-center flex-1 h-full relative transform-gpu transition-transform duration-75 ease-out select-none touch-manipulation cursor-pointer"
+            className="flex items-center justify-center flex-1 h-full relative transform-gpu transition-transform duration-75 ease-out select-none touch-manipulation cursor-pointer active:scale-95"
           >
+            {/* The little dot under the active tab, like the phone apps. */}
+            <span
+              className={`absolute bottom-1.5 w-1 h-1 rounded-full transition-all duration-200 ${
+                isActive
+                  ? isDarkNav ? 'bg-white scale-100 opacity-100' : 'bg-sky-500 scale-100 opacity-100'
+                  : 'scale-0 opacity-0'
+              }`}
+            />
             <div className="relative flex flex-col items-center justify-center pointer-events-none">
               {item.id === 'profile' ? (
                 <div className={`rounded-full transition-all duration-150 ${isActive ? (isDarkNav ? 'ring-2 ring-sky-400 p-[1px]' : 'ring-2 ring-sky-500 p-[1px]') : ''}`}>
                   <img 
                     src={currentUser?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || '')}&background=random`} 
-                    className="w-[22px] h-[22px] rounded-full object-cover shadow-2xs" 
+                    className="w-[23px] h-[23px] rounded-full object-cover shadow-2xs" 
                     alt="Profile" 
                     loading="lazy" 
                     decoding="async" 
@@ -250,17 +258,17 @@ const BottomNav = memo(() => {
                   />
                 </div>
               ) : item.id === 'create' ? (
-                <div className="w-[36px] h-[28px] rounded-lg bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-sky-500/25">
+                <div className="w-[38px] h-[30px] rounded-xl bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-sky-500/25">
                   <NavCreateIcon 
-                    size={17}
+                    size={18}
                     className="text-white" 
                   />
                 </div>
               ) : (
                 <Icon 
-                  size={22}
+                  size={23} 
                   filled={isActive}
-                  className={`transition-all duration-150 ${getIconColor()}`} 
+                  className={`transition-all duration-150 ${getIconColor()} ${isActive ? 'scale-105' : ''}`} 
                 />
               )}
               

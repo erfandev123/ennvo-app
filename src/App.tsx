@@ -716,10 +716,30 @@ export default function App() {
       }).catch(() => {});
     } catch (e) {}
 
+    // Every time the app comes back to the front the device token is checked.
+    // Firebase rotates it from time to time and a phone with an old token
+    // never receives a push.
+    let capResumeSub: any = null;
+    try {
+      CapApp.addListener('resume', () => {
+        const uid = useAppStore.getState().currentUser?.uid;
+        if (uid) {
+          import('./services/nativePushReplies')
+            .then((m) => m.refreshNativePushToken(uid))
+            .catch(() => {});
+        }
+      }).then(sub => {
+        capResumeSub = sub;
+      }).catch(() => {});
+    } catch (e) {}
+
     return () => {
       window.removeEventListener('popstate', handleNavigationBack);
       if (capBackSub && capBackSub.remove) {
         capBackSub.remove();
+      }
+      if (capResumeSub && capResumeSub.remove) {
+        capResumeSub.remove();
       }
     };
   }, []);

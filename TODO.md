@@ -26,6 +26,7 @@ needs work.
 | 2.3 | The splash symbol is sharp on every screen density | done |
 | 2.4 | The launch screen is black with the logo and the "Ennvo" wordmark, it fades out with the first frame | done |
 | 2.5 | No React / web splash, the splash is pure Java | done |
+| 2.6 | Exactly one splash: the system splash only paints the black background, the logo and the wordmark are drawn by the app itself | done |
 
 ## 3. Notifications
 
@@ -38,6 +39,9 @@ needs work.
 | 3.5 | The in-app notification (toast) shows again | done |
 | 3.6 | The notification of the chat that is open right now is skipped | done |
 | 3.7 | The reply and the decline action on a notification work without the app | done |
+| 3.8 | The device token is written again every time the app comes to the front, so a rotated token never blocks a push | done |
+| 3.9 | The gateway removes device tokens that Firebase does not know any more | done |
+| 3.10 | A push that no device took is sent once more a moment later | done |
 
 ## 4. Chat
 
@@ -55,6 +59,8 @@ needs work.
 | 4.10 | The header has no own bar, the background stays visible | done |
 | 4.11 | Deleting a message removes it everywhere in real time | done |
 | 4.12 | The older messages are loaded with a cursor instead of a full reload | done |
+| 4.13 | The chat does not jump to the top when a message comes in (the guessed row heights are gone) | done |
+| 4.14 | The chat always opens at the newest message, also after Back | done |
 
 ## 5. Calls
 
@@ -94,3 +100,4 @@ needs work.
 | 8.1 | The reel videos are uploaded without a transcode, so a big clip still needs a lot of data. A server side transcode to 720p with faststart would make the feed much lighter | open |
 | 8.2 | The base64 thumbnails inside the post documents make the first feed load heavy. Moving them to the storage would shrink the download a lot | open |
 | 8.3 | The calls could use a real push so the phone rings through the Doze mode without the app being open | open |
+| 8.4 | The Firestore security rules could not be published from the workflow: the service account needs the role "Firebase Rules Admin" on the project. The rules in the repository are newer than the published ones | open |

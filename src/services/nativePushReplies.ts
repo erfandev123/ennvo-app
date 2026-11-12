@@ -169,6 +169,29 @@ export const registerNativePushAndReplies = (uid: string) => {
   w.__flushReplies();
 };
 
+/**
+ * Makes sure the device token of this phone is still registered.
+ *
+ * Firebase rotates the token from time to time. If the phone has an old token
+ * the push for this device is never delivered, so the token is written again
+ * every time the app comes back to the front.
+ */
+export const refreshNativePushToken = async (uid: string) => {
+  if (!uid) return;
+  try {
+    const token = native.getFcmToken();
+    if (!token || typeof token !== 'string' || !token.trim()) return;
+    const clean = token.trim();
+    if (clean === currentFcmToken) return;
+    currentFcmToken = clean;
+    await updateDoc(doc(db, 'users', uid), {
+      fcmTokens: arrayUnion(clean)
+    });
+  } catch (e) {
+    console.warn('[NativePush] The device token could not be refreshed:', e);
+  }
+};
+
 export const unregisterNativePush = async (uid: string) => {
   native.clearNativeConfig();
   if (currentFcmToken && uid) {

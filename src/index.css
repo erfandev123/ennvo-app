@@ -856,10 +856,11 @@ video::-webkit-media-controls-enclosure {
   -webkit-transform: translateZ(0);
 }
 
-/* Chat Message Bubbles Ultra Fast Virtual Performance Optimization */
+/* Chat Message Bubbles Ultra Fast Virtual Performance Optimization
+   No content-visibility here: it makes the browser guess the height of the
+   rows that are off screen, and the chat jumped to the top every time a
+   message came in. The rows are cheap enough without it. */
 .chat-msg-row-opt {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 65px;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
 }

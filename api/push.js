@@ -89,6 +89,33 @@ async function readDoc(path) {
   return res.json();
 }
 
+/* Removes a token that Firebase no longer knows (a reinstall or a token
+   rotation). Without this the list of devices grows and the push fails for
+   the devices that are no longer registered. */
+async function removeToken(userId, token) {
+  try {
+    const token_ = await getAccessToken();
+    const field = `fcmTokens`;
+    const url = `${FIRESTORE}/users/${userId}?updateMask.fieldPaths=${field}`;
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token_}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fieldValue: { arrayValue: { values: [] } } }),
+    });
+    if (!res.ok) return;
+    const doc = await readDoc('users/' + userId);
+    const rest = toArray(doc && doc.fields && doc.fields.fcmTokens).filter((t) => t !== token);
+    const value = { arrayValue: { values: rest.map((t) => ({ stringValue: t })) } };
+    await fetch(`${FIRESTORE}/users/${userId}?updateMask.fieldPaths=${field}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token_}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fieldValue: value }),
+    });
+  } catch (e) {
+    console.warn('[push] could not clean up an old token:', e);
+  }
+}
+
 const toArray = (field) =>
   (field && field.arrayValue && Array.isArray(field.arrayValue.values) ? field.arrayValue.values : [])
     .map((v) => v.stringValue)
@@ -177,6 +204,7 @@ export default async function handler(req, res) {
 
     let sent = 0;
     let failed = 0;
+    const dead = [];
     for (const token of tokens) {
       try {
         const r = await fetch(`https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`, {
@@ -194,13 +222,24 @@ export default async function handler(req, res) {
           sent += 1;
         } else {
           failed += 1;
+          const body = await r.json().catch(() => ({}));
+          const status = (body && body.error && body.error.status) || '';
+          if (status === 'NOT_FOUND' || status === 'UNREGISTERED' || status === 'INVALID_ARGUMENT') {
+            dead.push(token);
+          }
         }
       } catch (err) {
         failed += 1;
       }
     }
 
-    return res.json({ success: true, sent, failed });
+    // Devices that are not registered any more are removed, so the next push
+    // only goes to the phones that really exist.
+    for (const token of dead) {
+      await removeToken(targetUserId, token);
+    }
+
+    return res.json({ success: true, sent, failed, cleaned: dead.length });
   } catch (err) {
     console.error('[push] error:', err);
     return res.status(err.status || 500).json({ error: String(err.message || err).slice(0, 200) });

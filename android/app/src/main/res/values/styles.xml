@@ -20,10 +20,13 @@
     </style>
 
     <!-- Fast native launch screen. Core SplashScreen keeps this on screen until
-         the WebView reports its first painted frame (Android.appReady()). -->
+         the WebView reports its first painted frame (Android.appReady()).
+         The system splash only paints the black background, the logo and the
+         wordmark are drawn by the Ennvo launch screen, so there is exactly one
+         splash and no icon that jumps or disappears. -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splashBackground</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_blank</item>
         <item name="windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
         <item name="android:windowBackground">@color/splashBackground</item>

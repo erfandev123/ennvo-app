@@ -406,35 +406,45 @@ button:focus-visible {
   width: 100%;
 }
 
-/* The call controls sit in one clean rounded panel, like WhatsApp. */
+/* The call controls sit in one clean rounded panel, like WhatsApp. The panel
+   always fits inside the screen, also on a small phone. */
 .actions.controls {
-  gap: 8px;
-  width: min(100% - 36px, 400px);
-  padding: 12px 10px;
+  gap: 4px;
+  width: 100%;
+  max-width: 420px;
+  padding: 10px 8px;
   border-radius: 30px;
   background: rgba(255, 255, 255, 0.09);
   border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
+  overflow: hidden;
 }
 
 .actions.controls .action {
   max-width: 84px;
-  gap: 6px;
+  gap: 5px;
+}
+
+.actions.controls .label {
+  font-size: 10.5px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .actions.controls .round {
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   border: 0;
   background: rgba(255, 255, 255, 0.14);
   box-shadow: none;
 }
 
 .actions.controls .round svg {
-  width: 23px;
-  height: 23px;
+  width: 22px;
+  height: 22px;
 }
 
 .actions.controls .round.hangup {

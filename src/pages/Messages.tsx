@@ -2943,9 +2943,24 @@ export default function Messages() {
 
   useLayoutEffect(() => {
     setMessageLimit(20); // Reset limit when chat changes
-    if (activeChat && messagesContainerRef.current) {
+    if (!activeChat) return;
+    shouldAutoScrollRef.current = true;
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    // The chat always opens at the newest message. The scroll is repeated
+    // after the frame, because the bubbles (and their images) are only laid
+    // out afterwards.
+    const toBottom = () => {
+      if (!messagesContainerRef.current) return;
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-    }
+    };
+    toBottom();
+    const raf = requestAnimationFrame(toBottom);
+    const timer = setTimeout(toBottom, 140);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
   }, [activeChat]);
 
   // Tell the native side which chat is open, so the notification for this very
