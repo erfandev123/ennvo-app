@@ -157,15 +157,17 @@ jobs:
       - name: Publish the web bundle for the in-app updater
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          OTA_BACKEND_URL: ${{ secrets.OTA_BACKEND_URL }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           # The installed app updates itself: the web build is uploaded and the
           # app config in Firestore points to it, so a new version is live
-          # without a new APK from the store.
+          # without a new APK from the store. A failure here must not stop the
+          # APK release.
           (cd dist && zip -qr "$RUNNER_TEMP/ennvo-web.zip" .)
           VERSION_NAME=$(grep -oP 'versionName\s+"\K[^"]+' android/app/build.gradle | head -n 1)
           CODE=$(grep -oP 'versionCode\s+\K[0-9]+' android/app/build.gradle | head -n 1)
-          node scripts/publish-ota.mjs "$RUNNER_TEMP/ennvo-web.zip" "${VERSION_NAME}+${GITHUB_SHA::7}" "${CODE:-1}"
+          node scripts/publish-ota.mjs "$RUNNER_TEMP/ennvo-web.zip" "${VERSION_NAME}+${GITHUB_SHA::7}" "${CODE:-1}" || echo "::warning::The OTA bundle was not published."
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
