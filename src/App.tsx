@@ -97,21 +97,55 @@ const InAppToaster = memo(() => {
     return false;
   }, []);
 
-  useEffect(() => {
-    setInAppToastListener((t) => {
-      // Suppress in-app toast if user is actively typing, or if it's a typing indicator toast
-      if (isUserTyping() || t?.type === 'typing') {
-        return;
-      }
-      setToast(t);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => setToast(null), 4500);
-    });
-
-    return () => {
-      setInAppToastListener(null);
-    };
+  const lastToastRef = useRef<{ key: string; at: number }>({ key: '', at: 0 });
+  const showToast = useCallback((t: any) => {
+    // Suppress in-app toast if the user is actively typing, or if it's a
+    // typing indicator event.
+    if (!t || isUserTyping() || t.type === 'typing') return;
+    // The conversation listener and the FCM forwarding can both announce the
+    // same message. One toast per chat per 3 seconds is enough.
+    const key = t.conversationId || t.url || `${t.actorName}|${t.content}`;
+    const now = Date.now();
+    if (key && lastToastRef.current.key === key && now - lastToastRef.current.at < 3000) return;
+    lastToastRef.current = { key, at: now };
+    setToast(t);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setToast(null), 4500);
   }, [isUserTyping]);
+
+  useEffect(() => {
+    setInAppToastListener(showToast);
+    return () => setInAppToastListener(null);
+  }, [showToast]);
+
+  // The Android shell forwards the FCM payload here while the app is open
+  // (see AppFcmService). This is the reliable in-app notification: it does not
+  // depend on a conversation being inside the live query window.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const d: any = (event as CustomEvent).detail || {};
+      const isMessage = d.type === 'message';
+      showToast({
+        id: `${d.convId || d.url || 'fcm'}-${Date.now()}`,
+        type: isMessage ? 'message' : 'activity',
+        actorName: d.title || 'Ennvo',
+        actorAvatar: d.avatar || '',
+        content: d.body || '',
+        conversationId: d.convId,
+        url: d.url,
+      });
+    };
+    (window as any).onFcmMessage = (raw: string) => {
+      try {
+        window.dispatchEvent(new CustomEvent('ennvo:fcm-inapp', { detail: JSON.parse(raw) }));
+      } catch (e) {}
+    };
+    window.addEventListener('ennvo:fcm-inapp', handler);
+    return () => {
+      window.removeEventListener('ennvo:fcm-inapp', handler);
+      try { delete (window as any).onFcmMessage; } catch (e) {}
+    };
+  }, [showToast]);
 
   if (!toast) return null;
 
@@ -161,6 +195,12 @@ const InAppToaster = memo(() => {
                } catch (e) {
                  console.error(e);
                }
+             } else if (toast.url) {
+               try {
+                 const open = (window as any).__ennvoOpenLink;
+                 if (typeof open === 'function') open(toast.url);
+                 else window.location.assign(toast.url);
+               } catch (e) {}
              } else {
                if (toast.actorId) {
                  setViewingUser({ uid: toast.actorId, name: toast.actorName, avatar: toast.actorAvatar });
@@ -250,6 +290,7 @@ const InAppToaster = memo(() => {
                     {toast.type === 'mention' && 'mentioned you'}
                     {toast.type === 'favorite' && 'saved your post'}
                     {(toast.type as string) === 'repost' && 'reposted your video'}
+                    {!['like', 'comment', 'follow', 'mention', 'favorite', 'repost'].includes(toast.type as string) && (toast.content || 'New notification')}
                   </p>
                 </div>
               )}

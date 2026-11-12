@@ -86,21 +86,36 @@ export const registerNativePushAndReplies = (uid: string) => {
   syncNotifMode();
 
   // 1. Save token helper
-  const handleSaveToken = async (token?: string | null) => {
-    if (!token || typeof token !== 'string' || token.trim().length === 0) return;
-    const cleanToken = token.trim();
-    currentFcmToken = cleanToken;
-
-    // Save FCM token to Firestore user document
+  const writeToken = async (cleanToken: string, attempt = 0): Promise<boolean> => {
     try {
+      // auth may still be restoring the session right after launch; writing
+      // before that fails with permission-denied and the phone then never
+      // receives a push. Retry a few times instead of giving up once.
+      if (!auth.currentUser) throw new Error('auth-not-ready');
       await updateDoc(doc(db, 'users', uid), {
         fcmTokens: arrayUnion(cleanToken)
       });
-    } catch (e) {
+      return true;
+    } catch (e: any) {
+      if (attempt < 5) {
+        await new Promise((r) => setTimeout(r, 700 + attempt * 900));
+        return writeToken(cleanToken, attempt + 1);
+      }
       console.warn('[NativePush] Failed to register FCM token in Firestore:', e);
+      return false;
     }
+  };
 
-    // Register with Express backend for deviceToken and notification callbacks
+  const handleSaveToken = async (token?: string | null) => {
+    if (!token || typeof token !== 'string' || token.trim().length === 0) return;
+    const cleanToken = token.trim();
+
+    const saved = await writeToken(cleanToken);
+    // Only remember the token once it is really in Firestore, otherwise the
+    // resume check would keep skipping a token that was never stored.
+    if (saved) currentFcmToken = cleanToken;
+
+    // Register with the backend for deviceToken and notification callbacks
     const currentMode = native.getNotifMode();
     await registerDeviceWithBackend(uid, cleanToken, currentMode);
   };
@@ -183,10 +198,11 @@ export const refreshNativePushToken = async (uid: string) => {
     if (!token || typeof token !== 'string' || !token.trim()) return;
     const clean = token.trim();
     if (clean === currentFcmToken) return;
-    currentFcmToken = clean;
+    if (!auth.currentUser) return;
     await updateDoc(doc(db, 'users', uid), {
       fcmTokens: arrayUnion(clean)
     });
+    currentFcmToken = clean;
   } catch (e) {
     console.warn('[NativePush] The device token could not be refreshed:', e);
   }

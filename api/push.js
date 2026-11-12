@@ -165,7 +165,12 @@ export default async function handler(req, res) {
       if (!callId) return res.status(400).json({ error: 'callId is required' });
       const callDoc = await readDoc('calls/' + callId);
       const callerId = toStr(callDoc && callDoc.fields && callDoc.fields.callerId);
-      if (callerId !== callerUid) return res.status(403).json({ error: 'Not the caller of this call' });
+      // Fail open when the call document could not be read, so a transient
+      // Firestore hiccup never swallows the ringing push. A readable document
+      // that belongs to somebody else is still rejected.
+      if (callerId && callerId !== callerUid) {
+        return res.status(403).json({ error: 'Not the caller of this call' });
+      }
     }
 
     // A message push is only allowed for a conversation the caller is really
@@ -175,7 +180,11 @@ export default async function handler(req, res) {
       if (!convId) return res.status(400).json({ error: 'convId is required' });
       const convDoc = await readDoc('conversations/' + convId);
       const participants = toArray(convDoc && convDoc.fields && convDoc.fields.participantIds);
-      if (!participants.includes(callerUid)) {
+      // Fail open: if the conversation could not be read (transient Firestore
+      // error), the authenticated caller is still allowed to notify. Only a
+      // conversation that was read and clearly does not contain the caller is
+      // rejected, so a temporary read failure never blocks a real message push.
+      if (participants.length && !participants.includes(callerUid)) {
         return res.status(403).json({ error: 'Not a participant of this conversation' });
       }
     }

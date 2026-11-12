@@ -57,13 +57,14 @@ export default function Reels() {
   const [activeTab, setActiveTab] = useState<'forYou' | 'following'>('forYou');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const followingSet = useMemo(() => new Set(followingIds || []), [followingIds]);
-  const [visibleCount, setVisibleCount] = useState(8);
+  const [visibleCount, setVisibleCount] = useState(6);
   // The reel that is currently in the middle of the screen. The reel behind
   // it is preloaded, so the next one starts without buffering.
   const [activeIndex, setActiveIndex] = useState(0);
-  // Each mounted reel owns a <video>. Keeping that list bounded is what keeps
-  // scrolling smooth after the user has watched dozens of reels.
-  const MAX_MOUNTED_REELS = 24;
+  // Only the reels around the active one are mounted (each one owns a <video>).
+  // The rest of the list is a plain black spacer with the same height, so the
+  // scrollbar and snap points stay intact without hundreds of players alive.
+  const REEL_WINDOW = 4;
   const [seenIds, setSeenIds] = useState<Set<string>>(getSeenReelIds);
   const reelsContainerRef = useRef<HTMLDivElement>(null);
   const initialLoadDone = useRef(false);
@@ -176,7 +177,7 @@ export default function Reels() {
       requestAnimationFrame(() => {
         scrollTickingRef.current = false;
         const { scrollTop, scrollHeight, clientHeight } = currentTarget;
-        if (scrollTop + clientHeight >= scrollHeight - 1600) {
+        if (scrollTop + clientHeight >= scrollHeight - 1200) {
           setVisibleCount(prev => prev + 5);
         }
 
@@ -494,15 +495,22 @@ export default function Reels() {
             <button onClick={() => setActiveTab('forYou')} className="bg-white text-black px-8 py-2.5 rounded-full font-normal">Discover Creators</button>
           </div>
         ) : (
-          filteredReels.slice(0, visibleCount).map((reel, index) => (
-            <div
-              key={reel.id}
-              className="reel-snap-item w-full h-full shrink-0"
-              style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
-            >
-              <ReelItem reel={reel} isNext={index === activeIndex + 1} />
-            </div>
-          ))
+          filteredReels.slice(0, visibleCount).map((reel, index) => {
+            const inWindow = Math.abs(index - activeIndex) <= REEL_WINDOW;
+            return (
+              <div
+                key={reel.id}
+                className="reel-snap-item w-full h-full shrink-0 reel-cv"
+                style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
+              >
+                {inWindow ? (
+                  <ReelItem reel={reel} isNext={index === activeIndex + 1} />
+                ) : (
+                  <div className="w-full h-full bg-black" />
+                )}
+              </div>
+            );
+          })
         )}
       </div>
     </div>

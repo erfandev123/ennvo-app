@@ -449,7 +449,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
           setIsNearScreen(entry.isIntersecting);
         });
       },
-      { rootMargin: '150% 0px' }
+      { rootMargin: '100% 0px' }
     );
     if (containerRef.current) preloadObserver.observe(containerRef.current);
     
@@ -1174,7 +1174,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
               controls={false}
               poster={reel.thumbnailUrl || reel.thumbnail || "data:image/gif;base64,R0lHODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"}
               autoPlay={playing}
-              preload={playing || isNext || isNearScreen ? "auto" : "metadata"}
+              preload={playing || isNext ? "auto" : "metadata"}
               onWaiting={() => setIsBuffering(true)}
               onPlaying={() => setIsBuffering(false)}
               onCanPlay={() => setIsBuffering(false)}
@@ -1418,7 +1418,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
           {/* Vertical Action Buttons (Overlayed on Video - MOBILE ONLY) */}
           {reelsUiStyle === 'tiktok' ? (
             /* TikTok Clean UI Vertical Action Stack (Matches User Image) */
-            <div className={`md:hidden absolute right-2.5 ${reelBottomSpacing} flex flex-col items-center space-y-4 z-40 pointer-events-auto transition-all duration-300 ${isCleanZoom || is2XSpeed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+            <div className={`md:hidden absolute right-2.5 ${reelBottomSpacing} flex flex-col items-center space-y-5 z-40 pointer-events-auto transition-all duration-300 ${isCleanZoom || is2XSpeed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
               {/* 1. Profile Avatar with Red/Pink + Follow Badge */}
               <div className="relative mb-1 flex items-center justify-center">
                 <div 
@@ -1428,7 +1428,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                     if (onClose) onClose();
                     pushPage('profile');
                   }}
-                  className="w-[48px] h-[48px] rounded-full border-2 border-white overflow-hidden shadow-lg cursor-pointer transition-transform"
+                  className="w-[58px] h-[58px] rounded-full border-[2.5px] border-white overflow-hidden shadow-lg cursor-pointer transition-transform"
                 >
                   <img 
                     src={authorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=random`} 
@@ -1440,10 +1440,10 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                   <motion.button 
                     type="button"
                     onClick={handleToggleFollow}
-                    className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 bg-gradient-to-tr from-sky-400 to-blue-600 rounded-full flex items-center justify-center text-white shadow-md shadow-sky-500/40 cursor-pointer border-1.5 border-white transition-all select-none"
+                    className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-6 h-6 bg-gradient-to-tr from-sky-400 to-blue-600 rounded-full flex items-center justify-center text-white shadow-md shadow-sky-500/40 cursor-pointer border-1.5 border-white transition-all select-none"
                     title="Follow"
                   >
-                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                    <Plus className="w-4 h-4 stroke-[3]" />
                   </motion.button>
                 )}
               </div>
@@ -1454,9 +1454,9 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                 className="flex flex-col items-center cursor-pointer select-none transition-transform"
               >
                 <div className="transition-transform duration-200 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]" style={liked ? {color: '#fe2c55', filter: 'drop-shadow(0 0 8px rgba(254, 44, 85, 0.6))'} : {}}>
-                  <Heart className={`w-8 h-8 ${liked ? 'fill-[#fe2c55] text-[#fe2c55]' : 'text-white fill-white stroke-[1.5]'}`} />
+                  <Heart className={`w-9 h-9 ${liked ? 'fill-[#fe2c55] text-[#fe2c55]' : 'text-white fill-white stroke-[1.5]'}`} />
                 </div>
-                <span className="text-white text-[12px] font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                <span className="text-white text-[13px] font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                   {demoCounts.likes}
                 </span>
               </div>
@@ -1467,9 +1467,9 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                 className="flex flex-col items-center cursor-pointer select-none transition-transform"
               >
                 <div className="text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] flex items-center justify-center">
-                  <MessageCircle style={{ width: 32, height: 32 }} strokeWidth={1.8} />
+                  <MessageCircle style={{ width: 36, height: 36 }} strokeWidth={1.8} />
                 </div>
-                <span className="text-white text-[12px] font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                <span className="text-white text-[13px] font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                   {demoCounts.comments}
                 </span>
               </div>
@@ -1480,9 +1480,9 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                 className="flex flex-col items-center cursor-pointer select-none transition-transform"
               >
                 <div className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]" style={saved ? {color: '#FFD700', filter: 'drop-shadow(0 0 6px rgba(255, 215, 0, 0.6))'} : {}}>
-                  <Bookmark className={`w-8 h-8 ${saved ? 'fill-[#FFD700] text-[#FFD700]' : 'text-white fill-white'}`} />
+                  <Bookmark className={`w-9 h-9 ${saved ? 'fill-[#FFD700] text-[#FFD700]' : 'text-white fill-white'}`} />
                 </div>
-                <span className="text-white text-[12px] font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                <span className="text-white text-[13px] font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                   {demoCounts.bookmarks || '441'}
                 </span>
               </div>
@@ -1493,11 +1493,11 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                 className="flex flex-col items-center cursor-pointer select-none transition-transform"
               >
                 <div className="text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-                  <svg className="w-8 h-8 fill-white" viewBox="0 0 24 24">
+                  <svg className="w-9 h-9 fill-white" viewBox="0 0 24 24">
                     <path d="M14 5v4C7 10 4 15 3 20c2.5-3.5 6-5.1 11-5.1V19l8-7-8-7z"/>
                   </svg>
                 </div>
-                <span className="text-white text-[12px] font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                <span className="text-white text-[13px] font-bold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                   {demoCounts.shares || '1,947'}
                 </span>
               </div>
@@ -1508,7 +1508,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                   e.stopPropagation(); 
                   setShowSongModal(true);
                 }}
-                className={`w-10 h-10 rounded-full bg-[#111] border-[2.5px] border-[#2a2a2a] p-1 flex items-center justify-center overflow-hidden shadow-xl cursor-pointer mt-1  transition-transform relative ${playing ? 'animate-[spin_4s_linear_infinite]' : ''}`}
+                className={`w-11 h-11 rounded-full bg-[#111] border-[2.5px] border-[#2a2a2a] p-1 flex items-center justify-center overflow-hidden shadow-xl cursor-pointer mt-1  transition-transform relative ${playing ? 'animate-[spin_4s_linear_infinite]' : ''}`}
               >
                 <img src={reel.authorAvatar || `https://ui-avatars.com/api/?name=Music`} className="w-6 h-6 rounded-full object-cover" />
                 {isSongSaved && (
@@ -1520,37 +1520,37 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
             </div>
           ) : (
             /* Original Ennvo Modern UI Vertical Action Buttons */
-            <div className={`md:hidden absolute right-2.5 ${reelBottomSpacing} flex flex-col items-center space-y-2.5 z-40 pointer-events-auto transition-all duration-300 ${isCleanZoom || is2XSpeed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+            <div className={`md:hidden absolute right-2.5 ${reelBottomSpacing} flex flex-col items-center space-y-3.5 z-40 pointer-events-auto transition-all duration-300 ${isCleanZoom || is2XSpeed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
               <div 
                 onClick={(e) => { e.stopPropagation(); handleLike(); }} 
                 onTouchStart={(e) => { e.stopPropagation(); }}
                 className={`flex flex-col items-center cursor-pointer select-none  transition-transform ${liked ? 'liked' : ''}`}
               >
-                <div className="w-8 h-8 flex items-center justify-center text-white/95 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200" style={liked ? {color: '#fe2c55', filter: 'drop-shadow(0 0 6px rgba(254, 44, 85, 0.5))'} : {}}>
-                  <IonHeartIcon filled={liked} className="w-[1.85rem] h-[1.85rem]" />
+                <div className="w-9 h-9 flex items-center justify-center text-white/95 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200" style={liked ? {color: '#fe2c55', filter: 'drop-shadow(0 0 6px rgba(254, 44, 85, 0.5))'} : {}}>
+                  <IonHeartIcon filled={liked} className="w-[2.15rem] h-[2.15rem]" />
                 </div>
-                <span className="text-white text-[0.75rem] font-medium mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{demoCounts.likes}</span>
+                <span className="text-white text-[0.82rem] font-semibold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{demoCounts.likes}</span>
               </div>
               
               <div onClick={(e) => { e.stopPropagation(); setShowComments(true); }} className="flex flex-col items-center cursor-pointer">
-                <div className="w-8 h-8 flex items-center justify-center text-white/95 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200">
-                  <IonChatIcon className="w-[1.85rem] h-[1.85rem]" />
+                <div className="w-9 h-9 flex items-center justify-center text-white/95 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200">
+                  <IonChatIcon className="w-[2.15rem] h-[2.15rem]" />
                 </div>
-                <span className="text-white text-[0.75rem] font-medium mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{demoCounts.comments}</span>
+                <span className="text-white text-[0.82rem] font-semibold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{demoCounts.comments}</span>
               </div>
               
               <div onClick={(e) => { e.stopPropagation(); handleFavorite(); }} className={`flex flex-col items-center cursor-pointer ${saved ? 'saved' : ''}`}>
-                <div className="w-8 h-8 flex items-center justify-center text-white/95 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200" style={saved ? {color: '#FFD700', filter: 'drop-shadow(0 0 5px rgba(255, 215, 0, 0.4))'} : {}}>
+                <div className="w-9 h-9 flex items-center justify-center text-white/95 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200" style={saved ? {color: '#FFD700', filter: 'drop-shadow(0 0 5px rgba(255, 215, 0, 0.4))'} : {}}>
                   <IonBookmarkIcon filled={saved} className="w-[1.85rem] h-[1.85rem]" />
                 </div>
-                <span className="text-white text-[0.75rem] font-medium mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">Save</span>
+                <span className="text-white text-[0.82rem] font-semibold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">Save</span>
               </div>
 
               <div onClick={(e) => { e.stopPropagation(); setShowShare(true); }} className="flex flex-col items-center cursor-pointer">
-                <div className="w-8 h-8 flex items-center justify-center text-white/95 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200">
+                <div className="w-9 h-9 flex items-center justify-center text-white/95 drop-shadow-[0_1px_3px_rgba(0,0,0,0.3)] transition-transform duration-200">
                   <IonShareIcon className="w-[1.85rem] h-[1.85rem]" />
                 </div>
-                <span className="text-white text-[0.75rem] font-medium mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">Share</span>
+                <span className="text-white text-[0.82rem] font-semibold mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">Share</span>
               </div>
 
               {/* Spinning Record */}

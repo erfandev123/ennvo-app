@@ -168,10 +168,9 @@ public class Notifier {
 
     static void showMessage(final Context ctx, String title, String body, final String avatarUrl, String convId) {
         final String cid0 = convId == null ? "" : convId;
-        // The notification is posted in every case, also while the app is open,
-        // so it is waiting in the notification bar. Only the chat the user is
-        // reading right now is skipped.
-        if (foreground && !cid0.isEmpty() && cid0.equals(activeChat(ctx))) return;
+        // While the app is open the WebView shows its own in-app notification
+        // (toast + sound), so a system notification would be a duplicate.
+        if (foreground) return;
         String mode = ctx.getSharedPreferences("app", Context.MODE_PRIVATE).getString("notif_mode", "on");
         if ("off".equals(mode)) return;
         if ("secret".equals(mode)) {
@@ -405,6 +404,8 @@ public class Notifier {
     // Activity (likes, comments, follows)
     // ------------------------------------------------------------------
     static void showActivity(final Context ctx, final String title, final String body, final String avatarUrl, final String url) {
+        // App is open -> the WebView toast is the notification.
+        if (foreground) return;
         String mode = ctx.getSharedPreferences("app", Context.MODE_PRIVATE).getString("notif_mode", "on");
         if ("off".equals(mode)) return;
         final boolean secret = "secret".equals(mode);

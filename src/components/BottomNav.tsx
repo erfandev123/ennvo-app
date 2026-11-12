@@ -140,17 +140,17 @@ const BottomNav = memo(() => {
     const totalBadge = messageCount + notificationCount;
 
     return (
-      <div className="md:hidden fixed bottom-5 sm:bottom-6 left-0 right-0 z-[60] flex justify-center pointer-events-none pb-[var(--app-safe-bottom)]">
+      <div className="md:hidden fixed bottom-3 sm:bottom-4 left-0 right-0 z-[60] flex justify-center pointer-events-none pb-[var(--app-safe-bottom)]">
         <nav 
           ref={navRef}
           aria-label="Bottom Navigation"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-          className={`pointer-events-auto select-none flex items-center justify-between h-[56px] w-auto min-w-[292px] max-w-[340px] px-2 py-1 rounded-full backdrop-blur-2xl transition-colors duration-200 touch-none ${
+          className={`pointer-events-auto select-none flex items-center justify-between h-[56px] w-auto min-w-[292px] max-w-[340px] px-2 py-1 rounded-full transition-colors duration-200 touch-none ${
             isDarkNav
-              ? 'bg-black/82 border border-white/15 shadow-[0_10px_38px_rgba(0,0,0,0.55),inset_0_1px_1px_rgba(255,255,255,0.18)] text-white'
-              : 'bg-white/92 border border-sky-100 shadow-[0_10px_34px_rgba(14,165,233,0.14),0_2px_8px_rgba(0,0,0,0.05),inset_0_1px_1.5px_rgba(255,255,255,0.95)] text-slate-800'
+              ? 'bg-black border border-white/10 shadow-none text-white'
+              : 'bg-white border border-neutral-200/80 shadow-none text-slate-800'
           }`}
         >
           {navItems.map((item) => {
@@ -229,10 +229,16 @@ const BottomNav = memo(() => {
   }
 
   // Classic Standard Navigation Bar (Uniform styling across all pages, zero purple)
-  const classicNavBgClass = isDarkNav ? 'bg-black/92 border-white/10 text-white' : 'bg-white/92 border-gray-100/90 shadow-[0_-2px_18px_rgba(0,0,0,0.06)] text-gray-900';
+  // Flat 2D: reels page is pure black with no white edge, every other page is
+  // pure white with no dark glow above it.
+  const classicNavBgClass = isReels
+    ? 'bg-black border-transparent text-white'
+    : isDarkNav
+      ? 'bg-[#0b0b0e] border-white/10 text-white'
+      : 'bg-white border-gray-200/80 shadow-none text-gray-900';
 
   return (
-    <div className={`md:hidden fixed bottom-0 left-0 right-0 bottom-nav-classic ${classicNavBgClass} backdrop-blur-2xl border-t flex items-center justify-around h-[calc(58px+var(--app-safe-bottom))] pb-[var(--app-safe-bottom)] z-[60] px-3 select-none gpu-accelerated`}>
+    <div className={`md:hidden fixed bottom-0 left-0 right-0 bottom-nav-classic ${classicNavBgClass} border-t flex items-center justify-around h-[calc(58px+var(--app-safe-bottom))] pb-[var(--app-safe-bottom)] z-[60] px-3 select-none`}>
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = currentPage === item.id && (item.id !== 'profile' || viewingUser === null);

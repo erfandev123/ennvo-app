@@ -17,6 +17,21 @@ public class AppFcmService extends FirebaseMessagingService {
         getSharedPreferences("app", MODE_PRIVATE).edit().putBoolean("push_ok", true).apply();
 
         String type = data.get("type");
+
+        // App is open: hand the payload to the WebView, which shows the in-app
+        // toast immediately. No system notification is posted, so the same
+        // message never appears twice.
+        MainActivity main = Notifier.activity;
+        if (Notifier.foreground && main != null && !"call".equals(type) && !"call_cancel".equals(type)) {
+            try {
+                org.json.JSONObject out = new org.json.JSONObject();
+                for (Map.Entry<String, String> e : data.entrySet()) {
+                    if (e.getKey() != null && e.getValue() != null) out.put(e.getKey(), e.getValue());
+                }
+                main.runJs("window.onFcmMessage&&window.onFcmMessage(" + org.json.JSONObject.quote(out.toString()) + ")");
+            } catch (Exception ignored) { }
+            return;
+        }
         if ("call".equals(type)) {
             Notifier.showCall(this, data.get("name"), data.get("avatar"), data.get("callType"), data.get("callId"));
         } else if ("call_cancel".equals(type)) {

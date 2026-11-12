@@ -1011,7 +1011,7 @@ const MessageBubble = React.memo(function MessageBubble({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
-        className={`flex flex-col max-w-[78%] sm:max-w-[72%] ${isMe ? "items-end" : "items-start"} relative group/bubble select-none`}
+        className={`flex flex-col max-w-[88%] sm:max-w-[80%] ${isMe ? "items-end" : "items-start"} relative group/bubble select-none`}
       >
         {/* Swipe Right to Reply Indicator */}
         <div 
@@ -1816,14 +1816,14 @@ export default function Messages() {
   );
 
   // ---- PC only: draggable divider between the chat list and the conversation ----
-  const SIDEBAR_MIN = 300;
+  const SIDEBAR_MIN = 320;
   const SIDEBAR_MAX = 620;
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     try {
       const saved = Number(localStorage.getItem("ennvo_messages_sidebar_w"));
       if (saved >= SIDEBAR_MIN && saved <= SIDEBAR_MAX) return saved;
     } catch (e) {}
-    return typeof window !== "undefined" && window.innerWidth >= 1280 ? 430 : 400;
+    return typeof window !== "undefined" && window.innerWidth >= 1280 ? 470 : 440;
   });
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const sidebarDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -2853,7 +2853,7 @@ export default function Messages() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedProfileKey, currentUser?.uid]);
 
-  const [messageLimit, setMessageLimit] = useState(60);
+  const [messageLimit, setMessageLimit] = useState(40);
   const [activityLimit, setActivityLimit] = useState(15);
 
   useEffect(() => {
@@ -2875,7 +2875,7 @@ export default function Messages() {
     // The chat was opened from a notification: fetch the history once right
     // away so the conversation is never empty while the live stream connects.
     import("../services/chatService").then((m) =>
-      m.refreshMessages(activeChat, 60).then((fresh) => {
+      m.refreshMessages(activeChat, 40).then((fresh) => {
         if (!fresh || fresh.length === 0) return;
         setMessagesCache((prev) => {
           const current = prev[activeChat] || [];
@@ -3960,6 +3960,18 @@ export default function Messages() {
       window.removeEventListener('ennvo:message-failed', onFailed as EventListener);
   }, [setMessagesCache]);
 
+  // Stable primitives for the bubble list. Depending on the whole
+  // activeContact / activeConversation objects rebuilt every bubble whenever
+  // presence, typing or an unread counter changed, which is what made a long
+  // chat feel heavy.
+  const activeIsGroup = Boolean(activeContact?.isGroup);
+  const activeName = activeContact?.name;
+  const activeAvatar = activeContact?.avatar;
+  const groupNamesKey = JSON.stringify((activeConversation as any)?.participantNames || {});
+  const groupAvatarsKey = JSON.stringify((activeConversation as any)?.participantAvatars || {});
+  const groupNames = React.useMemo(() => JSON.parse(groupNamesKey), [groupNamesKey]);
+  const groupAvatars = React.useMemo(() => JSON.parse(groupAvatarsKey), [groupAvatarsKey]);
+
   const renderedMessages = React.useMemo(
     () =>
       messages.map((msg, idx) => {
@@ -4027,20 +4039,20 @@ export default function Messages() {
 
         const resolvedSenderName = isMe
           ? (currentUser?.name || "You")
-          : activeContact?.isGroup
-          ? (((activeConversation as any)?.participantNames || {})[msg.senderId] || userDataCache[msg.senderId]?.name || "User")
-          : (activeContact?.name || "User");
+          : activeIsGroup
+          ? ((groupNames || {})[msg.senderId] || userDataCache[msg.senderId]?.name || "User")
+          : (activeName || "User");
 
         const resolvedAvatarUrl = isMe
           ? (currentUser?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || "Me")}&background=random`)
-          : activeContact?.isGroup
-          ? (((activeConversation as any)?.participantAvatars || {})[msg.senderId] ||
+          : activeIsGroup
+          ? ((groupAvatars || {})[msg.senderId] ||
              userDataCache[msg.senderId]?.avatar ||
              `https://ui-avatars.com/api/?name=${encodeURIComponent(resolvedSenderName)}&background=random`)
-          : (activeContact?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(resolvedSenderName)}&background=random`);
+          : (activeAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(resolvedSenderName)}&background=random`);
 
         const avatarUrl = !isMe && isLastInGroup ? resolvedAvatarUrl : undefined;
-        const senderName = activeContact?.isGroup && !isMe ? resolvedSenderName : undefined;
+        const senderName = activeIsGroup && !isMe ? resolvedSenderName : undefined;
 
         if (msg.type === "system") {
           return (
@@ -4064,7 +4076,7 @@ export default function Messages() {
             avatarUrl={avatarUrl}
             senderName={senderName}
             senderInfo={{ name: resolvedSenderName, avatar: resolvedAvatarUrl }}
-            isGroup={Boolean(activeContact?.isGroup)}
+            isGroup={Boolean(activeIsGroup)}
             onRetry={retryMessage}
             onReply={(m) => setReplyingTo(m as any)}
             onLongPress={handleLongPress}
@@ -4091,7 +4103,7 @@ export default function Messages() {
           />
         );
       }),
-    [messages, currentUser?.uid, currentUser?.name, currentUser?.avatar, activeContact, activeConversation, userDataCache, chatTheme, activeChat, retryMessage],
+    [messages, currentUser?.uid, currentUser?.name, currentUser?.avatar, activeIsGroup, activeName, activeAvatar, groupNames, groupAvatars, userDataCache, chatTheme, activeChat, retryMessage],
   );
 
   // "Seen" lives in one fixed-height slot below the list, not inside a bubble.
@@ -4828,7 +4840,7 @@ export default function Messages() {
                         </div>
                         <div className="flex flex-col min-w-0 pr-2 space-y-0.5 flex-1">
                           <div className="flex items-center space-x-1 min-w-0">
-                            <h3 className={`truncate tracking-tight leading-tight ${isUnread ? "font-semibold text-neutral-900 dark:text-white text-[13.5px] sm:text-[14px]" : "font-medium text-neutral-800 dark:text-neutral-200 text-[13px] sm:text-[13.5px]"}`}>
+                            <h3 className={`truncate tracking-tight leading-tight ${isUnread ? "font-bold text-neutral-900 dark:text-white text-[15px] sm:text-[15.5px]" : "font-semibold text-neutral-800 dark:text-neutral-200 text-[14.5px] sm:text-[15px]"}`}>
                               {name}
                             </h3>
                             {pinnedChatIds.includes(conv.id) && (
@@ -4846,7 +4858,7 @@ export default function Messages() {
                           ) : isUnread ? (
                             unreadMessages >= 2 ? (
                               <>
-                                <p className="truncate max-w-[150px] md:max-w-[200px] text-[12px] sm:text-[12.5px] font-medium text-neutral-900 dark:text-white">
+                                <p className="truncate max-w-[150px] md:max-w-[200px] text-[13px] sm:text-[13.5px] font-bold text-neutral-900 dark:text-white">
                                   {unreadMessages > 5
                                     ? "5+ new messages"
                                     : `${unreadMessages} new messages`}
@@ -4876,7 +4888,7 @@ export default function Messages() {
                             );
                           })() : (
                             <>
-                              <p className="truncate max-w-[150px] md:max-w-[200px] text-[13px] text-neutral-500 dark:text-neutral-400 font-normal">
+                              <p className="truncate max-w-[150px] md:max-w-[200px] text-[13.5px] text-neutral-600 dark:text-neutral-300 font-medium">
                                 {conv.lastMessage || "Sent a message"}
                               </p>
                               <span className="mx-1 text-[11.5px] text-neutral-400 dark:text-neutral-500 font-normal">·</span>

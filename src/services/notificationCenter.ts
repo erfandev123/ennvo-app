@@ -90,7 +90,7 @@ export const startNotificationCenter = (uid: string) => {
   const convQuery = query(
     collection(db, 'conversations'),
     where('participantIds', 'array-contains', uid),
-    limit(20)
+    limit(40)
   );
 
   state.unsubConversations = onSnapshot(convQuery, (snapshot) => {
