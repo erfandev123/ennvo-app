@@ -5485,7 +5485,7 @@ export default function Messages() {
                       const oldestTime = oldest?.createdAt?.toMillis?.() ?? (oldest?.createdAt ?? 0);
                       if (oldest && oldestTime) {
                         import("../services/chatService").then((m) =>
-                          m.loadOlderMessages(activeChat, oldestTime, 25).then((older) => {
+                          m.loadOlderMessages(activeChat, oldest.createdAt, 25).then((older) => {
                             if (!older || older.length === 0) return;
                             setMessagesCache((prev) => {
                               const current = prev[activeChat] || [];

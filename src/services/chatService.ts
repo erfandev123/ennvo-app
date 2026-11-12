@@ -16,7 +16,8 @@ import {
   getDocs,
   writeBatch,
   limit,
-  startAfter
+  startAfter,
+  Timestamp
 } from 'firebase/firestore';
 import { notifyUser } from './pushGateway';
 import { db, auth } from '../firebase';
@@ -600,14 +601,21 @@ export const markConversationRead = async (conversationId: string, userId: strin
  */
 export const loadOlderMessages = async (
   conversationId: string,
-  beforeCreatedAt: number,
+  before: any,
   count = 20
 ): Promise<Message[]> => {
   try {
+    // The cursor has to be a real Timestamp, the same type the documents are
+    // ordered by.
+    let cursor: any = before;
+    if (cursor && typeof cursor.toMillis === 'function') cursor = Timestamp.fromMillis(cursor.toMillis());
+    else if (typeof cursor === 'number') cursor = Timestamp.fromMillis(cursor);
+    if (!cursor || typeof cursor.toMillis !== 'function') return [];
+
     const q = query(
       collection(db, 'conversations', conversationId, 'messages'),
       orderBy('createdAt', 'desc'),
-      startAfter(beforeCreatedAt),
+      startAfter(cursor),
       limit(count)
     );
     const snap = await getDocs(q);
