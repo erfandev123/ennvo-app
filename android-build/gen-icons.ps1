@@ -24,6 +24,30 @@ function Save-Resized {
     $bmp.Dispose()
 }
 
+function Save-Padded {
+    # Draws the logo centred on a transparent canvas, using only the given
+    # fraction of the canvas. The adaptive icon foreground is always scaled to
+    # the full 108dp launcher canvas, so the artwork itself has to be smaller
+    # than the canvas - otherwise the launcher crops it and the icon looks
+    # zoomed in.
+    param([System.Drawing.Image]$image, [int]$w, [int]$h, [string]$out, [double]$contentScale)
+    $bmp = New-Object System.Drawing.Bitmap($w, $h, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+    $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+    $g.Clear([System.Drawing.Color]::Transparent)
+    $cw = [int]($w * $contentScale)
+    $ch = [int]($h * $contentScale)
+    $dx = [int](($w - $cw) / 2)
+    $dy = [int](($h - $ch) / 2)
+    $g.DrawImage($image, $dx, $dy, $cw, $ch)
+    $g.Dispose()
+    $bmp.Save($out, [System.Drawing.Imaging.ImageFormat]::Png)
+    $bmp.Dispose()
+}
+
 $sizes = @{ 'mdpi' = 48; 'hdpi' = 72; 'xhdpi' = 96; 'xxhdpi' = 144; 'xxxhdpi' = 192 }
 foreach ($key in $sizes.Keys) {
     $size = $sizes[$key]
@@ -31,14 +55,47 @@ foreach ($key in $sizes.Keys) {
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
     Save-Resized -image $src -w $size -h $size -out (Join-Path $dir 'ic_launcher.png')
     Save-Resized -image $src -w $size -h $size -out (Join-Path $dir 'ic_launcher_round.png') -Round
+    # Adaptive icon foreground: 108dp canvas (2.25 x the 48dp launcher size),
+    # artwork in the inner 66dp (61%). Filling the whole canvas is what made
+    # the home screen icon look zoomed in and cropped.
     $fg = [int]($size * 2.25)
-    Save-Resized -image $src -w $fg -h $fg -out (Join-Path $dir 'ic_launcher_foreground.png')
+    Save-Padded -image $src -w $fg -h $fg -out (Join-Path $dir 'ic_launcher_foreground.png') -contentScale 0.62
 }
 
-# High quality native splash symbol
-$drawable = Join-Path $res 'drawable-nodpi'
-New-Item -ItemType Directory -Force -Path $drawable | Out-Null
-Save-Resized -image $src -w 512 -h 512 -out (Join-Path $drawable 'splash_logo.png')
+function Save-JpegOnBlack {
+    # The splash icon is masked into a circle by the system and the splash
+    # background is black, so the transparent corners of the logo are painted
+    # black. That keeps the file small (JPEG instead of a huge PNG).
+    param([System.Drawing.Image]$image, [int]$w, [int]$h, [string]$out)
+    $bmp = New-Object System.Drawing.Bitmap($w, $h, [System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+    $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+    $g.Clear([System.Drawing.Color]::Black)
+    $g.DrawImage($image, 0, 0, $w, $h)
+    $g.Dispose()
+    $codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.MimeType -eq 'image/jpeg' }
+    $params = New-Object System.Drawing.Imaging.EncoderParameters(1)
+    $params.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter([System.Drawing.Imaging.Encoder]::Quality, 92L)
+    $bmp.Save($out, $codec, $params)
+    $bmp.Dispose()
+}
+
+# High quality native splash symbol.
+# The system splash draws the icon at 288dp. A single drawable-nodpi file was
+# stretched to the screen size and looked blurry, so one file per density is
+# generated instead.
+$splashSizes = @{ 'mdpi' = 288; 'hdpi' = 432; 'xhdpi' = 576; 'xxhdpi' = 864; 'xxxhdpi' = 1152 }
+foreach ($key in $splashSizes.Keys) {
+    $size = $splashSizes[$key]
+    $dir = Join-Path $res "drawable-$key"
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    Save-JpegOnBlack -image $src -w $size -h $size -out (Join-Path $dir 'splash_logo.jpg')
+}
+Get-ChildItem -Path $res -Recurse -Filter 'splash_logo.png' -ErrorAction SilentlyContinue | Remove-Item -Force
+Remove-Item -Force (Join-Path $res 'drawable-nodpi\splash_logo.png') -ErrorAction SilentlyContinue
 
 # White "e" silhouette for the status bar. Android masks the alpha channel of
 # small icons, so a white-on-transparent crop keeps the logo crisp at 24dp.
@@ -81,6 +138,8 @@ for ($y = 0; $y -lt 96; $y++) {
         }
     }
 }
+$drawable = Join-Path $res 'drawable-nodpi'
+New-Item -ItemType Directory -Force -Path $drawable | Out-Null
 $notify.Save((Join-Path $drawable 'ic_stat_notify.png'), [System.Drawing.Imaging.ImageFormat]::Png)
 $notify.Dispose()
 $bitmap.Dispose()

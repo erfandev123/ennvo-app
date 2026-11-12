@@ -129,7 +129,7 @@ export default function CreateGroupModal({
           />
 
           {/* Seamless Header - NO white solid background, NO border line, pure fluid blur */}
-          <div className="relative px-4 py-3 flex items-center justify-between pt-[calc(env(safe-area-inset-top,0px)+12px)] bg-transparent shrink-0 z-20">
+          <div className="relative px-4 py-3 flex items-center justify-between pt-[calc(var(--app-safe-top)+12px)] bg-transparent shrink-0 z-20">
             <div className="flex items-center space-x-3">
               <button
                 type="button"
@@ -362,7 +362,7 @@ export default function CreateGroupModal({
           </div>
 
           {/* Floating Bottom Action Bar - Floating seamless pill, NO white solid bar */}
-          <div className="fixed bottom-0 left-0 right-0 z-20 px-4 py-3 bg-gradient-to-t from-[#f8f9fc] via-[#f8f9fc]/90 to-transparent dark:from-[#090a0f] dark:via-[#090a0f]/90 dark:to-transparent pb-[max(env(safe-area-inset-bottom),14px)] pointer-events-none">
+          <div className="fixed bottom-0 left-0 right-0 z-20 px-4 py-3 bg-gradient-to-t from-[#f8f9fc] via-[#f8f9fc]/90 to-transparent dark:from-[#090a0f] dark:via-[#090a0f]/90 dark:to-transparent pb-[max(var(--app-safe-bottom),14px)] pointer-events-none">
             <div className="max-w-lg mx-auto w-full pointer-events-auto">
               <button
                 type="button"

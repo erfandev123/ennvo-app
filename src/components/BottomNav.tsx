@@ -127,7 +127,7 @@ const BottomNav = memo(() => {
     const totalBadge = messageCount + notificationCount;
 
     return (
-      <div className="md:hidden fixed bottom-5 sm:bottom-6 left-0 right-0 z-[60] flex justify-center pointer-events-none pb-[env(safe-area-inset-bottom)]">
+      <div className="md:hidden fixed bottom-5 sm:bottom-6 left-0 right-0 z-[60] flex justify-center pointer-events-none pb-[var(--app-safe-bottom)]">
         <nav 
           ref={navRef}
           aria-label="Bottom Navigation"
@@ -219,7 +219,7 @@ const BottomNav = memo(() => {
   const classicNavBgClass = isDarkNav ? 'bg-black border-white/10 text-white' : 'bg-white border-gray-100 shadow-md text-gray-900';
 
   return (
-    <div className={`md:hidden fixed bottom-0 left-0 right-0 bottom-nav-classic ${classicNavBgClass} backdrop-blur-xl border-t flex items-center justify-around h-[calc(54px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] z-[60] px-3 select-none gpu-accelerated`}>
+    <div className={`md:hidden fixed bottom-0 left-0 right-0 bottom-nav-classic ${classicNavBgClass} backdrop-blur-xl border-t flex items-center justify-around h-[calc(54px+var(--app-safe-bottom))] pb-[var(--app-safe-bottom)] z-[60] px-3 select-none gpu-accelerated`}>
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = currentPage === item.id && (item.id !== 'profile' || viewingUser === null);

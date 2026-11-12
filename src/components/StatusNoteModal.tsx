@@ -140,7 +140,7 @@ export default function StatusNoteModal({
           />
 
           {/* Seamless Header - NO white solid background, NO border line, pure fluid blur */}
-          <div className="relative px-4 py-3 flex items-center justify-between pt-[calc(env(safe-area-inset-top,0px)+12px)] bg-transparent z-20 shrink-0">
+          <div className="relative px-4 py-3 flex items-center justify-between pt-[calc(var(--app-safe-top)+12px)] bg-transparent z-20 shrink-0">
             {/* Close round frosted button */}
             <button
               type="button"
@@ -252,7 +252,7 @@ export default function StatusNoteModal({
             </div>
 
             {/* Bottom Actions */}
-            <div className="w-full mt-8 flex flex-col items-center space-y-3 pb-[max(env(safe-area-inset-bottom),16px)]">
+            <div className="w-full mt-8 flex flex-col items-center space-y-3 pb-[max(var(--app-safe-bottom),16px)]">
               <div className="px-3.5 py-1.5 rounded-full bg-white/70 dark:bg-[#15161c]/70 border border-black/[0.04] dark:border-white/5 text-[11.5px] text-neutral-500 dark:text-neutral-400 font-medium backdrop-blur-sm">
                 Shared with: Friends you follow back
               </div>

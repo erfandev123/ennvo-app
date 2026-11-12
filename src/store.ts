@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { User as AppUser } from './types';
 import { primePendingOpen } from './native';
+import { persist, trimChatCache, trimReelsCache } from './utils/persist';
 
 export type PageType = 'home' | 'search' | 'reels' | 'messages' | 'notifications' | 'create' | 'profile' | 'settings' | 'edit-profile' | 'admin';
 
@@ -506,9 +507,9 @@ export const useAppStore = create<AppState>((set) => ({
   }),
   cachedReels: getInitialCachedReels(),
   setCachedReels: (reels) => set(() => {
-    try {
-      localStorage.setItem('cachedReels', JSON.stringify(reels.slice(0, 30)));
-    } catch (e) {}
+    // The base64 thumbnails made this cache megabytes big, which blocked the
+    // main thread on every snapshot. They are dropped from the cache.
+    persist('cachedReels', trimReelsCache(reels), 1500);
     return { cachedReels: reels };
   }),
   feedScrollY: 0,
@@ -526,17 +527,15 @@ export const useAppStore = create<AppState>((set) => ({
   cachedChatMessages: getInitialChatMessages(),
   setCachedChatMessages: (updater) => set((state) => {
     const next = updater(state.cachedChatMessages);
-    try {
-      localStorage.setItem('cachedChatMessages', JSON.stringify(next));
-    } catch (e) {}
+    // Debounced + trimmed: a new message no longer serialises the whole chat
+    // cache on the main thread.
+    persist('cachedChatMessages', trimChatCache(next), 1200);
     return { cachedChatMessages: next };
   }),
   cachedConversations: getInitialConversations(),
   setCachedConversations: (updater) => set((state) => {
     const next = typeof updater === 'function' ? updater(state.cachedConversations) : updater;
-    try {
-      localStorage.setItem('cachedConversations', JSON.stringify(next));
-    } catch (e) {}
+    persist('cachedConversations', next, 1200);
     return { cachedConversations: next };
   }),
   cachedProfilePosts: {},

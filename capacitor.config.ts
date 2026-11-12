@@ -13,6 +13,14 @@ const config: CapacitorConfig = {
     backgroundColor: '#ffffff'
   },
   plugins: {
+    // Ennvo handles the window insets itself: the Android shell pads the
+    // content view by the keyboard height, so the page reflows exactly like a
+    // native app. Letting Capacitor do it as well applied the keyboard height
+    // twice, which made the page jump and showed a black band on top.
+    SystemBars: {
+      insetsHandling: 'disable',
+      hidden: true,
+    },
     SplashScreen: {
       launchShowDuration: 0,
       launchAutoHide: true,

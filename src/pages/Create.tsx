@@ -230,7 +230,7 @@ export default function Create() {
       />
 
       {/* Top Header Bar: Left Arrow • Clean Center Title • Right Text-Only Share Button */}
-      <header className="sticky top-0 left-0 right-0 z-40 w-full max-w-[560px] mx-auto bg-transparent border-0 shadow-none px-1 pt-[max(calc(env(safe-area-inset-top,0px)+6px),10px)] pb-3 flex items-center justify-between">
+      <header className="sticky top-0 left-0 right-0 z-40 w-full max-w-[560px] mx-auto bg-transparent border-0 shadow-none px-1 pt-[max(calc(var(--app-safe-top)+6px),10px)] pb-3 flex items-center justify-between">
         {/* Left: Back Button */}
         <button 
           type="button"

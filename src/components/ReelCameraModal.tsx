@@ -772,7 +772,7 @@ export const ReelCameraModal: React.FC = () => {
             </div>
 
             {/* Top Bar: Close (Left) & Add Sound with Cancel button (Center) */}
-            <div className="relative z-20 px-4 pt-[max(calc(env(safe-area-inset-top,0px)+12px),16px)] pb-3 flex items-center justify-between">
+            <div className="relative z-20 px-4 pt-[max(calc(var(--app-safe-top)+12px),16px)] pb-3 flex items-center justify-between">
               {/* Left: Close Button */}
               <button
                 type="button"
@@ -812,7 +812,7 @@ export const ReelCameraModal: React.FC = () => {
             </div>
 
             {/* Right Tool Rail: Flashlight, Flip Camera, Effects/Filters (Coming Soon), Mic/Sound */}
-            <div className="absolute right-4 top-[max(calc(env(safe-area-inset-top,0px)+74px),78px)] z-20 flex flex-col items-center space-y-3.5">
+            <div className="absolute right-4 top-[max(calc(var(--app-safe-top)+74px),78px)] z-20 flex flex-col items-center space-y-3.5">
               {/* 1. Flashlight Button */}
               <button
                 type="button"
@@ -867,7 +867,7 @@ export const ReelCameraModal: React.FC = () => {
             )}
 
             {/* Bottom Controls Area: Record Button (Center) & Gallery (Left), followed by Clean Mode Text Below */}
-            <div className="relative z-20 px-6 pb-[max(calc(env(safe-area-inset-bottom,0px)+18px),24px)] pt-6 bg-gradient-to-t from-black/85 via-black/40 to-transparent flex flex-col items-center space-y-4">
+            <div className="relative z-20 px-6 pb-[max(calc(var(--app-safe-bottom)+18px),24px)] pt-6 bg-gradient-to-t from-black/85 via-black/40 to-transparent flex flex-col items-center space-y-4">
               
               {/* Main Shutter & Gallery Row */}
               <div className="w-full flex items-center justify-between px-4">
@@ -983,7 +983,7 @@ export const ReelCameraModal: React.FC = () => {
                   />
 
                   {/* Mode Badge in Top-Left Corner */}
-                  <div className="absolute top-[max(calc(env(safe-area-inset-top,0px)+74px),78px)] left-4 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-bold uppercase tracking-wider text-white border border-white/10 shadow-sm z-10 pointer-events-none">
+                  <div className="absolute top-[max(calc(var(--app-safe-top)+74px),78px)] left-4 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-bold uppercase tracking-wider text-white border border-white/10 shadow-sm z-10 pointer-events-none">
                     {mode} • {aspectRatio}
                   </div>
                 </div>
@@ -1017,7 +1017,7 @@ export const ReelCameraModal: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleRemovePhoto(activePhotoIndex)}
-                      className="absolute top-[max(calc(env(safe-area-inset-top,0px)+74px),78px)] left-4 w-8 h-8 rounded-full bg-black/60 hover:bg-rose-600/80 backdrop-blur-md text-white flex items-center justify-center transition-all cursor-pointer border border-white/10 shadow-md z-10"
+                      className="absolute top-[max(calc(var(--app-safe-top)+74px),78px)] left-4 w-8 h-8 rounded-full bg-black/60 hover:bg-rose-600/80 backdrop-blur-md text-white flex items-center justify-center transition-all cursor-pointer border border-white/10 shadow-md z-10"
                       title="Remove this photo"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1052,7 +1052,7 @@ export const ReelCameraModal: React.FC = () => {
 
                   {/* Bottom Multi-Photo Pagination Dots & Counter */}
                   {previewUrls.length > 1 && (
-                    <div className="absolute bottom-[max(calc(env(safe-area-inset-bottom,0px)+78px),86px)] left-1/2 -translate-x-1/2 flex flex-col items-center space-y-1.5 z-20 pointer-events-none">
+                    <div className="absolute bottom-[max(calc(var(--app-safe-bottom)+78px),86px)] left-1/2 -translate-x-1/2 flex flex-col items-center space-y-1.5 z-20 pointer-events-none">
                       <div className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-bold text-white border border-white/15">
                         {activePhotoIndex + 1} / {previewUrls.length}
                       </div>
@@ -1073,7 +1073,7 @@ export const ReelCameraModal: React.FC = () => {
             </div>
 
             {/* Top Bar Controls Overlay */}
-            <div className="relative z-30 px-4 pt-[max(calc(env(safe-area-inset-top,0px)+12px),16px)] pb-2 flex items-center justify-between">
+            <div className="relative z-30 px-4 pt-[max(calc(var(--app-safe-top)+12px),16px)] pb-2 flex items-center justify-between">
               {/* Retake Button */}
               <button
                 type="button"
@@ -1139,7 +1139,7 @@ export const ReelCameraModal: React.FC = () => {
             </div>
 
             {/* Right Side Floating Size / Aspect Ratio Selector Button */}
-            <div className="absolute right-4 top-[max(calc(env(safe-area-inset-top,0px)+74px),78px)] z-30 flex flex-col items-end">
+            <div className="absolute right-4 top-[max(calc(var(--app-safe-top)+74px),78px)] z-30 flex flex-col items-end">
               <button
                 type="button"
                 onClick={() => setShowSizeMenu(prev => !prev)}
@@ -1318,7 +1318,7 @@ export const ReelCameraModal: React.FC = () => {
             </AnimatePresence>
 
             {/* Bottom Controls Bar: Retake (Left) & Soft Lag-Free Next Button (Right) */}
-            <div className="relative z-30 px-6 pb-[max(calc(env(safe-area-inset-bottom,0px)+18px),22px)] pt-3 bg-gradient-to-t from-black/90 via-black/45 to-transparent flex items-center justify-between">
+            <div className="relative z-30 px-6 pb-[max(calc(var(--app-safe-bottom)+18px),22px)] pt-3 bg-gradient-to-t from-black/90 via-black/45 to-transparent flex items-center justify-between">
               <button
                 type="button"
                 onClick={handleRetake}
@@ -1350,7 +1350,7 @@ export const ReelCameraModal: React.FC = () => {
           <div className="relative flex-1 w-full h-full bg-neutral-950 flex flex-col justify-between overflow-y-auto no-scrollbar">
             
             {/* Seamless Top Header: Soft Blue Ambient Glow Flows Right Through! */}
-            <div className="sticky top-0 z-30 px-4 pt-[max(calc(env(safe-area-inset-top,0px)+12px),16px)] pb-3 bg-neutral-950/40 backdrop-blur-md border-b border-white/5 flex items-center justify-between">
+            <div className="sticky top-0 z-30 px-4 pt-[max(calc(var(--app-safe-top)+12px),16px)] pb-3 bg-neutral-950/40 backdrop-blur-md border-b border-white/5 flex items-center justify-between">
               {/* Back to Preview */}
               <button
                 type="button"

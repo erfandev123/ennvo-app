@@ -108,8 +108,14 @@ public class Notifier {
         calls.setBypassDnd(true);
         nm.createNotificationChannel(calls);
 
-        NotificationChannel activityChannel = new NotificationChannel(ACT_CH, "Activity", NotificationManager.IMPORTANCE_DEFAULT);
-        activityChannel.enableVibration(true);
+        // Activity notifications (likes, comments, follows) arrive quietly: no
+        // sound, no vibration and no heads-up card that covers the app the
+        // user is in. They wait in the shade with the actor's photo, the Ennvo
+        // symbol and the action text, and open the right place when tapped.
+        NotificationChannel activityChannel = new NotificationChannel(ACT_CH, "Activity", NotificationManager.IMPORTANCE_LOW);
+        activityChannel.enableVibration(false);
+        activityChannel.setSound(null, null);
+        activityChannel.setShowBadge(true);
         nm.createNotificationChannel(activityChannel);
 
         if (Build.VERSION.SDK_INT >= 29) {

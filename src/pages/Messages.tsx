@@ -71,7 +71,9 @@ import { subscribeNotifications } from "../services/notificationService";
 
 import { VideoSticker } from "../components/VideoSticker";
 import { useAppStore } from "../store";
-import { safeFile, formatTime, downloadMediaFile } from "../utils";
+import { useShallow } from "zustand/react/shallow";
+import { safeFile, formatTime, downloadMediaFile, formatMediaUrl } from "../utils";
+import ChatMediaImage from "../components/ChatMediaImage";
 import {
   subscribeConversations,
   subscribeMessages,
@@ -174,7 +176,10 @@ const FollowerItem = React.memo(
     const [realtimeUser, setRealtimeUser] = useState<any>(follower);
     // They are in our followers list, so they follow us by definition
     const followsMe = true;
-    const { setViewingUser, pushPage } = useAppStore();
+    const { setViewingUser, pushPage } = useAppStore(useShallow((s: any) => ({
+      setViewingUser: s.setViewingUser,
+      pushPage: s.pushPage
+    })));
 
     useEffect(() => {
       // Fetch latest user data for real-time avatar and name
@@ -1266,7 +1271,7 @@ const MessageBubble = React.memo(function MessageBubble({
                 const mediaUser = senderInfo || { name: senderName || "User", avatar: avatarUrl || "" };
                 return (
                   <div
-                    className="relative group cursor-pointer rounded-2xl overflow-hidden w-[235px] sm:w-[260px] max-w-[78vw] aspect-[4/3] bg-neutral-900/5 border border-neutral-200/70 select-none shadow-xs"
+                    className="relative group cursor-pointer rounded-2xl overflow-hidden w-[70vw] max-w-[280px] bg-neutral-900/5 border border-neutral-200/70 select-none shadow-xs"
                     onClick={() =>
                       setViewingMedia({
                         type: "image",
@@ -1277,11 +1282,10 @@ const MessageBubble = React.memo(function MessageBubble({
                       })
                     }
                   >
-                    <img
+                    <ChatMediaImage
                       src={msg.mediaUrl}
                       alt="Sent image"
-                      className="w-full h-full object-cover transition-transform duration-200"
-                      loading="lazy"
+                      imgClassName="w-full max-h-[320px] object-cover transition-transform duration-200"
                     />
                     <div className="absolute inset-0 bg-black/15 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                       <div className="bg-black/60 text-white text-[10px] font-medium px-2 py-0.5 rounded-full backdrop-blur-sm">
@@ -1336,19 +1340,10 @@ const MessageBubble = React.memo(function MessageBubble({
                       </div>
                     ) : (
                       <div className="w-40 h-40 sm:w-48 sm:h-48 overflow-hidden bg-transparent border-0 shadow-none flex items-center justify-center">
-                        <img
+                        <ChatMediaImage
                           src={stickerSrc}
                           alt="Sticker"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-contain pointer-events-none select-none rounded-2xl bg-transparent border-0 shadow-none"
-                          onError={(e) => {
-                            const el = e.currentTarget;
-                            if (stickerSrc.includes('/uploads/') && !el.dataset.retried) {
-                              el.dataset.retried = 'true';
-                              el.src = `/uploads/${stickerSrc.split('/uploads/')[1]}`;
-                            }
-                          }}
+                          imgClassName="w-full h-full object-contain pointer-events-none select-none rounded-2xl bg-transparent border-0 shadow-none"
                         />
                       </div>
                     )}
@@ -1528,6 +1523,10 @@ const getTextWidth = (text: string, font = '15px system-ui, -apple-system, sans-
 };
 
 export default function Messages() {
+  // useShallow keeps this screen from re-rendering on every unrelated store
+  // change (uploads, media viewer, nav state...). Before, the whole chat
+  // screen re-rendered whenever anything in the store changed, which made
+  // scrolling and typing stutter.
   const {
     chatTheme,
     setChatTheme,
@@ -1554,7 +1553,33 @@ export default function Messages() {
     followingIds,
     setFollowingIds,
     followerIds
-  } = useAppStore();
+  } = useAppStore(useShallow((s: any) => ({
+    chatTheme: s.chatTheme,
+    setChatTheme: s.setChatTheme,
+    setViewingUser: s.setViewingUser,
+    viewingStory: s.viewingStory,
+    setViewingStory: s.setViewingStory,
+    activeChat: s.activeChat,
+    setActiveChat: s.setActiveChat,
+    currentUser: s.currentUser,
+    pushPage: s.pushPage,
+    lastCheckedActivity: s.lastCheckedActivity,
+    setLastCheckedActivity: s.setLastCheckedActivity,
+    lastCheckedFollowers: s.lastCheckedFollowers,
+    setLastCheckedFollowers: s.setLastCheckedFollowers,
+    setViewingReel: s.setViewingReel,
+    setViewingReelContext: s.setViewingReelContext,
+    setViewingMedia: s.setViewingMedia,
+    cachedChatMessages: s.cachedChatMessages,
+    setCachedChatMessages: s.setCachedChatMessages,
+    cachedConversations: s.cachedConversations,
+    setCachedConversations: s.setCachedConversations,
+    setIsBottomNavHidden: s.setIsBottomNavHidden,
+    setActiveCallState: s.setActiveCallState,
+    followingIds: s.followingIds,
+    setFollowingIds: s.setFollowingIds,
+    followerIds: s.followerIds
+  })));
 
   const handleStartCall = async (type: 'audio' | 'video') => {
     if (!currentUser || !activeContact?.uid || activeContact.isGroup) return;
@@ -2865,10 +2890,19 @@ export default function Messages() {
           });
           return { ...prev, [activeChat]: [...confirmed, ...pending] };
         });
-        if (currentUser && newMsgs.some(m => m.senderId !== currentUser.uid && m.status !== 'seen')) {
-          import("../services/chatService").then((m) =>
-            m.markConversationRead(activeChat, currentUser.uid),
-          );
+        if (currentUser) {
+          // Only the messages that actually need it are marked as seen. The
+          // previous version read and rewrote 25 documents for every single
+          // incoming message, which delayed the next snapshot.
+          const unseen = newMsgs
+            .filter((m: any) => m.senderId !== currentUser.uid && m.status !== 'seen')
+            .map((m: any) => m.id)
+            .filter(Boolean);
+          if (unseen.length) {
+            import("../services/chatService").then((m) =>
+              m.markConversationRead(activeChat, currentUser.uid, unseen),
+            );
+          }
         }
       },
       messageLimit,
@@ -3619,29 +3653,31 @@ export default function Messages() {
     : (typeof (activeConversation as any)?.themeBrightness === 'number' ? (activeConversation as any).themeBrightness : 1);
 
   const scrollToBottom = (force = false) => {
-    if (messagesContainerRef.current && (shouldAutoScrollRef.current || force)) {
-      messagesContainerRef.current.scrollTo({
-        top: messagesContainerRef.current.scrollHeight,
-        behavior: force ? "instant" : "smooth",
-      });
-    }
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    if (!force && !shouldAutoScrollRef.current) return;
+    // Instant, never smooth: a smooth animation fought with the instant
+    // scroll of the previous frame and made the list stutter.
+    el.scrollTop = el.scrollHeight;
   };
 
-  useEffect(() => {
-    if (messagesContainerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } =
-        messagesContainerRef.current;
+  // One scroll handler for the whole chat. New messages jump straight to the
+  // bottom, older messages are prepended without losing the reading position,
+  // and the typing indicator never moves the list.
+  useLayoutEffect(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const { scrollTop, scrollHeight } = el;
+    const grew = scrollHeight > prevScrollHeightRef.current;
 
-      // Handle pagination scroll adjustment when top messages are loaded
-      if (scrollHeight > prevScrollHeightRef.current && scrollTop < 80) {
-        const diff = scrollHeight - prevScrollHeightRef.current;
-        messagesContainerRef.current.scrollTop = scrollTop + diff;
-      } else if (shouldAutoScrollRef.current) {
-        scrollToBottom();
-      }
-      prevScrollHeightRef.current = scrollHeight;
+    if (grew && scrollTop < 80) {
+      // Older messages were prepended: keep the reading position.
+      el.scrollTop = scrollTop + (scrollHeight - prevScrollHeightRef.current);
+    } else if (shouldAutoScrollRef.current) {
+      el.scrollTop = scrollHeight;
     }
-  }, [messages, typingUsers]);
+    prevScrollHeightRef.current = scrollHeight;
+  }, [messages]);
 
   // Force scroll to bottom on chat enter
   useEffect(() => {
@@ -3832,7 +3868,7 @@ export default function Messages() {
         style={isDesktop ? { width: sidebarWidth } : undefined}
       >
         {/* Top Controls Area (NO Boxed Header - completely transparent so blur & background flows seamlessly to the top) */}
-        <div className="px-3 sm:px-4 pt-[max(calc(env(safe-area-inset-top,0px)+8px),12px)] pb-2 flex items-center justify-between sticky top-0 bg-transparent border-0 z-20 w-full min-h-[52px] transition-all select-none">
+        <div className="px-3 sm:px-4 pt-[max(calc(var(--app-safe-top)+8px),12px)] pb-2 flex items-center justify-between sticky top-0 bg-transparent border-0 z-20 w-full min-h-[52px] transition-all select-none">
           {isSearchExpanded ? (
             <div className="relative flex items-center flex-1 space-x-2 animate-in fade-in duration-150">
               <div className="relative flex-1 flex items-center">
@@ -4678,7 +4714,7 @@ export default function Messages() {
               }}
             >
               {/* Clean 2D Modern Activity Header with Frosted Glass */}
-              <div className="min-h-[56px] md:min-h-[60px] px-3.5 md:px-4 pt-[calc(env(safe-area-inset-top,0px)+6px)] md:pt-0 pb-1.5 md:pb-0 border-b border-neutral-100/60 flex items-center justify-between bg-white sticky top-0 z-30 select-none">
+              <div className="min-h-[56px] md:min-h-[60px] px-3.5 md:px-4 pt-[calc(var(--app-safe-top)+6px)] md:pt-0 pb-1.5 md:pb-0 border-b border-neutral-100/60 flex items-center justify-between bg-white sticky top-0 z-30 select-none">
                 <div className="flex items-center space-x-2.5">
                   <button
                     type="button"
@@ -5212,18 +5248,25 @@ export default function Messages() {
                     {/* Background Layer: Image Wallpaper or Gradient Theme */}
                     {isImage ? (
                       <img
-                        src={activeConvTheme === 'bg-image' ? '/chat-background.jpg' : activeConvTheme}
+                        src={formatMediaUrl(activeConvTheme === 'bg-image' ? '/chat-background.jpg' : activeConvTheme)}
                         alt=""
                         loading="eager"
-                        decoding="sync"
+                        decoding="async"
                         fetchPriority="high"
-                        className="absolute left-0 right-0 top-0 w-full pointer-events-none z-0 select-none object-cover object-top"
+                        className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none object-cover object-center"
                         style={{
-                          // 100lvh = tallest viewport. The chat pane itself shrinks when
-                          // the keyboard opens, but the wallpaper keeps its full size.
-                          height: '100lvh',
+                          // The wallpaper always fills the chat pane. It used to be
+                          // pinned to 100lvh, so it was cut off as soon as the
+                          // keyboard shrank the pane.
                           filter: activeConvThemeBlur ? `blur(18px) brightness(${activeConvThemeBrightness})` : `brightness(${activeConvThemeBrightness})`,
                           transform: activeConvThemeBlur ? 'scale(1.10)' : 'scale(1)',
+                        }}
+                        onError={(e) => {
+                          const el = e.currentTarget;
+                          if (!el.dataset.retried) {
+                            el.dataset.retried = 'true';
+                            el.src = '/chat-background.jpg';
+                          }
                         }}
                       />
                     ) : (activeConvTheme.startsWith('bg-') || activeConvTheme.startsWith('#')) ? (
@@ -5260,7 +5303,7 @@ export default function Messages() {
 
                 return (
                   <div
-                    className="sticky top-0 z-40 shrink-0 w-full relative overflow-hidden px-3 md:px-5 pt-[max(10px,calc(env(safe-area-inset-top,0px)+8px))] pb-2.5 flex items-center justify-between gap-2 select-none border-b-0 shadow-none touch-manipulation"
+                    className="sticky top-0 z-40 shrink-0 w-full relative overflow-hidden px-3 md:px-5 pt-[max(10px,calc(var(--app-safe-top)+8px))] pb-2.5 flex items-center justify-between gap-2 select-none border-b-0 shadow-none touch-manipulation"
                   >
                     {/* Header Theme Background Layer - Sharp and crystal clear, NOT BLURRED */}
                     {isThemeImage ? (
@@ -5268,7 +5311,7 @@ export default function Messages() {
                         <img
                           src={wallpaperImgSrc}
                           alt=""
-                          className="w-full h-[100dvh] object-cover object-top absolute top-0 left-0 transition-all duration-300"
+                          className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-300"
                           style={{
                             filter: `brightness(${activeConvThemeBrightness})`,
                             transform: 'scale(1)',
@@ -6858,7 +6901,7 @@ export default function Messages() {
             className="fixed inset-0 z-[120] bg-slate-50 md:bg-white flex flex-col md:w-[380px] md:left-auto md:border-l border-gray-100 shadow-2xl will-change-transform"
           >
             {/* Header */}
-            <div className="pt-[calc(env(safe-area-inset-top,0px)+16px)] md:pt-3 pb-3 px-4 min-h-[calc(72px+env(safe-area-inset-top,0px))] md:min-h-[64px] border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-10 shadow-2xs">
+            <div className="pt-[calc(var(--app-safe-top)+16px)] md:pt-3 pb-3 px-4 min-h-[calc(72px+var(--app-safe-top))] md:min-h-[64px] border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-10 shadow-2xs">
               <div className="flex items-center space-x-2.5">
                 <button
                   onClick={() => {

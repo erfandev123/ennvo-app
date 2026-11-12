@@ -17,6 +17,10 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 
 import androidx.core.content.ContextCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.ServerPath;
@@ -87,6 +91,16 @@ public class CallActivity extends BridgeActivity {
         Window window = getWindow();
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+        // Fullscreen call screen: no status bar, no navigation bar. A swipe
+        // from the edge brings them back for a moment.
+        try {
+            WindowInsetsControllerCompat controller =
+                    WindowCompat.getInsetsController(window, window.getDecorView());
+            controller.setSystemBarsBehavior(
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            controller.hide(WindowInsetsCompat.Type.systemBars());
+        } catch (Exception ignored) { }
+
         // Only the call bundle is hosted at the app root, keeping the
         // https://localhost origin (shared Firebase login) but never parsing
         // the full React application.
@@ -107,6 +121,22 @@ public class CallActivity extends BridgeActivity {
             web.getSettings().setDomStorageEnabled(true);
             web.addJavascriptInterface(new CallBridge(), "AndroidCallScreen");
         } catch (Exception ignored) { }
+
+        // The call page is fullscreen, so it only needs the display cutout.
+        // The value is published as a CSS variable, exactly like in the main
+        // app, so the header never sits under the notch.
+        View content = findViewById(android.R.id.content);
+        if (content != null) {
+            ViewCompat.setOnApplyWindowInsetsListener(content, (v, insets) -> {
+                int top = insets.getInsets(WindowInsetsCompat.Type.displayCutout()).top;
+                float density = getResources().getDisplayMetrics().density;
+                runJs("(function(){var s=document.documentElement.style;"
+                        + "s.setProperty('--safe-area-inset-top','" + (top / density) + "px');"
+                        + "s.setProperty('--safe-area-inset-bottom','0px');})()");
+                return insets;
+            });
+            content.requestApplyInsets();
+        }
 
         // The interface may be injected after the page's first script tick;
         // let the page re-read id/name/action and auto-accept if needed.

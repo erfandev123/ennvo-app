@@ -181,7 +181,7 @@ export default function StoryNoteViewerModal({
         </div>
 
         {/* Story Top Progress Bar */}
-        <div className="relative z-20 px-3.5 pt-[calc(env(safe-area-inset-top,0px)+10px)] pb-2 flex items-center space-x-1">
+        <div className="relative z-20 px-3.5 pt-[calc(var(--app-safe-top)+10px)] pb-2 flex items-center space-x-1">
           <div className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
             <div
               className="h-full bg-white transition-[width] duration-75 ease-linear rounded-full"
@@ -273,7 +273,7 @@ export default function StoryNoteViewerModal({
         </div>
 
         {/* Bottom Interaction Bar */}
-        <div className="relative z-20 px-4 pt-2 pb-[max(env(safe-area-inset-bottom),18px)] flex flex-col space-y-3 bg-gradient-to-t from-black via-black/85 to-transparent">
+        <div className="relative z-20 px-4 pt-2 pb-[max(var(--app-safe-bottom),18px)] flex flex-col space-y-3 bg-gradient-to-t from-black via-black/85 to-transparent">
           {/* Toast Notification */}
           <AnimatePresence>
             {showToast && (

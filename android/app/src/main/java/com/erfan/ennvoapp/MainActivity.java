@@ -196,32 +196,47 @@ public class MainActivity extends BridgeActivity {
         controller.setAppearanceLightStatusBars(light);
         controller.setAppearanceLightNavigationBars(light);
         controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-        controller.show(WindowInsetsCompat.Type.statusBars());
-        controller.show(WindowInsetsCompat.Type.navigationBars());
+        // Fullscreen: the app owns the whole screen. A swipe from the top or
+        // the bottom edge brings the bars back for a moment.
+        controller.hide(WindowInsetsCompat.Type.systemBars());
     }
 
-    // Edge-to-edge without a hidden notch area. The content is padded for the
-    // bars so chat headers and the composer never sit under the status bar or
-    // the gesture bar. The values are also exposed as CSS variables for pages
-    // that want to draw behind the bars themselves.
+    /**
+     * The single owner of the window insets.
+     *
+     * Capacitor's own SystemBars plugin is disabled (capacitor.config.ts), so
+     * the keyboard height is applied exactly once: the content view is padded
+     * by the keyboard, which shrinks the WebView. The page then reflows like
+     * in a native app instead of jumping, and the composer sits right on top
+     * of the keyboard without any JavaScript compensation.
+     */
     private void setupInsets() {
         View content = findViewById(android.R.id.content);
         ViewCompat.setOnApplyWindowInsetsListener(content, (v, insets) -> {
-            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+            Insets cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout());
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
             boolean keyboard = insets.isVisible(WindowInsetsCompat.Type.ime()) && ime.bottom > 0;
-            int top = bars.top;
-            int bottom = keyboard ? ime.bottom : bars.bottom;
-            v.setPadding(bars.left, top, bars.right, bottom);
-            if (top != lastBarsTop || bottom != lastBarsBottom) {
-                lastBarsTop = top;
+
+            // The system bars are hidden, so only the display cutout (notch) and
+            // the keyboard move the content. The notch is not padded natively:
+            // the web app draws its header into it, so there is no black band.
+            int left = Math.max(cutout.left, bars.left);
+            int right = Math.max(cutout.right, bars.right);
+            int bottom = keyboard ? ime.bottom : 0;
+
+            v.setPadding(left, 0, right, bottom);
+
+            float density = getResources().getDisplayMetrics().density;
+            if (cutout.top != lastBarsTop || bottom != lastBarsBottom) {
+                lastBarsTop = cutout.top;
                 lastBarsBottom = bottom;
-                float density = getResources().getDisplayMetrics().density;
                 runJs("(function(){var s=document.documentElement.style;"
-                        + "s.setProperty('--safe-area-inset-top','" + (top / density) + "px');"
-                        + "s.setProperty('--safe-area-inset-bottom','" + (bottom / density) + "px');"
-                        + "s.setProperty('--safe-area-inset-left','" + (bars.left / density) + "px');"
-                        + "s.setProperty('--safe-area-inset-right','" + (bars.right / density) + "px');})()");
+                        + "s.setProperty('--safe-area-inset-top','" + (cutout.top / density) + "px');"
+                        + "s.setProperty('--safe-area-inset-bottom','0px');"
+                        + "s.setProperty('--safe-area-inset-left','" + (left / density) + "px');"
+                        + "s.setProperty('--safe-area-inset-right','" + (right / density) + "px');"
+                        + "s.setProperty('--keyboard-inset','" + (bottom / density) + "px');})()");
             }
             return insets;
         });
@@ -620,8 +635,14 @@ public class MainActivity extends BridgeActivity {
                 try {
                     Window window = getWindow();
                     applyBars(window, !isDark);
+                    int color = Color.parseColor(hex);
                     WebView web = getBridge().getWebView();
-                    web.setBackgroundColor(Color.parseColor(hex));
+                    web.setBackgroundColor(color);
+                    // The window background is only visible in the areas the
+                    // WebView does not cover (the notch while the keyboard is
+                    // animating). Keeping it in sync with the app theme means
+                    // no black band ever flashes.
+                    window.setBackgroundDrawable(new ColorDrawable(color));
                 } catch (Exception ignored) {}
             });
         }

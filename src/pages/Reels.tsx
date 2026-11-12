@@ -57,6 +57,9 @@ export default function Reels() {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const followingSet = useMemo(() => new Set(followingIds || []), [followingIds]);
   const [visibleCount, setVisibleCount] = useState(6);
+  // The reel that is currently in the middle of the screen. The reel behind
+  // it is preloaded, so the next one starts without buffering.
+  const [activeIndex, setActiveIndex] = useState(0);
   // Each mounted reel owns a <video>. Keeping that list bounded is what keeps
   // scrolling smooth after the user has watched dozens of reels.
   const MAX_MOUNTED_REELS = 24;
@@ -179,6 +182,7 @@ export default function Reels() {
         // Determine current index to mark reel as seen after 2.5 seconds of viewing
         if (clientHeight > 0) {
           const activeIdx = Math.round(scrollTop / clientHeight);
+          setActiveIndex(prev => (prev === activeIdx ? prev : activeIdx));
           if (activeReelTimerRef.current) clearTimeout(activeReelTimerRef.current);
           activeReelTimerRef.current = setTimeout(() => {
             const activeReel = reels[activeIdx];
@@ -364,7 +368,7 @@ export default function Reels() {
 
       {/* Top Navigation Tabs: "Following" & "For You" - Extremely close together, NO vertical line divider, Spring animation */}
       <div 
-        className={`absolute top-0 left-0 right-0 z-40 flex items-center justify-center pt-[max(calc(env(safe-area-inset-top,0px)+10px),14px)] pb-2 select-none pointer-events-none transition-opacity duration-200 lg:hidden ${
+        className={`absolute top-0 left-0 right-0 z-40 flex items-center justify-center pt-[max(calc(var(--app-safe-top)+10px),14px)] pb-2 select-none pointer-events-none transition-opacity duration-200 lg:hidden ${
           isReelsCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100'
         }`}
       >
@@ -414,7 +418,7 @@ export default function Reels() {
       </div>
 
       {/* Top Right Search Button */}
-      <div className={`absolute top-[max(calc(env(safe-area-inset-top,0px)+10px),16px)] right-4 md:right-8 z-40 transition-opacity duration-300 ${isReelsCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}>
+      <div className={`absolute top-[max(calc(var(--app-safe-top)+10px),16px)] right-4 md:right-8 z-40 transition-opacity duration-300 ${isReelsCleanZoom ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}>
         <button 
           onClick={() => pushPage('search')}
           className="p-2 text-white md:text-gray-800 dark:md:text-white hover:opacity-80 transition-all drop-shadow-sm flex items-center justify-center cursor-pointer"
@@ -466,13 +470,13 @@ export default function Reels() {
             <button onClick={() => setActiveTab('forYou')} className="bg-white text-black px-8 py-2.5 rounded-full font-normal">Discover Creators</button>
           </div>
         ) : (
-          filteredReels.slice(0, visibleCount).map((reel) => (
+          filteredReels.slice(0, visibleCount).map((reel, index) => (
             <div
               key={reel.id}
               className="reel-snap-item w-full h-full shrink-0 reel-cv"
               style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
             >
-              <ReelItem reel={reel} />
+              <ReelItem reel={reel} isNext={index === activeIndex + 1} />
             </div>
           ))
         )}

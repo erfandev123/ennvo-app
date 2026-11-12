@@ -51,13 +51,12 @@ const isNativeShell =
 export const db = initializeFirestore(app, {
   localCache: localCacheSetting,
   ignoreUndefinedProperties: true,
-  // Inside the Android WebView the HTTP/2 WebChannel stream is frequently
-  // dropped by carrier networks or by the WebView itself. That is what makes
-  // chat look "not connected": new messages never arrive and old chats never
-  // load. Long polling is the transport that always works there, so the native
-  // app uses it directly instead of waiting for a 30 second auto-detect.
-  experimentalForceLongPolling: isNativeShell,
-  experimentalAutoDetectLongPolling: !isNativeShell,
+  // WebChannel (HTTP/2 streaming) delivers a new message in a few hundred
+  // milliseconds. Long polling used to be forced inside the Android WebView,
+  // which added seconds to every single message. Auto detect starts with long
+  // polling and switches to the streaming transport as soon as the connection
+  // allows it, and falls back automatically when it does not.
+  experimentalAutoDetectLongPolling: true,
 });
 
 /**

@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <!-- Android WebView & Mobile Touch Performance Optimizations -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <!-- interactive-widget=resizes-visual: the Android shell already resizes
+         the WebView by the keyboard height, so the layout viewport must not be
+         resized a second time (that was the "page jumps up" bug). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-visual" />
     <meta name="theme-color" content="#0ea5e9" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

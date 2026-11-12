@@ -1335,7 +1335,7 @@ export default function Home() {
         />
 
         {/* Screen 3 Top Header: Search Icon (Left) • ennvo brand (Center) • Notification Bell (Right) - Hidden on PC */}
-        <header className="lg:hidden sticky top-0 left-0 right-0 z-50 w-full max-w-[560px] mx-auto bg-transparent border-0 shadow-none px-4 pt-[max(calc(env(safe-area-inset-top,0px)+8px),12px)] pb-2 flex items-center justify-between select-none">
+        <header className="lg:hidden sticky top-0 left-0 right-0 z-50 w-full max-w-[560px] mx-auto bg-transparent border-0 shadow-none px-4 pt-[max(calc(var(--app-safe-top)+8px),12px)] pb-2 flex items-center justify-between select-none">
           {/* Left: Search Button (Mobile only) - No animation on click */}
           <button 
             onClick={() => pushPage('search')} 

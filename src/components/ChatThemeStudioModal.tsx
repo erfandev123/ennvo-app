@@ -526,7 +526,7 @@ export const ChatThemeStudioModal: React.FC<ChatThemeStudioModalProps> = ({
             ======================================================== */}
         <div className="flex md:hidden flex-col h-[100dvh] w-full bg-black select-none overflow-hidden">
           {/* Top Bar */}
-          <div className="pt-[calc(env(safe-area-inset-top,0px)+10px)] pb-2.5 px-4 flex items-center justify-between bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md shrink-0 z-30 border-b border-black/5 dark:border-white/10">
+          <div className="pt-[calc(var(--app-safe-top)+10px)] pb-2.5 px-4 flex items-center justify-between bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md shrink-0 z-30 border-b border-black/5 dark:border-white/10">
             <button
               onClick={onClose}
               className="text-[15px] font-medium text-neutral-800 dark:text-neutral-200 hover:text-black py-1 cursor-pointer"

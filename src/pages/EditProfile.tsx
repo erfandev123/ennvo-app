@@ -170,7 +170,7 @@ export default function EditProfile() {
       />
 
       {/* Floating Top Action Controls - No Header Bar so blue gradient flows to the very top */}
-      <div className="sticky top-0 z-30 pointer-events-none bg-transparent border-0 px-4 pt-[max(calc(env(safe-area-inset-top,0px)+8px),14px)] pb-2 flex items-center justify-between select-none [&>*]:pointer-events-auto">
+      <div className="sticky top-0 z-30 pointer-events-none bg-transparent border-0 px-4 pt-[max(calc(var(--app-safe-top)+8px),14px)] pb-2 flex items-center justify-between select-none [&>*]:pointer-events-auto">
         <button 
           onClick={() => setCurrentPage('profile')} 
           className="w-10 h-10 rounded-full bg-white/75 dark:bg-black/60 hover:bg-white dark:hover:bg-black/80 backdrop-blur-md flex items-center justify-center transition-all text-neutral-900 dark:text-white cursor-pointer border border-black/5 dark:border-white/15 shadow-sm"

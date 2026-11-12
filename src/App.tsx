@@ -54,6 +54,7 @@ const MiniChat = lazy(() => import('./components/MiniChat'));
 import { UploadProgressBar } from './components/UploadProgressBar';
 import { getPost } from './services/postService';
 import { bridge, PendingSharePayload } from './native/bridge';
+import { native } from './native';
 import { 
   startNotificationCenter, 
   stopNotificationCenter, 
@@ -131,7 +132,7 @@ const InAppToaster = memo(() => {
             setToast(null);
           }
         }}
-        className="fixed top-[max(calc(env(safe-area-inset-top,0px)+8px),12px)] left-0 right-0 z-[350] flex justify-center pointer-events-none px-3 sm:px-4"
+        className="fixed top-[max(calc(var(--app-safe-top)+8px),12px)] left-0 right-0 z-[350] flex justify-center pointer-events-none px-3 sm:px-4"
       >
         <div 
           className="bg-white/95 dark:bg-[#121824]/95 text-neutral-900 dark:text-white shadow-[0_16px_40px_rgba(14,165,233,0.18),0_4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.45)] border border-sky-200/90 dark:border-sky-500/25 rounded-[26px] p-3.5 pointer-events-auto cursor-pointer max-w-[400px] w-full transition-transform relative overflow-hidden group backdrop-blur-2xl transform-gpu select-none"
@@ -458,6 +459,13 @@ export default function App() {
       document.head.appendChild(metaThemeColor);
     }
     metaThemeColor.setAttribute('content', targetColor);
+
+    // Tell the Android shell which colour the app is painted in. The window
+    // and the WebView use it, so the areas the WebView does not cover (the
+    // notch, the keyboard animation) never flash a black band.
+    try {
+      native.setStatusBarColor(targetColor, isDark);
+    } catch (e) {}
   }, [currentPage, appTheme, viewingReel, viewingMedia]);
 
   // State for App Updates, Banned Accounts, Native Shares, and Battery Prompt
@@ -1026,7 +1034,7 @@ export default function App() {
           <button 
             type="button"
             onClick={() => { setViewingReel(null); setViewingReelList(null); }}
-            className="fixed top-[max(calc(env(safe-area-inset-top,0px)+12px),16px)] left-4 sm:top-6 sm:left-6 z-[160] p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/20 shadow-2xl transition-transform cursor-pointer flex items-center justify-center group"
+            className="fixed top-[max(calc(var(--app-safe-top)+12px),16px)] left-4 sm:top-6 sm:left-6 z-[160] p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/20 shadow-2xl transition-transform cursor-pointer flex items-center justify-center group"
             title="Close Reel"
             aria-label="Close Reel"
           >
@@ -1410,7 +1418,7 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
         className="w-full h-full sm:w-[390px] md:w-[410px] sm:h-[min(calc(100vh-32px),820px)] sm:max-h-[94vh] bg-black sm:rounded-[32px] overflow-hidden relative shadow-2xl sm:border sm:border-white/10 flex flex-col justify-between my-auto mx-auto"
       >
         {/* Top Segmented Progress Bar */}
-        <div className="absolute top-[max(calc(env(safe-area-inset-top,0px)+8px),12px)] left-3 right-3 flex space-x-1.5 z-40">
+        <div className="absolute top-[max(calc(var(--app-safe-top)+8px),12px)] left-3 right-3 flex space-x-1.5 z-40">
           {storiesList.map((st, idx) => (
             <div key={st.id || idx} className="h-1 bg-white/30 rounded-full flex-1 overflow-hidden backdrop-blur-xs">
               <div 
@@ -1424,7 +1432,7 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
         </div>
 
         {/* Top Header: Creator Info & Controls */}
-        <div className="absolute top-[max(calc(env(safe-area-inset-top,0px)+22px),26px)] left-3 right-3 flex items-center justify-between z-40">
+        <div className="absolute top-[max(calc(var(--app-safe-top)+22px),26px)] left-3 right-3 flex items-center justify-between z-40">
           {/* Creator Pill */}
           <div className="flex items-center space-x-2 bg-black/40 backdrop-blur-md border border-white/15 pl-1.5 pr-3 py-1.5 rounded-full shadow-lg max-w-[80%] min-w-0">
             <div className="p-[1.5px] rounded-full bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600 shrink-0">
@@ -1526,7 +1534,7 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
         )}
 
         {/* Bottom Floating Area: Quick Emojis + Modern Reply Input Bar */}
-        <div className="absolute bottom-0 left-0 right-0 z-30 pb-[max(calc(env(safe-area-inset-bottom,0px)+10px),14px)] px-3 sm:px-4 space-y-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-8">
+        <div className="absolute bottom-0 left-0 right-0 z-30 pb-[max(calc(var(--app-safe-bottom)+10px),14px)] px-3 sm:px-4 space-y-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-8">
           {/* Quick Reaction Emojis */}
           <div className="flex items-center justify-around px-2">
             {quickEmojis.map((emoji) => (

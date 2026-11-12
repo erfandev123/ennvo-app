@@ -142,9 +142,15 @@ interface ReelItemProps {
   reel: Post;
   isModal?: boolean;
   onClose?: () => void;
+  /**
+   * True for the reel right behind the one that is currently playing. Its
+   * video is downloaded while the user is still watching, so the next reel
+   * starts instantly instead of buffering.
+   */
+  isNext?: boolean;
 }
 
-export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, onClose }) => {
+export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, onClose, isNext }) => {
   const [playing, setPlaying] = useState(false);
   const [liked, setLiked] = useState<boolean>(() => !!(reel.isLiked || reel.liked));
   const [saved, setSaved] = useState<boolean>(() => !!(reel.isSaved || reel.saved));
@@ -316,7 +322,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
     reelsStyle: reelsUiStyle
   } = useAppStore();
 
-  const reelBottomSpacing = isModal ? 'bottom-[78px]' : navStyle === 'glass' ? 'bottom-[calc(98px+env(safe-area-inset-bottom))]' : 'bottom-[calc(72px+env(safe-area-inset-bottom))]';
+  const reelBottomSpacing = isModal ? 'bottom-[78px]' : navStyle === 'glass' ? 'bottom-[calc(98px+var(--app-safe-bottom))]' : 'bottom-[calc(72px+var(--app-safe-bottom))]';
 
   const cachedAuthor = userCache[reel.authorId];
   const rawAuthorName = cachedAuthor?.name || reel.authorName || 'User';
@@ -575,7 +581,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
           }
         });
       },
-      { threshold: 0.6 }
+      { threshold: 0.35, rootMargin: '0px 0px 15% 0px' }
     );
 
     if (containerRef.current) observer.observe(containerRef.current);
@@ -1143,9 +1149,9 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
             </div>
           ) : !isNearScreen ? (
             <div className="w-full h-full bg-black flex items-center justify-center">
-              {(reel.thumbnailUrl || reel.thumbnail || mediaSrc || reel.media?.[0]) && (
+              {(reel.thumbnailUrl || reel.thumbnail) && (
                 <img 
-                  src={reel.thumbnailUrl || reel.thumbnail || mediaSrc || reel.media?.[0]} 
+                  src={reel.thumbnailUrl || reel.thumbnail}
                   alt="" 
                   className={`w-full h-full ${(reel as any).aspectRatioFit === 'contain' ? 'object-contain' : 'object-cover'}`}
                   loading="lazy"
@@ -1167,7 +1173,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
               controls={false}
               poster={reel.thumbnailUrl || reel.thumbnail || "data:image/gif;base64,R0lHODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"}
               autoPlay={playing}
-              preload={playing ? "auto" : "metadata"}
+              preload={playing || isNext ? "auto" : "metadata"}
               onWaiting={() => setIsBuffering(true)}
               onPlaying={() => setIsBuffering(false)}
               onCanPlay={() => setIsBuffering(false)}
@@ -1179,6 +1185,14 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
                 isCleanZoom ? 'scale-[1.08] sm:scale-110' : ''
               }`}
             />
+          )}
+
+          {/* A tiny spinner while the video buffers. Without it the reel just
+              looked frozen and the user thought the app had hung. */}
+          {isBuffering && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <div className="w-9 h-9 rounded-full border-[3px] border-white/25 border-t-white animate-spin" />
+            </div>
           )}
 
           {/* Clean seamless video view without buffering spinner */}
@@ -1570,7 +1584,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
           {/* Timeline / Progress Bar (ONLY in Classic Navigation: Flush right above bottom nav without dipping or overlapping) */}
           {!isImageReel && isNearScreen && navStyle !== 'glass' && (
             <div 
-              className={`absolute ${isModal ? 'bottom-0' : 'bottom-[calc(54px+env(safe-area-inset-bottom))] md:bottom-0'} left-0 right-0 z-[70] flex flex-col justify-end h-4 cursor-pointer touch-none select-none group/timeline transition-opacity duration-200 ${(!playing || isScrubbing) ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+              className={`absolute ${isModal ? 'bottom-0' : 'bottom-[calc(54px+var(--app-safe-bottom))] md:bottom-0'} left-0 right-0 z-[70] flex flex-col justify-end h-4 cursor-pointer touch-none select-none group/timeline transition-opacity duration-200 ${(!playing || isScrubbing) ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
               onPointerDown={handleScrubPointerDown}
               onPointerMove={handleScrubPointerMove}
               onPointerUp={handleScrubPointerUp}
@@ -1732,7 +1746,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
         {isModal && (
           <div 
             onClick={(e) => { e.stopPropagation(); setShowComments(true); }}
-            className="md:hidden absolute bottom-3 inset-x-3.5 h-[52px] bg-neutral-950/85 backdrop-blur-2xl border border-white/15 rounded-full flex items-center px-3 z-[90] space-x-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.55)] mb-[env(safe-area-inset-bottom)] cursor-pointer transition-transform select-none group"
+            className="md:hidden absolute bottom-3 inset-x-3.5 h-[52px] bg-neutral-950/85 backdrop-blur-2xl border border-white/15 rounded-full flex items-center px-3 z-[90] space-x-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.55)] mb-[var(--app-safe-bottom)] cursor-pointer transition-transform select-none group"
           >
             {/* User Avatar with soft glow border */}
             <div className="relative shrink-0">
@@ -3437,7 +3451,7 @@ export const CommentsPortal = ({ postId, onClose, authorId, authorName, authorAv
         />
 
         {/* Input & Action Controls Form - Clean White & Sky Blue */}
-        <form onSubmit={handleSubmit} style={{ transform: 'translateZ(0)' }} className="p-3 border-t border-sky-100/80 dark:border-sky-900/40 flex flex-col space-y-2 bg-white dark:bg-[#0c121e] sticky bottom-0 z-20 shrink-0 shadow-[0_-2px_12px_rgba(14,165,233,0.05)] pb-[max(1.35rem,calc(env(safe-area-inset-bottom)+0.7rem))]">
+        <form onSubmit={handleSubmit} style={{ transform: 'translateZ(0)' }} className="p-3 border-t border-sky-100/80 dark:border-sky-900/40 flex flex-col space-y-2 bg-white dark:bg-[#0c121e] sticky bottom-0 z-20 shrink-0 shadow-[0_-2px_12px_rgba(14,165,233,0.05)] pb-[max(1.35rem,calc(var(--app-safe-bottom)+0.7rem))]">
           {/* Replying Banner */}
           {replyingTo && (
             <div className="flex items-center justify-between text-[11px] bg-sky-50 dark:bg-sky-950/50 px-3 py-1.5 rounded-xl border border-sky-100 dark:border-sky-900/50">

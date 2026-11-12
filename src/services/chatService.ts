@@ -20,6 +20,17 @@ import {
 import { notifyUser } from './pushGateway';
 import { db, auth } from '../firebase';
 import { Conversation, Message } from '../types';
+import { persist } from '../utils/persist';
+
+/**
+ * The newest copy of every conversation the user is part of.
+ *
+ * The conversation list already streams this data, so keeping it in memory
+ * means an outgoing message never has to read the conversation document
+ * again - that read was the reason a message could take seconds to appear on
+ * the other phone.
+ */
+const conversationCache = new Map<string, any>();
 
 /** Idempotent message id used as the Firestore document id. */
 export const createClientMessageId = (uid: string) =>
@@ -291,23 +302,27 @@ export const sendMessage = async (
 ) => {
   try {
     const convRef = doc(db, 'conversations', conversationId);
-    let convData: any = null;
+    let convData: any = conversationCache.get(conversationId) || null;
     try {
-      // Read the cached copy first: on a slow network the server round-trip
-      // used to delay every single outgoing message by several seconds. A cache
-      // miss (new conversation / cleared cache) falls back to the server so the
-      // conversation metadata and unread counts are still updated correctly.
+      // The newest conversation metadata is already in memory (the
+      // conversation list streams it), so an outgoing message never waits for
+      // a server round trip. Only a completely unknown conversation falls back
+      // to the cached document and then to the server.
       let convSnap;
-      try {
-        convSnap = await getDocFromCache(convRef);
-      } catch {
-        convSnap = null;
+      if (!convData) {
+        try {
+          convSnap = await getDocFromCache(convRef);
+        } catch {
+          convSnap = null;
+        }
+        if (!convSnap || !convSnap.exists()) {
+          convSnap = await getDoc(convRef).catch(() => null);
+        }
+        if (convSnap && convSnap.exists()) {
+          convData = convSnap.data();
+        }
       }
-      if (!convSnap || !convSnap.exists()) {
-        convSnap = await getDoc(convRef).catch(() => null);
-      }
-      if (convSnap && convSnap.exists()) {
-        convData = convSnap.data();
+      if (convData) {
 
         // Check if blocked
         if (convData.participantIds?.length === 2) {
@@ -438,9 +453,13 @@ export const sendMessage = async (
           updatePayload.requestMessageCount = increment(1);
         }
 
-        await updateDoc(convRef, updatePayload);
+        // The push is what makes the message show up instantly on the other
+        // phone, so it is sent in parallel with the conversation update
+        // instead of after it.
+        const updatePromise = updateDoc(convRef, updatePayload).catch((updateErr) => {
+          console.warn("Failed updating conversation lastMessage:", updateErr);
+        });
 
-        // Dispatch High-Priority DATA-ONLY Push Notification to all other participants
         const senderName = convData.participantNames?.[senderId] || 'Friend';
         const senderAvatar = convData.participantAvatars?.[senderId] || '';
 
@@ -455,6 +474,20 @@ export const sendMessage = async (
             convId: conversationId,
           });
         });
+
+        // Keep the in-memory copy fresh so the next message does not need a
+        // read either.
+        const cachedConv = conversationCache.get(conversationId);
+        if (cachedConv) {
+          conversationCache.set(conversationId, {
+            ...cachedConv,
+            lastMessage: lastMsgLabel,
+            lastSenderId: senderId,
+            lastMessageTime: Date.now(),
+          });
+        }
+
+        await updatePromise;
       }
     } catch (updateErr) {
       console.warn("Failed updating conversation lastMessage:", updateErr);
@@ -512,32 +545,46 @@ export const markMessagesDelivered = async (conversationId: string, userId: stri
   }
 };
 
-export const markConversationRead = async (conversationId: string, userId: string) => {
+/**
+ * Messages that still have to be marked as "seen".
+ *
+ * Marking every incoming message straight away used to run a 25 document
+ * read plus a 25 document write for every single new message, which delayed
+ * the next snapshot and made the chat feel slow. The ids are collected here
+ * and flushed in one small batch instead.
+ */
+const pendingSeen = new Map<string, Set<string>>();
+let seenFlushTimer: any = null;
+
+export const markConversationRead = async (conversationId: string, userId: string, messageIds?: string[]) => {
   try {
     const convRef = doc(db, 'conversations', conversationId);
     updateDoc(convRef, {
       [`unreadCount.${userId}`]: 0
     }).catch(() => {});
 
-    // Mark unread messages sent by others as seen
-    const q = query(
-      collection(db, 'conversations', conversationId, 'messages'), 
-      orderBy('createdAt', 'desc'),
-      limit(25)
-    );
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      const batch = writeBatch(db);
-      let updated = false;
-      snap.docs.forEach(d => {
-        const data = d.data();
-        if (data.senderId !== userId && data.status !== 'seen') {
-          batch.update(d.ref, { status: 'seen' });
-          updated = true;
-        }
-      });
-      if (updated) await batch.commit();
-    }
+    if (!messageIds || messageIds.length === 0) return;
+
+    const ids = pendingSeen.get(conversationId) || new Set<string>();
+    messageIds.forEach((id) => ids.add(id));
+    pendingSeen.set(conversationId, ids);
+
+    if (seenFlushTimer) return;
+    seenFlushTimer = setTimeout(async () => {
+      seenFlushTimer = null;
+      const entries = Array.from(pendingSeen.entries());
+      pendingSeen.clear();
+      for (const [convId, ids] of entries) {
+        if (!ids.size) continue;
+        try {
+          const batch = writeBatch(db);
+          Array.from(ids).slice(0, 30).forEach((id) => {
+            batch.update(doc(db, 'conversations', convId, 'messages', id), { status: 'seen' });
+          });
+          await batch.commit();
+        } catch (e) {}
+      }
+    }, 700);
   } catch (error: any) {
     console.error(error);
   }
@@ -579,9 +626,9 @@ export const subscribeMessages = (conversationId: string, callback: (messages: M
     });
 
     const reversed = deduped.reverse();
-    try {
-      localStorage.setItem(`ennvo_offline_msgs_${conversationId}`, JSON.stringify(reversed.slice(-50)));
-    } catch (e) {}
+    // Debounced: the offline cache is written once the stream settles down
+    // instead of on every single snapshot.
+    persist(`ennvo_offline_msgs_${conversationId}`, reversed.slice(-50), 1200);
     callback(reversed);
   }, (err) => {
     console.warn("Firestore messages snapshot notice:", err);
@@ -645,9 +692,10 @@ export const subscribeConversations = (userId: string, callback: (conversations:
     const conversations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Conversation));
     const deduped = dedupeConversations(conversations);
     deduped.sort((a: any, b: any) => getConversationTime(b) - getConversationTime(a));
-    try {
-      localStorage.setItem(`ennvo_offline_convs_${userId}`, JSON.stringify(deduped));
-    } catch (e) {}
+    // Keep the newest copy in memory: sending a message then no longer needs
+    // a server round trip just to read the conversation metadata.
+    deduped.forEach((c: any) => conversationCache.set(c.id, c));
+    persist(`ennvo_offline_convs_${userId}`, deduped, 1200);
     callback(deduped);
   }, (err) => {
     console.warn("Firestore conversations snapshot notice:", err);
