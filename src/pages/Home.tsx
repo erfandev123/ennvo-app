@@ -59,6 +59,7 @@ import { PullToRefresh } from '../components/PullToRefresh';
 import { FacebookStorySkeleton, FacebookPostSkeleton } from '../components/Skeletons';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { useShallow } from 'zustand/react/shallow';
+import { formatMediaUrl } from '../utils';
 
 // --- Dedicated 2D User Search Bar with Live Dropdown ---
 export const FeedUserSearchBar: React.FC<{ className?: string; placeholder?: string }> = React.memo(({ 
@@ -214,7 +215,7 @@ const StoryItem = React.memo(({ story, onClick }: { story: any, onClick: () => v
         className="relative shrink-0 cursor-pointer group transition-all select-none w-[96px] h-[142px] sm:w-[110px] sm:h-[162px] rounded-[24px] sm:rounded-[26px] overflow-hidden bg-neutral-100 dark:bg-white/[0.06] flex flex-col justify-between p-2.5 shadow-xs ring-1 ring-black/5 dark:ring-white/10"
       >
         <img 
-          src={story.bg || `https://ui-avatars.com/api/?name=${encodeURIComponent(story.name || 'User')}&background=random`} 
+          src={formatMediaUrl(story.bg) || `https://ui-avatars.com/api/?name=${encodeURIComponent(story.name || 'User')}&background=random`} 
           alt="My Story" 
           loading="lazy" 
           decoding="async" 
@@ -244,7 +245,7 @@ const StoryItem = React.memo(({ story, onClick }: { story: any, onClick: () => v
       className="relative shrink-0 cursor-pointer group transition-all select-none w-[96px] h-[142px] sm:w-[110px] sm:h-[162px] rounded-[24px] sm:rounded-[26px] overflow-hidden bg-neutral-100 dark:bg-white/[0.06] flex flex-col justify-between p-2.5 shadow-xs ring-1 ring-black/5 dark:ring-white/10"
     >
       <img 
-        src={mediaImg} 
+        src={formatMediaUrl(mediaImg)} 
         alt="Story" 
         loading="lazy" 
         decoding="async" 
@@ -255,7 +256,7 @@ const StoryItem = React.memo(({ story, onClick }: { story: any, onClick: () => v
       {/* Top author mini avatar - clean, left side, without blue box */}
       <div className="relative z-10 self-start w-8 h-8 rounded-full overflow-hidden ring-2 ring-white/95 dark:ring-black/90 shadow-sm shrink-0">
         <img 
-          src={avatarImg} 
+          src={formatMediaUrl(avatarImg)} 
           alt="" 
           className="w-full h-full object-cover"
         />

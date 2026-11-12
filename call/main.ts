@@ -217,9 +217,10 @@ function finish() {
 function openApp() {
   try {
     const N = refreshNative();
-    // When the call is already running in the main app, the native side has to
-    // keep the call service and the audio route alive while it closes.
-    if (callRunningInMain && N && typeof N.openAppKeepingCall === 'function') {
+    // A running call must not be torn down: the call screen only moves to the
+    // background, the media and the audio route keep running.
+    const keepCall = callRunningInMain || active;
+    if (keepCall && N && typeof N.openAppKeepingCall === 'function') {
       N.openAppKeepingCall();
       return;
     }
@@ -231,6 +232,24 @@ function openApp() {
   } catch (e) {
     finish();
   }
+}
+
+/**
+ * Back returns to the app, exactly like WhatsApp: the call keeps running in
+ * the background and the notification stays, so the call is never lost.
+ */
+function goBackToApp() {
+  try {
+    const N = refreshNative();
+    if (N && typeof N.goBackToApp === 'function') {
+      N.goBackToApp();
+      return;
+    }
+    if (N && typeof N.openAppKeepingCall === 'function') {
+      N.openAppKeepingCall();
+      return;
+    }
+  } catch (e) {}
 }
 
 async function ensurePermissions(): Promise<boolean> {
@@ -336,7 +355,7 @@ async function startAccept() {
   try { remoteAudio.play().catch(() => {}); } catch (e) {}
 
   setMode('connecting');
-  statusEl.textContent = 'Connecting…';
+  statusEl.textContent = 'Ringing…';
   setHint(null);
 
   try {
@@ -385,6 +404,9 @@ async function startAccept() {
         } else if (status === 'reconnecting') {
           statusEl.textContent = 'Reconnecting…';
           setHint('Network changed — keeping the call alive');
+        } else if (status === 'calling') {
+          // The network is still setting the call up.
+          statusEl.textContent = 'Calling…';
         } else if (status === 'accepted') {
           setHint(null);
           onConnected();
@@ -528,7 +550,9 @@ function tick() {
 
 function watchNativeCallbacks() {
   (window as any).onNativeHangup = () => hangup();
-  (window as any).onAndroidBack = () => hangup();
+  // Back returns to the app, exactly like WhatsApp: the call keeps running in
+  // the background and the notification stays.
+  (window as any).onAndroidBack = () => goBackToApp();
   (window as any).onNativeDecline = () => decline();
   (window as any).onCallAccept = () => {
     if (!active && !accepting && !ending) void startAccept();
@@ -593,7 +617,7 @@ async function boot() {
   // tap on the call notification's Answer button) auto-accepts immediately.
   if (info.action === 'answer') {
     setMode('connecting');
-    statusEl.textContent = 'Connecting…';
+    statusEl.textContent = 'Ringing…';
     void startAccept();
     return;
   }

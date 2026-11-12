@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Media } from '../store';
 import { bridge } from '../native/bridge';
+import { formatMediaUrl } from '../utils';
 
 interface MediaViewerModalProps {
   media: Media;
@@ -323,7 +324,7 @@ export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ media, onClo
         {isVideo ? (
           <div className="relative max-w-full max-h-[85vh] flex items-center justify-center">
             <video
-              src={currentItem.url}
+              src={formatMediaUrl(currentItem.url)}
               controls
               autoPlay
               playsInline
@@ -339,7 +340,7 @@ export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ media, onClo
             onDoubleClick={handleDoubleTap}
           >
             <img
-              src={currentItem.url}
+              src={formatMediaUrl(currentItem.url)}
               alt="Media full view"
               referrerPolicy="no-referrer"
               draggable={false}
@@ -420,7 +421,7 @@ export const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ media, onClo
                     <Play className="w-4 h-4 text-white fill-white" />
                   </div>
                 ) : (
-                  <img src={it.url} alt={`thumb ${idx}`} className="w-full h-full object-cover" />
+                  <img src={formatMediaUrl(it.url)} alt={`thumb ${idx}`} className="w-full h-full object-cover" />
                 )}
               </button>
             ))}

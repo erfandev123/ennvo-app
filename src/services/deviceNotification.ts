@@ -4,6 +4,7 @@
  */
 
 import { playNotificationSound, playIncomingRingtone } from './soundService';
+import { formatMediaUrl } from '../utils';
 
 export interface DeviceNotificationOptions {
   title: string;
@@ -68,7 +69,10 @@ class DeviceNotificationService {
     const title = options.title || 'Ennvo';
     const body = options.body || '';
     const hasAvatar = !!options.icon && options.icon !== '/icon-192.png?v=5';
-    const icon = options.icon || '/icon-192.png?v=5';
+    // The photo has to be an absolute url: a stored "/uploads/..." path can not
+    // be loaded by the native notification, so the notification would fall back
+    // to the app icon.
+    const icon = hasAvatar ? formatMediaUrl(options.icon) : (options.icon || '/icon-192.png?v=5');
     const tag = options.tag || `ennvo-${Date.now()}`;
     const type = options.type || 'activity';
 

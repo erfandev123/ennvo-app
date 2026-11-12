@@ -45,7 +45,7 @@ export interface CallData {
   receiverName: string;
   receiverAvatar: string;
   type: 'audio' | 'video';
-  status: 'ringing' | 'accepted' | 'rejected' | 'ended' | 'reconnecting';
+  status: 'ringing' | 'calling' | 'accepted' | 'rejected' | 'ended' | 'reconnecting';
   createdAt: number;
   offer?: any;
   answer?: any;
@@ -500,7 +500,7 @@ export const initiateCall = async (
   receiver: { uid: string; name: string; avatar: string },
   type: 'audio' | 'video',
   onRemoteStream: (stream: MediaStream) => void,
-  onCallStatusChange: (status: 'ringing' | 'accepted' | 'rejected' | 'ended' | 'reconnecting') => void
+  onCallStatusChange: (status: 'ringing' | 'calling' | 'accepted' | 'rejected' | 'ended' | 'reconnecting') => void
 ): Promise<{ callId: string; stream: MediaStream }> => {
   cleanupMedia();
   currentCallType = type;
@@ -582,6 +582,9 @@ export const initiateCall = async (
       } else if (activeCallId === callId) {
         endCall(callId);
       }
+    } else if (state === 'checking' && !isCallConnected) {
+      // The connection is being set up. The call screen shows "Calling".
+      onCallStatusChange('calling');
     } else if ((state === 'connected' || state === 'completed') && !isCallConnected) {
       reconnectAttempts = 0;
       isCallConnected = true;
@@ -671,7 +674,7 @@ export const initiateCall = async (
 export const acceptIncomingCall = async (
   call: CallData,
   onRemoteStream: (stream: MediaStream) => void,
-  onCallStatusChange: (status: 'ringing' | 'accepted' | 'rejected' | 'ended' | 'reconnecting') => void
+  onCallStatusChange: (status: 'ringing' | 'calling' | 'accepted' | 'rejected' | 'ended' | 'reconnecting') => void
 ): Promise<{ stream: MediaStream }> => {
   cleanupMedia();
   stopRingtone();

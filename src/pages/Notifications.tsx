@@ -21,6 +21,7 @@ import { collection, query, orderBy, onSnapshot, doc, getDoc, limit } from 'fire
 import { activityBody } from '../utils/activityText';
 import { db } from '../firebase';
 import { useShallow } from 'zustand/react/shallow';
+import { formatMediaUrl } from '../utils';
 
 // Light haptic feedback helper
 const triggerHaptic = (ms = 12) => {
@@ -176,7 +177,7 @@ const ActivityCard = React.memo(({
       {/* Profile Picture with Micro Badge */}
       <div className="relative w-12 h-12 shrink-0 cursor-pointer" onClick={handleActorClick}>
         <img 
-          src={notif.actorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(notif.actorName || 'User')}&background=random`} 
+          src={formatMediaUrl(notif.actorAvatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(notif.actorName || 'User')}&background=random`} 
           alt={notif.actorName || 'avatar'}
           className="w-full h-full rounded-full object-cover shadow-[0_4px_14px_rgba(0,0,0,0.18)]"
           referrerPolicy="no-referrer"
@@ -231,7 +232,7 @@ const ActivityCard = React.memo(({
           {isVideo ? (
             <div className="w-full h-full relative flex items-center justify-center bg-neutral-950">
               <video 
-                src={notif.postMedia} 
+                src={formatMediaUrl(notif.postMedia)} 
                 className="w-full h-full object-cover pointer-events-none opacity-80" 
                 preload="none" 
                 muted 
@@ -243,7 +244,7 @@ const ActivityCard = React.memo(({
             </div>
           ) : notif.postMedia ? (
             <img 
-              src={notif.postMedia} 
+              src={formatMediaUrl(notif.postMedia)} 
               alt="post" 
               className="w-full h-full object-cover pointer-events-none transition-transform duration-300" 
               referrerPolicy="no-referrer" 

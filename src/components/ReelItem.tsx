@@ -900,8 +900,8 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
       >
         {/* Triangular profile picture group with motion animation */}
         <motion.div 
-          animate={{ y: [0, -3, 0], x: [0, 1, 0] }}
-          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+          animate={playing ? { y: [0, -3, 0], x: [0, 1, 0] } : { y: 0, x: 0 }}
+          transition={{ duration: 2.5, repeat: playing ? Infinity : 0, ease: "easeInOut" }}
           className="relative shrink-0 flex items-center justify-center"
         >
           {topAvatars.length === 1 && (
@@ -1012,7 +1012,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
       className="w-full h-full min-h-full snap-start flex items-center justify-center relative bg-black md:bg-white dark:md:bg-[#08080a] overflow-hidden shrink-0 select-none antialiased"
     >
       {isNearScreen && (
-        <div className="flex flex-col md:flex-row items-center justify-center w-full h-full mx-auto relative group py-0 md:py-3 lg:py-4 md:space-x-5 lg:space-x-6 md:-translate-x-14 lg:-translate-x-20 xl:-translate-x-24 animate-in fade-in duration-150">
+        <div className="flex flex-col md:flex-row items-center justify-center w-full h-full mx-auto relative group py-0 md:py-3 lg:py-4 md:space-x-5 lg:space-x-6 md:-translate-x-14 lg:-translate-x-20 xl:-translate-x-24">
           
           {/* Desktop Left Info Column (Strictly Outside Reels Box on Left, At the Bottom) */}
           <div className={`hidden md:flex flex-col justify-end self-end w-[220px] lg:w-[260px] pb-6 shrink-0 transition-all duration-300 ${isCleanZoom || is2XSpeed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>

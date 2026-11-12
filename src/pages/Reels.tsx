@@ -456,7 +456,7 @@ export default function Reels() {
         id="global-reels-container"
         ref={reelsContainerRef}
         onScroll={handleScroll}
-        className="h-full w-full overflow-y-auto reels-scroll-viewport no-scrollbar bg-black md:bg-white dark:md:bg-[#08080a] transform-gpu will-change-transform overscroll-y-contain select-none"
+        className="h-full w-full overflow-y-auto reels-scroll-viewport no-scrollbar bg-black md:bg-white dark:md:bg-[#08080a] overscroll-y-contain select-none"
         style={{ 
           scrollSnapType: 'y mandatory', 
           WebkitOverflowScrolling: 'touch',

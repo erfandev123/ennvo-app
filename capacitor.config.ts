@@ -19,7 +19,7 @@ const config: CapacitorConfig = {
     // twice, which made the page jump and showed a black band on top.
     SystemBars: {
       insetsHandling: 'disable',
-      hidden: true,
+      hidden: false,
     },
     SplashScreen: {
       launchShowDuration: 0,

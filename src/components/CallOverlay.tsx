@@ -36,6 +36,8 @@ export const CallOverlay = () => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMirrored, setIsMirrored] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
+  // "Calling…" / "Ringing…" while the connection is being set up.
+  const [callPhase, setCallPhase] = useState('');
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -135,6 +137,10 @@ export const CallOverlay = () => {
             (status) => {
               if (status === 'ended' || status === 'rejected') {
                 handleEndActiveCall();
+              } else if (status === 'calling') {
+                setCallPhase('Calling…');
+              } else if (status === 'accepted') {
+                setCallPhase('');
               }
             }
           );
@@ -260,6 +266,10 @@ export const CallOverlay = () => {
         (status) => {
           if (status === 'ended' || status === 'rejected') {
             handleEndActiveCall();
+          } else if (status === 'calling') {
+            setCallPhase('Calling…');
+          } else if (status === 'accepted') {
+            setCallPhase('');
           }
         }
       );
@@ -461,7 +471,9 @@ export const CallOverlay = () => {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-xs font-bold max-w-[95px] truncate">{activeCallState.otherName}</span>
-                  <span className="text-[10.5px] text-sky-600 dark:text-sky-300 font-mono font-bold">{formatDuration(callDuration)}</span>
+                  <span className="text-[10.5px] text-sky-600 dark:text-sky-300 font-mono font-bold">
+                    {callPhase || formatDuration(callDuration)}
+                  </span>
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); setIsHiddenPill(false); }}

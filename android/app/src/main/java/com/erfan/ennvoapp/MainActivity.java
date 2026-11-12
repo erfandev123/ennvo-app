@@ -18,6 +18,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -67,7 +68,12 @@ public class MainActivity extends BridgeActivity {
     static volatile String pendingCall = null;
     static volatile String pendingShare = null;
 
-    private final Runnable splashTimeout = () -> splashHold = false;
+    private final Runnable splashTimeout = () -> {
+        splashHold = false;
+        hideSplashOverlay();
+    };
+    /** Black launch screen with the Ennvo symbol and the wordmark. */
+    private View splashOverlay = null;
 
     /**
      * Capacitor's BridgeActivity forces its own AppTheme in onCreate. That
@@ -105,6 +111,10 @@ public class MainActivity extends BridgeActivity {
         splash.setKeepOnScreenCondition(() -> splashHold);
         splash.setOnExitAnimationListener(vp -> vp.getView().animate().alpha(0f).setDuration(120)
                 .withEndAction(() -> vp.remove()).start());
+
+        // The Ennvo launch screen (black, the logo symbol and the wordmark)
+        // sits on top of the WebView until the app is ready.
+        showSplashOverlay();
 
         // Never keep the native splash longer than 3.5 seconds, even if a page
         // fails to report ready.
@@ -187,6 +197,35 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception ignored) {}
     }
 
+    /** Adds the black Ennvo launch screen on top of the WebView. */
+    private void showSplashOverlay() {
+        try {
+            android.view.ViewGroup root = findViewById(android.R.id.content);
+            if (root == null) return;
+            View overlay = LayoutInflater.from(this).inflate(R.layout.ennvo_splash, root, false);
+            root.addView(overlay);
+            splashOverlay = overlay;
+        } catch (Exception ignored) { }
+    }
+
+    /** Fades the launch screen away once the app painted its first frame. */
+    private void hideSplashOverlay() {
+        final View overlay = splashOverlay;
+        if (overlay == null) return;
+        splashOverlay = null;
+        runOnUiThread(() -> {
+            try {
+                overlay.animate().alpha(0f).setDuration(240).withEndAction(() -> {
+                    try {
+                        if (overlay.getParent() instanceof android.view.ViewGroup) {
+                            ((android.view.ViewGroup) overlay.getParent()).removeView(overlay);
+                        }
+                    } catch (Exception ignored) { }
+                }).start();
+            } catch (Exception ignored) { }
+        });
+    }
+
     private void applyBars(Window window, boolean light) {
         if (window == null) return;
         window.setStatusBarColor(Color.TRANSPARENT);
@@ -196,9 +235,10 @@ public class MainActivity extends BridgeActivity {
         controller.setAppearanceLightStatusBars(light);
         controller.setAppearanceLightNavigationBars(light);
         controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-        // Fullscreen: the app owns the whole screen. A swipe from the top or
-        // the bottom edge brings the bars back for a moment.
-        controller.hide(WindowInsetsCompat.Type.systemBars());
+        // The status bar and the navigation bar stay visible: the phone's own
+        // clock, notifications and the back / home / recents buttons must
+        // always be reachable.
+        controller.show(WindowInsetsCompat.Type.systemBars());
     }
 
     /**
@@ -218,21 +258,26 @@ public class MainActivity extends BridgeActivity {
             Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
             boolean keyboard = insets.isVisible(WindowInsetsCompat.Type.ime()) && ime.bottom > 0;
 
-            // The system bars are hidden, so only the display cutout (notch) and
-            // the keyboard move the content. The notch is not padded natively:
-            // the web app draws its header into it, so there is no black band.
+            // The status bar and the navigation bar are visible, so the
+            // content is padded by them. The keyboard replaces the navigation
+            // bar when it is open.
+            int top = bars.top;
             int left = Math.max(cutout.left, bars.left);
             int right = Math.max(cutout.right, bars.right);
-            int bottom = keyboard ? ime.bottom : 0;
+            int bottom = keyboard ? ime.bottom : bars.bottom;
 
-            v.setPadding(left, 0, right, bottom);
+            v.setPadding(left, top, right, bottom);
 
             float density = getResources().getDisplayMetrics().density;
-            if (cutout.top != lastBarsTop || bottom != lastBarsBottom) {
-                lastBarsTop = cutout.top;
+            // Only the part of the cutout that the status bar does not already
+            // cover is published, so the web app does not add the same inset
+            // twice.
+            int extraTop = Math.max(0, cutout.top - bars.top);
+            if (extraTop != lastBarsTop || bottom != lastBarsBottom) {
+                lastBarsTop = extraTop;
                 lastBarsBottom = bottom;
                 runJs("(function(){var s=document.documentElement.style;"
-                        + "s.setProperty('--safe-area-inset-top','" + (cutout.top / density) + "px');"
+                        + "s.setProperty('--safe-area-inset-top','" + (extraTop / density) + "px');"
                         + "s.setProperty('--safe-area-inset-bottom','0px');"
                         + "s.setProperty('--safe-area-inset-left','" + (left / density) + "px');"
                         + "s.setProperty('--safe-area-inset-right','" + (right / density) + "px');"
@@ -769,6 +814,7 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public void appReady() {
             splashHold = false;
+            hideSplashOverlay();
             injectInsetsAgain();
         }
 

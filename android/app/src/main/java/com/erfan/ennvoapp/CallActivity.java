@@ -17,6 +17,7 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -91,14 +92,14 @@ public class CallActivity extends BridgeActivity {
         Window window = getWindow();
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-        // Fullscreen call screen: no status bar, no navigation bar. A swipe
-        // from the edge brings them back for a moment.
+        // The status bar and the navigation bar stay visible so the clock and
+        // the back / home / recents buttons are always reachable.
         try {
             WindowInsetsControllerCompat controller =
                     WindowCompat.getInsetsController(window, window.getDecorView());
             controller.setSystemBarsBehavior(
                     WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-            controller.hide(WindowInsetsCompat.Type.systemBars());
+            controller.show(WindowInsetsCompat.Type.systemBars());
         } catch (Exception ignored) { }
 
         // Only the call bundle is hosted at the app root, keeping the
@@ -122,16 +123,18 @@ public class CallActivity extends BridgeActivity {
             web.addJavascriptInterface(new CallBridge(), "AndroidCallScreen");
         } catch (Exception ignored) { }
 
-        // The call page is fullscreen, so it only needs the display cutout.
-        // The value is published as a CSS variable, exactly like in the main
-        // app, so the header never sits under the notch.
+        // The system bars are visible, so the call page is padded by them and
+        // only the extra cutout height is published to the web layer.
         View content = findViewById(android.R.id.content);
         if (content != null) {
             ViewCompat.setOnApplyWindowInsetsListener(content, (v, insets) -> {
-                int top = insets.getInsets(WindowInsetsCompat.Type.displayCutout()).top;
+                Insets cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout());
+                Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                int extraTop = Math.max(0, cutout.top - bars.top);
                 float density = getResources().getDisplayMetrics().density;
                 runJs("(function(){var s=document.documentElement.style;"
-                        + "s.setProperty('--safe-area-inset-top','" + (top / density) + "px');"
+                        + "s.setProperty('--safe-area-inset-top','" + (extraTop / density) + "px');"
                         + "s.setProperty('--safe-area-inset-bottom','0px');})()");
                 return insets;
             });
@@ -236,15 +239,30 @@ public class CallActivity extends BridgeActivity {
     }
 
     /**
-     * Hardware Back behaves like a native call screen: the web page hangs up
-     * (Firestore + media cleanup), then the activity closes even if JS is dead.
+     * Hardware Back behaves like WhatsApp: it returns to the app and the call
+     * keeps running in the background. The call is only ended with the
+     * hang up button or the notification action.
      */
     @Override
     public void onBackPressed() {
         if (backHandled) return;
         backHandled = true;
         runJs("window.onAndroidBack&&window.onAndroidBack()");
-        ui.postDelayed(this::finishScreen, 900);
+        ui.postDelayed(this::goBackToApp, 300);
+    }
+
+    /** Brings the app to the front and leaves the call running. */
+    private void goBackToApp() {
+        runOnUiThread(() -> {
+            try {
+                Intent main = new Intent(CallActivity.this, MainActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                startActivity(main);
+            } catch (Exception ignored) { }
+            try {
+                moveTaskToBack(true);
+            } catch (Exception ignored) { }
+        });
     }
 
     @Override
@@ -292,14 +310,13 @@ public class CallActivity extends BridgeActivity {
             } catch (Exception ignored) { }
 
             if (keepCall) {
-                // MainActivity owns the media. Closing this screen must not
-                // stop the foreground service or reset the audio route.
+                // MainActivity owns the media. The call screen moves to the
+                // background, but the call service and the audio route stay
+                // alive, so the call keeps running.
                 keepAudioForMainCall = true;
                 try {
-                    finishAndRemoveTask();
-                } catch (Exception e) {
-                    finish();
-                }
+                    moveTaskToBack(true);
+                } catch (Exception ignored) { }
                 return;
             }
 
@@ -435,6 +452,15 @@ public class CallActivity extends BridgeActivity {
         @JavascriptInterface
         public void openAppKeepingCall() {
             openMainActivity(true);
+        }
+
+        /**
+         * Back on the call screen returns to the app and keeps the call
+         * running, exactly like WhatsApp.
+         */
+        @JavascriptInterface
+        public void goBackToApp() {
+            CallActivity.this.goBackToApp();
         }
 
         @JavascriptInterface

@@ -108,14 +108,13 @@ public class Notifier {
         calls.setBypassDnd(true);
         nm.createNotificationChannel(calls);
 
-        // Activity notifications (likes, comments, follows) arrive quietly: no
-        // sound, no vibration and no heads-up card that covers the app the
-        // user is in. They wait in the shade with the actor's photo, the Ennvo
-        // symbol and the action text, and open the right place when tapped.
-        NotificationChannel activityChannel = new NotificationChannel(ACT_CH, "Activity", NotificationManager.IMPORTANCE_LOW);
-        activityChannel.enableVibration(false);
-        activityChannel.setSound(null, null);
-        activityChannel.setShowBadge(true);
+        // Activity notifications (likes, comments, follows) make a quiet
+        // sound but never cover the app the user is in: a heads-up card is
+        // only shown for calls and chat messages.
+        NotificationChannel activityChannel = new NotificationChannel(ACT_CH, "Activity", NotificationManager.IMPORTANCE_DEFAULT);
+        activityChannel.enableVibration(true);
+        activityChannel.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), null);
+        activityChannel.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
         nm.createNotificationChannel(activityChannel);
 
         if (Build.VERSION.SDK_INT >= 29) {
@@ -506,8 +505,22 @@ public class Notifier {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
+    /** Backend that serves the uploaded media of the app. */
+    private static final String BACKEND =
+            "https://ais-dev-ququzv7htl2qshqf3skacy-736538280490.asia-northeast1.run.app";
+
     private static Bitmap loadAvatar(String u) {
-        if (u == null || !u.startsWith("http")) return null;
+        if (u == null || u.trim().isEmpty()) return null;
+        String url = u.trim();
+        // A stored "/uploads/..." path has to be resolved against the backend,
+        // otherwise the notification falls back to the app icon and the actor
+        // photo is missing.
+        if (url.startsWith("/")) {
+            url = BACKEND + url;
+        } else if (!url.startsWith("http")) {
+            url = BACKEND + "/uploads/" + url;
+        }
+        if (!url.startsWith("http")) return null;
         try {
             HttpURLConnection h = (HttpURLConnection) new URL(u).openConnection();
             h.setConnectTimeout(4000);

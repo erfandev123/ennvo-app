@@ -366,6 +366,19 @@ export default function App() {
     };
   }, []);
 
+  // The notification center watches the conversations and the activities while
+  // the app is open: it plays the sound and shows the in-app toast. Without
+  // this, no in-app notification ever appears.
+  useEffect(() => {
+    const uid = currentUser?.uid;
+    if (!isAuthenticated || !uid) {
+      stopNotificationCenter();
+      return;
+    }
+    startNotificationCenter(uid);
+    return () => stopNotificationCenter();
+  }, [isAuthenticated, currentUser?.uid]);
+
   // Hide native Capacitor Splash Screen on mount
   // (the launch splash is owned by AndroidX core-splashscreen and MainActivity;
   //  it is dismissed by Android.appReady() from main.tsx after the first paint)

@@ -699,8 +699,6 @@ html.dark .ultra-glass-pc-dock .ultra-glass-pc-item.active .ultra-glass-pc-icon 
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior-y: contain !important;
   touch-action: pan-y !important;
-  transform: translateZ(0);
-  will-change: scroll-position;
 }
 
 .reel-snap-item {

@@ -19,6 +19,7 @@ import { AccountSwitcherModal } from '../components/AccountSwitcherModal';
 import { MediaCropModal } from '../components/MediaCropModal';
 import { shareContent } from '../services/shareService';
 import { useShallow } from 'zustand/react/shallow';
+import { formatMediaUrl } from '../utils';
 
 const isVideoMedia = (url?: string | null): boolean => {
   if (!url) return false;
@@ -908,7 +909,7 @@ export default function Profile() {
 
                 {isVideoMedia(user.bannerUrl) ? (
                   <video 
-                    src={user.bannerUrl} 
+                    src={formatMediaUrl(user.bannerUrl)} 
                     autoPlay 
                     loop 
                     muted 
@@ -917,7 +918,7 @@ export default function Profile() {
                   />
                 ) : (
                   <img 
-                    src={user.bannerUrl} 
+                    src={formatMediaUrl(user.bannerUrl)} 
                     alt="Profile Banner" 
                     className="w-full h-full object-cover" 
                   />
@@ -1406,9 +1407,9 @@ export default function Profile() {
               /* Desktop Panoramic Banner */
               <div className="w-full h-56 lg:h-64 relative overflow-hidden bg-gradient-to-r from-purple-100 via-pink-50 to-indigo-100">
                 {isVideoMedia(user.bannerUrl) ? (
-                  <video src={user.bannerUrl} autoPlay loop muted playsInline className="w-full h-full object-cover pointer-events-none" />
+                  <video src={formatMediaUrl(user.bannerUrl)} autoPlay loop muted playsInline className="w-full h-full object-cover pointer-events-none" />
                 ) : (
-                  <img src={user.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
+                  <img src={formatMediaUrl(user.bannerUrl)} alt="Banner" className="w-full h-full object-cover" />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-black/20" />
 
@@ -1883,7 +1884,7 @@ export default function Profile() {
                       ) : (
                         <>
                           {post.media?.[0] ? (
-                            <img src={post.media[0]} className="w-full h-full object-cover transition-transform duration-500" alt="Repost" />
+                            <img src={formatMediaUrl(post.media[0])} className="w-full h-full object-cover transition-transform duration-500" alt="Repost" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-purple-500 to-indigo-600 text-white text-[10px] text-center font-normal">
                               {post.text?.substring(0, 40)}...
@@ -2162,7 +2163,7 @@ export default function Profile() {
                           ) : (
                             <>
                               {post.media?.[0] ? (
-                                <img src={post.media[0]} className="w-full h-full object-cover transition-transform duration-500" alt="Saved" />
+                                <img src={formatMediaUrl(post.media[0])} className="w-full h-full object-cover transition-transform duration-500" alt="Saved" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-blue-600 to-purple-700 text-white text-[11px] font-medium text-center">
                                   {post.text?.substring(0, 50)}...
@@ -2244,7 +2245,7 @@ export default function Profile() {
                               className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" 
                             />
                           ) : post.media?.[0] ? (
-                            <img src={post.media[0]} className="w-full h-full object-cover transition-transform duration-300" alt="Private" />
+                            <img src={formatMediaUrl(post.media[0])} className="w-full h-full object-cover transition-transform duration-300" alt="Private" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center p-2 bg-gradient-to-br from-gray-800 to-gray-900 text-white text-[10px] text-center">
                               {post.text?.substring(0, 30)}

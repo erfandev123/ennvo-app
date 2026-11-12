@@ -37,6 +37,7 @@ import { formatTime, formatCount } from '../utils';
 import { SharePortal, CommentsPortal } from './ReelItem';
 import { VerifiedBadge } from './VerifiedBadge';
 import { useShallow } from 'zustand/react/shallow';
+import { formatMediaUrl } from '../utils';
 
 interface PostItemProps {
   post: Post;
@@ -708,7 +709,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                   ) : (
                     <video 
                       ref={videoRef}
-                      src={post.media[0]} 
+                      src={formatMediaUrl(post.media[0])} 
                       autoPlay={isCenteredInViewport && isPlaying}
                       muted={isMuted}
                       loop
@@ -744,7 +745,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                 </div>
               ) : (
                 <img 
-                  src={post.media[0]} 
+                  src={formatMediaUrl(post.media[0])} 
                   alt="Post content" 
                   loading="lazy" 
                   decoding="async" 
@@ -796,7 +797,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                 }}
               >
                 <img 
-                  src={post.media[0]} 
+                  src={formatMediaUrl(post.media[0])} 
                   alt="Primary photo" 
                   loading="lazy" 
                   decoding="async"
@@ -855,7 +856,7 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
                 }}
               >
                 <img 
-                  src={post.media[0]} 
+                  src={formatMediaUrl(post.media[0])} 
                   alt="Primary photo" 
                   loading="lazy" 
                   decoding="async"

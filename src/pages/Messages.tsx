@@ -344,7 +344,7 @@ const StackedMediaAlbumBubble = React.memo(({
             {nextItem2.type === 'video' ? (
               <video src={`${nextItem2.url}#t=0.001`} className="w-full h-full object-cover" preload="none" playsInline />
             ) : (
-              <img src={nextItem2.url} alt="album peek 2" className="w-full h-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
+              <img src={formatMediaUrl(nextItem2.url)} alt="album peek 2" className="w-full h-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
             )}
           </div>
         )}
@@ -359,7 +359,7 @@ const StackedMediaAlbumBubble = React.memo(({
             {nextItem1.type === 'video' ? (
               <video src={`${nextItem1.url}#t=0.001`} className="w-full h-full object-cover" preload="none" playsInline />
             ) : (
-              <img src={nextItem1.url} alt="album peek 1" className="w-full h-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
+              <img src={formatMediaUrl(nextItem1.url)} alt="album peek 1" className="w-full h-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
             )}
           </div>
         )}
@@ -380,7 +380,7 @@ const StackedMediaAlbumBubble = React.memo(({
             </div>
           ) : (
             <img 
-              src={currentItem.url} 
+              src={formatMediaUrl(currentItem.url)} 
               alt={`album photo ${activeIndex + 1}`} 
               className="w-full h-full object-cover transition-transform duration-300 group-hover/album:scale-105" 
               loading="lazy"
@@ -1047,7 +1047,7 @@ const MessageBubble = React.memo(function MessageBubble({
             >
               {/* Media Thumbnails inside Bubble Reply Box */}
               {msg.replyTo.mediaUrl && (msg.replyTo.type === "image" || (!msg.replyTo.type && !msg.replyTo.stickerUrl)) && (
-                <img src={msg.replyTo.mediaUrl} className="w-5 h-5 rounded object-cover shrink-0 border border-black/10" alt="Reply thumbnail" referrerPolicy="no-referrer" />
+                <img src={formatMediaUrl(msg.replyTo.mediaUrl)} className="w-5 h-5 rounded object-cover shrink-0 border border-black/10" alt="Reply thumbnail" referrerPolicy="no-referrer" />
               )}
               {(msg.replyTo.type === "sticker" || msg.replyTo.stickerUrl) && (
                 <img src={msg.replyTo.stickerUrl || msg.replyTo.mediaUrl} className="w-5 h-5 object-contain shrink-0" alt="Sticker thumbnail" referrerPolicy="no-referrer" />
@@ -3600,8 +3600,13 @@ export default function Messages() {
       activeConversation.participantIds?.length > 2
     : false;
 
-  const activeContact = activeChat === "jarvis"
-    ? {
+  // The contact object is memoised. It used to be a new object on every
+  // render, which broke the memo of the message list and rebuilt every
+  // message bubble on every single state change - the main reason the chat
+  // felt laggy while scrolling.
+  const activeContact = React.useMemo(() => {
+    if (activeChat === "jarvis") {
+      return {
         id: "jarvis",
         uid: "jarvis",
         name: "Ennvo Jarvis",
@@ -3609,10 +3614,11 @@ export default function Messages() {
         online: true,
         lastSeen: Date.now(),
         isGroup: false,
-        isAi: true
-      }
-    : activeConversation
-    ? {
+        isAi: true,
+      };
+    }
+    if (activeConversation) {
+      return {
         id: activeConversation.id,
         uid: isGroup ? activeConversation.id : otherParticipantId,
         name: isGroup
@@ -3636,18 +3642,21 @@ export default function Messages() {
           ? 0
           : presenceData[otherParticipantId || ""]?.lastSeen || 0,
         isGroup,
-      }
-    : (activeChat && activeChat !== "followers" && activeChat !== "activity" && activeChat !== "requests")
-    ? {
+      };
+    }
+    if (activeChat && activeChat !== "followers" && activeChat !== "activity" && activeChat !== "requests") {
+      return {
         id: activeChat,
         uid: activeChat,
         name: userDataCache[activeChat]?.name || "Chat",
         avatar: userDataCache[activeChat]?.avatar || `https://ui-avatars.com/api/?name=Chat&background=random`,
         online: false,
         lastSeen: 0,
-        isGroup: false
-      }
-    : null;
+        isGroup: false,
+      };
+    }
+    return null;
+  }, [activeChat, activeConversation, isGroup, otherParticipantId, userDataCache, presenceData]);
 
   const themeOverride = activeChat ? conversationThemeOverrides[activeChat] : undefined;
   const activeConvTheme = themeOverride?.theme || 
@@ -5314,31 +5323,8 @@ export default function Messages() {
                   <div
                     className="sticky top-0 z-40 shrink-0 w-full relative overflow-hidden px-3 md:px-5 pt-[max(10px,calc(var(--app-safe-top)+8px))] pb-2.5 flex items-center justify-between gap-2 select-none border-b-0 shadow-none touch-manipulation"
                   >
-                    {/* Header Theme Background Layer - Sharp and crystal clear, NOT BLURRED */}
-                    {isThemeImage ? (
-                      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-                        <img
-                          src={wallpaperImgSrc}
-                          alt=""
-                          className="w-full h-full object-cover object-center absolute inset-0 transition-all duration-300"
-                          style={{
-                            filter: `brightness(${activeConvThemeBrightness})`,
-                            transform: 'scale(1)',
-                          }}
-                        />
-                        {/* Clean translucent sheen that melts into chat background without blur */}
-                        <div className="absolute inset-0 bg-gradient-to-b from-white/15 via-white/5 to-transparent" />
-                      </div>
-                    ) : (activeConvTheme.startsWith('bg-') || activeConvTheme.startsWith('#')) ? (
-                      <div 
-                        className={`absolute inset-0 pointer-events-none z-0 ${activeConvTheme.startsWith('bg-') ? activeConvTheme : ''} opacity-95`}
-                        style={{
-                          backgroundColor: activeConvTheme.startsWith('#') ? activeConvTheme : undefined,
-                        }}
-                      />
-                    ) : (
-                      <div className="absolute inset-0 pointer-events-none z-0 bg-white/95 dark:bg-[#0C0C0E]/95 border-b border-neutral-200/60 dark:border-white/10 backdrop-blur-md" />
-                    )}
+                    {/* No header bar: the chat background stays visible behind the
+                        profile, the name and the call button. */}
 
                     {/* Left: Back button + Friend Profile Info */}
                     <div className="relative z-10 flex items-center space-x-2 min-w-0 flex-1">
@@ -5629,13 +5615,13 @@ export default function Messages() {
                         <div key={item.id || idx} className="relative group shrink-0 w-16 h-16 rounded-xl overflow-hidden border border-gray-200 shadow-2xs bg-black">
                           {item.type === "video" ? (
                             <video
-                              src={item.url}
+                              src={formatMediaUrl(item.url)}
                               className="w-full h-full object-cover"
                               muted
                               playsInline
                             />
                           ) : (
-                            <img src={item.url} className="w-full h-full object-cover" alt={`Selected ${idx}`} />
+                            <img src={formatMediaUrl(item.url)} className="w-full h-full object-cover" alt={`Selected ${idx}`} />
                           )}
                           {item.type === "video" && (
                             <div className="absolute bottom-1 left-1 p-0.5 bg-black/60 rounded text-white text-[9px] font-semibold flex items-center">
@@ -5672,7 +5658,7 @@ export default function Messages() {
                       {/* Photo Preview */}
                       {(replyingTo.type === "image" || replyingTo.mediaUrl) && replyingTo.type !== "sticker" && replyingTo.type !== "reel" && replyingTo.type !== "voice" && (
                         <div className="w-8 h-8 rounded-lg shrink-0 overflow-hidden bg-gray-100 border border-gray-200/80 shadow-2xs">
-                          <img src={replyingTo.mediaUrl} className="w-full h-full object-cover" alt="Photo preview" referrerPolicy="no-referrer" />
+                          <img src={formatMediaUrl(replyingTo.mediaUrl)} className="w-full h-full object-cover" alt="Photo preview" referrerPolicy="no-referrer" />
                         </div>
                       )}
                       {/* Sticker Preview */}

@@ -36,6 +36,7 @@ import { AddLocationModal } from './AddLocationModal';
 import { AdvancedSettingsModal, AdvancedSettings } from './AdvancedSettingsModal';
 import { MusicLibraryModal } from './MusicLibraryModal';
 import { useShallow } from 'zustand/react/shallow';
+import { formatMediaUrl } from '../utils';
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -445,9 +446,9 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                         }`}
                       >
                         {media.type === 'video' ? (
-                          <video src={media.url} className="w-full h-full object-cover" preload="auto" />
+                          <video src={formatMediaUrl(media.url)} className="w-full h-full object-cover" preload="auto" />
                         ) : (
-                          <img src={media.url} alt="Thumb" className="w-full h-full object-cover" />
+                          <img src={formatMediaUrl(media.url)} alt="Thumb" className="w-full h-full object-cover" />
                         )}
                       </div>
                     ))}
