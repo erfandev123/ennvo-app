@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.ennvo.app',
+  appId: 'com.erfan.ennvoapp',
   appName: 'Ennvo',
   webDir: 'dist',
   server: {

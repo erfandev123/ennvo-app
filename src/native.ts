@@ -12,12 +12,22 @@ export interface NativeConfigPayload {
   declineUrl: string;
 }
 
+/**
+ * Normalised shape of the payload the Android shell leaves behind when a
+ * notification (or deep link) is tapped while the app was not running.
+ * The Java side uses short keys (`c`, `n`, `a`, `id`) to keep intents small;
+ * every JS consumer only ever sees this shape.
+ */
 export interface PendingOpenPayload {
-  convId: string;
+  type: 'chat' | 'activity' | 'link';
+  convId?: string;
+  name?: string;
+  url?: string;
+  page?: string;
 }
 
 export interface PendingCallActionPayload {
-  action: 'accept' | 'decline';
+  action: 'accept' | 'decline' | 'open';
   callId: string;
   name?: string;
   type?: 'voice' | 'video' | 'audio';
@@ -60,6 +70,101 @@ export const safeJsonParse = <T = any>(raw: any, fallback: T): T => {
   } catch (e) {
     return fallback;
   }
+};
+
+const normalizePendingOpen = (raw: any): PendingOpenPayload | null => {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const convId = String(
+    raw.convId || raw.conversationId || raw.c || ''
+  ).trim();
+  const url = String(raw.url || raw.link || raw.uri || '').trim();
+  const name = String(raw.name || raw.n || '').trim();
+  const page = raw.page || raw.screen;
+
+  let type: PendingOpenPayload['type'] = 'activity';
+  if (raw.type === 'chat' || raw.type === 'activity' || raw.type === 'link') {
+    type = raw.type;
+  } else if (url) {
+    type = 'link';
+  } else if (page === 'activity') {
+    type = 'activity';
+  } else if (convId) {
+    type = 'chat';
+  }
+
+  // An activity notification with a direct link arrives as type=link, but it is
+  // still allowed to fall through to the activity page when the URL is empty.
+  if (!convId && !url && type === 'chat') type = 'activity';
+
+  return {
+    type,
+    convId: convId || undefined,
+    name: name || undefined,
+    url: url || undefined,
+    page: typeof page === 'string' ? page : undefined,
+  };
+};
+
+const readPendingOpenFromNative = (): PendingOpenPayload | null => {
+  try {
+    const A = getA();
+    if (!A || typeof A.getPendingOpen !== 'function') return null;
+    const raw = A.getPendingOpen();
+    if (!raw) return null;
+    return normalizePendingOpen(safeJsonParse<any>(raw, null));
+  } catch (e) {
+    console.warn('[Native] getPendingOpen error:', e);
+    return null;
+  }
+};
+
+/**
+ * Android consumes its pending intent the first time it is read. Cache that
+ * first payload so both the store (initial page/chat) and the React effect
+ * (deep-link router) can use it without losing the notification target.
+ */
+let cachedPendingOpen: PendingOpenPayload | null = null;
+let pendingOpenPrimed = false;
+
+export const primePendingOpen = (): PendingOpenPayload | null => {
+  if (!pendingOpenPrimed) {
+    pendingOpenPrimed = true;
+    cachedPendingOpen = readPendingOpenFromNative();
+  }
+  return cachedPendingOpen;
+};
+
+export const peekPendingOpen = (): PendingOpenPayload | null => {
+  return cachedPendingOpen || readPendingOpenFromNative();
+};
+
+export const takePendingOpen = (): PendingOpenPayload | null => {
+  const value = cachedPendingOpen || readPendingOpenFromNative();
+  cachedPendingOpen = null;
+  pendingOpenPrimed = true;
+  return value;
+};
+
+const normalizeCallAction = (raw: any): PendingCallActionPayload | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const rawAction = String(raw.action || raw.a || '').toLowerCase();
+  const action: PendingCallActionPayload['action'] =
+    rawAction === 'accept' || rawAction === 'answer'
+      ? 'accept'
+      : rawAction === 'decline' || rawAction === 'reject'
+        ? 'decline'
+        : 'open';
+  const callId = String(raw.callId || raw.id || '').trim();
+  if (!callId && action !== 'open') return null;
+  const type = String(raw.type || raw.callType || '').toLowerCase();
+  return {
+    action,
+    callId,
+    name: String(raw.name || raw.callName || '').trim() || undefined,
+    type: type === 'video' ? 'video' : type ? 'voice' : undefined,
+    avatar: String(raw.avatar || raw.callAvatar || '').trim() || undefined,
+  };
 };
 
 export const native = {
@@ -141,21 +246,16 @@ export const native = {
   },
 
   /**
-   * Returns pending open action (e.g. chat to navigate to after notification tap)
+   * Returns pending open action (e.g. chat to navigate to after notification tap).
+   * The value is cached, so a second read does not lose the target.
    */
   getPendingOpen(): PendingOpenPayload | null {
-    try {
-      const A = getA();
-      if (!A) return null;
-      if (typeof A.getPendingOpen === 'function') {
-        const raw = A.getPendingOpen();
-        if (!raw) return null;
-        return safeJsonParse<PendingOpenPayload>(raw, null as any);
-      }
-    } catch (e) {
-      console.warn('[Native] getPendingOpen error:', e);
-    }
-    return null;
+    return peekPendingOpen();
+  },
+
+  /** Returns the pending open action once and clears it. */
+  consumePendingOpen(): PendingOpenPayload | null {
+    return takePendingOpen();
   },
 
   /**
@@ -168,7 +268,7 @@ export const native = {
       if (typeof A.getPendingCallAction === 'function') {
         const raw = A.getPendingCallAction();
         if (!raw) return null;
-        return safeJsonParse<PendingCallActionPayload>(raw, null as any);
+        return normalizeCallAction(safeJsonParse<any>(raw, null));
       }
     } catch (e) {
       console.warn('[Native] getPendingCallAction error:', e);
@@ -195,7 +295,23 @@ export const native = {
   },
 
   /**
-   * Show local message notification (only shown when app is not in foreground)
+   * Keeps a fresh Firebase ID token on the native side. Notification declines
+   * and quick actions can then update Firestore before the WebView has booted.
+   */
+  setAuthToken(uid: string, token: string): void {
+    try {
+      const A = getA();
+      if (!A || !uid || !token) return;
+      if (typeof A.setAuthToken === 'function') {
+        A.setAuthToken(uid, token);
+      }
+    } catch (e) {
+      console.warn('[Native] setAuthToken error:', e);
+    }
+  },
+
+  /**
+   * Show local message notification (ignored by native while app is in foreground)
    */
   showMessageNotification(title: string, body: string, avatar?: string, convId?: string): void {
     try {
@@ -208,6 +324,25 @@ export const native = {
       }
     } catch (e) {
       console.warn('[Native] showMessageNotification error:', e);
+    }
+  },
+
+  /**
+   * Activity notification with the actor avatar and the exact in-app target.
+   * Uses a dedicated native method so the tap opens the relevant post/profile
+   * instead of a generic activity list.
+   */
+  showActivityNotification(title: string, body: string, avatar?: string, url?: string): void {
+    try {
+      const A = getA();
+      if (!A) return;
+      if (typeof A.showActivityNotification === 'function') {
+        A.showActivityNotification(title, body, avatar || '', url || '');
+      } else if (typeof A.showNotification === 'function') {
+        A.showNotification(title, body, avatar || '', 'activity');
+      }
+    } catch (e) {
+      console.warn('[Native] showActivityNotification error:', e);
     }
   },
 
@@ -229,12 +364,16 @@ export const native = {
   /**
    * Call audio & foreground service controls
    */
-  startCall(name: string, isVideo: boolean): void {
+  startCall(name: string, isVideo: boolean, callId?: string): void {
     try {
       const A = getA();
       if (!A) return;
       if (typeof A.startCall === 'function') {
-        A.startCall(name || 'Ennvo Call', !!isVideo);
+        try {
+          A.startCall(name || 'Ennvo Call', !!isVideo, callId || '');
+        } catch (e) {
+          A.startCall(name || 'Ennvo Call', !!isVideo);
+        }
       }
     } catch (e) {
       console.warn('[Native] startCall error:', e);

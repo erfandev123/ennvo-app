@@ -8,6 +8,7 @@ import { db } from '../firebase';
 import { bridge } from '../native/bridge';
 import { playNotificationSound } from './soundService';
 import { activityBody } from '../utils/activityText';
+import { activityUrl } from '../utils/activityLink';
 
 interface NotificationCenterState {
   currentUid: string | null;
@@ -135,7 +136,7 @@ export const startNotificationCenter = (uid: string) => {
           }
 
           // Native Android notification (ignored by native while app is in foreground)
-          bridge.showNotification(name, body, avatar, 'message');
+          bridge.showMessageNotification(name, body, avatar, cid);
 
           // In-App Toast (suppressed if user is actively typing)
           if (onToastListener && !typingNow) {
@@ -189,7 +190,12 @@ export const startNotificationCenter = (uid: string) => {
             playNotificationSound();
           }
 
-          bridge.showNotification(actorName, body, data.actorAvatar || '', 'activity');
+          bridge.showActivityNotification(
+            actorName,
+            body,
+            data.actorAvatar || '',
+            activityUrl({ ...data, type: data.type })
+          );
 
           if (onToastListener && !typingNow) {
             onToastListener({

@@ -23,19 +23,30 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
+// The call screen is a second WebView on the same https://localhost origin. Two
+// persistent IndexedDB caches would fight over the same Firestore lease, so the
+// tiny call page uses memory cache and reads the call document from the server.
+const isCallPage =
+  typeof window !== 'undefined' && !!(window as any).AndroidCallScreen;
+
 // Use persistent disk cache (IndexedDB) for instant offline startup and zero-delay loads on low-end devices, with fallback to memory
 let localCacheSetting: any;
-try {
-  localCacheSetting = persistentLocalCache({
-    tabManager: persistentSingleTabManager({})
-  });
-} catch (e) {
-  console.warn('[Firebase] Persistent cache init fallback to memory:', e);
+if (isCallPage) {
   localCacheSetting = memoryLocalCache();
+} else {
+  try {
+    localCacheSetting = persistentLocalCache({
+      tabManager: persistentSingleTabManager({})
+    });
+  } catch (e) {
+    console.warn('[Firebase] Persistent cache init fallback to memory:', e);
+    localCacheSetting = memoryLocalCache();
+  }
 }
 
 const isNativeShell =
-  typeof window !== 'undefined' && !!((window as any).Android || (window as any).AndroidInterface);
+  typeof window !== 'undefined' &&
+  !!((window as any).Android || (window as any).AndroidInterface || (window as any).AndroidCallScreen);
 
 export const db = initializeFirestore(app, {
   localCache: localCacheSetting,

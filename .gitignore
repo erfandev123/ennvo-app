@@ -12,11 +12,20 @@ coverage/
 uploads/
 
 # Native build output & signing material
-android/
 ios/
 *.jks
 *.keystore
 secret-values.txt
+
+# Generated Capacitor web payloads (copied in CI / by cap sync)
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/capacitor-cordova-android-plugins/build/
 
 # compiled express server (never published)
 server-build/

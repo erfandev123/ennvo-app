@@ -294,14 +294,19 @@ export const sendMessage = async (
     let convData: any = null;
     try {
       // Read the cached copy first: on a slow network the server round-trip
-      // used to delay every single outgoing message by several seconds.
+      // used to delay every single outgoing message by several seconds. A cache
+      // miss (new conversation / cleared cache) falls back to the server so the
+      // conversation metadata and unread counts are still updated correctly.
       let convSnap;
       try {
         convSnap = await getDocFromCache(convRef);
       } catch {
-        convSnap = await getDoc(convRef);
+        convSnap = null;
       }
-      if (convSnap.exists()) {
+      if (!convSnap || !convSnap.exists()) {
+        convSnap = await getDoc(convRef).catch(() => null);
+      }
+      if (convSnap && convSnap.exists()) {
         convData = convSnap.data();
 
         // Check if blocked
@@ -409,15 +414,6 @@ export const sendMessage = async (
     // Update conversation and increment unread count for others
     try {
       if (convData) {
-        const unreadCount = convData.unreadCount || {};
-        
-        // Increment for everyone else
-        convData.participantIds?.forEach((id: string) => {
-          if (id !== senderId) {
-            unreadCount[id] = (unreadCount[id] || 0) + 1;
-          }
-        });
-
         const totalItemsCount = extra?.mediaUrls?.length || extra?.mediaItems?.length || 0;
         const lastMsgLabel = totalItemsCount > 1
           ? `Sent ${totalItemsCount} photos/videos`
@@ -427,9 +423,16 @@ export const sendMessage = async (
           lastMessage: lastMsgLabel,
           lastSenderId: senderId,
           lastMessageTime: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          unreadCount
+          updatedAt: serverTimestamp()
         };
+
+        const otherParticipants = (convData.participantIds || []).filter((id: string) => id !== senderId);
+
+        // Atomic per-user increments. Writing the whole map back made two
+        // people sending at the same time lose each other's unread count.
+        otherParticipants.forEach((id: string) => {
+          updatePayload[`unreadCount.${id}`] = increment(1);
+        });
 
         if (convData.isRequest && convData.requestStatus === 'pending' && convData.requestFrom === senderId) {
           updatePayload.requestMessageCount = increment(1);
@@ -440,7 +443,6 @@ export const sendMessage = async (
         // Dispatch High-Priority DATA-ONLY Push Notification to all other participants
         const senderName = convData.participantNames?.[senderId] || 'Friend';
         const senderAvatar = convData.participantAvatars?.[senderId] || '';
-        const otherParticipants = (convData.participantIds || []).filter((id: string) => id !== senderId);
 
         otherParticipants.forEach((otherId: string) => {
           notifyUser({

@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { Notification, User } from '../types';
 import { notifyUser } from './pushGateway';
 import { activityBody } from '../utils/activityText';
+import { activityUrl } from '../utils/activityLink';
 
 export const sendNotification = async (
   userId: string | undefined | null, 
@@ -34,7 +35,7 @@ export const sendNotification = async (
   if (!targetUid || targetUid === actor.uid) return;
 
   try {
-    await addDoc(collection(db, 'notifications', targetUid, 'items'), {
+    const notifRef = await addDoc(collection(db, 'notifications', targetUid, 'items'), {
       type,
       actorId: actor.uid,
       actorName: actor.name || 'Ennvo User',
@@ -52,12 +53,25 @@ export const sendNotification = async (
     // Wake the recipient's phone even when the app is closed. The native service
     // renders this with Notifier.showActivity, so liking/commenting/following now
     // reaches the device exactly like a chat message does.
+    const targetType = postId
+      ? (String(postMedia || '').includes('.mp4') || String(postMedia || '').includes('video') ? 'reel' : 'post')
+      : undefined;
     notifyUser({
       targetUserId: targetUid,
       type: 'activity',
       title: actor.name || 'Ennvo',
-      body: activityBody(type, { postMedia, content, targetType: postMedia ? 'post' : undefined }),
+      body: activityBody(type, { postMedia, content, targetType }),
       avatar: actor.avatar || '',
+      // Native Notifier opens this URL directly, so a like/comment tap lands on
+      // the post and a follow tap lands on the actor's profile.
+      url: activityUrl({
+        type,
+        actorId: actor.uid,
+        targetId: targetId || postId || '',
+        postId,
+        targetType,
+        notifId: notifRef.id,
+      }),
     } as any);
   } catch (error: any) {
     console.warn('[NotificationService] sendNotification error:', error);

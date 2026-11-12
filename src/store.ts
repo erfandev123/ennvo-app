@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { User as AppUser } from './types';
+import { primePendingOpen } from './native';
 
 export type PageType = 'home' | 'search' | 'reels' | 'messages' | 'notifications' | 'create' | 'profile' | 'settings' | 'edit-profile' | 'admin';
 
@@ -144,7 +145,49 @@ type AppState = {
   setNewUserWelcomeName: (name: string | null) => void;
 };
 
+const URL_PAGE_MAP: Record<string, PageType> = {
+  home: 'home',
+  feed: 'reels',
+  reels: 'reels',
+  search: 'search',
+  explore: 'search',
+  messages: 'messages',
+  chat: 'messages',
+  massage: 'messages',
+  m: 'messages',
+  notifications: 'notifications',
+  create: 'create',
+  profile: 'profile',
+  user: 'profile',
+  u: 'profile',
+  settings: 'settings',
+  'edit-profile': 'edit-profile',
+  admin: 'admin',
+};
+
+const pageFromPath = (raw?: string): PageType | null => {
+  if (!raw) return null;
+  try {
+    const path = raw.includes('://') ? new URL(raw).pathname : raw;
+    const first = path.replace(/^\/+/, '').split(/[/?#]/)[0].toLowerCase();
+    return URL_PAGE_MAP[first] || null;
+  } catch (e) {
+    return null;
+  }
+};
+
 const getInitialPage = (): PageType => {
+  // A notification tap is handled natively before the WebView starts. Use that
+  // pending target as the very first screen so a chat opens directly instead of
+  // flashing the Reels feed and then jumping.
+  const nativePending = primePendingOpen();
+  if (nativePending) {
+    if (nativePending.type === 'chat' && nativePending.convId) return 'messages';
+    const pendingPage = nativePending.url ? pageFromPath(nativePending.url) : null;
+    if (pendingPage) return pendingPage;
+    if (nativePending.type === 'activity') return 'notifications';
+  }
+
   // A direct URL (e.g. /feed, /notifications, /messages/xyz) must open the
   // matching tab immediately instead of flashing a random page first.
   if (typeof window !== 'undefined') {
@@ -152,31 +195,17 @@ const getInitialPage = (): PageType => {
       .replace(/^\/+/, '')
       .split('/')[0]
       .toLowerCase();
-    const urlPages: Record<string, PageType> = {
-      home: 'home',
-      feed: 'reels',
-      reels: 'reels',
-      search: 'search',
-      explore: 'search',
-      messages: 'messages',
-      chat: 'messages',
-      massage: 'messages',
-      m: 'messages',
-      notifications: 'notifications',
-      create: 'create',
-      profile: 'profile',
-      user: 'profile',
-      u: 'profile',
-      settings: 'settings',
-      'edit-profile': 'edit-profile',
-      admin: 'admin',
-    };
-    if (urlPages[first]) return urlPages[first];
+    if (URL_PAGE_MAP[first]) return URL_PAGE_MAP[first];
     if (first) return 'home';
   }
   // The app always opens on the Reels feed (like Instagram/TikTok). Only a real
-  // URL/deep link above can send the user somewhere else.
+  // URL/deep link or notification target above can send the user somewhere else.
   return 'home';
+};
+
+const getInitialActiveChat = (): string | null => {
+  const pending = primePendingOpen();
+  return pending?.type === 'chat' && pending.convId ? pending.convId : null;
 };
 
 const getInitialUserCache = (): Record<string, CachedUser> => {
@@ -367,9 +396,17 @@ export const useAppStore = create<AppState>((set) => ({
   setViewingReelList: (list) => set({ viewingReelList: list }),
   viewingReelContext: 'all',
   setViewingReelContext: (ctx) => set({ viewingReelContext: ctx }),
-  activeChat: null,
+  activeChat: getInitialActiveChat(),
   setActiveChat: (chatId) => {
-    if (chatId) syncUrl('messages', null, chatId);
+    if (chatId) {
+      syncUrl('messages', null, chatId);
+    } else {
+      set((state) => {
+        if (state.currentPage === 'messages') syncUrl('messages', null, null);
+        return { activeChat: null };
+      });
+      return;
+    }
     set({ activeChat: chatId });
   },
   showCreatePost: false,

@@ -67,6 +67,7 @@ class DeviceNotificationService {
 
     const title = options.title || 'Ennvo';
     const body = options.body || '';
+    const hasAvatar = !!options.icon && options.icon !== '/icon-192.png?v=5';
     const icon = options.icon || '/icon-192.png?v=5';
     const tag = options.tag || `ennvo-${Date.now()}`;
     const type = options.type || 'activity';
@@ -82,9 +83,25 @@ class DeviceNotificationService {
       }
     } catch (e) {}
 
-    // 1. Comprehensive Android WebView Native Java Bridge Support
+    // 1. Native Android bridge. Use the dedicated methods so the notification
+    //    carries the actor's real photo, the chat id or the exact in-app URL.
     try {
       const win = window as any;
+      const A = win.Android || win.AndroidInterface;
+      if (A) {
+        if (type === 'activity' || type === 'like' || type === 'comment' || type === 'follow') {
+          if (typeof A.showActivityNotification === 'function') {
+            A.showActivityNotification(title, body, hasAvatar ? icon : '', options.data?.url || '');
+            return;
+          }
+        } else if (type === 'message') {
+          if (typeof A.showMessageNotification === 'function') {
+            A.showMessageNotification(title, body, hasAvatar ? icon : '', options.data?.convId || '');
+            return;
+          }
+        }
+      }
+
       if (typeof win.AndroidInterface?.showNotification === 'function') {
         win.AndroidInterface.showNotification(title, body, icon, type);
         return;

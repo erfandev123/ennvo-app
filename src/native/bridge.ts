@@ -28,7 +28,11 @@ export const bridge = {
   },
 
   showNotification(title: string, body: string, icon?: string, type: string = 'message'): void {
-    native.showMessageNotification(title, body, icon);
+    if (type === 'activity' || type === 'like' || type === 'comment' || type === 'follow') {
+      native.showActivityNotification(title, body, icon);
+    } else {
+      native.showMessageNotification(title, body, icon);
+    }
   },
 
   sendNotification(title: string, body: string): void {
@@ -39,6 +43,14 @@ export const bridge = {
     native.showMessageNotification(title, body, avatar, convId);
   },
 
+  showActivityNotification(title: string, body: string, avatar?: string, url?: string): void {
+    native.showActivityNotification(title, body, avatar, url);
+  },
+
+  setAuthToken(uid: string, token: string): void {
+    native.setAuthToken(uid, token);
+  },
+
   showIncomingCall(name: string, avatarUrl: string, callType: 'voice' | 'video', callId: string): void {
     native.showIncomingCall(name, avatarUrl, callType, callId);
   },
@@ -47,8 +59,8 @@ export const bridge = {
     native.dismissIncomingCall();
   },
 
-  startCall(name: string, isVideo: boolean): void {
-    native.startCall(name, isVideo);
+  startCall(name: string, isVideo: boolean, callId?: string): void {
+    native.startCall(name, isVideo, callId);
   },
 
   endCall(): void {
@@ -77,6 +89,10 @@ export const bridge = {
 
   getPendingOpen(): PendingOpenPayload | null {
     return native.getPendingOpen();
+  },
+
+  consumePendingOpen(): PendingOpenPayload | null {
+    return native.consumePendingOpen();
   },
 
   getPendingCallAction(): PendingCallActionPayload | null {

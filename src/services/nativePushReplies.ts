@@ -3,7 +3,8 @@
  */
 
 import { doc, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { onIdTokenChanged } from 'firebase/auth';
+import { auth, db } from '../firebase';
 import { native, PendingReplyItem } from '../native';
 import { sendMessage } from './chatService';
 import { useAppStore } from '../store';
@@ -11,12 +12,30 @@ import { useAppStore } from '../store';
 let activeUid: string | null = null;
 let currentFcmToken: string | null = null;
 let currentDeviceToken: string | null = null;
+let authTokenUnsub: (() => void) | null = null;
+
+/**
+ * Keep the native side supplied with a fresh Firebase ID token. Notification
+ * actions (Decline) can then update Firestore before the WebView boots, and
+ * they keep working after the normal one-hour token lifetime.
+ */
+const watchNativeAuthToken = () => {
+  if (authTokenUnsub) return;
+  authTokenUnsub = onIdTokenChanged(auth, async (user) => {
+    if (!user) return;
+    try {
+      native.setAuthToken(user.uid, await user.getIdToken());
+    } catch (e) {}
+  });
+};
 
 export const registerDeviceWithBackend = async (uid: string, fcmToken: string, notifMode: 'on' | 'off' | 'secret' = 'on') => {
   if (!uid || !fcmToken) return null;
   try {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const res = await fetch('/api/native/register-device', {
+    // Inside the APK this origin is https://localhost, where no API exists.
+    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) return null;
+    const res = await fetch(`${origin}/api/native/register-device`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -50,6 +69,7 @@ export const registerDeviceWithBackend = async (uid: string, fcmToken: string, n
 export const registerNativePushAndReplies = (uid: string) => {
   if (!uid) return;
   activeUid = uid;
+  watchNativeAuthToken();
 
   const w = window as any;
 
@@ -99,8 +119,12 @@ export const registerNativePushAndReplies = (uid: string) => {
   // 2. Wire up window.onNotificationOpen callback (opens right chat from notification)
   w.onNotificationOpen = () => {
     try {
+      if (typeof w.onNativeOpen === 'function') {
+        w.onNativeOpen();
+        return;
+      }
       const p = native.getPendingOpen();
-      if (p && p.convId) {
+      if (p?.convId) {
         const store = useAppStore.getState();
         store.setActiveChat(p.convId);
         store.pushPage('messages');
@@ -109,13 +133,6 @@ export const registerNativePushAndReplies = (uid: string) => {
       console.warn('[NativePush] onNotificationOpen error:', e);
     }
   };
-
-  // Run on startup cold-start too
-  setTimeout(() => {
-    if (w.onNotificationOpen) {
-      w.onNotificationOpen();
-    }
-  }, 500);
 
   // 3. Wire up silent quick replies from native notification
   w.__replyQ = w.__replyQ || [];

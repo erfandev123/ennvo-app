@@ -78,20 +78,23 @@ if (container) {
   createRoot(container).render(<App />);
 }
 
-/* Remove the black boot screen as soon as React has painted a frame. */
-const hideBoot = () => {
-  const boot = document.getElementById('ennvo-boot');
-  if (!boot) return;
-  boot.classList.add('is-hidden');
-  setTimeout(() => boot.remove(), 260);
+/* Hand the native launch splash over to the first React frame. There is no
+   second web splash anymore: the Android core-splashscreen stays visible until
+   this call, so the user sees exactly one uninterrupted Ennvo symbol. */
+const notifyNativeReady = () => {
+  try {
+    const w = window as any;
+    const A = w.Android || w.AndroidInterface;
+    if (A && typeof A.appReady === 'function') A.appReady();
+  } catch (e) {}
 };
 if (typeof requestAnimationFrame === 'function') {
-  requestAnimationFrame(() => requestAnimationFrame(hideBoot));
+  requestAnimationFrame(() => requestAnimationFrame(notifyNativeReady));
 } else {
-  setTimeout(hideBoot, 60);
+  setTimeout(notifyNativeReady, 60);
 }
-// Safety net: never let the boot screen trap the user.
-setTimeout(hideBoot, 2500);
+// Safety net: MainActivity also dismisses the splash after 3.5 s.
+setTimeout(notifyNativeReady, 3200);
 
 /* ------------------------------------------------------------------ *
  * 6. Service worker: web only (a Capacitor WebView is already offline

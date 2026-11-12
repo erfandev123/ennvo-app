@@ -336,11 +336,8 @@ export default function App() {
   }, []);
 
   // Hide native Capacitor Splash Screen on mount
-  useEffect(() => {
-    import('@capacitor/splash-screen').then(({ SplashScreen }) => {
-      SplashScreen.hide();
-    }).catch(() => {});
-  }, []);
+  // (the launch splash is owned by AndroidX core-splashscreen and MainActivity;
+  //  it is dismissed by Android.appReady() from main.tsx after the first paint)
 
   // Expose global openChat & incomingCall trigger for Android Native Notification Intents
   useEffect(() => {
@@ -352,25 +349,35 @@ export default function App() {
     };
 
     // The native side calls window.onNativeOpen() when a notification is tapped
-    // (see MainActivity.handleIntent -> runJs("window.onNativeOpen&&...")). It was
-    // never defined, so tapping a notification only opened the app on the reels
-    // feed. Now it jumps straight to the right screen.
+    // (see MainActivity.handleIntent -> runJs("window.onNativeOpen&&...")).
     (window as any).onNativeOpen = () => {
       try {
-        const pending = bridge.getPendingOpen() as any;
+        const pending = bridge.consumePendingOpen();
         if (!pending) return;
         const store = useAppStore.getState();
-        if (pending.type === 'activity' || pending.page === 'activity' || (!pending.convId && pending.screen === 'activity')) {
+
+        // Activity notification with a direct target (post/reel/story/profile).
+        // Route through the in-app deep-link router so Back closes the overlay
+        // instead of reloading the app.
+        if (pending.url) {
+          import('./services/deepLinkService')
+            .then((m) => m.openFromLink(pending.url as string))
+            .catch(() => {});
+          return;
+        }
+
+        if (pending.type === 'activity' || pending.page === 'activity') {
           store.setCurrentPage('notifications');
           return;
         }
-        const convId = pending.convId || pending.conversationId || pending.c;
-        if (convId) {
+
+        if (pending.convId) {
           store.pushPage('messages');
-          store.setActiveChat(convId);
+          store.setActiveChat(pending.convId);
           return;
         }
-        if (pending.page) store.setCurrentPage(pending.page);
+
+        if (pending.page) store.setCurrentPage(pending.page as any);
       } catch (e) {
         console.warn('[Native] onNativeOpen error:', e);
       }
@@ -627,16 +634,7 @@ export default function App() {
         return;
       }
 
-      // 5. Check if the URL pathname changed during popstate
-      if (typeof window !== 'undefined' && window.location.pathname) {
-        const curPath = window.location.pathname;
-        if (curPath && curPath !== '/' && curPath !== '/home') {
-          openFromLink(curPath);
-          return;
-        }
-      }
-
-      // 6. Walk back through the real page stack first (profile -> settings ->
+      // 5. Walk back through the real page stack first (profile -> settings ->
       //    the tab the user came from ...), then fall through to home, then exit.
       //    This is how Android back behaves in the app: it never jumps straight
       //    to home and it never returns to a page the user already left.
@@ -647,14 +645,14 @@ export default function App() {
         return;
       }
 
-      // 7. Main Navigation Tabs (server tabs other than the Reels/home tab)
+      // 6. Main Navigation Tabs (server tabs other than the Reels/home tab)
       if (store.currentPage !== 'home') {
         store.backPage();
         window.history.pushState({ page: 'init' }, '');
         return;
       }
 
-      // 6. Already at Root 'home' -> Double back press within 2.5s to exit
+      // 7. Already at Root 'home' -> Double back press within 2.5s to exit
       const now = Date.now();
       if (lastBackPressRef.current && (now - lastBackPressRef.current < 2500)) {
         if (typeof (window as any).AndroidApp?.exitApp === 'function') {
@@ -715,28 +713,14 @@ export default function App() {
       console.warn('onMessageListener notice:', err);
     }
 
-    let initialConvsLoaded = false;
-    const prevConvsMap = new Map<string, { lastMessage: string, unread: number }>();
-    let initialNotifsLoaded = false;
-
-    const unsubscribeNotifs = onSnapshot(query(collection(db, 'notifications', currentUser.uid, 'items'), where('isRead', '==', false)), (snap) => {
-      setNotificationCount(snap.size);
-      if (!initialNotifsLoaded) {
-        initialNotifsLoaded = true;
-        return;
-      }
-      snap.docChanges().forEach((change) => {
-        if (change.type === 'added') {
-          const nData = change.doc.data();
-          deviceNotification.show({
-            title: nData.senderName || 'Ennvo Notification',
-            body: nData.message || nData.text || 'You have a new notification',
-            icon: nData.senderAvatar || '/icon-192.png?v=5',
-            type: 'activity',
-          });
-        }
-      });
-    }, (err) => console.warn('Notif count error:', err));
+    // NotificationCenter owns live activity notification dispatch (with the
+    // actor avatar + exact target URL). This listener only keeps the tab badge
+    // count in sync, so activities are never announced twice.
+    const unsubscribeNotifs = onSnapshot(
+      query(collection(db, 'notifications', currentUser.uid, 'items'), where('isRead', '==', false)),
+      (snap) => setNotificationCount(snap.size),
+      (err) => console.warn('Notif count error:', err)
+    );
 
     const unsubscribeMessages = onSnapshot(query(collection(db, 'conversations'), where('participantIds', 'array-contains', currentUser.uid)), (snap) => {
       let total = 0;
@@ -747,7 +731,6 @@ export default function App() {
 
       });
 
-      initialConvsLoaded = true;
       setMessageCount(total);
     }, (err) => console.warn('Msg count error:', err));
 

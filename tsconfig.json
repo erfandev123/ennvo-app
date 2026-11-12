@@ -23,6 +23,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src", "admin-console/src", "server.ts", "vite.config.ts"],
+  "include": ["src", "call", "admin-console/src", "server.ts", "vite.config.ts", "vite.call.config.ts"],
   "exclude": ["functions", "scripts", "node_modules", "dist"]
 }

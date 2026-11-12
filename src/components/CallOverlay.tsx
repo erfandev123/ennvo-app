@@ -18,7 +18,6 @@ import {
   setSpeaker
 } from '../services/callService';
 import { logCallMessageInChat } from '../services/chatService';
-import { deviceNotification } from '../services/deviceNotification';
 import { native } from '../native';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -40,6 +39,7 @@ export const CallOverlay = () => {
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const timerIntervalRef = useRef<any>(null);
   const durationRef = useRef<number>(0);
 
@@ -67,19 +67,13 @@ export const CallOverlay = () => {
           playRingtone('incoming');
 
           try {
-            deviceNotification.show({
-              title: `Incoming ${call.type === 'video' ? 'Video' : 'Audio'} Call 📞`,
-              body: `${call.callerName} is calling you on Ennvo...`,
-              icon: call.callerAvatar || '/icon-192.png',
-              tag: `call-${call.id}`,
-              type: 'activity',
-            });
             if (typeof window !== 'undefined' && 'vibrate' in navigator) {
               navigator.vibrate([300, 150, 300, 150, 450]);
             }
           } catch (e) {}
 
-          // Native Android bridge full-screen intent / heads-up notification
+          // Only the native notification is used in the APK. A second generic
+          // notification here made two notifications appear for one call.
           native.showIncomingCall(call.callerName, call.callerAvatar || '', call.type === 'video' ? 'video' : 'voice', call.id);
         }
       } else {
@@ -144,7 +138,6 @@ export const CallOverlay = () => {
               }
             }
           );
-          native.startCall(callData.callerName || 'Ennvo Call', callData.type === 'video');
         } catch (e) {
           console.warn('[Call] Failed connecting from native call action:', e);
           native.dismissIncomingCall();
@@ -187,7 +180,6 @@ export const CallOverlay = () => {
       timerIntervalRef.current = setInterval(() => {
         setCallDuration(prev => prev + 1);
       }, 1000);
-      native.startCall(activeCallState.otherName || 'Ennvo Call', activeCallState.type === 'video');
     } else {
       setCallDuration(0);
       durationRef.current = 0;
@@ -196,7 +188,16 @@ export const CallOverlay = () => {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [activeCallState?.status, activeCallState?.otherName, activeCallState?.type]);
+  }, [activeCallState?.status]);
+
+  // Speaker/earpiece is decided by the call type: video is hands-free, a voice
+  // call starts on the earpiece (and holds the screen against the ear).
+  useEffect(() => {
+    if (!activeCallState) return;
+    const speaker = activeCallState.type === 'video';
+    setIsSpeakerOn(speaker);
+    setSpeaker(speaker);
+  }, [activeCallState?.callId, activeCallState?.type]);
 
   // Attach local stream to local video tag
   useEffect(() => {
@@ -209,6 +210,19 @@ export const CallOverlay = () => {
       }
     }
   }, [localStream, isMinimized, activeCallState?.status, activeCallState?.type]);
+
+  // Attach remote stream to the hidden audio element. Audio is always played
+  // here so it keeps working for voice calls, minimized video and camera-off.
+  useEffect(() => {
+    const audio = remoteAudioRef.current;
+    if (!audio) return;
+    if (remoteStream && remoteStream.getTracks().length > 0) {
+      if (audio.srcObject !== remoteStream) audio.srcObject = remoteStream;
+      audio.play().catch(() => console.log('Remote audio playback initiated:', audio.srcObject));
+    } else {
+      audio.srcObject = null;
+    }
+  }, [remoteStream, activeCallState?.status]);
 
   // Attach remote stream to remote video tag
   useEffect(() => {
@@ -249,7 +263,6 @@ export const CallOverlay = () => {
           }
         }
       );
-      native.startCall(callData.callerName || 'Ennvo Call', callData.type === 'video');
     } catch (err) {
       console.error("Failed to accept call:", err);
       handleEndActiveCall();
@@ -276,7 +289,6 @@ export const CallOverlay = () => {
 
   const handleEndActiveCall = async () => {
     native.dismissIncomingCall();
-    native.endCall();
     if (activeCallState && currentUser) {
       if (activeCallState.callId) {
         await endCall(activeCallState.callId);
@@ -308,8 +320,8 @@ export const CallOverlay = () => {
   const toggleSpeaker = () => {
     setIsSpeakerOn(prev => {
       const next = !prev;
+      // bridge.setSpeaker already updates the native audio route and proximity.
       setSpeaker(next);
-      native.setSpeaker(next);
       if (remoteVideoRef.current) {
         remoteVideoRef.current.volume = next ? 1.0 : 0.2;
       }
@@ -429,6 +441,10 @@ export const CallOverlay = () => {
       <AnimatePresence>
         {activeCallState && (
           <>
+            {/* The audio of every call is routed through this element. The
+                remote <video> stays muted so audio never plays twice. */}
+            <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+
             {/* Collapsed Pill Mode */}
             {isMinimized && isHiddenPill ? (
               <div
@@ -508,8 +524,9 @@ export const CallOverlay = () => {
                       ref={remoteVideoRef} 
                       autoPlay 
                       playsInline 
+                      muted
                       controls={false}
-                      className={!isVideoOff && remoteStream ? "absolute inset-0 w-full h-full object-cover z-0 transform-gpu" : "hidden pointer-events-none"}
+                      className={remoteStream ? "absolute inset-0 w-full h-full object-cover z-0 transform-gpu" : "hidden pointer-events-none"}
                     />
                   )}
 

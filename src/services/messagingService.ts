@@ -3,6 +3,13 @@ import { db } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
 export const requestFirebaseNotificationPermission = async (userId: string) => {
+  // The native Android shell owns FCM: AppFcmService receives data-only pushes
+  // and nativePushReplies writes the real token to users/{uid}.fcmTokens. The
+  // web SDK path here uses a different token shape and cannot work in a WebView.
+  if (typeof window !== 'undefined' && ((window as any).Android || (window as any).AndroidInterface)) {
+    return;
+  }
+
   console.log('Requesting notification permission...');
   
   if (!('Notification' in window)) {

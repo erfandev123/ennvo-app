@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../store';
 import { subscribeReels } from '../services/postService';
 import { Post } from '../types';
-import { getFollowing } from '../services/followService';
 import { ReelItem } from '../components/ReelItem';
 import { FacebookReelSkeleton } from '../components/Skeletons';
 
@@ -44,7 +43,7 @@ const markReelAsSeen = (reelId: string) => {
 };
 
 export default function Reels() {
-  const { pushPage, currentUser, cachedReels, setCachedReels, isReelsCleanZoom, newUserWelcomeName, setNewUserWelcomeName } = useAppStore();
+  const { pushPage, currentUser, cachedReels, setCachedReels, isReelsCleanZoom, newUserWelcomeName, setNewUserWelcomeName, followingIds } = useAppStore();
   const [reels, setReels] = useState<Post[]>(() => {
     if (cachedReels && cachedReels.length > 0) return cachedReels;
     try {
@@ -56,7 +55,7 @@ export default function Reels() {
   const [loading, setLoading] = useState(reels.length === 0);
   const [activeTab, setActiveTab] = useState<'forYou' | 'following'>('forYou');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const followingSet = useMemo(() => new Set(followingIds || []), [followingIds]);
   const [visibleCount, setVisibleCount] = useState(6);
   // Each mounted reel owns a <video>. Keeping that list bounded is what keeps
   // scrolling smooth after the user has watched dozens of reels.
@@ -102,14 +101,14 @@ export default function Reels() {
     const c = reelsContainerRef.current;
     if (!c) return;
     const h = c.clientHeight || window.innerHeight;
-    c.scrollBy({ top: -h, behavior: 'smooth' });
+    c.scrollBy({ top: -h });
   }, []);
 
   const handleNextReel = useCallback(() => {
     const c = reelsContainerRef.current;
     if (!c) return;
     const h = c.clientHeight || window.innerHeight;
-    c.scrollBy({ top: h, behavior: 'smooth' });
+    c.scrollBy({ top: h });
   }, []);
 
   useEffect(() => {
@@ -211,22 +210,9 @@ export default function Reels() {
       });
       setLoading(false);
     });
-    
-    getFollowing(currentUser.uid).then(following => {
-      setFollowingIds(new Set(following.map(f => f.uid)));
-    });
 
     return () => unsubscribe();
   }, [currentUser, setCachedReels]);
-
-  // Re-fetch following creator IDs when active tab changes to 'following'
-  useEffect(() => {
-    if (activeTab === 'following' && currentUser?.uid) {
-      getFollowing(currentUser.uid).then(following => {
-        setFollowingIds(new Set(following.map(f => f.uid)));
-      });
-    }
-  }, [activeTab, currentUser?.uid]);
 
   const filteredReels = useMemo(() => {
     const notInterested = getNotInterestedIds();
@@ -243,7 +229,7 @@ export default function Reels() {
     let list = Array.from(dedupeMap.values());
 
     if (activeTab === 'following') {
-      list = list.filter(r => followingIds.has(r.authorId));
+      list = list.filter(r => followingSet.has(r.authorId));
     }
 
     // 3. Smart Algorithm: Promoted items at Top (#1), followed by Fresh & Viral
@@ -276,7 +262,7 @@ export default function Reels() {
     }
 
     return list;
-  }, [reels, activeTab, followingIds, selectedCategory, seenIds]);
+  }, [reels, activeTab, followingSet, selectedCategory, seenIds]);
 
 
   if (reels.length === 0 && !loading) {
@@ -469,7 +455,6 @@ export default function Reels() {
         style={{ 
           scrollSnapType: 'y mandatory', 
           WebkitOverflowScrolling: 'touch',
-          scrollBehavior: 'smooth',
           touchAction: 'pan-y'
         }}
       >

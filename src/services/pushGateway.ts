@@ -36,6 +36,8 @@ export type PushPayload = {
   name?: string;
   callType?: string;
   callId?: string;
+  /** In-app path for an activity notification (post / reel / profile). */
+  url?: string;
 };
 
 /** Fire and forget: push must never slow down sending a message or a call. */

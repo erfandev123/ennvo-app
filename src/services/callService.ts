@@ -1,14 +1,21 @@
 /**
  * Ennvo High-Performance WebRTC Video & Voice Call Service
  * Integrated with Native Android Bridge, Trickle ICE, Dynamic Reconnection & Bandwidth Control.
+ *
+ * Latency rules used everywhere in this file:
+ *  - the ring/push is sent before media is acquired, so the other phone starts
+ *    ringing while the camera/mic is still warming up;
+ *  - answering overlaps the Firestore round-trip with getUserMedia;
+ *  - every call owns exactly one native CallService start (with its callId);
+ *  - both peers can restart ICE without dropping the call.
  */
 
-import { 
-  collection, 
-  addDoc, 
-  doc, 
-  onSnapshot, 
-  updateDoc, 
+import {
+  collection,
+  addDoc,
+  doc,
+  onSnapshot,
+  updateDoc,
   getDoc,
   query,
   where,
@@ -54,6 +61,15 @@ let reconnectAttempts = 0;
 let isCallConnected = false;
 let currentCallType: 'audio' | 'video' = 'audio';
 let activeCallPartnerName = '';
+let nativeCallAnnounced = false;
+
+// Active Firestore listeners. They are detached in cleanupMedia so a finished
+// call can never keep a snapshot stream (or a retry loop) alive.
+let callDocUnsub: Unsubscribe | null = null;
+let candidatesUnsub: Unsubscribe | null = null;
+let answeringRestart = false;
+let lastAppliedAnswerSdp = '';
+let lastAppliedOfferSdp = '';
 
 type StreamListener = (local: MediaStream | null, remote: MediaStream | null) => void;
 const streamListeners = new Set<StreamListener>();
@@ -229,6 +245,15 @@ export const getMediaStreamWithFallback = async (type: 'audio' | 'video'): Promi
   }
 };
 
+const stopStream = (stream: MediaStream | null) => {
+  if (!stream) return;
+  try {
+    stream.getTracks().forEach(track => {
+      try { track.stop(); } catch (e) {}
+    });
+  } catch (e) {}
+};
+
 export const switchCamera = async () => {
   if (!localStream) return;
   const videoTrack = localStream.getVideoTracks()[0];
@@ -301,20 +326,31 @@ export const stopRingtone = () => {
   stopCallSounds();
 };
 
+const detachCallListeners = () => {
+  try { callDocUnsub?.(); } catch (e) {}
+  try { candidatesUnsub?.(); } catch (e) {}
+  callDocUnsub = null;
+  candidatesUnsub = null;
+  answeringRestart = false;
+  lastAppliedAnswerSdp = '';
+  lastAppliedOfferSdp = '';
+  nativeCallAnnounced = false;
+};
+
 export const cleanupMedia = () => {
   stopRingtone();
+  detachCallListeners();
   bridge.endCall();
   bridge.dismissIncomingCall();
   bridge.setPip(false, 0, 0);
 
-  if (localStream) {
-    localStream.getTracks().forEach(track => {
-      try { track.stop(); } catch (e) {}
-    });
-    localStream = null;
-  }
+  stopStream(localStream);
+  localStream = null;
   if (peerConnection) {
     try {
+      peerConnection.ontrack = null;
+      peerConnection.onicecandidate = null;
+      peerConnection.oniceconnectionstatechange = null;
       peerConnection.close();
     } catch (e) {}
     peerConnection = null;
@@ -332,6 +368,78 @@ export const markCallHandled = (callId: string) => {
   if (callId) handledCallIds.add(callId);
 };
 
+/** Latest call document. Accept can start before the caller wrote the offer. */
+const readCall = async (callId: string): Promise<any | null> => {
+  try {
+    const snap = await getDoc(doc(db, 'calls', callId));
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  } catch (e) {
+    return null;
+  }
+};
+
+const waitForOffer = (callId: string, seed: any, timeoutMs = 9000): Promise<any> => {
+  if (seed?.sdp) return Promise.resolve(seed);
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    let unsub: Unsubscribe | null = null;
+    const finish = (fn: () => void) => {
+      if (finished) return;
+      finished = true;
+      try { unsub?.(); } catch (e) {}
+      fn();
+    };
+    unsub = onSnapshot(doc(db, 'calls', callId), (snap) => {
+      const data = snap.data();
+      if (!data) return;
+      if (data.offer?.sdp) finish(() => resolve(data.offer));
+      else if (data.status === 'ended' || data.status === 'rejected') finish(() => reject(new Error('Call ended')));
+    }, () => {});
+    setTimeout(() => finish(() => reject(new Error('Timed out waiting for the call offer'))), timeoutMs);
+  });
+};
+
+const createPeer = (
+  type: 'audio' | 'video',
+  onRemoteStream: (stream: MediaStream) => void
+): RTCPeerConnection => {
+  const pc = new RTCPeerConnection({
+    iceServers: getEffectiveIceServers(),
+    iceCandidatePoolSize: 4,
+    bundlePolicy: 'max-bundle',
+  } as RTCConfiguration);
+
+  remoteStream = new MediaStream();
+  pc.ontrack = (event) => {
+    if (event.streams && event.streams[0]) {
+      remoteStream = event.streams[0];
+    } else {
+      if (!remoteStream) remoteStream = new MediaStream();
+      if (event.track && !remoteStream.getTracks().some(t => t.id === event.track.id)) {
+        remoteStream.addTrack(event.track);
+      }
+    }
+    onRemoteStream(new MediaStream(remoteStream.getTracks()));
+    notifyStreamChanges();
+  };
+
+  // A WebRTC connection needs a tiny nudge on some Android WebViews before the
+  // remote audio is actually routed to the earpiece/speaker.
+  if (type === 'audio') {
+    try { bridge.setSpeaker(false); } catch (e) {}
+  }
+
+  return pc;
+};
+
+const addLocalTracks = (pc: RTCPeerConnection) => {
+  if (!localStream) return;
+  localStream.getTracks().forEach(track => {
+    pc.addTrack(track, localStream!);
+  });
+  tuneSenderParameters(pc);
+};
+
 /**
  * Incoming call subscription with background native notifications
  */
@@ -344,33 +452,43 @@ export const subscribeIncomingCalls = (userId: string, callback: (call: CallData
     limit(5)
   );
 
+  // Only cancel the native notification when a call we were actually showing
+  // disappeared. An empty first snapshot must never dismiss the FCM
+  // notification that arrived a moment before Firestore caught up.
+  let hadRinging = false;
+
   return onSnapshot(q, (snapshot) => {
-    if (!snapshot.empty) {
-      const now = Date.now();
-      const ringingCalls = snapshot.docs
-        .map(d => ({ id: d.id, ...d.data() } as CallData))
-        .filter(c => c.status === 'ringing' && !handledCallIds.has(c.id) && (now - (c.createdAt || 0)) < 35000)
-        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const now = Date.now();
+    const ringingCalls = snapshot.docs
+      .map(d => ({ id: d.id, ...d.data() } as CallData))
+      .filter(c => c.status === 'ringing' && !handledCallIds.has(c.id) && (now - (c.createdAt || 0)) < 35000)
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-      if (ringingCalls.length > 0) {
-        const topCall = ringingCalls[0];
-        
-        // If app is currently minimized/backgrounded, trigger full-screen native incoming call
-        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-          bridge.showIncomingCall(
-            topCall.callerName || 'Ennvo User',
-            topCall.callerAvatar || '',
-            topCall.type === 'video' ? 'video' : 'voice',
-            topCall.id
-          );
-        }
+    if (ringingCalls.length > 0) {
+      const topCall = ringingCalls[0];
+      hadRinging = true;
 
-        callback(topCall);
-        return;
+      // FCM already creates the notification when the app is closed. This path
+      // covers the app being alive but backgrounded; the native id is the same,
+      // so this replaces (never duplicates) the push notification.
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        bridge.showIncomingCall(
+          topCall.callerName || 'Ennvo User',
+          topCall.callerAvatar || '',
+          topCall.type === 'video' ? 'video' : 'voice',
+          topCall.id
+        );
       }
+
+      callback(topCall);
+      return;
     }
-    bridge.dismissIncomingCall();
-    callback(null);
+
+    if (hadRinging) {
+      hadRinging = false;
+      bridge.dismissIncomingCall();
+      callback(null);
+    }
   }, (err) => console.warn('[CallService] incoming calls error:', err));
 };
 
@@ -390,64 +508,10 @@ export const initiateCall = async (
 
   playOutgoingRingtone();
 
-  // 1. Pre-warm media and connection
-  localStream = await getMediaStreamWithFallback(type);
-  notifyStreamChanges();
+  // 1. Ring first, acquire media second. The receiver starts vibrating while
+  //    getUserMedia is still opening the camera on this phone.
+  const mediaPromise = getMediaStreamWithFallback(type);
 
-  const rtcConfig: RTCConfiguration = {
-    iceServers: getEffectiveIceServers(),
-    iceCandidatePoolSize: 4
-  };
-
-  peerConnection = new RTCPeerConnection(rtcConfig);
-  localStream.getTracks().forEach(track => {
-    peerConnection?.addTrack(track, localStream!);
-  });
-
-  tuneSenderParameters(peerConnection);
-
-  remoteStream = new MediaStream();
-  peerConnection.ontrack = (event) => {
-    if (event.streams && event.streams[0]) {
-      remoteStream = event.streams[0];
-    } else {
-      if (!remoteStream) remoteStream = new MediaStream();
-      if (event.track && !remoteStream.getTracks().some(t => t.id === event.track.id)) {
-        remoteStream.addTrack(event.track);
-      }
-    }
-    onRemoteStream(new MediaStream(remoteStream.getTracks()));
-    notifyStreamChanges();
-  };
-
-  // Reconnection & ICE State handler
-  peerConnection.oniceconnectionstatechange = async () => {
-    const state = peerConnection?.iceConnectionState;
-    if (state === 'disconnected' || state === 'failed') {
-      if (reconnectAttempts < 3 && activeCallId) {
-        reconnectAttempts++;
-        onCallStatusChange('reconnecting');
-        try {
-          const restartOffer = await peerConnection?.createOffer({ iceRestart: true });
-          if (restartOffer && peerConnection) {
-            await peerConnection.setLocalDescription(restartOffer);
-            await updateDoc(doc(db, 'calls', activeCallId), {
-              offer: { type: restartOffer.type, sdp: setOpusBandwidthAndFec(restartOffer.sdp) }
-            });
-          }
-        } catch (e) {
-          console.warn('[CallService] ICE restart failed:', e);
-        }
-      } else {
-        endCall(activeCallId || '');
-      }
-    } else if (state === 'connected' || state === 'completed') {
-      reconnectAttempts = 0;
-      onCallStatusChange('accepted');
-    }
-  };
-
-  // 2. Create Call in Firestore
   const callDocRef = await addDoc(collection(db, 'calls'), {
     callerId: caller.uid,
     callerName: caller.name || 'User',
@@ -463,7 +527,7 @@ export const initiateCall = async (
   const callId = callDocRef.id;
   activeCallId = callId;
 
-  // Dispatch High-Priority DATA-ONLY Call Push for native notification (rings even when app is closed)
+  // Data-only, high priority: wakes the other phone even when it is closed.
   notifyUser({
     targetUserId: receiver.uid,
     type: 'call',
@@ -473,29 +537,70 @@ export const initiateCall = async (
     callId,
   });
 
-  // 3. Batch Trickle ICE Candidates
+  localStream = await mediaPromise;
+  notifyStreamChanges();
+
+  if (!activeCallId || activeCallId !== callId) {
+    // The call was cancelled while the camera/mic was still opening.
+    stopStream(localStream);
+    localStream = null;
+    throw new Error('Call cancelled');
+  }
+
+  const pc = createPeer(type, onRemoteStream);
+  peerConnection = pc;
+  addLocalTracks(pc);
+
+  // 2. Trickle ICE from the first gathered candidate.
   const callerCandidatesCol = collection(db, 'calls', callId, 'callerCandidates');
-  peerConnection.onicecandidate = (event) => {
+  pc.onicecandidate = (event) => {
     if (event.candidate) {
       addDoc(callerCandidatesCol, event.candidate.toJSON()).catch(() => {});
     }
   };
 
-  // 4. Create Offer with Opus FEC & Bitrate tuning
-  const rawOffer = await peerConnection.createOffer();
+  // Reconnection: the caller restarts ICE and writes a fresh offer.
+  pc.oniceconnectionstatechange = async () => {
+    const state = pc.iceConnectionState;
+    if (state === 'disconnected' || state === 'failed') {
+      if (reconnectAttempts < 3 && activeCallId === callId) {
+        reconnectAttempts++;
+        onCallStatusChange('reconnecting');
+        try {
+          const restartOffer = await pc.createOffer({ iceRestart: true });
+          if (restartOffer && pc.signalingState !== 'closed') {
+            const munged = {
+              type: restartOffer.type,
+              sdp: setOpusBandwidthAndFec(restartOffer.sdp || '')
+            };
+            await pc.setLocalDescription(munged);
+            await updateDoc(doc(db, 'calls', callId), { offer: munged });
+          }
+        } catch (e) {
+          console.warn('[CallService] ICE restart failed:', e);
+        }
+      } else if (activeCallId === callId) {
+        endCall(callId);
+      }
+    } else if ((state === 'connected' || state === 'completed') && !isCallConnected) {
+      reconnectAttempts = 0;
+      isCallConnected = true;
+      onCallStatusChange('accepted');
+    }
+  };
+
+  // 3. Offer with Opus FEC & bitrate tuning.
+  const rawOffer = await pc.createOffer();
   const mungedOffer = {
     type: rawOffer.type,
     sdp: setOpusBandwidthAndFec(rawOffer.sdp || '')
   };
-  await peerConnection.setLocalDescription(mungedOffer);
+  await pc.setLocalDescription(mungedOffer);
+  await updateDoc(callDocRef, { offer: mungedOffer });
 
-  await updateDoc(callDocRef, {
-    offer: mungedOffer
-  });
-
-  // 5. Listen for answer & status
-  let unsubReceiverCandidates: Unsubscribe | null = null;
-  const unsubscribeCall = onSnapshot(callDocRef, async (snapshot) => {
+  // 4. Answer + status stream. Applies the first answer and any later
+  //    renegotiation answer produced by an ICE restart on the receiver.
+  callDocUnsub = onSnapshot(callDocRef, async (snapshot) => {
     const data = snapshot.data();
     if (!data) return;
 
@@ -503,40 +608,54 @@ export const initiateCall = async (
       stopRingtone();
       onCallStatusChange(data.status);
       cleanupMedia();
-      unsubscribeCall();
-      if (unsubReceiverCandidates) unsubReceiverCandidates();
-    } else if (data.status === 'accepted' && data.answer && !peerConnection?.currentRemoteDescription) {
+      return;
+    }
+
+    const answerSdp = data.answer?.sdp;
+    if (data.status === 'accepted' && answerSdp && answerSdp !== lastAppliedAnswerSdp) {
+      lastAppliedAnswerSdp = answerSdp;
+      try {
+        if (pc.signalingState === 'have-local-offer' || (!pc.currentRemoteDescription && answerSdp)) {
+          await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+        } else if (pc.currentRemoteDescription && pc.currentRemoteDescription.sdp !== answerSdp) {
+          await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+        }
+      } catch (e) {
+        console.warn('[CallService] setRemoteDescription(answer) failed:', e);
+      }
+
       stopRingtone();
       isCallConnected = true;
-      bridge.startCall(receiver.name || 'Ennvo Call', type === 'video');
-      bridge.setPip(true, 9, 16);
+      if (!nativeCallAnnounced) {
+        nativeCallAnnounced = true;
+        bridge.startCall(receiver.name || 'Ennvo Call', type === 'video', callId);
+        bridge.setPip(true, 9, 16);
+      }
       onCallStatusChange('accepted');
 
-      const rtcAnswer = new RTCSessionDescription(data.answer);
-      await peerConnection?.setRemoteDescription(rtcAnswer);
-
-      // Drain queue
+      // Drain candidates that arrived before the answer.
       while (iceCandidateQueue.length > 0) {
         const cand = iceCandidateQueue.shift();
-        if (cand && peerConnection) {
-          peerConnection.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+        if (cand) {
+          pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
         }
       }
 
-      // Listen for receiver candidates
-      const receiverCandidatesCol = collection(db, 'calls', callId, 'receiverCandidates');
-      unsubReceiverCandidates = onSnapshot(receiverCandidatesCol, (candSnapshot) => {
-        candSnapshot.docChanges().forEach(change => {
-          if (change.type === 'added') {
-            const candData = change.doc.data();
-            if (peerConnection?.remoteDescription) {
-              peerConnection.addIceCandidate(new RTCIceCandidate(candData)).catch(() => {});
-            } else {
-              iceCandidateQueue.push(candData);
+      if (!candidatesUnsub) {
+        const receiverCandidatesCol = collection(db, 'calls', callId, 'receiverCandidates');
+        candidatesUnsub = onSnapshot(receiverCandidatesCol, (candSnapshot) => {
+          candSnapshot.docChanges().forEach(change => {
+            if (change.type === 'added') {
+              const candData = change.doc.data();
+              if (pc.remoteDescription) {
+                pc.addIceCandidate(new RTCIceCandidate(candData)).catch(() => {});
+              } else {
+                iceCandidateQueue.push(candData);
+              }
             }
-          }
+          });
         });
-      });
+      }
     }
   });
 
@@ -544,7 +663,10 @@ export const initiateCall = async (
 };
 
 /**
- * Accept Incoming Call
+ * Accept Incoming Call.
+ *
+ * The Firestore fetch and the camera/microphone open in parallel, so Accept
+ * connects about as fast as the hardware can start the tracks.
  */
 export const acceptIncomingCall = async (
   call: CallData,
@@ -555,47 +677,52 @@ export const acceptIncomingCall = async (
   stopRingtone();
   bridge.dismissIncomingCall();
 
-  currentCallType = call.type;
-  activeCallId = call.id;
+  const callId = call.id;
+  currentCallType = call.type === 'video' ? 'video' : 'audio';
+  activeCallId = callId;
   activeCallPartnerName = call.callerName || 'Ennvo Call';
 
-  localStream = await getMediaStreamWithFallback(call.type);
+  // Overlap: camera/mic + latest call document (which holds the SDP offer).
+  const mediaPromise = getMediaStreamWithFallback(currentCallType);
+  const latest = await readCall(callId);
+  if (latest && (latest.status === 'ended' || latest.status === 'rejected')) {
+    stopStream(await mediaPromise.catch(() => null));
+    throw new Error('Call has already ended');
+  }
+
+  // Native call service + audio mode first: the user hears/sees the call
+  // screen immediately while the SDP handshake finishes.
+  if (!nativeCallAnnounced) {
+    nativeCallAnnounced = true;
+    bridge.startCall(latest?.callerName || call.callerName || 'Ennvo Call', currentCallType === 'video', callId);
+  }
+
+  let offer = latest?.offer || call.offer;
+  if (!offer?.sdp) {
+    offer = await waitForOffer(callId, offer);
+  }
+
+  localStream = await mediaPromise;
   notifyStreamChanges();
 
-  const rtcConfig: RTCConfiguration = {
-    iceServers: getEffectiveIceServers(),
-    iceCandidatePoolSize: 4
-  };
+  if (activeCallId !== callId) {
+    stopStream(localStream);
+    localStream = null;
+    throw new Error('Call cancelled');
+  }
 
-  peerConnection = new RTCPeerConnection(rtcConfig);
-  localStream.getTracks().forEach(track => {
-    peerConnection?.addTrack(track, localStream!);
-  });
+  const pc = createPeer(currentCallType, onRemoteStream);
+  peerConnection = pc;
+  addLocalTracks(pc);
 
-  tuneSenderParameters(peerConnection);
-
-  remoteStream = new MediaStream();
-  peerConnection.ontrack = (event) => {
-    if (event.streams && event.streams[0]) {
-      remoteStream = event.streams[0];
-    } else {
-      if (!remoteStream) remoteStream = new MediaStream();
-      if (event.track && !remoteStream.getTracks().some(t => t.id === event.track.id)) {
-        remoteStream.addTrack(event.track);
-      }
-    }
-    onRemoteStream(new MediaStream(remoteStream.getTracks()));
-    notifyStreamChanges();
-  };
-
-  // Listen for caller candidates in parallel immediately
-  const callerCandidatesCol = collection(db, 'calls', call.id, 'callerCandidates');
-  const unsubCallerCandidates = onSnapshot(callerCandidatesCol, (candSnapshot) => {
+  // Caller candidates can arrive before the offer: queue them, don't drop them.
+  const callerCandidatesCol = collection(db, 'calls', callId, 'callerCandidates');
+  candidatesUnsub = onSnapshot(callerCandidatesCol, (candSnapshot) => {
     candSnapshot.docChanges().forEach(change => {
       if (change.type === 'added') {
         const candData = change.doc.data();
-        if (peerConnection?.remoteDescription) {
-          peerConnection.addIceCandidate(new RTCIceCandidate(candData)).catch(() => {});
+        if (pc.remoteDescription) {
+          pc.addIceCandidate(new RTCIceCandidate(candData)).catch(() => {});
         } else {
           iceCandidateQueue.push(candData);
         }
@@ -603,59 +730,78 @@ export const acceptIncomingCall = async (
     });
   });
 
-  if (call.offer) {
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(call.offer));
-  } else {
-    // Fallback: fetch offer doc if missing
-    try {
-      const snap = await getDoc(doc(db, 'calls', call.id));
-      if (snap.exists() && snap.data()?.offer) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(snap.data()!.offer));
-      }
-    } catch (e) {}
-  }
+  await pc.setRemoteDescription(new RTCSessionDescription(offer));
+  lastAppliedOfferSdp = offer.sdp;
 
-  const receiverCandidatesCol = collection(db, 'calls', call.id, 'receiverCandidates');
-  peerConnection.onicecandidate = (event) => {
+  const receiverCandidatesCol = collection(db, 'calls', callId, 'receiverCandidates');
+  pc.onicecandidate = (event) => {
     if (event.candidate) {
       addDoc(receiverCandidatesCol, event.candidate.toJSON()).catch(() => {});
     }
   };
 
-  const rawAnswer = await peerConnection.createAnswer();
+  const rawAnswer = await pc.createAnswer();
   const mungedAnswer = {
     type: rawAnswer.type,
     sdp: setOpusBandwidthAndFec(rawAnswer.sdp || '')
   };
-  await peerConnection.setLocalDescription(mungedAnswer);
+  await pc.setLocalDescription(mungedAnswer);
 
-  const callDocRef = doc(db, 'calls', call.id);
+  const callDocRef = doc(db, 'calls', callId);
   await updateDoc(callDocRef, {
     answer: mungedAnswer,
     status: 'accepted'
   });
 
-  // Flush any queued caller candidates instantly
+  // Flush candidates collected while the offer/answer handshake was running.
   while (iceCandidateQueue.length > 0) {
     const cand = iceCandidateQueue.shift();
-    if (cand && peerConnection && peerConnection.remoteDescription) {
-      peerConnection.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+    if (cand && pc.remoteDescription) {
+      pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
     }
   }
 
   isCallConnected = true;
-  bridge.startCall(call.callerName || 'Ennvo Call', call.type === 'video');
   bridge.setPip(true, 9, 16);
   onCallStatusChange('accepted');
 
-  const unsubscribeCall = onSnapshot(callDocRef, (snap) => {
+  // Receiver-side ICE restart: the caller may write a new offer at any time.
+  callDocUnsub = onSnapshot(callDocRef, async (snap) => {
     const data = snap.data();
-    if (data && (data.status === 'ended' || data.status === 'rejected')) {
+    if (!data) return;
+
+    if (data.status === 'ended' || data.status === 'rejected') {
       stopRingtone();
       onCallStatusChange(data.status);
       cleanupMedia();
-      unsubscribeCall();
-      if (unsubCallerCandidates) unsubCallerCandidates();
+      return;
+    }
+
+    const newOffer = data.offer;
+    if (
+      newOffer?.sdp &&
+      newOffer.sdp !== lastAppliedOfferSdp &&
+      pc.remoteDescription &&
+      !answeringRestart
+    ) {
+      lastAppliedOfferSdp = newOffer.sdp;
+      answeringRestart = true;
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(newOffer));
+        const restartAnswer = await pc.createAnswer();
+        const munged = {
+          type: restartAnswer.type,
+          sdp: setOpusBandwidthAndFec(restartAnswer.sdp || '')
+        };
+        await pc.setLocalDescription(munged);
+        await updateDoc(callDocRef, { answer: munged });
+        reconnectAttempts = 0;
+        onCallStatusChange('accepted');
+      } catch (e) {
+        console.warn('[CallService] Receiver ICE restart failed:', e);
+      } finally {
+        answeringRestart = false;
+      }
     }
   });
 

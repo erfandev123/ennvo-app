@@ -154,6 +154,7 @@ export default async function handler(req, res) {
             title: secret ? 'Ennvo' : String(body.title || 'Ennvo'),
             body: secret ? 'New notification' : String(body.body || '').slice(0, 160),
             avatar: secret ? '' : String(body.avatar || ''),
+            url: secret ? '' : String(body.url || '').slice(0, 240),
           }
       : type === 'message'
         ? {

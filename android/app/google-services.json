@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "8931913340",
+    "firebase_url": "https://ennvo-6c01c-default-rtdb.firebaseio.com",
+    "project_id": "ennvo-6c01c",
+    "storage_bucket": "ennvo-6c01c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:8931913340:android:40740b62d10f13b3e123f9",
+        "android_client_info": {
+          "package_name": "com.erfan.ennvoapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "8931913340-fdva8f3cgadue2e2ot87sst7g9d1it8p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBF6QrSEtyz61W3_02mQ2K3-1133tWSR8M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "8931913340-fdva8f3cgadue2e2ot87sst7g9d1it8p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
