@@ -30,6 +30,19 @@ const BottomNav = memo(() => {
     { id: 'profile', icon: NavProfileIcon, label: 'Profile' },
   ];
 
+  // Download the chunk the moment a finger touches the tab, so the page is
+  // already parsed by the time the tap completes. On a slow phone this is the
+  // difference between an instant tab switch and a skeleton flash.
+  const prefetchPage = useCallback((id: string) => {
+    switch (id) {
+      case 'home': import('../pages/Reels').catch(() => {}); break;
+      case 'reels': import('../pages/Home').catch(() => {}); break;
+      case 'messages': import('../pages/Messages').catch(() => {}); break;
+      case 'profile': import('../pages/Profile').catch(() => {}); break;
+      default: break;
+    }
+  }, []);
+
   const lastClickRef = useRef<{ [key: string]: number }>({});
   const navRef = useRef<HTMLElement>(null);
   const [dragHoveredId, setDragHoveredId] = useState<string | null>(null);
@@ -235,6 +248,8 @@ const BottomNav = memo(() => {
           <button
             key={item.id}
             onClick={() => handleItemClick(item.id)}
+            onPointerDown={() => prefetchPage(item.id)}
+            onTouchStart={() => prefetchPage(item.id)}
             className="flex items-center justify-center flex-1 h-full relative transform-gpu transition-transform duration-75 ease-out select-none touch-manipulation cursor-pointer active:scale-95"
           >
             {/* The little dot under the active tab, like the phone apps. */}

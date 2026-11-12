@@ -183,11 +183,11 @@ public class Notifier {
         final String b = body == null ? "" : body;
         final String cid = convId == null ? "" : convId;
         final int id = cid.isEmpty() ? ("c:" + norm(t)).hashCode() : ("cid:" + cid).hashCode();
-        final String key = norm(t) + "|" + norm(b);
+        final String key = cid + "|" + norm(t) + "|" + norm(b);
 
         synchronized (Notifier.class) {
             long now = System.currentTimeMillis();
-            if (key.equals(lastKey) && now - lastTime < 15000) {
+            if (key.equals(lastKey) && now - lastTime < 6000) {
                 Conv dup = convs.get(id);
                 if (dup != null && dup.convId.isEmpty() && !cid.isEmpty()) {
                     dup.convId = cid;
@@ -526,9 +526,8 @@ public class Notifier {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
-    /** Backend that serves the uploaded media of the app. */
-    private static final String BACKEND =
-            "https://ais-dev-ququzv7htl2qshqf3skacy-736538280490.asia-northeast1.run.app";
+    /** Public origin that serves the uploaded media of the app. */
+    private static final String BACKEND = "https://ennvo.vercel.app";
 
     private static Bitmap loadAvatar(String u) {
         if (u == null || u.trim().isEmpty()) return null;

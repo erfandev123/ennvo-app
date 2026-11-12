@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Send,
   SendHorizontal,
+  AlertCircle,
   X,
   Heart,
   Type,
@@ -65,6 +66,7 @@ import {
   orderBy,
   onSnapshot,
   doc,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { subscribeNotifications } from "../services/notificationService";
@@ -82,6 +84,7 @@ import {
   createConversation,
   updateConversationTheme,
   deleteConversation,
+  getDeletedMessageIds,
 } from "../services/chatService";
 import { ChatThemeStudioModal } from "../components/ChatThemeStudioModal";
 import { StickerPickerModal, StickerViewerModal } from "../components/StickerPickerModal";
@@ -841,7 +844,7 @@ const MessageBubble = React.memo(function MessageBubble({
   senderName,
   senderInfo,
   isGroup,
-  seenStr,
+  onRetry,
   onReply,
   onLongPress,
   onContextMenu,
@@ -862,7 +865,7 @@ const MessageBubble = React.memo(function MessageBubble({
   senderName?: string;
   senderInfo?: { name: string; avatar: string };
   isGroup?: boolean;
-  seenStr: string | null;
+  onRetry?: (msg: any) => void;
   onReply: (msg: any) => void;
   onLongPress: (e: React.UIEvent, msgId: string) => void;
   onContextMenu: (e: React.MouseEvent, msgId: string) => void;
@@ -1008,7 +1011,7 @@ const MessageBubble = React.memo(function MessageBubble({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
-        className={`flex flex-col max-w-[84%] sm:max-w-[80%] ${isMe ? "items-end" : "items-start"} relative group/bubble select-none`}
+        className={`flex flex-col max-w-[78%] sm:max-w-[72%] ${isMe ? "items-end" : "items-start"} relative group/bubble select-none`}
       >
         {/* Swipe Right to Reply Indicator */}
         <div 
@@ -1455,19 +1458,21 @@ const MessageBubble = React.memo(function MessageBubble({
           )}
         </div>
 
-        {/* Seen text animation: soft smooth glide and fade-in */}
-        {seenStr && (
-          <motion.div
-            key="seen-indicator"
-            initial={{ opacity: 0, y: -4, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: "auto" }}
-            exit={{ opacity: 0, y: -4, height: 0 }}
-            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-            className="text-[10.5px] text-gray-400 dark:text-zinc-400 font-normal select-none self-end mt-0.5 pr-1 overflow-hidden flex items-center space-x-1 transition-colors"
+        {/* A message that never reached Firestore: clearly marked and one tap
+            resends it with the same id, so it can never be duplicated. */}
+        {isMe && msg.status === 'failed' && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRetry?.(msg);
+            }}
+            className="self-end mt-0.5 pr-1 flex items-center space-x-1 text-[10.5px] font-semibold text-rose-500 hover:text-rose-600 select-none cursor-pointer bg-transparent border-0"
+            title="Tap to resend"
           >
-            <CheckCheck className="w-3 h-3 text-purple-500/80 inline" />
-            <span>{seenStr}</span>
-          </motion.div>
+            <AlertCircle className="w-3 h-3" />
+            <span>Not sent · Tap to retry</span>
+          </button>
         )}
       </div>
 
@@ -1503,7 +1508,6 @@ const MessageBubble = React.memo(function MessageBubble({
     prev.isFirstInGroup === next.isFirstInGroup &&
     prev.isLastInGroup === next.isLastInGroup &&
     prev.borderRadius === next.borderRadius &&
-    prev.seenStr === next.seenStr &&
     prev.isMe === next.isMe &&
     prev.isNew === next.isNew &&
     prev.avatarUrl === next.avatarUrl &&
@@ -1677,6 +1681,20 @@ export default function Messages() {
   }>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const chatContentRef = useRef<HTMLDivElement>(null);
+  const contentHeightRef = useRef<number>(0);
+  // Timestamp of the last "load older" prepend. While it is fresh, a growth of
+  // the content comes from the images above the viewport loading and the
+  // reading position has to be kept.
+  const prependAtRef = useRef<number>(0);
+  // Ids that were explicitly paged in with "load older". Only these are kept
+  // outside the live window; anything else in the cache must be allowed to
+  // disappear when it is deleted (otherwise an old deleted bubble came back).
+  const pagedIdsRef = useRef<Record<string, Set<string>>>({});
+  // The screen was opened straight into this chat (notification / deep link),
+  // so the pane is already there: sliding it in from the right would look like
+  // an animation on top of an already open chat.
+  const openedWithChatRef = useRef<boolean>(Boolean(activeChat));
   const prevScrollHeightRef = useRef<number>(0);
   const shouldAutoScrollRef = useRef<boolean>(true);
   const activityTouchStartXRef = useRef<number | null>(null);
@@ -1752,10 +1770,43 @@ export default function Messages() {
       try {
         localStorage.setItem("ennvo_muted_chats", JSON.stringify(next));
       } catch (_) {}
+      // A local-only flag could not stop a push. The mute is also written to
+      // the conversation so the sender's gateway, the in-app notification
+      // center and every other device of this account honour it.
+      const uid = currentUser?.uid;
+      if (uid) {
+        updateDoc(doc(db, "conversations", convId), {
+          [`mutedBy.${uid}`]: !isMuted,
+        }).catch((err) => console.warn("Mute sync notice:", err));
+      }
       return next;
     });
     setChatContextMenu(null);
   };
+
+  // The conversation document is the source of truth for a mute, so a chat
+  // muted on another phone is muted here too. Ids for chats that are not
+  // loaded yet stay local until they arrive.
+  useEffect(() => {
+    const uid = currentUser?.uid;
+    if (!uid || !conversations.length) return;
+    const serverMuted = conversations
+      .filter((c: any) => c.mutedBy?.[uid])
+      .map((c: any) => c.id);
+    const loadedIds = new Set(conversations.map((c: any) => c.id));
+    setMutedChatIds((prev) => {
+      const next = Array.from(
+        new Set([...serverMuted, ...prev.filter((id) => !loadedIds.has(id))])
+      );
+      if (next.length === prev.length && next.every((id) => prev.includes(id))) {
+        return prev;
+      }
+      try {
+        localStorage.setItem("ennvo_muted_chats", JSON.stringify(next));
+      } catch (_) {}
+      return next;
+    });
+  }, [conversations, currentUser?.uid]);
   const [activityTab, setActivityTab] = useState<"activity" | "followers">("activity");
   const [isOnline, setIsOnline] = useState<boolean>(() =>
     typeof navigator !== "undefined" ? navigator.onLine : true
@@ -1772,7 +1823,7 @@ export default function Messages() {
       const saved = Number(localStorage.getItem("ennvo_messages_sidebar_w"));
       if (saved >= SIDEBAR_MIN && saved <= SIDEBAR_MAX) return saved;
     } catch (e) {}
-    return typeof window !== "undefined" && window.innerWidth >= 1280 ? 410 : 380;
+    return typeof window !== "undefined" && window.innerWidth >= 1280 ? 430 : 400;
   });
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const sidebarDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -1895,49 +1946,36 @@ export default function Messages() {
     return () => clearTimeout(timer);
   }, [activeChat]);
 
-  const [unzoomedCssHeight, setUnzoomedCssHeight] = useState(() => {
-    if (typeof window === "undefined") {
-      return 800;
-    }
-    // Always use window.innerHeight (CSS layout pixels) to avoid physical pixel over-zooming from window.screen.height
-    return window.innerHeight || 800;
-  });
-
   useEffect(() => {
-    const handleScreenResize = () => {
-      const currentInnerHeight = window.innerHeight;
-      // Only update if height expands (e.g. keyboard closes or orientation changes), never shrink on keyboard open
-      setUnzoomedCssHeight((prev) => {
-        if (currentInnerHeight > prev || Math.abs(window.innerWidth - 390) > 50) {
-          return currentInnerHeight;
-        }
-        return prev;
-      });
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let lastOffset = -1;
+    // Reading the keyboard height is cheap; changing state is not, so the
+    // state is only written when the offset really changed.
+    const read = () => {
+      const offset = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0));
+      if (offset !== lastOffset) {
+        lastOffset = offset;
+        setViewportBottomOffset(offset);
+      }
+      return offset;
     };
-    window.addEventListener("resize", handleScreenResize);
-    window.addEventListener("orientationchange", handleScreenResize);
-    return () => {
-      window.removeEventListener("resize", handleScreenResize);
-      window.removeEventListener("orientationchange", handleScreenResize);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!window.visualViewport) return;
-    const updateViewport = () => {
-      if (!window.visualViewport) return;
-      const diff = window.innerHeight - window.visualViewport.height;
-      const offset = Math.max(0, diff);
-      setViewportBottomOffset(offset);
-      if (messagesContainerRef.current && (shouldAutoScrollRef.current || offset > 0)) {
+    const onResize = () => {
+      // Only a real keyboard open moves the composer. Scrolling the visual
+      // viewport (which fires on every touch scroll on mobile) used to force
+      // the list back to the bottom, which is why scrolling up felt laggy and
+      // the screen jumped.
+      const offset = read();
+      if (offset > 0 && shouldAutoScrollRef.current && messagesContainerRef.current) {
         messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
       }
     };
-    window.visualViewport.addEventListener("resize", updateViewport);
-    window.visualViewport.addEventListener("scroll", updateViewport);
+    const onScroll = () => { read(); };
+    vv.addEventListener("resize", onResize);
+    vv.addEventListener("scroll", onScroll);
     return () => {
-      window.visualViewport?.removeEventListener("resize", updateViewport);
-      window.visualViewport?.removeEventListener("scroll", updateViewport);
+      vv.removeEventListener("resize", onResize);
+      vv.removeEventListener("scroll", onScroll);
     };
   }, []);
 
@@ -2706,20 +2744,21 @@ export default function Messages() {
   }, [activeChat, currentUser, followers.length]);
 
   useEffect(() => {
-    if (!currentUser) return;
+    const uid = currentUser?.uid;
+    if (!uid) return;
     const unsubscribe = subscribeConversations(
-      currentUser.uid,
+      uid,
       setConversations,
     );
     const unsubscribeNotifs = subscribeNotifications(
-      currentUser.uid,
+      uid,
       setNotifications,
     );
     const unsubscribeStories = subscribeStories(setInboxStories, "inbox");
 
     // Fetch followers for the followers tab
     const q = query(
-      collection(db, "users", currentUser.uid, "followers"),
+      collection(db, "users", uid, "followers"),
       orderBy("createdAt", "desc"),
     );
     const unsubscribeFollowers = onSnapshot(q, async (snapshot) => {
@@ -2753,7 +2792,7 @@ export default function Messages() {
       unsubscribeStories();
       unsubscribeFollowers();
     };
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   // Only watch profiles that are actually visible: the other person in each
   // direct chat, plus the members of the currently open group. Watching every
@@ -2814,23 +2853,29 @@ export default function Messages() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedProfileKey, currentUser?.uid]);
 
-  const [messageLimit, setMessageLimit] = useState(20);
+  const [messageLimit, setMessageLimit] = useState(60);
   const [activityLimit, setActivityLimit] = useState(15);
 
   useEffect(() => {
     if (!activeChat || activeChat === "followers" || activeChat === "activity")
       return;
 
-    if (currentUser) {
+    // Depend on the uid, never on the whole user object. The profile document
+    // updates (online presence, last seen, status) and every update used to
+    // tear down and restart the message listener, re-reading the cache and
+    // re-ordering the bubbles while the user was reading.
+    const uid = currentUser?.uid;
+
+    if (uid) {
       import("../services/chatService").then((m) =>
-        m.markConversationRead(activeChat, currentUser.uid),
+        m.markConversationRead(activeChat, uid),
       );
     }
 
     // The chat was opened from a notification: fetch the history once right
     // away so the conversation is never empty while the live stream connects.
     import("../services/chatService").then((m) =>
-      m.refreshMessages(activeChat, 30).then((fresh) => {
+      m.refreshMessages(activeChat, 60).then((fresh) => {
         if (!fresh || fresh.length === 0) return;
         setMessagesCache((prev) => {
           const current = prev[activeChat] || [];
@@ -2844,9 +2889,23 @@ export default function Messages() {
 
     const unsubscribe = subscribeMessages(
       activeChat,
-      (newMsgs) => {
+      (newMsgs, removedIds) => {
         setMessagesCache((prev) => {
-          const currentCached = prev[activeChat] || [];
+          // A message deleted by either side arrives here as a removal. Drop it
+          // from the local cache first, otherwise the "keep older messages"
+          // branch below put it straight back and the delete looked like it
+          // never reached the other phone.
+          const removed = new Set<string>([
+            ...(removedIds || []),
+            // Every tombstone this account has for the chat, so a message
+            // deleted in an earlier session can never come back from the
+            // persistent cache either.
+            ...getDeletedMessageIds(activeChat, uid),
+          ]);
+          const currentCached = (prev[activeChat] || []).filter(
+            (m: any) =>
+              !removed.has(m?.id) && !(m?.tempId && removed.has(m.tempId))
+          );
           const newMsgIds = new Set(newMsgs.map(m => m.id));
           
           // Filter out temp messages that have already synced to Firestore
@@ -2909,40 +2968,58 @@ export default function Messages() {
           // ones that were loaded with the "load older" action are kept, so
           // scrolling back through the history does not throw them away.
           const oldestLoaded = confirmed.length ? timeOf(confirmed[0]) : Number.MAX_SAFE_INTEGER;
+          const paged = pagedIdsRef.current[activeChat];
           const older = currentCached.filter(
-            (m: any) => !isPending(m) && timeOf(m) < oldestLoaded
+            (m: any) =>
+              !isPending(m) &&
+              timeOf(m) < oldestLoaded &&
+              !!paged?.has(m.id)
           );
 
-          return { ...prev, [activeChat]: [...older, ...confirmed, ...pending] };
+          // One chronological order for the whole list. An optimistic message
+          // keeps its local send time, so when the server acknowledges it the
+          // bubble no longer jumps from the bottom to a new position (the old
+          // code always parked pending messages at the very end).
+          const ordered = [...older, ...confirmed, ...pending];
+          ordered.sort((a: any, b: any) => {
+            const diff = timeOf(a) - timeOf(b);
+            if (diff !== 0) return diff;
+            return String(a.id || a.tempId || '').localeCompare(
+              String(b.id || b.tempId || '')
+            );
+          });
+
+          return { ...prev, [activeChat]: ordered };
         });
-        if (currentUser) {
+        if (uid) {
           // Only the messages that actually need it are marked as seen. The
           // previous version read and rewrote 25 documents for every single
           // incoming message, which delayed the next snapshot.
           const unseen = newMsgs
-            .filter((m: any) => m.senderId !== currentUser.uid && m.status !== 'seen')
+            .filter((m: any) => m.senderId !== uid && m.status !== 'seen')
             .map((m: any) => m.id)
             .filter(Boolean);
           if (unseen.length) {
             import("../services/chatService").then((m) =>
-              m.markConversationRead(activeChat, currentUser.uid, unseen),
+              m.markConversationRead(activeChat, uid, unseen),
             );
           }
         }
       },
       messageLimit,
+      uid,
     );
     const unsubscribeTyping = subscribeTyping(activeChat, (users) => {
-      setTypingUsers(users.filter((uid) => uid !== currentUser?.uid));
+      setTypingUsers(users.filter((id) => id !== uid));
     });
     return () => {
       unsubscribe();
       unsubscribeTyping();
     };
-  }, [activeChat, currentUser, messageLimit]);
+  }, [activeChat, currentUser?.uid, messageLimit]);
 
   useLayoutEffect(() => {
-    setMessageLimit(20); // Reset limit when chat changes
+    setMessageLimit(60); // Reset limit when chat changes
     if (!activeChat) return;
     shouldAutoScrollRef.current = true;
     const el = messagesContainerRef.current;
@@ -3733,13 +3810,31 @@ export default function Messages() {
     const grew = scrollHeight > prevScrollHeightRef.current;
 
     if (grew && scrollTop < 80) {
-      // Older messages were prepended: keep the reading position.
-      el.scrollTop = scrollTop + (scrollHeight - prevScrollHeightRef.current);
+      // Older messages were prepended: keep the reading position. The
+      // ResizeObserver below does the same job more accurately (it also
+      // accounts for images that load later), so the manual delta is only the
+      // fallback for a WebView without ResizeObserver. Doing both shifted the
+      // list twice and made the jump worse.
+      if (typeof ResizeObserver === 'undefined') {
+        el.scrollTop = scrollTop + (scrollHeight - prevScrollHeightRef.current);
+        contentHeightRef.current = scrollHeight;
+      }
     } else if (shouldAutoScrollRef.current) {
       el.scrollTop = scrollHeight;
+      contentHeightRef.current = scrollHeight;
     }
     prevScrollHeightRef.current = scrollHeight;
   }, [messages]);
+
+  // Consume the "opened straight into a chat" flag after the first paint, so
+  // every later chat still slides in normally.
+  useEffect(() => {
+    if (!activeChat || !openedWithChatRef.current) return;
+    const timer = setTimeout(() => {
+      openedWithChatRef.current = false;
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [activeChat]);
 
   // Force scroll to bottom on chat enter
   useEffect(() => {
@@ -3747,7 +3842,45 @@ export default function Messages() {
       shouldAutoScrollRef.current = true;
       scrollToBottom(true);
       setTimeout(() => scrollToBottom(true), 150);
+      setTimeout(() => scrollToBottom(true), 450);
     }
+  }, [activeChat]);
+
+  /**
+   * Chat media (photos, videos, stickers) has no fixed height until it loads,
+   * so the list grew *after* the first scroll and the newest message ended up
+   * below the fold (the screen looked like it jumped when a chat was opened).
+   * A ResizeObserver keeps the newest message pinned, and while the user is
+   * reading history it compensates the height of images that load above the
+   * viewport instead of letting the text slide away.
+   */
+  useEffect(() => {
+    if (!activeChat) return;
+    const content = chatContentRef.current;
+    if (!content || typeof ResizeObserver === 'undefined') return;
+    contentHeightRef.current = content.scrollHeight;
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      const next = content.scrollHeight;
+      const prev = contentHeightRef.current;
+      if (next === prev) return;
+      contentHeightRef.current = next;
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const el = messagesContainerRef.current;
+        if (!el) return;
+        if (shouldAutoScrollRef.current) {
+          el.scrollTop = el.scrollHeight;
+        } else if (performance.now() - prependAtRef.current < 1600) {
+          el.scrollTop = el.scrollTop + (next - prev);
+        }
+      });
+    });
+    ro.observe(content);
+    return () => {
+      ro.disconnect();
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, [activeChat]);
 
   const isSpecialChat = activeChat === "followers" || activeChat === "activity" || activeChat === "requests";
@@ -3756,6 +3889,76 @@ export default function Messages() {
     typeof window !== "undefined" ? window.innerWidth < 768 : false;
 
   const unreadNotifsCount = notifications.filter((n) => !n.isRead).length;
+
+  /** Resend a bubble whose write failed, reusing its id (idempotent). */
+  const retryMessage = React.useCallback(
+    async (msg: any) => {
+      const uid = currentUser?.uid;
+      const convId = activeChat;
+      if (!uid || !convId || !msg) return;
+      const docId = msg.id || msg.tempId;
+      if (!docId) return;
+
+      setMessagesCache((prev) => ({
+        ...prev,
+        [convId]: (prev[convId] || []).map((m: any) =>
+          m.id === docId || m.tempId === docId
+            ? { ...m, status: 'sent', pending: true }
+            : m
+        ),
+      }));
+
+      try {
+        await sendMessage(
+          convId,
+          uid,
+          msg.type || 'text',
+          msg.content || '',
+          msg.mediaUrl,
+          msg.postId,
+          msg.replyTo,
+          {
+            clientMessageId: docId,
+            mediaUrls: msg.mediaUrls,
+            mediaItems: msg.mediaItems,
+            duration: msg.duration,
+            fileName: msg.fileName,
+            fileSize: msg.fileSize,
+            fileExt: msg.fileExt,
+          }
+        );
+      } catch (e) {
+        // chatService emits the failure event again; nothing else to do here.
+      }
+    },
+    [activeChat, currentUser?.uid, setMessagesCache]
+  );
+
+  // A send that failed after every retry marks its optimistic bubble.
+  useEffect(() => {
+    const onFailed = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {};
+      const convId = detail.conversationId;
+      const clientId = detail.clientMessageId;
+      if (!convId || !clientId) return;
+      setMessagesCache((prev) => {
+        const list = prev[convId];
+        if (!list) return prev;
+        let changed = false;
+        const next = list.map((m: any) => {
+          if (m.id === clientId || m.tempId === clientId) {
+            changed = true;
+            return { ...m, status: 'failed' };
+          }
+          return m;
+        });
+        return changed ? { ...prev, [convId]: next } : prev;
+      });
+    };
+    window.addEventListener('ennvo:message-failed', onFailed as EventListener);
+    return () =>
+      window.removeEventListener('ennvo:message-failed', onFailed as EventListener);
+  }, [setMessagesCache]);
 
   const renderedMessages = React.useMemo(
     () =>
@@ -3813,28 +4016,6 @@ export default function Messages() {
         const messageKey = msg.id || msg.tempId || `msg_${idx}`;
 
         const isLastMsg = idx === messages.length - 1;
-        let seenStr: string | null = null;
-        if (isMe && isLastMsg) {
-          const otherUid = activeConversation?.participantIds?.find(id => id !== currentUser?.uid);
-          const isReadByOther = msg.status === 'seen' || (otherUid && activeConversation?.unreadCount && activeConversation.unreadCount[otherUid] === 0);
-          if (isReadByOther) {
-            const mTime = (msg.createdAt as any)?.toMillis ? (msg.createdAt as any).toMillis() : ((msg.createdAt as any)?.seconds ? (msg.createdAt as any).seconds * 1000 : (typeof msg.createdAt === 'number' ? msg.createdAt : Date.now()));
-            const diffSec = Math.floor((Date.now() - mTime) / 1000);
-            if (diffSec < 45) {
-              seenStr = "Seen";
-            } else if (diffSec < 3600) {
-              const mins = Math.max(1, Math.floor(diffSec / 60));
-              seenStr = `Seen ${mins}m ago`;
-            } else if (diffSec < 86400) {
-              const hours = Math.floor(diffSec / 3600);
-              seenStr = `Seen ${hours}h ago`;
-            } else {
-              const days = Math.floor(diffSec / 86400);
-              seenStr = `Seen ${days}d ago`;
-            }
-          }
-        }
-
         const msgId = msg.id || msg.tempId;
         // Only truly optimistic messages are "pending"; once Firestore echoes
         // the same document id the flag is gone and animations stop replaying.
@@ -3884,7 +4065,7 @@ export default function Messages() {
             senderName={senderName}
             senderInfo={{ name: resolvedSenderName, avatar: resolvedAvatarUrl }}
             isGroup={Boolean(activeContact?.isGroup)}
-            seenStr={seenStr}
+            onRetry={retryMessage}
             onReply={(m) => setReplyingTo(m as any)}
             onLongPress={handleLongPress}
             onContextMenu={handleContextMenu}
@@ -3910,8 +4091,24 @@ export default function Messages() {
           />
         );
       }),
-    [messages, currentUser, activeContact, activeConversation, userDataCache, chatTheme, activeChat],
+    [messages, currentUser?.uid, currentUser?.name, currentUser?.avatar, activeContact, activeConversation, userDataCache, chatTheme, activeChat, retryMessage],
   );
+
+  // "Seen" lives in one fixed-height slot below the list, not inside a bubble.
+  // The slot exists whenever the newest message is mine, so the text appearing
+  // later never pushes the chat up.
+  const lastMessage = messages.length ? messages[messages.length - 1] : null;
+  const lastSeenLabel = React.useMemo(() => {
+    if (!lastMessage || lastMessage.senderId !== currentUser?.uid) return null;
+    if ((lastMessage as any).status !== 'seen') return null;
+    const c: any = (lastMessage as any).createdAt;
+    const mTime = c?.toMillis ? c.toMillis() : (c?.seconds ? c.seconds * 1000 : (typeof c === 'number' ? c : Date.now()));
+    const diffSec = Math.floor((Date.now() - mTime) / 1000);
+    if (diffSec < 45) return 'Seen';
+    if (diffSec < 3600) return `Seen ${Math.max(1, Math.floor(diffSec / 60))}m ago`;
+    if (diffSec < 86400) return `Seen ${Math.floor(diffSec / 3600)}h ago`;
+    return `Seen ${Math.floor(diffSec / 86400)}d ago`;
+  }, [lastMessage, currentUser?.uid]);
 
   return (
     <div
@@ -3926,7 +4123,7 @@ export default function Messages() {
 
       {/* Left Sidebar (Contacts & Stories) - Pure High-White Glass & Solid OLED Dark Mode Seamlessly under PC Dock */}
       <div
-        className={`w-full md:w-auto md:pl-[84px] lg:pl-[92px] flex-shrink-0 border-r border-neutral-200/50 dark:border-white/10 flex-col h-full bg-transparent md:bg-white dark:md:bg-[#0b0b0e] z-10 transition-colors ${activeChat ? "hidden md:flex" : "flex"}`}
+        className={`w-full md:w-auto md:pl-[100px] lg:pl-[110px] flex-shrink-0 border-r border-neutral-200/50 dark:border-white/10 flex-col h-full bg-transparent md:bg-white dark:md:bg-[#0b0b0e] z-10 transition-colors ${activeChat ? "hidden md:flex" : "flex"}`}
         style={isDesktop ? { width: sidebarWidth } : undefined}
       >
         {/* Top Controls Area (NO Boxed Header - completely transparent so blur & background flows seamlessly to the top) */}
@@ -4731,15 +4928,17 @@ export default function Messages() {
         </div>
       )}
 
-      {/* Right Chat Area */}
-      <AnimatePresence>
+      {/* Right Chat Area. "wait" prevents the old pane and the new pane from
+          sliding across each other when switching chats (or when a
+          notification opens a different chat while one is already open). */}
+      <AnimatePresence mode="wait">
         {activeChat ? (
           (activeChat === "activity" || activeChat === "followers") ? (
             <motion.div
               key="activity-special"
               initial={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "-100%", opacity: 0.98 }}
+              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
               transition={isDesktop ? { duration: 0 } : { duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
               className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 min-w-0 flex flex-col h-full bg-[#f2f2f7] dark:bg-black will-change-transform select-none"
             >
@@ -4750,7 +4949,7 @@ export default function Messages() {
               key="special"
               initial={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "-100%", opacity: 0.98 }}
+              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
               transition={isDesktop ? { duration: 0 } : { duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
               className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 min-w-0 flex flex-col h-full bg-white will-change-opacity select-none"
               onTouchStart={(e) => {
@@ -4855,7 +5054,7 @@ export default function Messages() {
                                 <p className="text-[12.5px] text-neutral-500 truncate mt-0.5">{req.lastMessage || "Sent a message"}</p>
                                 <div className="flex items-center space-x-2 mt-1">
                                   <span className="text-[11px] font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
-                                    {count} of 2 sent
+                                    {count === 1 ? "1 message" : `${count} messages`}
                                   </span>
                                 </div>
                               </div>
@@ -5287,9 +5486,9 @@ export default function Messages() {
           ) : (
             <motion.div
               key={`chat-${activeChat}`}
-              initial={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
+              initial={isDesktop || openedWithChatRef.current ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "-100%", opacity: 0.98 }}
+              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
               transition={isDesktop ? { duration: 0 } : { duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
               className="chat-view-container fixed inset-0 z-[100] md:relative md:z-auto flex-1 min-w-0 flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-white dark:bg-black select-none will-change-transform"
             >
@@ -5502,11 +5701,11 @@ export default function Messages() {
                 {/* Messages Area - Scrolls Cleanly Below Fixed Header */}
                 <div
                   ref={messagesContainerRef}
-                  className="absolute inset-0 overflow-y-auto px-1 sm:px-2 md:px-3 py-2 space-y-0.5 scrollbar-hide flex flex-col justify-start z-10 overscroll-contain transform-gpu [webkit-overflow-scrolling:touch] touch-pan-y [overflow-anchor:none] will-change-scroll"
-                  style={{ paddingBottom: `${((showStickerModal && !isDesktop) ? 360 : 76) + (viewportBottomOffset > 0 ? viewportBottomOffset : 0)}px` }}
+                  className="absolute inset-0 overflow-y-auto px-1 sm:px-2 md:px-3 py-2 scrollbar-hide flex flex-col justify-start z-10 overscroll-contain [webkit-overflow-scrolling:touch] touch-pan-y [overflow-anchor:none]"
+                  style={{ paddingBottom: `calc(${((showStickerModal && !isDesktop) ? 360 : 76) + (viewportBottomOffset > 0 ? viewportBottomOffset : 0)}px + var(--app-safe-bottom, 0px))` }}
                   onScroll={(e) => {
                     const target = e.currentTarget;
-                    if (target.scrollTop < 60 && !isPagingRef.current) {
+                    if (target.scrollTop < 320 && !isPagingRef.current) {
                       isPagingRef.current = true;
                       // Older messages are fetched with a cursor. Bumping the
                       // limit of the live query re-downloaded the whole
@@ -5515,8 +5714,11 @@ export default function Messages() {
                       const oldestTime = oldest?.createdAt?.toMillis?.() ?? (oldest?.createdAt ?? 0);
                       if (oldest && oldestTime) {
                         import("../services/chatService").then((m) =>
-                          m.loadOlderMessages(activeChat, oldest.createdAt, 25).then((older) => {
+                          m.loadOlderMessages(activeChat, oldest.createdAt, 50).then((older) => {
                             if (!older || older.length === 0) return;
+                            prependAtRef.current = performance.now();
+                            const paged = (pagedIdsRef.current[activeChat] ||= new Set<string>());
+                            older.forEach((o: any) => { if (o?.id) paged.add(o.id); });
                             setMessagesCache((prev) => {
                               const current = prev[activeChat] || [];
                               const known = new Set(current.map((c: any) => c.id));
@@ -5529,13 +5731,14 @@ export default function Messages() {
                       }
                       setTimeout(() => {
                         isPagingRef.current = false;
-                      }, 800);
+                      }, 600);
                     }
                     const { scrollTop, scrollHeight, clientHeight } = target;
                     shouldAutoScrollRef.current =
                       scrollHeight - scrollTop - clientHeight < 200;
                   }}
                 >
+                  <div ref={chatContentRef} className="flex flex-col w-full space-y-0.5">
                   <div className="flex flex-col items-center justify-center py-8">
                     <img
                       src={activeContact?.avatar}
@@ -5590,53 +5793,43 @@ export default function Messages() {
 
                   {renderedMessages}
 
-                  {(typingUsers.length > 0 || isJarvisTyping) && (
-                    <div className="flex items-center justify-start mt-2.5 mb-1 animate-in fade-in slide-in-from-bottom-2 duration-150">
-                      <img
-                        src={
-                          activeChat === "jarvis"
-                            ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80"
-                            : activeContact?.isGroup
-                            ? ((activeConversation as any)?.participantAvatars ||
-                                {})[typingUsers[0]] ||
-                              userDataCache[typingUsers[0]]?.avatar ||
-                              `https://ui-avatars.com/api/?name=${encodeURIComponent(((activeConversation as any)?.participantNames || {})[typingUsers[0]] || userDataCache[typingUsers[0]]?.name || "User")}&background=random`
-                            : activeContact?.avatar
-                        }
-                        className="w-7 h-7 rounded-full mr-2 self-end mb-0.5 object-cover shadow-xs border border-white/90"
-                        alt="Avatar"
-                      />
-                      <div
-                        className="px-3.5 py-2.5 rounded-[18px] rounded-bl-[4px] flex items-center space-x-1.5 ios-liquid-glass"
-                      >
-                        <div className="w-2 h-2 bg-purple-600/80 rounded-full ios-typing-dot-1" />
-                        <div className="w-2 h-2 bg-purple-600/80 rounded-full ios-typing-dot-2" />
-                        <div className="w-2 h-2 bg-purple-600/80 rounded-full ios-typing-dot-3" />
-                      </div>
+                  {lastMessage && lastMessage.senderId === currentUser?.uid && (
+                    <div className="h-[15px] flex items-center justify-end pr-3 text-[10.5px] font-normal text-gray-400 select-none shrink-0">
+                      {lastSeenLabel && (
+                        <>
+                          <CheckCheck className="w-3 h-3 text-sky-500/80 mr-1" />
+                          <span>{lastSeenLabel}</span>
+                        </>
+                      )}
                     </div>
                   )}
+
                   <div ref={messagesEndRef} />
+                  </div>
                 </div>
 
                 {/* Soft Bottom Ambient Glow & Fade Mask - messages vanish into this glow when scrolling near input box */}
                 <div 
-                  className="absolute inset-x-0 bottom-0 h-28 pointer-events-none z-20 bg-gradient-to-t from-white via-white/80 to-transparent dark:from-black dark:via-black/80 dark:to-transparent backdrop-blur-[1.5px] [mask-image:linear-gradient(to_top,black_25%,transparent)]"
+                  className="absolute inset-x-0 bottom-0 h-28 pointer-events-none z-20 bg-gradient-to-t from-white via-white/75 to-transparent dark:from-black dark:via-black/75 dark:to-transparent [mask-image:linear-gradient(to_top,black_25%,transparent)]"
                 />
 
                 {/* Floating Input Area */}
                 <div
-                  className={`absolute inset-x-0 z-30 pb-2 md:pb-2.5 pt-1 px-2 sm:px-3 md:px-5 w-full flex flex-col justify-end pointer-events-none transform-gpu ${
+                  className={`absolute inset-x-0 ${showStickerModal ? 'z-[310]' : 'z-30'} pb-2 md:pb-2.5 pt-1 px-2 sm:px-3 md:px-5 w-full flex flex-col justify-end pointer-events-none ${
                     showStickerModal ? 'bottom-[340px] md:bottom-2.5' : 'bottom-2 md:bottom-2.5'
                   }`}
                   style={{
                     transform: viewportBottomOffset > 0 ? `translate3d(0, -${viewportBottomOffset}px, 0)` : 'translate3d(0, 0, 0)',
-                    transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), bottom 0.22s ease',
-                    willChange: 'transform'
+                    transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), bottom 0.2s ease',
+                    // Keep the composer above the phone's navigation bar / gesture
+                    // area (the native shell publishes the inset, it is 0 while
+                    // the keyboard is open).
+                    paddingBottom: 'max(8px, var(--app-safe-bottom, 0px))'
                   }}
                 >
 
                 {selectedMediaItems.length > 0 && (
-                  <div className="pointer-events-auto flex flex-col bg-white/95 backdrop-blur-xl border border-gray-200/90 rounded-2xl p-2.5 mx-auto mb-2 max-w-3xl w-full shadow-lg relative transition-all">
+                  <div className="pointer-events-auto flex flex-col bg-white/95 backdrop-blur-xl border border-gray-200/90 rounded-2xl p-2.5 mx-auto mb-2 max-w-4xl w-full shadow-lg relative transition-all">
                     <div className="flex items-center justify-between pb-2 border-b border-gray-100 px-0.5">
                       <div className="flex items-center space-x-1.5">
                         <span className="text-[12px] font-semibold text-gray-900">
@@ -5696,7 +5889,7 @@ export default function Messages() {
                 )}
 
                 {replyingTo && (
-                  <div className="pointer-events-auto flex items-center justify-between ultra-glass-reply-box px-3.5 py-2 mx-auto mb-2 max-w-3xl w-full relative overflow-hidden transition-all rounded-2xl shadow-sm border border-purple-100/60 bg-white/90 backdrop-blur-xl">
+                  <div className="pointer-events-auto flex items-center justify-between ultra-glass-reply-box px-3.5 py-2 mx-auto mb-2 max-w-4xl w-full relative overflow-hidden transition-all rounded-2xl shadow-sm border border-purple-100/60 bg-white/90 backdrop-blur-xl">
                     <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-purple-600 rounded-r-full"></div>
                     <div className="flex-1 min-w-0 pl-2.5 flex items-center space-x-2.5">
                       {/* Photo Preview */}
@@ -5828,9 +6021,7 @@ export default function Messages() {
                     ) && (
                       <div className="pointer-events-auto max-w-md mx-auto mb-2 px-3.5 py-1.5 bg-purple-50/90 border border-purple-200/80 rounded-2xl text-center shadow-xs">
                         <p className="text-[12px] font-medium text-purple-900">
-                          {(activeConversation.requestMessageCount || 0) >= 2
-                            ? "Waiting for recipient to accept your message request (2 of 2 messages sent)"
-                            : `Message request · You can send up to 2 messages (${activeConversation.requestMessageCount || 0}/2 sent)`}
+                          Message request · waiting for the recipient to accept. You can keep messaging.
                         </p>
                       </div>
                     )}
@@ -5842,7 +6033,7 @@ export default function Messages() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 4 }}
                         transition={{ duration: 0.12 }}
-                        className="pointer-events-auto flex items-center space-x-2 px-2.5 py-0.5 mx-auto mb-1 max-w-3xl w-full overflow-x-auto no-scrollbar touch-pan-x overscroll-contain select-none bg-transparent border-0 shadow-none"
+                        className="pointer-events-auto flex items-center space-x-2 px-2.5 py-0.5 mx-auto mb-1 max-w-4xl w-full overflow-x-auto no-scrollbar touch-pan-x overscroll-contain select-none bg-transparent border-0 shadow-none"
                       >
                         {stickerSuggestions.map((stk) => (
                           <button
@@ -5885,10 +6076,10 @@ export default function Messages() {
                     {/* Modern Clean Chat Input Form - Compact, Soft, Perfect Concentric Circles */}
                     <form
                       onSubmit={handleSend}
-                      className="pointer-events-auto flex items-center w-full max-w-3xl mx-auto px-2 py-1 select-none"
+                      className="pointer-events-auto flex items-center w-full max-w-4xl mx-auto px-2 py-1.5 select-none"
                     >
                       {/* Main Clean Pill Container - Sleek, not elongated, no bloated box */}
-                      <div className="w-full bg-white/95 dark:bg-[#18191d]/95 backdrop-blur-md border border-neutral-200/90 dark:border-white/10 rounded-full px-1.5 py-1 flex items-center space-x-1.5 transition-all min-w-0 min-h-[44px] shadow-xs self-center">
+                      <div className="w-full bg-[#f0f2f5] border-0 rounded-[26px] px-2 py-1.5 flex items-center space-x-1.5 transition-colors min-w-0 min-h-[52px] shadow-none self-center">
                         
                         {/* Hidden File Inputs */}
                         <input
@@ -5923,7 +6114,7 @@ export default function Messages() {
                             <button
                               type="button"
                               onClick={() => setShowAttachMenu((prev) => !prev)}
-                              className={`w-9 h-9 rounded-full bg-sky-500/15 dark:bg-sky-400/20 backdrop-blur-md text-sky-600 dark:text-sky-300 border border-sky-400/30 hover:bg-sky-500/25  flex items-center justify-center shrink-0 cursor-pointer transition-all touch-manipulation shadow-xs ${showAttachMenu ? 'rotate-45' : ''}`}
+                              className={`w-10 h-10 rounded-full bg-sky-500/10 text-sky-600 border-0 hover:bg-sky-500/15 flex items-center justify-center shrink-0 cursor-pointer transition-colors touch-manipulation shadow-none ${showAttachMenu ? 'rotate-45' : ''}`}
                               title="Share File / Media"
                             >
                               <Paperclip className="w-4 h-4 stroke-[2.2]" />
@@ -6016,37 +6207,7 @@ export default function Messages() {
                                 onChange={(e) => {
                                   handleTyping(e);
                                   e.target.style.height = 'auto';
-                                  e.target.style.height = `${Math.min(e.target.scrollHeight, 84)}px`;
-                                }}
-                                onFocus={() => {
-                                  if (messagesContainerRef.current) {
-                                    requestAnimationFrame(() => {
-                                      messagesContainerRef.current?.scrollTo({
-                                        top: messagesContainerRef.current.scrollHeight,
-                                        behavior: 'auto'
-                                      });
-                                    });
-                                  }
-                                }}
-                                onClick={() => {
-                                  if (messagesContainerRef.current) {
-                                    requestAnimationFrame(() => {
-                                      messagesContainerRef.current?.scrollTo({
-                                        top: messagesContainerRef.current.scrollHeight,
-                                        behavior: 'auto'
-                                      });
-                                    });
-                                  }
-                                }}
-                                onTouchStart={() => {
-                                  if (messagesContainerRef.current) {
-                                    requestAnimationFrame(() => {
-                                      messagesContainerRef.current?.scrollTo({
-                                        top: messagesContainerRef.current.scrollHeight,
-                                        behavior: 'auto'
-                                      });
-                                    });
-                                  }
+                                  e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`;
                                 }}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -6056,7 +6217,7 @@ export default function Messages() {
                                   }
                                 }}
                                 placeholder="Message..."
-                                className="w-full bg-transparent py-1.5 px-2 border-0 outline-none focus:outline-none focus:ring-0 focus:border-0 text-[14px] font-normal text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 min-w-0 resize-none h-[34px] max-h-[84px] overflow-y-auto no-scrollbar leading-5 flex items-center self-center"
+                                className="w-full bg-transparent py-2 px-2.5 border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 text-[16px] font-normal text-neutral-900 placeholder:text-neutral-500 min-w-0 resize-none h-[40px] max-h-[140px] overflow-y-auto no-scrollbar leading-6 flex items-center self-center"
                               />
                             </div>
 
@@ -6069,7 +6230,7 @@ export default function Messages() {
                                 }
                                 setShowStickerModal((prev) => !prev);
                               }}
-                              className="w-8 h-8 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-neutral-700/60 rounded-full transition-all shrink-0 flex items-center justify-center cursor-pointer border-0 shadow-none bg-transparent touch-manipulation"
+                              className="w-10 h-10 text-neutral-600 hover:text-neutral-900 hover:bg-black/5 rounded-full transition-colors shrink-0 flex items-center justify-center cursor-pointer border-0 shadow-none bg-transparent touch-manipulation"
                               title="Stickers"
                             >
                               <svg
@@ -6092,13 +6253,13 @@ export default function Messages() {
                         )}
 
                         {/* RIGHT ACTION BUTTON: Concentric 36x36 Circle (Voice / Send) */}
-                        <div className="shrink-0 relative w-9 h-9 flex items-center justify-center">
+                        <div className="shrink-0 relative w-10 h-10 flex items-center justify-center">
                           {isRecording ? (
                             /* When recording: Send button appears right here to finish & send voice note */
                             <button
                               type="button"
                               onClick={stopRecording}
-                              className="w-9 h-9 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white rounded-full flex items-center justify-center cursor-pointer shadow-xs border-0 shrink-0 touch-manipulation transition-all"
+                              className="w-10 h-10 bg-[#0a84ff] hover:bg-[#0077e6] text-white rounded-full flex items-center justify-center cursor-pointer shadow-none border-0 shrink-0 touch-manipulation transition-colors"
                               title="Send Voice Message"
                             >
                               <svg
@@ -6128,7 +6289,7 @@ export default function Messages() {
                               {/* Send Button: Exactly concentric, icon perfectly centered without right-shift, color matching message bubble */}
                               <button
                                 type="submit"
-                                className={`absolute inset-0 w-9 h-9 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700  text-white rounded-full flex items-center justify-center shadow-xs border-0 cursor-pointer touch-manipulation transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] transform-gpu ${
+                                className={`absolute inset-0 w-10 h-10 bg-[#0a84ff] hover:bg-[#0077e6] text-white rounded-full flex items-center justify-center shadow-none border-0 cursor-pointer touch-manipulation transition-colors duration-100 ${
                                   (inputText.trim() || selectedImagePreview || selectedMediaItems.length > 0)
                                     ? "opacity-100 scale-100 pointer-events-auto"
                                     : "opacity-0 scale-50 pointer-events-none"
@@ -6162,7 +6323,7 @@ export default function Messages() {
                               <button
                                 type="button"
                                 onClick={startRecording}
-                                className={`absolute inset-0 w-9 h-9 rounded-full bg-sky-500/15 dark:bg-sky-400/20 backdrop-blur-md text-sky-600 dark:text-sky-300 border border-sky-400/30 hover:bg-sky-500/25  flex items-center justify-center cursor-pointer shadow-xs touch-manipulation transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] transform-gpu ${
+                                className={`absolute inset-0 w-10 h-10 rounded-full bg-sky-500/10 text-sky-600 border-0 hover:bg-sky-500/15 flex items-center justify-center cursor-pointer shadow-none touch-manipulation transition-colors duration-100 ${
                                   !(inputText.trim() || selectedImagePreview || selectedMediaItems.length > 0)
                                     ? "opacity-100 scale-100 pointer-events-auto"
                                     : "opacity-0 scale-50 pointer-events-none"
@@ -6326,6 +6487,13 @@ export default function Messages() {
                           onClick={() => {
                             if (activeChat) {
                               const targetMsgId = contextMenu.msgId;
+                              const targetMsg = messages.find(
+                                (m: any) => m.id === targetMsgId || m.tempId === targetMsgId
+                              );
+                              // "Unsend" removes the message for both sides.
+                              // "Delete for me" only hides it on this device
+                              // and must never delete the other person's copy.
+                              const isMine = targetMsg?.senderId === currentUser?.uid;
                               closeContextMenu();
                               // 1. Instant 0ms optimistic local deletion
                               setMessagesCache((prev) => ({
@@ -6338,6 +6506,20 @@ export default function Messages() {
                                 try {
                                   const { deleteDoc, doc, updateDoc, getDocs, collection, query, orderBy, limit } =
                                     await import("firebase/firestore");
+                                  const { rememberDeletedMessages, messagePreview } =
+                                    await import("../services/chatService");
+
+                                  // Tombstone first: even if the network drops in
+                                  // the middle, the cached copy never comes back
+                                  // when the chat is opened again.
+                                  rememberDeletedMessages(
+                                    activeChat,
+                                    [targetMsgId],
+                                    currentUser?.uid
+                                  );
+
+                                  if (!isMine) return;
+
                                   await deleteDoc(
                                     doc(
                                       db,
@@ -6355,11 +6537,37 @@ export default function Messages() {
                                   );
                                   const snap = await getDocs(q);
                                   let newLastMsg = "";
+                                  let newLastType = "";
+                                  let newLastSender = "";
                                   if (!snap.empty) {
-                                    const latestData = snap.docs[0].data();
-                                    newLastMsg = latestData.content || (latestData.type === "image" ? "Sent a photo" : "Sent a message");
+                                    const latestData: any = snap.docs[0].data();
+                                    newLastMsg = messagePreview(
+                                      latestData.type || 'text',
+                                      latestData.content || '',
+                                      latestData.mediaUrls?.length || latestData.mediaItems?.length || 0,
+                                      latestData.fileName
+                                    );
+                                    newLastType = latestData.type || 'text';
+                                    newLastSender = latestData.senderId || '';
                                   }
-                                  await updateDoc(doc(db, "conversations", activeChat), { lastMessage: newLastMsg });
+                                  // Keep the list preview in sync on both phones,
+                                  // not just the bubble in the open chat.
+                                  await updateDoc(doc(db, "conversations", activeChat), {
+                                    lastMessage: newLastMsg,
+                                    lastMessageType: newLastType,
+                                    lastSenderId: newLastSender,
+                                  });
+
+                                  // If the message was still being written when
+                                  // the user deleted it, that write can land
+                                  // after this delete. Remove it once more on
+                                  // the next beat so the other phone cannot see
+                                  // it come back.
+                                  setTimeout(() => {
+                                    deleteDoc(
+                                      doc(db, "conversations", activeChat, "messages", targetMsgId)
+                                    ).catch(() => {});
+                                  }, 1600);
                                 } catch (err) {
                                   console.error("Failed to unsend message", err);
                                 }
@@ -6708,8 +6916,9 @@ export default function Messages() {
                     setConfirmAction(null);
                     if (action.type === 'clear_chat') {
                       try {
-                        const { clearConversationMessages } = await import("../services/chatService");
+                        const { clearConversationMessages, forgetConversationCache } = await import("../services/chatService");
                         await clearConversationMessages(action.convId);
+                        forgetConversationCache(action.convId, currentUser?.uid);
                         setMessagesCache((prev) => ({ ...prev, [action.convId]: [] }));
                       } catch (err) {
                         console.error("Error clearing chat messages:", err);
@@ -6721,7 +6930,14 @@ export default function Messages() {
                           await unfollowUser(currentUser.uid, action.otherUid);
                         }
                         const { deleteDoc, doc } = await import("firebase/firestore");
+                        const { forgetConversationCache } = await import("../services/chatService");
                         await deleteDoc(doc(db, "conversations", action.convId));
+                        forgetConversationCache(action.convId, currentUser?.uid);
+                        setMessagesCache((prev) => {
+                          const next = { ...prev };
+                          delete next[action.convId];
+                          return next;
+                        });
                         if (activeChat === action.convId) setActiveChat(null);
                         setConversations((c) => c.filter((x) => x.id !== action.convId));
                       } catch (err) {
@@ -6730,7 +6946,14 @@ export default function Messages() {
                     } else if (action.type === 'delete_chat') {
                       try {
                         const { deleteDoc, doc } = await import("firebase/firestore");
+                        const { forgetConversationCache } = await import("../services/chatService");
                         await deleteDoc(doc(db, "conversations", action.convId));
+                        forgetConversationCache(action.convId, currentUser?.uid);
+                        setMessagesCache((prev) => {
+                          const next = { ...prev };
+                          delete next[action.convId];
+                          return next;
+                        });
                         if (activeChat === action.convId) setActiveChat(null);
                         setConversations((c) => c.filter((x) => x.id !== action.convId));
                       } catch (err) {

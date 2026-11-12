@@ -449,7 +449,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
           setIsNearScreen(entry.isIntersecting);
         });
       },
-      { rootMargin: '60% 0px' }
+      { rootMargin: '150% 0px' }
     );
     if (containerRef.current) preloadObserver.observe(containerRef.current);
     
@@ -1174,7 +1174,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
               controls={false}
               poster={reel.thumbnailUrl || reel.thumbnail || "data:image/gif;base64,R0lHODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"}
               autoPlay={playing}
-              preload={playing || isNext ? "auto" : "metadata"}
+              preload={playing || isNext || isNearScreen ? "auto" : "metadata"}
               onWaiting={() => setIsBuffering(true)}
               onPlaying={() => setIsBuffering(false)}
               onCanPlay={() => setIsBuffering(false)}
@@ -2204,7 +2204,7 @@ const RepostMenuModal: React.FC<RepostMenuModalProps> = ({
         animate={{ y: "0%" }}
         exit={{ y: "100%" }}
         transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
-        style={{ transform: 'translateZ(0)', willChange: 'transform' }}
+        style={{ transform: 'translateZ(0)' }}
         onClick={(e) => e.stopPropagation()}
         className="bg-white dark:bg-[#0c121e] text-slate-900 dark:text-white rounded-t-[32px] sm:rounded-3xl w-full max-w-lg h-[75vh] sm:h-[80dvh] max-h-[750px] flex flex-col overflow-hidden shadow-2xl transform-gpu border-t sm:border border-sky-100 dark:border-sky-900/40 relative"
       >
@@ -3047,7 +3047,7 @@ export const CommentsPortal = ({ postId, onClose, authorId, authorName, authorAv
   const stickerList = ['🔥', '❤️', '👏', '🎉', '🚀', '💖', '🤩', '👑', '🥳', '🍕', '💯', '🌟', '✨', '🎯', '⚡', '🌺', '💬', '🎵', '🎈', '🐱', '🐶', '🌈', '🏆', '💎', '😍', '🙌', '😎', '👍', '🙏'];
 
   useEffect(() => {
-    const q = query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'desc'), limit(60));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setComments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Comment)));
       setLoading(false);
@@ -3260,7 +3260,7 @@ export const CommentsPortal = ({ postId, onClose, authorId, authorName, authorAv
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.16, ease: "linear" }}
-      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/40 md:p-4 touch-manipulation backdrop-blur-xs" 
+      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/40 md:p-4 touch-manipulation" 
       onClick={onClose}
     >
       <motion.div 
@@ -3678,15 +3678,24 @@ export const SharePortal = ({
   const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   useEffect(() => {
-    if (currentUser) {
-      import('../services/chatService').then(m => {
-        m.subscribeConversations(currentUser.uid, setConversations);
-      });
-      import('../services/followService').then(m => {
-        m.getFollowing(currentUser.uid).then(setFriendsList);
-      });
-    }
-  }, [currentUser]);
+    const uid = currentUser?.uid;
+    if (!uid) return;
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    // The listener used to stay alive after the sheet closed: every open added
+    // another live query, which is why the share sheet got slower each time.
+    import('../services/chatService').then(m => {
+      if (cancelled) return;
+      unsub = m.subscribeConversations(uid, setConversations);
+    });
+    import('../services/followService').then(m => {
+      m.getFollowing(uid).then((list) => { if (!cancelled) setFriendsList(list); });
+    });
+    return () => {
+      cancelled = true;
+      try { unsub?.(); } catch (e) {}
+    };
+  }, [currentUser?.uid]);
 
   const toggleSelect = (id: string) => {
     setSelectedConvs(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -3773,7 +3782,7 @@ export const SharePortal = ({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.16, ease: "linear" }}
-      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/40 md:p-4 touch-manipulation backdrop-blur-xs" 
+      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/40 md:p-4 touch-manipulation" 
       onClick={onClose}
     >
       <motion.div 

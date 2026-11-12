@@ -301,7 +301,6 @@ const InAppToaster = memo(() => {
   );
 });
 
-import { requestFirebaseNotificationPermission, onMessageListener } from './services/messagingService';
 import { useShallow } from 'zustand/react/shallow';
 
 export default function App() {
@@ -375,19 +374,6 @@ export default function App() {
       window.dispatchEvent(new CustomEvent('ennvo:page-hidden'));
     } catch (e) {}
   }, [currentPage]);
-
-  // The notification center watches the conversations and the activities while
-  // the app is open: it plays the sound and shows the in-app toast. Without
-  // this, no in-app notification ever appears.
-  useEffect(() => {
-    const uid = currentUser?.uid;
-    if (!isAuthenticated || !uid) {
-      stopNotificationCenter();
-      return;
-    }
-    startNotificationCenter(uid);
-    return () => stopNotificationCenter();
-  }, [isAuthenticated, currentUser?.uid]);
 
   // Hide native Capacitor Splash Screen on mount
   // (the launch splash is owned by AndroidX core-splashscreen and MainActivity;
@@ -747,25 +733,10 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated || !currentUser?.uid) return;
     
-    // Request device/browser push notification permission
+    // Request the device permission once. Push itself is delivered by the
+    // native FCM service on Android and by the gateway; the old web FCM call
+    // used a placeholder VAPID key and could never produce a working token.
     deviceNotification.requestPermission().catch(() => {});
-    requestFirebaseNotificationPermission(currentUser.uid).catch(err => console.warn(err));
-    try {
-      const msgListener = onMessageListener();
-      if (msgListener && typeof (msgListener as any).then === 'function') {
-        (msgListener as Promise<any>).then(payload => {
-          if (payload) {
-            deviceNotification.show({
-              title: payload.notification?.title || 'New Message',
-              body: payload.notification?.body || '',
-              type: 'message'
-            });
-          }
-        }).catch(err => console.warn(err));
-      }
-    } catch (err) {
-      console.warn('onMessageListener notice:', err);
-    }
 
     // NotificationCenter owns live activity notification dispatch (with the
     // actor avatar + exact target URL). This listener only keeps the tab badge
@@ -904,7 +875,11 @@ export default function App() {
           {!isSidebarHidden && (
             <Sidebar currentPage={currentPage} />
           )}
-          <main className="w-full flex-1 h-full overflow-hidden relative gpu-accelerated">
+          {/* The messages screen owns a fixed, full-screen chat pane. A
+              transform / will-change on an ancestor would make that `fixed`
+              element relative to the page box, so the pane stopped short of
+              the bottom and jumped when the nav bar disappeared. */}
+          <main className={`w-full flex-1 h-full overflow-hidden relative ${currentPage === 'messages' ? '' : 'gpu-accelerated'}`}>
             <Suspense fallback={
               currentPage === 'home' ? (
                 <FacebookReelSkeleton />
@@ -931,7 +906,7 @@ export default function App() {
                   <div 
                     key={pageKey} 
                     style={{ display: isActive ? 'block' : 'none', opacity: isActive ? 1 : 0 }}
-                    className={`w-full h-full absolute inset-0 ${isActive ? 'z-10 pointer-events-auto opacity-100' : 'z-0 pointer-events-none opacity-0 hidden'} transform-gpu ${pageKey === 'admin' ? 'overflow-y-auto' : ''}`}
+                    className={`w-full h-full absolute inset-0 ${isActive ? 'z-10 pointer-events-auto opacity-100' : 'z-0 pointer-events-none opacity-0 hidden'} ${pageKey === 'messages' ? '' : 'transform-gpu'} ${pageKey === 'admin' ? 'overflow-y-auto' : ''}`}
                   >
                     {pageKey === 'home' && <Reels />}
                     {pageKey === 'search' && <SearchPage />}

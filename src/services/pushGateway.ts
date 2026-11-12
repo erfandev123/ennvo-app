@@ -60,10 +60,11 @@ export const notifyUser = (payload: PushPayload): void => {
       }
 
       const data = await res.json().catch(() => null);
-      if (data && data.sent === 0) {
+      if (data && data.sent === 0 && data.reason === 'no device tokens') {
         // The other phone has no device token (yet). It registers itself when
-        // the app starts, so the push is sent once more a moment later.
-        console.warn('[push] no device took the push, retrying once:', data.reason || '');
+        // the app starts, so the push is sent once more a moment later. A
+        // muted chat or a disabled notification mode is not retried.
+        console.warn('[push] no device took the push, retrying once');
         setTimeout(() => {
           fetch(`${gatewayBase()}/api/push`, {
             method: 'POST',

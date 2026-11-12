@@ -1632,3 +1632,122 @@ button,
   content-visibility: auto;
   contain-intrinsic-size: auto 100vh;
 }
+
+/* ------------------------------------------------------------------ *
+ * Lite mode (low-end phones, or forced in the settings)
+ * The layout is unchanged; only the expensive compositing is skipped.
+ * Backdrop blur on a 1-2 GB device is the main reason a scroll drops
+ * frames, and permanent will-change layers eat the small GPU memory.
+ * ------------------------------------------------------------------ */
+html.ennvo-lite *,
+html.ennvo-lite *::before,
+html.ennvo-lite *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.ennvo-lite * {
+  will-change: auto !important;
+}
+
+/* Keep the few places that really need their own layer (video, reels). */
+html.ennvo-lite video,
+html.ennvo-lite .reel-cv {
+  will-change: transform !important;
+}
+
+/* ------------------------------------------------------------------ *
+ * PC left dock: the same translucent glass language as the Android
+ * bottom navigation, so the desktop and the phone feel like one app.
+ * One blur layer only (no per-item glow) keeps it cheap to composite.
+ * ------------------------------------------------------------------ */
+.ultra-glass-pc-dock {
+  width: 66px;
+  border-radius: 36px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18px 50px rgba(2, 6, 23, 0.14), 0 2px 8px rgba(2, 6, 23, 0.06);
+}
+
+html.dark .ultra-glass-pc-dock,
+.ultra-glass-pc-dock.dark-mode {
+  background: rgba(18, 18, 22, 0.64);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+
+.ultra-glass-pc-item {
+  width: 48px;
+  height: 48px;
+}
+
+.ultra-glass-pc-item.active::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: rgba(14, 165, 233, 0.14);
+  pointer-events: none;
+}
+
+html.dark .ultra-glass-pc-item.active::before,
+.ultra-glass-pc-dock.dark-mode .ultra-glass-pc-item.active::before {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.ultra-glass-pc-item.active .ultra-glass-pc-icon {
+  stroke: #0284c7 !important;
+  filter: none !important;
+}
+
+html.dark .ultra-glass-pc-dock .ultra-glass-pc-item.active .ultra-glass-pc-icon,
+.ultra-glass-pc-dock.dark-mode .ultra-glass-pc-item.active .ultra-glass-pc-icon {
+  stroke: #ffffff !important;
+  filter: none !important;
+}
+
+/* ------------------------------------------------------------------ *
+ * PC dock, final: flat 2D surface (no blur) + one small blue "cursor"
+ * next to the active item. Cheaper to composite than the glass layer.
+ * ------------------------------------------------------------------ */
+.ultra-glass-pc-dock {
+  width: 64px;
+  border-radius: 30px;
+  background: #ffffff;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid rgba(2, 6, 23, 0.06);
+  border-top: 1px solid rgba(2, 6, 23, 0.06);
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.08);
+}
+
+html.dark .ultra-glass-pc-dock,
+.ultra-glass-pc-dock.dark-mode {
+  background: #101014;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.ultra-glass-pc-item.active::before {
+  content: '';
+  position: absolute;
+  inset: auto;
+  left: -8px;
+  top: 50%;
+  width: 3px;
+  height: 18px;
+  border-radius: 999px;
+  background: #0a84ff;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+html.dark .ultra-glass-pc-item.active::before,
+.ultra-glass-pc-dock.dark-mode .ultra-glass-pc-item.active::before {
+  background: #0a84ff;
+}

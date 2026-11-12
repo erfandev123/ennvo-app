@@ -485,14 +485,14 @@ const RightPanelInlineChat: React.FC<{
       });
       return () => unsubPresence();
     }
-  }, [contact, currentUser]);
+  }, [contact, currentUser?.uid]);
 
   useEffect(() => {
     if (conversationId && currentUser) {
       const unsubMsgs = subscribeMessages(conversationId, (msgs) => {
         setMessages(msgs);
         markConversationRead(conversationId, currentUser.uid);
-      });
+      }, 20, currentUser.uid);
       const unsubTyping = subscribeTyping(conversationId, (users) => {
         setTypingUsers(users.filter(uid => uid !== currentUser.uid));
       });
@@ -501,7 +501,7 @@ const RightPanelInlineChat: React.FC<{
         unsubTyping();
       };
     }
-  }, [conversationId, currentUser]);
+  }, [conversationId, currentUser?.uid]);
 
   // Fix: scroll ONLY internal message container, never trigger window auto-scroll
   useEffect(() => {

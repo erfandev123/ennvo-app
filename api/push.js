@@ -91,25 +91,28 @@ async function readDoc(path) {
 
 /* Removes a token that Firebase no longer knows (a reinstall or a token
    rotation). Without this the list of devices grows and the push fails for
-   the devices that are no longer registered. */
+   the devices that are no longer registered.
+
+   The document is read first and written once. The old version cleared the
+   whole array and then wrote the remaining tokens back, so a failed second
+   request left the user with no device at all. */
 async function removeToken(userId, token) {
   try {
-    const token_ = await getAccessToken();
-    const field = `fcmTokens`;
-    const url = `${FIRESTORE}/users/${userId}?updateMask.fieldPaths=${field}`;
-    const res = await fetch(url, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${token_}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fieldValue: { arrayValue: { values: [] } } }),
-    });
-    if (!res.ok) return;
+    const accessToken = await getAccessToken();
     const doc = await readDoc('users/' + userId);
-    const rest = toArray(doc && doc.fields && doc.fields.fcmTokens).filter((t) => t !== token);
-    const value = { arrayValue: { values: rest.map((t) => ({ stringValue: t })) } };
-    await fetch(`${FIRESTORE}/users/${userId}?updateMask.fieldPaths=${field}`, {
+    if (!doc) return;
+    const current = toArray(doc.fields && doc.fields.fcmTokens);
+    const rest = current.filter((t) => t !== token);
+    if (rest.length === current.length) return;
+    const url = `${FIRESTORE}/users/${userId}?updateMask.fieldPaths=fcmTokens`;
+    await fetch(url, {
       method: 'PATCH',
-      headers: { Authorization: `Bearer ${token_}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fieldValue: value }),
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fields: {
+          fcmTokens: { arrayValue: { values: rest.map((t) => ({ stringValue: t })) } },
+        },
+      }),
     });
   } catch (e) {
     console.warn('[push] could not clean up an old token:', e);
@@ -165,13 +168,33 @@ export default async function handler(req, res) {
       if (callerId !== callerUid) return res.status(403).json({ error: 'Not the caller of this call' });
     }
 
+    // A message push is only allowed for a conversation the caller is really
+    // part of, so the endpoint cannot be used to ping arbitrary users.
+    if (type === 'message') {
+      const convId = String(body.convId || '');
+      if (!convId) return res.status(400).json({ error: 'convId is required' });
+      const convDoc = await readDoc('conversations/' + convId);
+      const participants = toArray(convDoc && convDoc.fields && convDoc.fields.participantIds);
+      if (!participants.includes(callerUid)) {
+        return res.status(403).json({ error: 'Not a participant of this conversation' });
+      }
+    }
+
     const userDoc = await readDoc('users/' + targetUserId);
     const fields = (userDoc && userDoc.fields) || {};
     const tokens = Array.from(new Set(toArray(fields.fcmTokens)));
     const mode = toStr(fields.notifMode) || 'on';
+    const mutedField =
+      fields.mutedBy && fields.mutedBy.mapValue && fields.mutedBy.mapValue.fields
+        ? fields.mutedBy.mapValue.fields[targetUserId]
+        : null;
+    const mutedForUser = !!(mutedField && mutedField.booleanValue);
 
     if (!tokens.length) return res.json({ success: true, sent: 0, reason: 'no device tokens' });
     if (type === 'message' && mode === 'off') return res.json({ success: true, sent: 0, reason: 'notifications off' });
+    // A muted conversation still arrives in real time inside the app, it just
+    // never rings the phone. Calls are always delivered.
+    if (type !== 'call' && mutedForUser) return res.json({ success: true, sent: 0, reason: 'muted' });
 
     const secret = mode === 'secret';
     const data =

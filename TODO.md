@@ -99,5 +99,52 @@ needs work.
 |---|-------|-------|
 | 8.1 | The reel videos are uploaded without a transcode, so a big clip still needs a lot of data. A server side transcode to 720p with faststart would make the feed much lighter | open |
 | 8.2 | The base64 thumbnails inside the post documents make the first feed load heavy. Moving them to the storage would shrink the download a lot | open |
-| 8.3 | The calls could use a real push so the phone rings through the Doze mode without the app being open | open |
-| 8.4 | The Firestore security rules could not be published from the workflow: the service account needs the role "Firebase Rules Admin" on the project. The rules in the repository are newer than the published ones | open |
+| 8.3 | The Firestore security rules could not be published from the workflow: the service account needs the role "Firebase Rules Admin" on the project. The rules in the repository are newer than the published ones | open |
+| 8.4 | Google / Facebook sign-in inside the Android WebView cannot use the browser popup. It needs a native credential plugin (or a Custom Tab + deep link flow) to be as smooth as the email login | open |
+
+## 9. Fix pass (this release)
+
+| # | Point | State |
+|---|-------|-------|
+| 9.1 | Media upload and R2 presigning now reach the real deployment from inside the APK (the old AI Studio backend URL was dead) | done |
+| 9.2 | The sender writes `lastMessageType`, so a photo shows as "Photo" in the list, the toast and the push | done |
+| 9.3 | Muting a chat is written to Firestore (`mutedBy`) and honoured by the push gateway and the native notification | done |
+| 9.4 | One push sender only: the duplicate `pushOnNewMessage` / `pushOnIncomingCall` triggers are gone | done |
+| 9.5 | Dead device tokens are removed without wiping the whole token list | done |
+| 9.6 | The push gateway only accepts a message push for a conversation the caller is part of | done |
+| 9.7 | Sending a message retries on a flaky network (idempotent, no duplicates) | done |
+| 9.8 | Lite mode for 1-2 GB / 4-core phones skips backdrop blur and permanent GPU layers | done |
+| 9.9 | The startup prefetch loads the chunk of the real first screen instead of always downloading Reels | done |
+| 9.10 | Unused files, the broken web FCM path and 1.4 MB of unused images are removed | done |
+
+## 10. Chat deep fix pass
+
+| # | Point | State |
+|---|-------|-------|
+| 10.1 | A sent message no longer jumps to the top when Firestore writes the server timestamp (`serverTimestamps: 'estimate'` + one chronological sort) | done |
+| 10.2 | The message listener no longer restarts on every profile update (deps on `uid`, not the whole user object) | done |
+| 10.3 | Deleting a message disappears on both phones in real time, also for the oldest message of the live window | done |
+| 10.4 | Deleted messages never come back from the offline cache (per-account tombstones) | done |
+| 10.5 | "Delete for me" only hides locally; "Unsend" removes it for both sides | done |
+| 10.6 | Scrolling up no longer fights the visual-viewport listener, no extra GPU layer, no backdrop blur over the scroll area | done |
+| 10.7 | Older history is prefetched before the top, anchored with a ResizeObserver (images above no longer move the text) | done |
+| 10.8 | A chat that is opened from a notification no longer slides in on top of itself, and closing slides back to the right | done |
+| 10.9 | Chat images load lazily, so scrolling a long history does not download everything | done |
+| 10.10 | A message that fails to send shows "Not sent · Tap to retry" and resends with the same id (no duplicate) | done |
+| 10.11 | "Seen" was shown before the other person opened a brand new chat; fixed | done |
+| 10.12 | Clearing a chat also clears its local cache and works past the 500-write batch limit | done |
+
+## 11. WhatsApp-speed pass
+
+| # | Point | State |
+|---|-------|-------|
+| 11.1 | A message request has no 2-message cap any more; the chat behaves like a normal chat until the recipient decides | done |
+| 11.2 | The live window is 60 messages and "load older" pages 50 at a time, so the history has no practical limit | done |
+| 11.3 | The composer is a flat 2D field (no blur, no black border, no glow), 52px tall, 16px text, grows to 140px | done |
+| 11.4 | Bubbles stop at 72-78% of the width and never reach the other side; Enter sends, Shift+Enter adds a line | done |
+| 11.5 | The input stays above the sticker sheet and is clickable while the sheet is open (z-index + backdrop) | done |
+| 11.6 | Tab chunks are prefetched on touch-down / hover, so page changes are instant | done |
+| 11.7 | The PC left dock uses the same translucent glass language as the Android bottom bar | done |
+| 11.8 | Browser notifications are now actually shown, and a click opens the chat / post inside the app without a reload | done |
+| 11.9 | A message written from another device of the same account no longer notifies the sender | done |
+| 11.10 | Own-activity notifications (self-like, self-comment) are skipped, and the seen-set stays bounded | done |

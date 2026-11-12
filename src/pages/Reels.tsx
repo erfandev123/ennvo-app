@@ -57,7 +57,7 @@ export default function Reels() {
   const [activeTab, setActiveTab] = useState<'forYou' | 'following'>('forYou');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const followingSet = useMemo(() => new Set(followingIds || []), [followingIds]);
-  const [visibleCount, setVisibleCount] = useState(6);
+  const [visibleCount, setVisibleCount] = useState(8);
   // The reel that is currently in the middle of the screen. The reel behind
   // it is preloaded, so the next one starts without buffering.
   const [activeIndex, setActiveIndex] = useState(0);
@@ -176,7 +176,7 @@ export default function Reels() {
       requestAnimationFrame(() => {
         scrollTickingRef.current = false;
         const { scrollTop, scrollHeight, clientHeight } = currentTarget;
-        if (scrollTop + clientHeight >= scrollHeight - 1200) {
+        if (scrollTop + clientHeight >= scrollHeight - 1600) {
           setVisibleCount(prev => prev + 5);
         }
 
@@ -497,7 +497,7 @@ export default function Reels() {
           filteredReels.slice(0, visibleCount).map((reel, index) => (
             <div
               key={reel.id}
-              className="reel-snap-item w-full h-full shrink-0 reel-cv"
+              className="reel-snap-item w-full h-full shrink-0"
               style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
             >
               <ReelItem reel={reel} isNext={index === activeIndex + 1} />

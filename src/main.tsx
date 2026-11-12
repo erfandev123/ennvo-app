@@ -16,6 +16,25 @@ if (typeof window !== 'undefined') {
 }
 
 /* ------------------------------------------------------------------ *
+ * 1b. Lite mode for low-end phones
+ *     Backdrop blur and permanent GPU layers are the biggest source of
+ *     dropped frames on 1-2 GB devices. The layout stays identical, only
+ *     the expensive compositing is skipped. A user can force it in the
+ *     settings via localStorage 'ennvo_lite' = 'on' | 'off'.
+ * ------------------------------------------------------------------ */
+if (typeof window !== 'undefined') {
+  try {
+    const forced = localStorage.getItem('ennvo_lite');
+    const nav = navigator as any;
+    const lowEnd =
+      (typeof nav.deviceMemory === 'number' && nav.deviceMemory <= 2) ||
+      (typeof nav.hardwareConcurrency === 'number' && nav.hardwareConcurrency <= 4);
+    const lite = forced === 'on' || (forced !== 'off' && lowEnd);
+    if (lite) document.documentElement.classList.add('ennvo-lite');
+  } catch (e) {}
+}
+
+/* ------------------------------------------------------------------ *
  * 2. External app links (tel:, mailto:, whatsapp:, browser, deep links)
  *    Installed before React so the very first tap is routed correctly.
  * ------------------------------------------------------------------ */
@@ -57,16 +76,27 @@ const warmUp = () => {
   const conn = (navigator as any)?.connection;
   const slow = !!(conn && (conn.saveData || /(^|-)2g$/.test(conn.effectiveType || '')));
 
-  // The default screen. Kicked off before React renders so the chunk download
-  // overlaps the main bundle parse instead of waiting for it.
-  import('./pages/Reels').catch(() => {});
+  // Warm the chunk of the screen the app really opens on. This used to always
+  // download Reels, even when the first screen is Home, which wasted data and
+  // delayed the first paint on a phone.
+  const first = (typeof window !== 'undefined' ? window.location.pathname : '')
+    .replace(/^\/+/, '')
+    .split(/[/?#]/)[0]
+    .toLowerCase();
+  const startOnReels = first === 'feed' || first === 'reels';
+  if (startOnReels) import('./pages/Reels').catch(() => {});
+  else import('./pages/Home').catch(() => {});
 
   if (slow) return;
 
   idle(() => {
+    if (startOnReels) {
+      import('./pages/Home').catch(() => {});
+    } else {
+      import('./pages/Reels').catch(() => {});
+    }
     import('./pages/Messages').catch(() => {});
     import('./pages/Notifications').catch(() => {});
-    import('./pages/Home').catch(() => {});
   });
 };
 

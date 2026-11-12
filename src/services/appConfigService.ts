@@ -113,7 +113,18 @@ const isUserInRollout = (uid: string, percent: number): boolean => {
 // OTA Updater helper
 const OTA_VERSION_KEY = 'ennvo_ota_version';
 
-export const handleOtaUpdate = async (config: AndroidAppConfig, uid: string = 'guest') => {
+/** The signed-in uid, used for a stable rollout bucket. */
+const activeUid = (): string => {
+  try {
+    const raw = localStorage.getItem('ennvo_last_active_user_v1');
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed?.uid || 'guest';
+  } catch (e) {
+    return 'guest';
+  }
+};
+
+export const handleOtaUpdate = async (config: AndroidAppConfig, uid: string = activeUid()) => {
   if (!config.ota?.enabled || !config.ota.bundleUrl) return;
 
   try {

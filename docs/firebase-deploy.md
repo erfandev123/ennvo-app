@@ -44,12 +44,17 @@ This is an **IAM** issue, not a code issue. Fix it once:
 
 ## 3. What gets deployed
 
-| Function | Trigger | Result |
-| --- | --- | --- |
-| `pushOnNewMessage` | new document in `conversations/{id}/messages` | WhatsApp style chat notification, works with the app closed, honours On / Off / Secret |
-| `pushOnIncomingCall` | new document in `calls/{id}` | full screen ringing notification |
+The workflow publishes the security rules. It no longer deploys the message and
+call push triggers: the Vercel gateway (`api/push.js`) is the single push
+sender, and running both would deliver every notification twice.
 
-The same run also publishes `firestore.rules` and the Realtime Database rules.
+If an older deployment still has them, remove them once:
+
+```bash
+npx firebase-tools functions:delete pushOnNewMessage pushOnIncomingCall --project ennvo-6c01c
+```
+
+The remaining Cloud Functions are admin-only (ban, role, app config, reports).
 
 ## 4. Verify
 

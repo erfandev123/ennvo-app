@@ -17,7 +17,7 @@ import { useAppStore } from '../store';
 import { getSavedAccounts, saveAccount, removeSavedAccount, SavedAccount } from '../services/accountService';
 import { signIn, signInWithGoogle } from '../services/authService';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { User } from '../types';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -105,6 +105,18 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({ isOp
       setViewingUser(null);
       pushPage('profile');
       handleCloseModal();
+      return;
+    }
+
+    // A saved account entry only stores the profile, not a session. Swapping the
+    // UI alone would leave Firebase authenticated as the previous user, so
+    // every read and write of the new account would be rejected by the rules.
+    // Ask for the password and sign in for real.
+    if (!auth.currentUser || auth.currentUser.uid !== account.uid) {
+      setLoginIdentifier(account.email || account.username || '');
+      setLoginPassword('');
+      setErrorMessage(`Enter the password for @${account.username} to switch to this account.`);
+      setShowAddForm(true);
       return;
     }
 

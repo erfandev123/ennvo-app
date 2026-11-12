@@ -91,14 +91,14 @@ export default function MiniChat() {
       setConversationId(null);
       setMessages([]);
     }
-  }, [miniChatUser, currentUser]);
+  }, [miniChatUser, currentUser?.uid]);
 
   useEffect(() => {
     if (conversationId && currentUser) {
       const unsubMsgs = subscribeMessages(conversationId, (msgs) => {
         setMessages(msgs);
         markConversationRead(conversationId, currentUser.uid);
-      });
+      }, 20, currentUser.uid);
       const unsubTyping = subscribeTyping(conversationId, (users) => {
         setTypingUsers(users.filter(uid => uid !== currentUser.uid));
       });
@@ -107,7 +107,7 @@ export default function MiniChat() {
         unsubTyping(); 
       };
     }
-  }, [conversationId, currentUser]);
+  }, [conversationId, currentUser?.uid]);
 
   // Fix: Scroll strictly within MiniChat's internal container, never cause parent window auto-scroll
   useEffect(() => {

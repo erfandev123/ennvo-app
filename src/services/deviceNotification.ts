@@ -5,6 +5,7 @@
 
 import { playNotificationSound, playIncomingRingtone } from './soundService';
 import { formatMediaUrl } from '../utils';
+import { useAppStore } from '../store';
 
 export interface DeviceNotificationOptions {
   title: string;
@@ -172,10 +173,20 @@ class DeviceNotificationService {
         notif.onclick = () => {
           try {
             window.focus();
-            if (options.data?.url) {
-              window.location.href = options.data.url;
-            }
             notif.close();
+            // Open inside the app (no page reload): a chat notification goes
+            // straight to the chat, an activity notification to its target.
+            const store = useAppStore.getState();
+            if (options.data?.convId) {
+              store.pushPage('messages');
+              store.setActiveChat(options.data.convId);
+              return;
+            }
+            if (options.data?.url) {
+              const open = (window as any).__ennvoOpenLink;
+              if (typeof open === 'function') open(options.data.url);
+              else window.location.href = options.data.url;
+            }
           } catch (e) {}
         };
       } catch (e) {

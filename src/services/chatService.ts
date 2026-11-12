@@ -39,6 +39,64 @@ export const createClientMessageId = (uid: string) =>
   `msg_${uid}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 /**
+ * One short label for a message, shared by the conversation list, the in-app
+ * toast and the push notification so all three always say the same thing.
+ */
+export const messagePreview = (
+  type: string,
+  content: string,
+  itemCount = 0,
+  fileName?: string
+): string => {
+  if (itemCount > 1) return `Sent ${itemCount} photos/videos`;
+  switch (type) {
+    case 'text':
+      return content || 'New message';
+    case 'image':
+      return 'Photo';
+    case 'video':
+      return 'Video';
+    case 'voice':
+    case 'audio':
+      return 'Voice message';
+    case 'sticker':
+      return 'Sticker';
+    case 'document':
+      return fileName || 'Document';
+    case 'album':
+      return 'Album';
+    case 'reel':
+      return 'Shared a reel';
+    case 'post':
+      return 'Shared a post';
+    default:
+      return content || 'New message';
+  }
+};
+
+/**
+ * A message must survive a flaky mobile connection. The write is idempotent
+ * (the client message id is the document id), so retrying is always safe.
+ */
+const withRetry = async <T>(run: () => Promise<T>, attempts = 3): Promise<T> => {
+  let lastError: any;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await run();
+    } catch (err: any) {
+      lastError = err;
+      const code = String(err?.code || '');
+      // A permission or validation error will never succeed on a retry.
+      if (code.includes('permission-denied') || code.includes('invalid-argument')) break;
+      if (i < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 500 * Math.pow(2, i)));
+      }
+    }
+  }
+  throw lastError;
+};
+
+/**
  * Compress base64 image strings to ensure they stay well under Firestore's 1,048,487 byte document limit.
  */
 export const compressChatImageBase64 = async (dataUrl: string, maxDim = 900, quality = 0.7): Promise<string> => {
@@ -347,17 +405,12 @@ export const sendMessage = async (
           }
         }
 
-        if (convData.isRequest && convData.requestStatus === 'pending') {
-          if (convData.requestFrom === senderId) {
-            const currentCount = convData.requestMessageCount || 0;
-            if (currentCount >= 2) {
-              throw new Error("You can only send up to 2 messages until the recipient accepts your message request.");
-            }
-          }
-        }
+        // A message request has no message cap any more: the conversation
+        // behaves like a normal chat while the recipient decides. They can
+        // accept, decline or block from the request banner.
       }
     } catch (e: any) {
-      if (e.message?.includes('up to 2 messages') || e.message?.includes('blocked') || e.message?.includes('cannot send')) {
+      if (e.message?.includes('blocked') || e.message?.includes('cannot send')) {
         throw e;
       }
     }
@@ -413,31 +466,33 @@ export const sendMessage = async (
       }
     }
 
-    const clientMessageId = extra?.clientMessageId;
-    if (clientMessageId) {
-      // Idempotent write: the optimistic UI already uses this id, and a retry
-      // after a network timeout rewrites the same document instead of adding
-      // a duplicate message for both sides.
-      messageData.clientMessageId = clientMessageId;
-      await setDoc(
+    // Always a deterministic id. The optimistic UI passes its own id, and a
+    // caller that does not (an old album path, a retry) gets a generated one.
+    // Every write is therefore idempotent: a timeout retry can never create a
+    // second copy of the same message for either side.
+    const clientMessageId =
+      extra?.clientMessageId || createClientMessageId(senderId);
+    messageData.clientMessageId = clientMessageId;
+    await withRetry(() =>
+      setDoc(
         doc(db, 'conversations', conversationId, 'messages', clientMessageId),
         messageData,
         { merge: true }
-      );
-    } else {
-      await addDoc(collection(db, 'conversations', conversationId, 'messages'), messageData);
-    }
+      )
+    );
 
     // Update conversation and increment unread count for others
     try {
       if (convData) {
         const totalItemsCount = extra?.mediaUrls?.length || extra?.mediaItems?.length || 0;
-        const lastMsgLabel = totalItemsCount > 1
-          ? `Sent ${totalItemsCount} photos/videos`
-          : (type === 'text' ? content : `Sent a ${type}`);
+        const lastMsgLabel = messagePreview(type, content, totalItemsCount, extra?.fileName);
 
         const updatePayload: any = {
           lastMessage: lastMsgLabel,
+          // The conversation list, the in-app toast and the native notification
+          // all read this field. It was never written before, so a photo showed
+          // up as the raw "Sent a image" text instead of "Photo".
+          lastMessageType: type,
           lastSenderId: senderId,
           lastMessageTime: serverTimestamp(),
           updatedAt: serverTimestamp()
@@ -466,6 +521,9 @@ export const sendMessage = async (
         const senderAvatar = convData.participantAvatars?.[senderId] || '';
 
         otherParticipants.forEach((otherId: string) => {
+          // A muted chat still receives the message in real time, it just does
+          // not ring or show a notification. The gateway checks the same flag.
+          if (convData.mutedBy?.[otherId]) return;
           notifyUser({
             targetUserId: otherId,
             type: 'message',
@@ -496,6 +554,21 @@ export const sendMessage = async (
     }
   } catch (error: any) {
     console.error("SendMessage Error:", error);
+    // Tell the open chat that this bubble never reached the server, so it can
+    // show "Not sent · tap to retry" instead of looking delivered forever.
+    try {
+      if (typeof window !== 'undefined' && extra?.clientMessageId) {
+        window.dispatchEvent(
+          new CustomEvent('ennvo:message-failed', {
+            detail: {
+              conversationId,
+              clientMessageId: extra.clientMessageId,
+              message: String(error?.message || error || ''),
+            },
+          })
+        );
+      }
+    } catch (e) {}
     throw new Error(error.message);
   }
 };
@@ -620,7 +693,7 @@ export const loadOlderMessages = async (
     );
     const snap = await getDocs(q);
     return snap.docs
-      .map((d) => ({ id: d.id, ...d.data() } as Message))
+      .map((d) => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) } as Message))
       .reverse();
   } catch (e) {
     console.warn('[ChatService] Older messages could not be loaded:', e);
@@ -643,20 +716,102 @@ export const refreshMessages = async (conversationId: string, count = 30): Promi
       limit(count)
     );
     const snap = await getDocs(q);
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Message)).reverse();
+    return snap.docs
+      .map((d) => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) } as Message))
+      .reverse();
   } catch (e) {
     return [];
   }
 };
 
-export const subscribeMessages = (conversationId: string, callback: (messages: Message[]) => void, limitCount: number = 20) => {
+/**
+ * Deleted message ids per conversation.
+ *
+ * The chat cache keeps older messages so scrolling back is instant. Without a
+ * tombstone a message that was deleted (by either side) came back from that
+ * cache the next time the chat was opened, especially when it deleted the
+ * oldest message of the live window or a message that had been paged in.
+ */
+// Scoped per account: two accounts on the same phone must not hide each
+// other's messages in the same conversation.
+const deletedKey = (conversationId: string, uid?: string) =>
+  `ennvo_deleted_msgs_${uid || 'guest'}_${conversationId}`;
+const deletedCache = new Map<string, Set<string>>();
+
+const deletedFor = (conversationId: string, uid?: string): Set<string> => {
+  const key = deletedKey(conversationId, uid);
+  let set = deletedCache.get(key);
+  if (set) return set;
+  set = new Set<string>();
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(parsed)) parsed.forEach((id) => set!.add(String(id)));
+  } catch (e) {}
+  deletedCache.set(key, set);
+  return set;
+};
+
+export const rememberDeletedMessages = (
+  conversationId: string,
+  ids: string[],
+  uid?: string
+): void => {
+  if (!conversationId || !ids.length) return;
+  const key = deletedKey(conversationId, uid);
+  const set = deletedFor(conversationId, uid);
+  ids.forEach((id) => id && set.add(id));
+  // Keep the list bounded; only recent tombstones matter for the cache.
+  const kept = Array.from(set).slice(-300);
+  deletedCache.set(key, new Set(kept));
+  try {
+    localStorage.setItem(key, JSON.stringify(kept));
+  } catch (e) {}
+};
+
+/** Ids this account has deleted (or seen deleted) in a conversation. */
+export const getDeletedMessageIds = (
+  conversationId: string,
+  uid?: string
+): string[] => Array.from(deletedFor(conversationId, uid));
+
+/** Drops every local trace of a conversation (offline cache + tombstones). */
+export const forgetConversationCache = (conversationId: string, uid?: string): void => {
+  if (!conversationId) return;
+  try {
+    localStorage.removeItem(`ennvo_offline_msgs_${conversationId}`);
+  } catch (e) {}
+  const key = deletedKey(conversationId, uid);
+  try {
+    localStorage.removeItem(key);
+  } catch (e) {}
+  deletedCache.delete(key);
+};
+
+export const subscribeMessages = (
+  conversationId: string,
+  callback: (messages: Message[], removedIds?: string[]) => void,
+  limitCount: number = 20,
+  uid?: string
+) => {
+  const tombstones = deletedFor(conversationId, uid);
+  const visible = (list: any[]) => list.filter((m) => m && m.id && !tombstones.has(m.id));
+
   // 1. Instant Offline Cache Load
   try {
     const cached = localStorage.getItem(`ennvo_offline_msgs_${conversationId}`);
     if (cached) {
       const parsed = JSON.parse(cached);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        callback(parsed);
+        // A bubble left as "pending" from a previous session never reached the
+        // server (the app was killed mid-send). Show it as failed so the user
+        // can resend it in one tap instead of it looking delivered.
+        const restored = visible(parsed).map((m: any) =>
+          m && (m.pending || String(m.id || '').startsWith('temp_'))
+            ? { ...m, status: 'failed' }
+            : m
+        );
+        callback(restored);
       }
     }
   } catch (e) {}
@@ -667,7 +822,23 @@ export const subscribeMessages = (conversationId: string, callback: (messages: M
     limit(limitCount)
   );
   return onSnapshot(q, (snapshot) => {
-    const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
+    // `estimate` gives a pending server timestamp a local value instead of
+    // null. Without it a freshly sent message sorted to the top of the chat
+    // and then jumped to the bottom when the server acknowledged it.
+    const messages = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data({ serverTimestamps: 'estimate' }),
+    } as Message));
+
+    // A removal with no addition is a real delete. A removal together with an
+    // addition is only the oldest document leaving the limit(20) window and
+    // must not be treated as deleted.
+    const addedCount = snapshot.docChanges().filter((c) => c.type === 'added').length;
+    const removedIds =
+      addedCount === 0
+        ? snapshot.docChanges().filter((c) => c.type === 'removed').map((c) => c.doc.id)
+        : [];
+    if (removedIds.length) rememberDeletedMessages(conversationId, removedIds, uid);
 
     // Hide duplicate documents created by older app versions on bad networks.
     // New messages carry a clientMessageId and are idempotent, so they are
@@ -684,11 +855,11 @@ export const subscribeMessages = (conversationId: string, callback: (messages: M
       return true;
     });
 
-    const reversed = deduped.reverse();
+    const reversed = visible(deduped).reverse();
     // Debounced: the offline cache is written once the stream settles down
     // instead of on every single snapshot.
     persist(`ennvo_offline_msgs_${conversationId}`, reversed.slice(-50), 1200);
-    callback(reversed);
+    callback(reversed, removedIds);
   }, (err) => {
     console.warn("Firestore messages snapshot notice:", err);
   });
@@ -859,15 +1030,17 @@ export const clearConversationMessages = async (conversationId: string) => {
   try {
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
     const snap = await getDocs(messagesRef);
-    if (!snap.empty) {
+    const docs = snap.docs;
+    // Firestore allows at most 500 writes in one batch. A long chat used to
+    // fail silently at the 500th message, so it is deleted in chunks.
+    for (let i = 0; i < docs.length; i += 400) {
       const batch = writeBatch(db);
-      snap.docs.forEach((d) => {
-        batch.delete(d.ref);
-      });
+      docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
       await batch.commit();
     }
     await updateDoc(doc(db, 'conversations', conversationId), {
       lastMessage: '',
+      lastMessageType: '',
       updatedAt: serverTimestamp(),
     });
   } catch (err: any) {

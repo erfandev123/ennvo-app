@@ -241,21 +241,48 @@ export const downloadMediaFile = async (url: string, filename?: string) => {
   }
 };
 
+/**
+ * The public origin that serves the API (push, R2 presign) and the static
+ * media pages. Inside the APK the page runs on https://localhost, so a
+ * relative URL would never reach the deployment; there every request goes to
+ * the production origin. The old AI Studio Cloud Run URL that used to be here
+ * is gone, which is why uploads and presigning failed in the installed app.
+ */
+export const PRODUCTION_ORIGIN = 'https://ennvo.vercel.app';
+
 export const getBackendHost = (): string => {
   if (typeof window !== 'undefined') {
-    // 1. Check if user or admin saved custom backend URL in settings/storage
+    // 1. A custom backend saved in the settings always wins.
     const saved = localStorage.getItem('ennvo_backend_url');
     if (saved && saved.startsWith('http')) {
       return saved.replace(/\/$/, '');
     }
-    // 2. If running in normal browser (not file:// or capacitor://localhost), use current origin
+    // 2. In a normal browser (web app or the local dev server) the app is
+    //    served from the same origin as its API.
     const origin = window.location.origin;
-    if (origin && origin !== 'null' && !origin.includes('capacitor://') && !origin.includes('file://') && (!origin.includes('localhost') || origin.includes('3000'))) {
+    let host = '';
+    let port = '';
+    try {
+      const parsed = new URL(origin);
+      host = parsed.hostname;
+      port = parsed.port;
+    } catch (e) {}
+    const isNativeShell =
+      !!(window as any).Android ||
+      !!(window as any).AndroidInterface ||
+      !origin ||
+      origin === 'null' ||
+      origin.includes('capacitor://') ||
+      origin.includes('file://') ||
+      // The APK serves the page from https://localhost with no port. The dev
+      // server uses localhost:3000 and must keep talking to itself.
+      ((host === 'localhost' || host === '127.0.0.1') && !port);
+    if (!isNativeShell && origin.startsWith('http')) {
       return origin.replace(/\/$/, '');
     }
   }
-  // 3. Current active production backend URL for Android APK & remote WebView
-  return 'https://ais-dev-ququzv7htl2qshqf3skacy-736538280490.asia-northeast1.run.app';
+  // 3. Android APK / WebView: the real deployment.
+  return PRODUCTION_ORIGIN;
 };
 
 export const getApiEndpoint = (path: string): string => {

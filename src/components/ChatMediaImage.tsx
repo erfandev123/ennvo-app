@@ -74,10 +74,13 @@ export const ChatMediaImage = ({
   }
 
   return (
+    // Only the visible bubbles decode; scrolling through a long chat does not
+    // download every photo at once on a slow phone.
     <img
       src={current}
       alt={alt}
       referrerPolicy={referrerPolicy}
+      loading="lazy"
       decoding="async"
       onError={handleError}
       onClick={onClick}

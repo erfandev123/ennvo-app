@@ -7,6 +7,7 @@ import { collection, onSnapshot, query, where, limit, orderBy, Unsubscribe } fro
 import { db } from '../firebase';
 import { bridge } from '../native/bridge';
 import { playNotificationSound } from './soundService';
+import { deviceNotification } from './deviceNotification';
 import { activityBody } from '../utils/activityText';
 import { activityUrl } from '../utils/activityLink';
 
@@ -19,7 +20,15 @@ interface NotificationCenterState {
   initialConversationsLoaded: boolean;
   initialNotificationsLoaded: boolean;
   seenNotificationIds: Set<string>;
+  /** Last message time that already produced an alert, per conversation. */
+  lastAlertedMessageAt: Map<string, number>;
 }
+
+const isNativeShell = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const w = window as any;
+  return !!(w.Android || w.AndroidInterface);
+};
 
 const state: NotificationCenterState = {
   currentUid: null,
@@ -30,6 +39,7 @@ const state: NotificationCenterState = {
   initialConversationsLoaded: false,
   initialNotificationsLoaded: false,
   seenNotificationIds: new Set(),
+  lastAlertedMessageAt: new Map(),
 };
 
 export const isUserActivelyTyping = (): boolean => {
@@ -94,8 +104,17 @@ export const startNotificationCenter = (uid: string) => {
         const data = change.doc.data();
         const cid = change.doc.id;
         const otherId = data.participantIds?.find((id: string) => id !== uid);
-        const name = (data.isGroup ? data.groupName : data.participantNames?.[otherId]) || 'Ennvo User';
-        const avatar = (data.isGroup ? data.groupAvatar : data.participantAvatars?.[otherId]) || '';
+        // For a group the notification names the person who wrote, which is
+        // also what the push says. Using the group name here produced a second,
+        // differently titled notification for the same message.
+        const actorId = data.lastSenderId || otherId;
+        const isGroup = !!data.isGroup;
+        const name = (isGroup
+          ? data.participantNames?.[actorId] || data.groupName
+          : data.participantNames?.[otherId]) || 'Ennvo User';
+        const avatar = (isGroup
+          ? data.participantAvatars?.[actorId] || data.groupAvatar
+          : data.participantAvatars?.[otherId]) || '';
 
         // Typing notification when user is not inside this chat
         if (otherId && data.typing?.[otherId] && state.activeChatId !== cid) {
@@ -114,29 +133,62 @@ export const startNotificationCenter = (uid: string) => {
           }
         }
 
-        // New message alert check
-        const unreadForMe = (data.unreadCount?.[uid] || 0) > 0;
+        // New message alert check. A message written on another device of the
+        // same account must never notify the sender, even when older unread
+        // messages are still in the chat.
+        const fromSomeoneElse = !data.lastSenderId || data.lastSenderId !== uid;
+        const unreadForMe = (data.unreadCount?.[uid] || 0) > 0 && fromSomeoneElse;
         const updatedAtMillis = data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now();
         const isRecent = updatedAtMillis >= state.appStartTime - 5000;
         const isNotActiveChat = state.activeChatId !== cid;
         const isNotMuted = !data.mutedBy?.[uid];
 
-        if (unreadForMe && isRecent && isNotActiveChat && isNotMuted) {
+        // Typing status is written to the conversation document too. Without
+        // this time gate every "typing..." update re-fired the message alert
+        // (sound + notification) for the previous unread message.
+        const messageTime =
+          (data.lastMessageTime?.toMillis && data.lastMessageTime.toMillis()) ||
+          (typeof data.lastMessageTime === 'number' ? data.lastMessageTime : 0) ||
+          updatedAtMillis;
+        const previousAlert = state.lastAlertedMessageAt.get(cid) || 0;
+        const isNewMessage = messageTime > previousAlert;
+        if (isNewMessage) state.lastAlertedMessageAt.set(cid, messageTime);
+
+        if (unreadForMe && isNewMessage && isRecent && isNotActiveChat && isNotMuted) {
+          // The sender already writes a clean label ("Photo", "Voice message",
+          // the text itself). Using it verbatim keeps the in-app toast and the
+          // FCM push identical, which is what the native dedupe compares.
           const rawText = data.lastMessage || '';
-          let body = rawText;
-          if (data.lastMessageType === 'image') body = 'Photo';
-          else if (data.lastMessageType === 'video') body = 'Video';
-          else if (data.lastMessageType === 'voice') body = 'Voice message';
-          else if (data.lastMessageType === 'reel') body = 'Shared a reel';
-
-          const typingNow = isUserActivelyTyping();
-
-          if (!typingNow) {
-            playNotificationSound();
+          let body = rawText || 'New message';
+          if (!rawText) {
+            if (data.lastMessageType === 'image') body = 'Photo';
+            else if (data.lastMessageType === 'video') body = 'Video';
+            else if (data.lastMessageType === 'voice') body = 'Voice message';
+            else if (data.lastMessageType === 'reel') body = 'Shared a reel';
           }
 
-          // Native Android notification (ignored by native while app is in foreground)
-          bridge.showMessageNotification(name, body, avatar, cid);
+          const typingNow = isUserActivelyTyping();
+          const nativeShell = isNativeShell();
+
+          if (!typingNow) {
+            if (nativeShell) playNotificationSound();
+            else {
+              // Browser: a real desktop notification that opens the chat when
+              // clicked. It plays its own sound, so no double chime.
+              deviceNotification.show({
+                title: name,
+                body,
+                icon: avatar || '/icon-192.png?v=5',
+                type: 'message',
+                tag: `chat-${cid}`,
+                data: { convId: cid },
+              });
+            }
+          }
+
+          // Native Android notification (the WebView notification is skipped
+          // only for the chat that is open right now).
+          if (nativeShell) bridge.showMessageNotification(name, body, avatar, cid);
 
           // In-App Toast (suppressed if user is actively typing)
           if (onToastListener && !typingNow) {
@@ -174,8 +226,15 @@ export const startNotificationCenter = (uid: string) => {
         const id = change.doc.id;
         if (state.seenNotificationIds.has(id)) return;
         state.seenNotificationIds.add(id);
+        if (state.seenNotificationIds.size > 300) {
+          // Keep the memory bounded on a long session.
+          const keep = Array.from(state.seenNotificationIds).slice(-200);
+          state.seenNotificationIds = new Set(keep);
+        }
 
         const data = change.doc.data();
+        // Skip an activity I caused myself.
+        if (data.actorId && data.actorId === uid) return;
         const createdAtMillis = data.createdAt?.toMillis 
           ? data.createdAt.toMillis() 
           : (typeof data.createdAt === 'number' ? data.createdAt : Date.now());
@@ -185,17 +244,31 @@ export const startNotificationCenter = (uid: string) => {
           const body = activityBody(data.type, data);
 
           const typingNow = isUserActivelyTyping();
+          const nativeShell = isNativeShell();
+          const targetUrl = activityUrl({ ...data, type: data.type });
 
           if (!typingNow) {
-            playNotificationSound();
+            if (nativeShell) playNotificationSound();
+            else {
+              deviceNotification.show({
+                title: actorName,
+                body,
+                icon: data.actorAvatar || '/icon-192.png?v=5',
+                type: 'activity',
+                tag: `activity-${id}`,
+                data: { url: targetUrl },
+              });
+            }
           }
 
-          bridge.showActivityNotification(
-            actorName,
-            body,
-            data.actorAvatar || '',
-            activityUrl({ ...data, type: data.type })
-          );
+          if (nativeShell) {
+            bridge.showActivityNotification(
+              actorName,
+              body,
+              data.actorAvatar || '',
+              targetUrl
+            );
+          }
 
           if (onToastListener && !typingNow) {
             onToastListener({

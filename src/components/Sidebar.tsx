@@ -12,6 +12,20 @@ import {
   NavSettingsIcon 
 } from './NavIcons';
 
+/** Warm the page chunk on hover / touch-down so the click is instant. */
+const prefetchPage = (id: string) => {
+  switch (id) {
+    case 'home': import('../pages/Reels').catch(() => {}); break;
+    case 'reels': import('../pages/Home').catch(() => {}); break;
+    case 'messages': import('../pages/Messages').catch(() => {}); break;
+    case 'profile': import('../pages/Profile').catch(() => {}); break;
+    case 'notifications': import('../pages/Notifications').catch(() => {}); break;
+    case 'search': import('../pages/SearchPage').catch(() => {}); break;
+    case 'settings': import('../pages/Settings').catch(() => {}); break;
+    default: break;
+  }
+};
+
 const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
   const currentUser = useAppStore(state => state.currentUser);
   const pushPage = useAppStore(state => state.pushPage);
@@ -222,6 +236,8 @@ const Sidebar = memo(({ currentPage }: { currentPage: string }) => {
                     handleNavigate(item.id);
                   }
                 }}
+                onPointerEnter={() => prefetchPage(item.id)}
+                onPointerDown={() => prefetchPage(item.id)}
                 className={`ultra-glass-pc-item group ${isActive || (item.id === 'create' && showCreateMenu) ? 'active' : ''} ${isHoveredInDrag ? 'is-drag-hovered' : ''}`}
                 aria-label={item.label}
                 style={{

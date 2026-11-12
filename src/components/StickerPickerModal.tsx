@@ -615,7 +615,7 @@ export const StickerPickerModal: React.FC<StickerPickerModalProps> = ({
       <AnimatePresence>
         {/* Soft dismissal backdrop for PC and Mobile */}
         <div 
-          className="fixed inset-0 z-[290] bg-black/20 md:bg-black/10 backdrop-blur-xs transition-opacity" 
+          className="fixed inset-0 z-[290] bg-black/20 md:bg-black/10 transition-opacity" 
           onClick={onClose} 
         />
         <motion.div

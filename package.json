@@ -1,14 +1,15 @@
 {
-  "name": "react-example",
+  "name": "ennvo",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.9.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && vite build --config vite.call.config.ts && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=server-build/server.cjs",
     "start": "node server-build/server.cjs",
     "preview": "vite preview",
-    "clean": "rm -rf dist",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true});require('fs').rmSync('server-build',{recursive:true,force:true})\"",
+    "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "cap:sync": "npx cap sync android",
     "cap:build": "npm run build && npx cap sync android",
@@ -28,7 +29,6 @@
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "axios": "^1.15.0",
-    "browser-image-compression": "^2.0.2",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "firebase": "^12.12.0",
@@ -51,5 +51,6 @@
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
-  }
+  },
+  "description": "Ennvo - fast social app for reels, stories, chat and HD calls (web + Android)"
 }
