@@ -37,28 +37,36 @@ const key = `app-updates/ennvo-web-${version.replace(/[^A-Za-z0-9._-]/g, '-')}.z
 
 async function upload() {
   let lastError = null;
-  for (const backend of backends) {
-    try {
-      const presign = await fetch(`${backend}/api/r2-presign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, contentType: 'application/zip' }),
-      });
-      if (!presign.ok) throw new Error(`${backend} answered ${presign.status}`);
-      const { uploadUrl, publicUrl } = await presign.json();
-      if (!uploadUrl || !publicUrl) throw new Error(`${backend} did not return an upload url`);
+  // The web deployment (and with it this endpoint) may still be rolling out
+  // when the build finishes, so the upload is retried for a while.
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    for (const backend of backends) {
+      try {
+        const presign = await fetch(`${backend}/api/r2-presign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, contentType: 'application/zip' }),
+        });
+        if (!presign.ok) throw new Error(`${backend} answered ${presign.status}`);
+        const { uploadUrl, publicUrl } = await presign.json();
+        if (!uploadUrl || !publicUrl) throw new Error(`${backend} did not return an upload url`);
 
-      const put = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/zip' },
-        body: buffer,
-      });
-      if (!put.ok) throw new Error(`upload failed with ${put.status}`);
-      console.log(`::notice::Bundle uploaded to ${publicUrl}`);
-      return publicUrl;
-    } catch (e) {
-      lastError = e;
-      console.log(`::notice::${backend} could not be used: ${e.message}`);
+        const put = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/zip' },
+          body: buffer,
+        });
+        if (!put.ok) throw new Error(`upload failed with ${put.status}`);
+        console.log(`::notice::Bundle uploaded to ${publicUrl}`);
+        return publicUrl;
+      } catch (e) {
+        lastError = e;
+        console.log(`::notice::${backend} could not be used: ${e.message}`);
+      }
+    }
+    if (attempt < 4) {
+      console.log(`::notice::Attempt ${attempt} failed, waiting 20 seconds...`);
+      await new Promise((r) => setTimeout(r, 20000));
     }
   }
   throw lastError || new Error('no backend accepted the upload');
