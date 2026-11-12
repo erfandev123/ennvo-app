@@ -72,6 +72,7 @@ import { subscribeNotifications } from "../services/notificationService";
 import { VideoSticker } from "../components/VideoSticker";
 import { useAppStore } from "../store";
 import { useShallow } from "zustand/react/shallow";
+import { native } from "../native";
 import { safeFile, formatTime, downloadMediaFile, formatMediaUrl } from "../utils";
 import ChatMediaImage from "../components/ChatMediaImage";
 import {
@@ -2947,6 +2948,19 @@ export default function Messages() {
     }
   }, [activeChat]);
 
+  // Tell the native side which chat is open, so the notification for this very
+  // chat is skipped while every other chat still notifies.
+  useEffect(() => {
+    try {
+      native.setActiveChat(activeChat || '');
+    } catch (e) {}
+    return () => {
+      try {
+        native.setActiveChat('');
+      } catch (e) {}
+    };
+  }, [activeChat]);
+
   const prevMessagesCountRef = useRef(messages.length);
   useLayoutEffect(() => {
     const isAdded = messages.length > prevMessagesCountRef.current;
@@ -4710,7 +4724,7 @@ export default function Messages() {
               key="activity-special"
               initial={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
+              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "-100%", opacity: 0.98 }}
               transition={isDesktop ? { duration: 0 } : { duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
               className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 min-w-0 flex flex-col h-full bg-[#f2f2f7] dark:bg-black will-change-transform select-none"
             >
@@ -4721,7 +4735,7 @@ export default function Messages() {
               key="special"
               initial={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
+              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "-100%", opacity: 0.98 }}
               transition={isDesktop ? { duration: 0 } : { duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
               className="fixed inset-0 z-[100] md:relative md:z-auto flex-1 min-w-0 flex flex-col h-full bg-white will-change-opacity select-none"
               onTouchStart={(e) => {
@@ -5260,7 +5274,7 @@ export default function Messages() {
               key={`chat-${activeChat}`}
               initial={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "100%", opacity: 0.98 }}
+              exit={isDesktop ? { x: 0, opacity: 1 } : { x: "-100%", opacity: 0.98 }}
               transition={isDesktop ? { duration: 0 } : { duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
               className="chat-view-container fixed inset-0 z-[100] md:relative md:z-auto flex-1 min-w-0 flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-white dark:bg-black select-none will-change-transform"
             >

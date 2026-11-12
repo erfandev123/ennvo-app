@@ -432,6 +432,17 @@ public class CallActivity extends BridgeActivity {
                     stopService(new Intent(CallActivity.this, CallService.class));
                 } catch (Exception ignored) { }
                 resetAudio();
+                // The call is over: the call screen closes itself, otherwise it
+                // would stay on top and the end button would look broken.
+                try {
+                    new android.os.Handler(Looper.getMainLooper()).postDelayed(
+                            () -> {
+                                try {
+                                    if (!isFinishing()) finishAndRemoveTask();
+                                } catch (Exception ignored) { }
+                            },
+                            350);
+                } catch (Exception ignored) { }
             });
         }
 

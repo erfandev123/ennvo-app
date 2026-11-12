@@ -66,6 +66,7 @@ const warmUp = () => {
   idle(() => {
     import('./pages/Messages').catch(() => {});
     import('./pages/Notifications').catch(() => {});
+    import('./pages/Home').catch(() => {});
   });
 };
 

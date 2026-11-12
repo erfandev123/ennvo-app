@@ -362,6 +362,37 @@ export const native = {
   },
 
   /**
+   * Opens the light call screen for a call. Used by the in-app call banner.
+   */
+  openCall(callId: string, name: string, avatar: string, type: string): void {
+    try {
+      const A = getA();
+      if (!A) return;
+      if (typeof A.openCall === 'function') {
+        A.openCall(callId || '', name || '', avatar || '', type || 'audio');
+      }
+    } catch (e) {
+      console.warn('[Native] openCall error:', e);
+    }
+  },
+
+  /**
+   * The chat the user is reading right now. The native side uses it to skip
+   * the notification for the chat that is open on the screen.
+   */
+  setActiveChat(convId: string): void {
+    try {
+      const A = getA();
+      if (!A) return;
+      if (typeof A.setActiveChat === 'function') {
+        A.setActiveChat(convId || '');
+      }
+    } catch (e) {
+      console.warn('[Native] setActiveChat error:', e);
+    }
+  },
+
+  /**
    * Call audio & foreground service controls
    */
   startCall(name: string, isVideo: boolean, callId?: string): void {

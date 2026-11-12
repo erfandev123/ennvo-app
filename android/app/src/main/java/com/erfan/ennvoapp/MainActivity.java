@@ -813,6 +813,27 @@ public class MainActivity extends BridgeActivity {
         }
 
         @JavascriptInterface
+        public void openCall(String callId, String name, String avatar, String type) {
+            runOnUiThread(() -> {
+                try {
+                    Intent i = new Intent(MainActivity.this, CallActivity.class)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            .putExtra("call_action", "answer")
+                            .putExtra("call_id", callId == null ? "" : callId)
+                            .putExtra("call_name", name == null ? "" : name)
+                            .putExtra("call_avatar", avatar == null ? "" : avatar)
+                            .putExtra("call_type", type == null ? "voice" : type);
+                    startActivity(i);
+                } catch (Exception ignored) { }
+            });
+        }
+
+        @JavascriptInterface
+        public void setActiveChat(String convId) {
+            Notifier.setActiveChat(MainActivity.this, convId);
+        }
+
+        @JavascriptInterface
         public void appReady() {
             splashHold = false;
             hideSplashOverlay();

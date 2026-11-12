@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, Volume2, VolumeX, Minimize2, Maximize2, Shield, RefreshCw, SwitchCamera } from 'lucide-react';
+import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, Volume2, VolumeX, Minimize2, Maximize2, Shield, RefreshCw, SwitchCamera, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../store';
 import { 
@@ -249,6 +249,20 @@ export const CallOverlay = () => {
     const callData = incomingCall;
     setIncomingCall(null);
 
+    // The call runs in the light call screen, exactly like a call that is
+    // accepted from the notification.
+    try {
+      if (typeof native.openCall === 'function') {
+        native.openCall(
+          callData.id,
+          callData.callerName || '',
+          callData.callerAvatar || '',
+          callData.type || 'audio'
+        );
+        return;
+      }
+    } catch (e) {}
+
     setActiveCallState({
       callId: callData.id,
       otherUid: callData.callerId,
@@ -380,68 +394,63 @@ export const CallOverlay = () => {
 
   return (
     <>
-      {/* 1. Full-Screen Fresh White & Sky Blue Incoming Call Page */}
+      {/* 1. Incoming call banner. It stays on top of the app instead of
+          taking the whole screen over, it can be closed and a tap opens the
+          call screen. */}
       <AnimatePresence>
         {incomingCall && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-[360] bg-gradient-to-b from-sky-100 via-sky-50 to-white dark:from-[#061726] dark:via-[#09223a] dark:to-[#040f1a] text-slate-900 dark:text-white flex flex-col justify-between p-6 pt-10 pb-14 font-sans select-none overflow-hidden"
+          <motion.div
+            initial={{ y: -140, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -140, opacity: 0 }}
+            transition={{ type: 'spring', damping: 26, stiffness: 320, mass: 0.7 }}
+            className="fixed top-0 left-0 right-0 z-[360] px-3 pt-[max(calc(var(--app-safe-top)+6px),10px)] pointer-events-none font-sans select-none"
           >
-            {/* Top Bar - Minimal */}
-            <div className="flex items-center justify-between w-full z-10 px-2">
-              <span className="text-xs font-semibold text-sky-600 dark:text-sky-300 tracking-wide uppercase">
-                {incomingCall.type === 'video' ? 'Incoming Video Call' : 'Incoming Audio Call'}
-              </span>
-            </div>
-
-            {/* Center Profile Picture & Name */}
-            <div className="flex flex-col items-center text-center space-y-4 z-10 my-auto">
-              <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-full overflow-hidden border-4 border-white dark:border-slate-800 shadow-2xl bg-slate-200 dark:bg-slate-900 ring-4 ring-sky-400/40">
-                <img 
-                  src={incomingCall.callerAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(incomingCall.callerName)}&background=random`} 
+            <div className="pointer-events-auto mx-auto max-w-md flex items-center gap-2.5 rounded-2xl bg-white/95 dark:bg-[#121824]/95 backdrop-blur-xl border border-sky-200/90 dark:border-sky-500/25 shadow-[0_18px_44px_rgba(14,165,233,0.22)] px-3 py-2.5">
+              <div className="w-11 h-11 shrink-0 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-900 ring-2 ring-sky-400/40">
+                <img
+                  src={incomingCall.callerAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(incomingCall.callerName)}&background=random`}
                   className="w-full h-full object-cover"
                   alt={incomingCall.callerName}
+                  referrerPolicy="no-referrer"
                 />
               </div>
 
-              <div className="space-y-1 max-w-xs">
-                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight truncate">
+              <div className="min-w-0 flex-1">
+                <div className="text-[13.5px] font-black text-slate-900 dark:text-white truncate">
                   {incomingCall.callerName}
-                </h2>
-                <p className="text-sm font-semibold text-sky-600 dark:text-sky-300">
-                  Ringing...
-                </p>
-              </div>
-            </div>
-
-            {/* Bottom Action Buttons */}
-            <div className="w-full max-w-xs mx-auto flex items-center justify-around z-10">
-              {/* Decline */}
-              <div className="flex flex-col items-center space-y-1.5">
-                <button 
-                  onClick={handleRejectIncoming}
-                  className="w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 transition-all cursor-pointer border border-rose-400/30"
-                  title="Decline Call"
-                >
-                  <PhoneOff className="w-7 h-7" />
-                </button>
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Decline</span>
+                </div>
+                <div className="text-[11px] font-semibold text-sky-600 dark:text-sky-300">
+                  Incoming {incomingCall.type === 'video' ? 'video' : 'voice'} call…
+                </div>
               </div>
 
-              {/* Accept */}
-              <div className="flex flex-col items-center space-y-1.5">
-                <button 
-                  onClick={handleAcceptIncoming}
-                  className="w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-sky-400 hover:from-emerald-400 hover:to-sky-300 text-white flex items-center justify-center shadow-lg shadow-sky-500/30 transition-all cursor-pointer border border-white/50"
-                  title="Accept Call"
-                >
-                  <Phone className="w-7 h-7" />
-                </button>
-                <span className="text-xs font-bold text-sky-600 dark:text-sky-300">Accept</span>
-              </div>
+              <button
+                onClick={handleRejectIncoming}
+                className="w-9 h-9 shrink-0 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 transition-all cursor-pointer border border-rose-400/30"
+                title="Decline call"
+              >
+                <PhoneOff className="w-4.5 h-4.5" />
+              </button>
+
+              <button
+                onClick={handleAcceptIncoming}
+                className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-tr from-emerald-500 to-sky-400 hover:from-emerald-400 hover:to-sky-300 text-white flex items-center justify-center shadow-lg shadow-sky-500/30 transition-all cursor-pointer border border-white/60"
+                title="Accept call"
+              >
+                <Phone className="w-4.5 h-4.5" />
+              </button>
+
+              <button
+                onClick={() => {
+                  stopRingtone();
+                  setIncomingCall(null);
+                }}
+                className="w-7 h-7 shrink-0 rounded-full text-slate-500 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-center transition-all cursor-pointer border-0 bg-transparent"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </motion.div>
         )}
@@ -497,6 +506,19 @@ export const CallOverlay = () => {
                     : 'inset-0 z-[270] bg-gradient-to-b from-sky-100 via-sky-50 to-white dark:from-[#061726] dark:via-[#09223a] dark:to-[#040f1a] text-slate-900 dark:text-white flex flex-col select-none transform-gpu'
                 }`}
               >
+                {/* The shared video fills the whole call screen, also behind the
+                    top bar. */}
+                {activeCallState.type === 'video' && (
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    controls={false}
+                    className={remoteStream ? "absolute inset-0 w-full h-full object-cover z-0 transform-gpu" : "hidden pointer-events-none"}
+                  />
+                )}
+
                 {/* Top Bar - Clean Minimize Button */}
                 {!isMinimized ? (
                   <div className="pt-10 sm:pt-6 pb-2 px-6 flex items-center justify-between z-20">
@@ -530,18 +552,6 @@ export const CallOverlay = () => {
 
                 {/* Video / Audio Center Stage */}
                 <div className="flex-1 relative flex items-center justify-center overflow-hidden">
-                  {/* Remote Video Stream */}
-                  {activeCallState.type === 'video' && (
-                    <video 
-                      ref={remoteVideoRef} 
-                      autoPlay 
-                      playsInline 
-                      muted
-                      controls={false}
-                      className={remoteStream ? "absolute inset-0 w-full h-full object-cover z-0 transform-gpu" : "hidden pointer-events-none"}
-                    />
-                  )}
-
                   {/* Audio Call Profile Picture & Status */}
                   {(activeCallState.type === 'audio' || isVideoOff || !remoteStream) && (
                     <div className="flex flex-col items-center justify-center space-y-4 p-6 text-center z-10 my-auto">
