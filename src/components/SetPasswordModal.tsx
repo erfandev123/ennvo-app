@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Lock, Eye, EyeOff, X, CheckCircle2, ShieldCheck, Loader2, KeyRound } from 'lucide-react';
 import { setUserPassword } from '../services/authService';
 import { useAppStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 interface SetPasswordModalProps {
   isOpen: boolean;
@@ -19,7 +20,7 @@ export const SetPasswordModal: React.FC<SetPasswordModalProps> = ({
   title = 'Set Account Password',
   description = 'You are currently signed in via Google. Set a password so you can also log in directly using your username or email and password anytime.'
 }) => {
-  const { currentUser, setCurrentUser } = useAppStore();
+  const { currentUser, setCurrentUser } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser, setCurrentUser: s.setCurrentUser })));
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

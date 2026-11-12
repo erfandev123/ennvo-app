@@ -58,13 +58,14 @@ import { CreatePostModal } from '../components/CreatePostModal';
 import { PullToRefresh } from '../components/PullToRefresh';
 import { FacebookStorySkeleton, FacebookPostSkeleton } from '../components/Skeletons';
 import { VerifiedBadge } from '../components/VerifiedBadge';
+import { useShallow } from 'zustand/react/shallow';
 
 // --- Dedicated 2D User Search Bar with Live Dropdown ---
 export const FeedUserSearchBar: React.FC<{ className?: string; placeholder?: string }> = React.memo(({ 
   className = '', 
   placeholder = 'Search by User ID, name, @...' 
 }) => {
-  const { pushPage, setViewingUser } = useAppStore();
+  const { pushPage, setViewingUser } = useAppStore(useShallow((s: any) => ({ pushPage: s.pushPage, setViewingUser: s.setViewingUser })));
   const [queryText, setQueryText] = useState('');
   const [searchResults, setSearchResults] = useState<AppUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -271,7 +272,7 @@ const StoryItem = React.memo(({ story, onClick }: { story: any, onClick: () => v
 
 // --- Suggested Account Card in Right Panel ---
 const SuggestedRightItem: React.FC<{ user: AppUser }> = React.memo(({ user }) => {
-  const { setViewingUser, currentUser, pushPage, followingIds } = useAppStore();
+  const { setViewingUser, currentUser, pushPage, followingIds } = useAppStore(useShallow((s: any) => ({ setViewingUser: s.setViewingUser, currentUser: s.currentUser, pushPage: s.pushPage, followingIds: s.followingIds })));
   const [optimisticFollowing, setOptimisticFollowing] = useState<boolean | null>(null);
   const isFollowing = optimisticFollowing !== null ? optimisticFollowing : (followingIds || []).includes(user.uid);
 
@@ -334,7 +335,7 @@ const SuggestedRightItem: React.FC<{ user: AppUser }> = React.memo(({ user }) =>
 
 // --- Suggested Accounts Feed Inset (Unique Frameless, No Border Box) ---
 const SuggestedAccountItem: React.FC<{ user: AppUser }> = React.memo(({ user }) => {
-  const { setViewingUser, currentUser, pushPage, followingIds } = useAppStore();
+  const { setViewingUser, currentUser, pushPage, followingIds } = useAppStore(useShallow((s: any) => ({ setViewingUser: s.setViewingUser, currentUser: s.currentUser, pushPage: s.pushPage, followingIds: s.followingIds })));
   const [optimisticFollowing, setOptimisticFollowing] = useState<boolean | null>(null);
   const isFollowing = optimisticFollowing !== null ? optimisticFollowing : (followingIds || []).includes(user.uid);
 
@@ -390,7 +391,7 @@ const SuggestedAccountItem: React.FC<{ user: AppUser }> = React.memo(({ user }) 
 });
 
 const SuggestedAccounts = React.memo(() => {
-  const { currentUser, pushPage } = useAppStore();
+  const { currentUser, pushPage } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser, pushPage: s.pushPage })));
   const [suggested, setSuggested] = useState<AppUser[]>([]);
 
   useEffect(() => {
@@ -440,7 +441,7 @@ const RightPanelInlineChat: React.FC<{
   contact: any;
   onBack: () => void;
 }> = React.memo(({ contact, onBack }) => {
-  const { currentUser, pushPage, setActiveChat, setActiveCallState, setViewingUser } = useAppStore();
+  const { currentUser, pushPage, setActiveChat, setActiveCallState, setViewingUser } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser, pushPage: s.pushPage, setActiveChat: s.setActiveChat, setActiveCallState: s.setActiveCallState, setViewingUser: s.setViewingUser })));
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -902,7 +903,7 @@ const RightPanelInlineChat: React.FC<{
 
 // --- PC Right Side Panel (NO background box, Mini Chat List, Suggested Friends below it, or Inline Chat on click) ---
 const RightPanel = React.memo(() => {
-  const { currentUser, setMiniChatUser, pushPage } = useAppStore();
+  const { currentUser, setMiniChatUser, pushPage } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser, setMiniChatUser: s.setMiniChatUser, pushPage: s.pushPage })));
   const [contacts, setContacts] = useState<any[]>([]);
   const [suggested, setSuggested] = useState<AppUser[]>([]);
   const [presences, setPresences] = useState<{[uid: string]: boolean}>({});
@@ -1148,7 +1149,7 @@ export default function Home() {
     setCachedFeed, 
     setViewingUser, 
     setIsBottomNavHidden 
-  } = useAppStore();
+  } = useAppStore(useShallow((s: any) => ({ setViewingStory: s.setViewingStory, showCreatePost: s.showCreatePost, setShowCreatePost: s.setShowCreatePost, pushPage: s.pushPage, currentUser: s.currentUser, notificationCount: s.notificationCount, cachedFeed: s.cachedFeed, setCachedFeed: s.setCachedFeed, setViewingUser: s.setViewingUser, setIsBottomNavHidden: s.setIsBottomNavHidden })));
 
   const feedScrollY = useAppStore(state => state.feedScrollY);
   const [showCreateStory, setShowCreateStory] = useState(false);

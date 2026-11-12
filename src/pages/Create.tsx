@@ -22,6 +22,7 @@ import { MusicLibraryModal } from '../components/MusicLibraryModal';
 import { TagPeopleModal } from '../components/TagPeopleModal';
 import { AddLocationModal } from '../components/AddLocationModal';
 import { AdvancedSettingsModal, AdvancedSettings } from '../components/AdvancedSettingsModal';
+import { useShallow } from 'zustand/react/shallow';
 
 const BIG_TEXT_GRADIENTS = [
   { id: 'none', label: 'Plain', bg: '' },
@@ -47,7 +48,13 @@ export default function Create() {
     setUploadTask,
     selectedCreateSong, 
     setSelectedCreateSong,
-  } = useAppStore();
+  } = useAppStore(useShallow((s: any) => ({
+    popPage: s.popPage,
+    currentUser: s.currentUser,
+    setUploadTask: s.setUploadTask,
+    selectedCreateSong: s.selectedCreateSong,
+    setSelectedCreateSong: s.setSelectedCreateSong,
+  })))
 
   const [caption, setCaption] = useState('');
   const [files, setFiles] = useState<File[]>([]);

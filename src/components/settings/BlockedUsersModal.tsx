@@ -4,6 +4,7 @@ import { X, UserX, Search, ShieldCheck, UserPlus, Loader2, Check } from 'lucide-
 import { useAppStore } from '../../store';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { useShallow } from 'zustand/react/shallow';
 
 interface BlockedUsersModalProps {
   isOpen: boolean;
@@ -19,7 +20,7 @@ interface BlockedUserItem {
 }
 
 export const BlockedUsersModal: React.FC<BlockedUsersModalProps> = ({ isOpen, onClose }) => {
-  const { currentUser } = useAppStore();
+  const { currentUser } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser })));
   const [searchQuery, setSearchQuery] = useState('');
   const [newBlockUsername, setNewBlockUsername] = useState('');
   const [blockedList, setBlockedList] = useState<BlockedUserItem[]>(() => {

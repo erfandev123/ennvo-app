@@ -16,6 +16,7 @@ import { AndroidAppConfig } from '../services/appConfigService';
 import { bridge, PendingSharePayload } from '../native/bridge';
 import { useAppStore } from '../store';
 import { formatTime } from '../utils';
+import { useShallow } from 'zustand/react/shallow';
 
 export interface BannedInfo {
   status: 'banned' | 'suspended';
@@ -197,7 +198,7 @@ export const ShareReceivedSheet: React.FC<{
   share: PendingSharePayload;
   onClose: () => void;
 }> = ({ share, onClose }) => {
-  const { pushPage, setShowCreatePost } = useAppStore();
+  const { pushPage, setShowCreatePost } = useAppStore(useShallow((s: any) => ({ pushPage: s.pushPage, setShowCreatePost: s.setShowCreatePost })));
 
   const handleShareToPost = () => {
     onClose();

@@ -7,13 +7,14 @@ import {
 import { doc, updateDoc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAppStore } from '../../store';
+import { useShallow } from 'zustand/react/shallow';
 
 interface VerificationScreenProps {
   onBack: () => void;
 }
 
 export const VerificationScreen: React.FC<VerificationScreenProps> = ({ onBack }) => {
-  const { currentUser, setCurrentUser } = useAppStore();
+  const { currentUser, setCurrentUser } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser, setCurrentUser: s.setCurrentUser })));
 
   const [fullName, setFullName] = useState(currentUser?.name || '');
   const [knownAs, setKnownAs] = useState(currentUser?.username ? currentUser.username.replace('@', '') : '');

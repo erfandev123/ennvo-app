@@ -23,6 +23,7 @@ import {
 import { DEFAULT_MALE_AVATAR } from '../utils/defaultAvatars';
 import { PrivacyPolicyModal } from '../components/PrivacyPolicyModal';
 import { applyRouteSEO } from '../services/seoService';
+import { useShallow } from 'zustand/react/shallow';
 
 // Official Multicolor Google Icon
 const GoogleIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
@@ -95,7 +96,7 @@ export default function Auth() {
   // Privacy Policy modal
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
-  const { setCurrentUser, setNewUserWelcomeName } = useAppStore();
+  const { setCurrentUser, setNewUserWelcomeName } = useAppStore(useShallow((s: any) => ({ setCurrentUser: s.setCurrentUser, setNewUserWelcomeName: s.setNewUserWelcomeName })));
 
   // Helper to switch screens and sync browser URL cleanly
   const navigateAuth = (nextScreen: AuthScreen) => {

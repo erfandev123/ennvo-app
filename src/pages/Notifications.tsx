@@ -20,6 +20,7 @@ import { formatTime } from '../utils';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, limit } from 'firebase/firestore';
 import { activityBody } from '../utils/activityText';
 import { db } from '../firebase';
+import { useShallow } from 'zustand/react/shallow';
 
 // Light haptic feedback helper
 const triggerHaptic = (ms = 12) => {
@@ -80,7 +81,7 @@ const ActivityCard = React.memo(({
     followingIds,
     followerIds,
     setFollowingIds
-  } = useAppStore();
+  } = useAppStore(useShallow((s: any) => ({ setViewingUser: s.setViewingUser, pushPage: s.pushPage, setViewingReel: s.setViewingReel, currentUser: s.currentUser, setHighlightedCommentId: s.setHighlightedCommentId, setHighlightedPostId: s.setHighlightedPostId, followingIds: s.followingIds, followerIds: s.followerIds, setFollowingIds: s.setFollowingIds })));
 
   const [loading, setLoading] = useState(false);
 
@@ -276,7 +277,7 @@ const FollowerCard = React.memo(({
     followingIds,
     followerIds,
     setFollowingIds
-  } = useAppStore();
+  } = useAppStore(useShallow((s: any) => ({ setViewingUser: s.setViewingUser, pushPage: s.pushPage, currentUser: s.currentUser, followingIds: s.followingIds, followerIds: s.followerIds, setFollowingIds: s.setFollowingIds })));
 
   const [loading, setLoading] = useState(false);
 
@@ -385,7 +386,7 @@ export default function Notifications({ onBack, isModal = false }: Notifications
     setCachedNotifications,
     appTheme,
     setAppTheme
-  } = useAppStore();
+  } = useAppStore(useShallow((s: any) => ({ popPage: s.popPage, currentUser: s.currentUser, cachedNotifications: s.cachedNotifications, setCachedNotifications: s.setCachedNotifications, appTheme: s.appTheme, setAppTheme: s.setAppTheme })));
 
   const [activeTab, setActiveTab] = useState<0 | 1>(0); // 0 = Activity, 1 = Followers
   const [followers, setFollowers] = useState<FollowerUser[]>([]);

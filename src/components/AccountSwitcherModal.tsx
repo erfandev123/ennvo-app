@@ -19,6 +19,7 @@ import { signIn, signInWithGoogle } from '../services/authService';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { User } from '../types';
+import { useShallow } from 'zustand/react/shallow';
 
 interface AccountSwitcherModalProps {
   isOpen?: boolean;
@@ -33,7 +34,14 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({ isOp
     setViewingUser,
     showAccountSwitcherModal, 
     setShowAccountSwitcherModal 
-  } = useAppStore();
+  } = useAppStore(useShallow((s: any) => ({
+    currentUser: s.currentUser,
+    setCurrentUser: s.setCurrentUser,
+    pushPage: s.pushPage,
+    setViewingUser: s.setViewingUser,
+    showAccountSwitcherModal: s.showAccountSwitcherModal,
+    setShowAccountSwitcherModal: s.setShowAccountSwitcherModal,
+  })))
 
   const isModalOpen = isOpen !== undefined ? isOpen : showAccountSwitcherModal;
   const handleCloseModal = () => {

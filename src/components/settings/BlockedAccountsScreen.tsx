@@ -7,6 +7,7 @@ import { useAppStore } from '../../store';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { blockUser, unblockUser, getBlockedUsersList } from '../../services/followService';
+import { useShallow } from 'zustand/react/shallow';
 
 interface BlockedAccountsScreenProps {
   onBack: () => void;
@@ -21,7 +22,7 @@ interface BlockedItem {
 }
 
 export const BlockedAccountsScreen: React.FC<BlockedAccountsScreenProps> = ({ onBack }) => {
-  const { currentUser } = useAppStore();
+  const { currentUser } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser })));
 
   const [blockedList, setBlockedList] = useState<BlockedItem[]>([]);
   const [loading, setLoading] = useState(true);

@@ -26,6 +26,7 @@ import { db } from '../firebase';
 import { followUser, unfollowUser } from '../services/followService';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { FacebookSearchSkeleton } from '../components/Skeletons';
+import { useShallow } from 'zustand/react/shallow';
 
 // Light haptic feedback helper
 const triggerHaptic = (ms = 12) => {
@@ -288,7 +289,20 @@ export default function SearchPage() {
     followingIds,
     appTheme,
     setAppTheme
-  } = useAppStore();
+  } = useAppStore(useShallow((s: any) => ({
+    setViewingMedia: s.setViewingMedia,
+    setViewingUser: s.setViewingUser,
+    setViewingReel: s.setViewingReel,
+    setViewingReelList: s.setViewingReelList,
+    pushPage: s.pushPage,
+    popPage: s.popPage,
+    currentUser: s.currentUser,
+    cachedDiscovery: s.cachedDiscovery,
+    setCachedDiscovery: s.setCachedDiscovery,
+    followingIds: s.followingIds,
+    appTheme: s.appTheme,
+    setAppTheme: s.setAppTheme,
+  })))
 
   const toggleTheme = () => {
     triggerHaptic(12);

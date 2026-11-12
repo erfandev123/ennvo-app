@@ -36,6 +36,7 @@ import { sendMessage, subscribeConversations } from '../services/chatService';
 import { formatTime, formatCount } from '../utils';
 import { SharePortal, CommentsPortal } from './ReelItem';
 import { VerifiedBadge } from './VerifiedBadge';
+import { useShallow } from 'zustand/react/shallow';
 
 interface PostItemProps {
   post: Post;
@@ -43,7 +44,7 @@ interface PostItemProps {
 }
 
 const MentionText = ({ text, onClosePortal, isWhiteText = false }: { text: string; onClosePortal?: () => void; isWhiteText?: boolean }) => {
-  const { setViewingUser, pushPage } = useAppStore();
+  const { setViewingUser, pushPage } = useAppStore(useShallow((s: any) => ({ setViewingUser: s.setViewingUser, pushPage: s.pushPage })));
   if (!text) return null;
 
   const renderFormattedToken = (token: string, key: number) => {
@@ -128,7 +129,23 @@ export const PostItem: React.FC<PostItemProps> = React.memo(({ post, theme = 'wh
     highlightedPostId,
     setHighlightedPostId,
     viewingReel
-  } = useAppStore();
+  } = useAppStore(useShallow((s: any) => ({
+    setViewingUser: s.setViewingUser,
+    setViewingMedia: s.setViewingMedia,
+    currentUser: s.currentUser,
+    pushPage: s.pushPage,
+    setShowAnalytics: s.setShowAnalytics,
+    setTargetAnalyticsPostId: s.setTargetAnalyticsPostId,
+    setShowLikesList: s.setShowLikesList,
+    setTargetLikesPostId: s.setTargetLikesPostId,
+    setShowViewsList: s.setShowViewsList,
+    setTargetViewsPostId: s.setTargetViewsPostId,
+    highlightedCommentId: s.highlightedCommentId,
+    setHighlightedCommentId: s.setHighlightedCommentId,
+    highlightedPostId: s.highlightedPostId,
+    setHighlightedPostId: s.setHighlightedPostId,
+    viewingReel: s.viewingReel,
+  })))
 
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likesCount || 0);

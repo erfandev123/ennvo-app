@@ -7,6 +7,7 @@ import { compressAvatarImage } from '../services/mediaCompressor';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../firebase';
 import { MediaCropModal } from '../components/MediaCropModal';
+import { useShallow } from 'zustand/react/shallow';
 
 const isVideoMedia = (url?: string | null): boolean => {
   if (!url) return false;
@@ -14,7 +15,7 @@ const isVideoMedia = (url?: string | null): boolean => {
 };
 
 export default function EditProfile() {
-  const { currentUser, setCurrentUser, setCurrentPage } = useAppStore();
+  const { currentUser, setCurrentUser, setCurrentPage } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser, setCurrentUser: s.setCurrentUser, setCurrentPage: s.setCurrentPage })));
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState(currentUser?.name || '');
   const [username, setUsername] = useState(currentUser?.username || '');

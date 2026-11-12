@@ -5,6 +5,7 @@ import { collection, query, getDocs, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAppStore } from '../store';
 import { VerifiedBadge } from './VerifiedBadge';
+import { useShallow } from 'zustand/react/shallow';
 
 interface TagPeopleModalProps {
   isOpen: boolean;
@@ -19,7 +20,7 @@ export const TagPeopleModal: React.FC<TagPeopleModalProps> = ({
   taggedUsers,
   onToggleTagUser,
 }) => {
-  const { currentUser } = useAppStore();
+  const { currentUser } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser })));
   const [searchQuery, setSearchQuery] = useState('');
   const [usersList, setUsersList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);

@@ -4,6 +4,7 @@ import { X, AlertTriangle, ShieldAlert, Trash2, PauseCircle, Lock, Loader2, Chec
 import { useAppStore } from '../../store';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { useShallow } from 'zustand/react/shallow';
 
 interface DeactivateDeleteModalProps {
   isOpen: boolean;
@@ -11,7 +12,7 @@ interface DeactivateDeleteModalProps {
 }
 
 export const DeactivateDeleteModal: React.FC<DeactivateDeleteModalProps> = ({ isOpen, onClose }) => {
-  const { currentUser, setIsAuthenticated, popPage } = useAppStore();
+  const { currentUser, setIsAuthenticated, popPage } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser, setIsAuthenticated: s.setIsAuthenticated, popPage: s.popPage })));
   const [selectedAction, setSelectedAction] = useState<'deactivate' | 'delete'>('deactivate');
   const [confirmText, setConfirmText] = useState('');
   const [reason, setReason] = useState('Need a break from social media');

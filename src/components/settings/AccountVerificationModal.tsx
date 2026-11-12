@@ -4,6 +4,7 @@ import { X, CheckCircle2, ShieldCheck, BadgeCheck, Upload, AlertCircle, Loader2 
 import { useAppStore } from '../../store';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { useShallow } from 'zustand/react/shallow';
 
 interface AccountVerificationModalProps {
   isOpen: boolean;
@@ -11,7 +12,7 @@ interface AccountVerificationModalProps {
 }
 
 export const AccountVerificationModal: React.FC<AccountVerificationModalProps> = ({ isOpen, onClose }) => {
-  const { currentUser, setCurrentUser } = useAppStore();
+  const { currentUser, setCurrentUser } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser, setCurrentUser: s.setCurrentUser })));
   const [fullName, setFullName] = useState(currentUser?.name || '');
   const [knownAs, setKnownAs] = useState(currentUser?.username || '');
   const [category, setCategory] = useState('Creator / Influencer');

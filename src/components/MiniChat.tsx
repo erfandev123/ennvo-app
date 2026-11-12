@@ -32,6 +32,7 @@ import { Message } from '../types';
 import { formatTime } from '../utils';
 import { playMessageSentSound } from '../services/soundService';
 import { VerifiedBadge } from './VerifiedBadge';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function MiniChat() {
   const { 
@@ -42,7 +43,7 @@ export default function MiniChat() {
     setActiveChat, 
     setActiveCallState,
     setViewingUser 
-  } = useAppStore();
+  } = useAppStore(useShallow((s: any) => ({ miniChatUser: s.miniChatUser, setMiniChatUser: s.setMiniChatUser, currentUser: s.currentUser, pushPage: s.pushPage, setActiveChat: s.setActiveChat, setActiveCallState: s.setActiveCallState, setViewingUser: s.setViewingUser })));
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');

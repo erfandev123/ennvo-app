@@ -18,6 +18,7 @@ import { FacebookProfileSkeleton, FacebookPostSkeleton, FacebookGridSkeleton } f
 import { AccountSwitcherModal } from '../components/AccountSwitcherModal';
 import { MediaCropModal } from '../components/MediaCropModal';
 import { shareContent } from '../services/shareService';
+import { useShallow } from 'zustand/react/shallow';
 
 const isVideoMedia = (url?: string | null): boolean => {
   if (!url) return false;
@@ -25,7 +26,7 @@ const isVideoMedia = (url?: string | null): boolean => {
 };
 
 const UserRowWithFollow = React.memo(({ user, currentUser, onSelectUser }: { user: any, currentUser: any, onSelectUser: (user: any) => void }) => {
-  const { followingIds, followerIds, setFollowingIds } = useAppStore();
+  const { followingIds, followerIds, setFollowingIds } = useAppStore(useShallow((s: any) => ({ followingIds: s.followingIds, followerIds: s.followerIds, setFollowingIds: s.setFollowingIds })));
   const [loading, setLoading] = useState(false);
 
   // Synchronous, instant, glitch-free lookup from synchronized store
@@ -110,7 +111,7 @@ const UserRowWithFollow = React.memo(({ user, currentUser, onSelectUser }: { use
 
 export default function Profile() {
   const [activeTab, setActiveTab] = useState<'posts' | 'reels' | 'saved' | 'reposts' | 'private'>('reels');
-  const { viewingUser, setViewingUser, setViewingMedia, setViewingPost, setViewingReel, setViewingReelList, setViewingReelContext, currentUser, setCurrentUser, pushPage, popPage, setActiveChat, cachedProfilePosts, setCachedProfilePosts, cachedSavedPosts, setCachedSavedPosts, setIsBottomNavHidden, setSelectedCreateSong, setShowAccountSwitcherModal } = useAppStore();
+  const { viewingUser, setViewingUser, setViewingMedia, setViewingPost, setViewingReel, setViewingReelList, setViewingReelContext, currentUser, setCurrentUser, pushPage, popPage, setActiveChat, cachedProfilePosts, setCachedProfilePosts, cachedSavedPosts, setCachedSavedPosts, setIsBottomNavHidden, setSelectedCreateSong, setShowAccountSwitcherModal } = useAppStore(useShallow((s: any) => ({ viewingUser: s.viewingUser, setViewingUser: s.setViewingUser, setViewingMedia: s.setViewingMedia, setViewingPost: s.setViewingPost, setViewingReel: s.setViewingReel, setViewingReelList: s.setViewingReelList, setViewingReelContext: s.setViewingReelContext, currentUser: s.currentUser, setCurrentUser: s.setCurrentUser, pushPage: s.pushPage, popPage: s.popPage, setActiveChat: s.setActiveChat, cachedProfilePosts: s.cachedProfilePosts, setCachedProfilePosts: s.setCachedProfilePosts, cachedSavedPosts: s.cachedSavedPosts, setCachedSavedPosts: s.setCachedSavedPosts, setIsBottomNavHidden: s.setIsBottomNavHidden, setSelectedCreateSong: s.setSelectedCreateSong, setShowAccountSwitcherModal: s.setShowAccountSwitcherModal })));
   const isCurrentUser = !viewingUser || viewingUser.uid === currentUser?.uid;
   const targetUserId = isCurrentUser ? currentUser?.uid : viewingUser.uid;
   const [userData, setUserData] = useState<User | null>(null);

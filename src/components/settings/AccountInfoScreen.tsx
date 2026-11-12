@@ -8,13 +8,14 @@ import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/fire
 import { db } from '../../firebase';
 import { useAppStore } from '../../store';
 import { BirthdayPickerModal } from '../BirthdayPickerModal';
+import { useShallow } from 'zustand/react/shallow';
 
 interface AccountInfoScreenProps {
   onBack: () => void;
 }
 
 export const AccountInfoScreen: React.FC<AccountInfoScreenProps> = ({ onBack }) => {
-  const { currentUser, setCurrentUser } = useAppStore();
+  const { currentUser, setCurrentUser } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser, setCurrentUser: s.setCurrentUser })));
 
   const [name, setName] = useState(currentUser?.name || 'Ennvo User');
   const [username, setUsername] = useState(currentUser?.username ? currentUser.username.replace('@', '') : 'user');

@@ -23,6 +23,7 @@ import { changeUserPassword, sendPasswordReset, setUserPassword, logout } from '
 import { saveAccount } from '../services/accountService';
 import { shareUserProfile } from '../services/deepLinkService';
 import { shareContent } from '../services/shareService';
+import { useShallow } from 'zustand/react/shallow';
 
 type SettingsScreen = 
   | 'main'                    // Settings and privacy
@@ -48,7 +49,7 @@ type SettingsScreen =
 
 export default function Settings() {
   const [currentScreen, setCurrentScreen] = useState<SettingsScreen>('main');
-  const { setIsAuthenticated, currentUser, setCurrentUser, popPage, pushPage, setShowAccountSwitcherModal, navStyle, setNavStyle, profileStyle, setProfileStyle, reelsStyle, setReelsStyle, appTheme, setAppTheme } = useAppStore();
+  const { setIsAuthenticated, currentUser, setCurrentUser, popPage, pushPage, setShowAccountSwitcherModal, navStyle, setNavStyle, profileStyle, setProfileStyle, reelsStyle, setReelsStyle, appTheme, setAppTheme } = useAppStore(useShallow((s: any) => ({ setIsAuthenticated: s.setIsAuthenticated, currentUser: s.currentUser, setCurrentUser: s.setCurrentUser, popPage: s.popPage, pushPage: s.pushPage, setShowAccountSwitcherModal: s.setShowAccountSwitcherModal, navStyle: s.navStyle, setNavStyle: s.setNavStyle, profileStyle: s.profileStyle, setProfileStyle: s.setProfileStyle, reelsStyle: s.reelsStyle, setReelsStyle: s.setReelsStyle, appTheme: s.appTheme, setAppTheme: s.setAppTheme })));
 
   const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
 

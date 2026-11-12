@@ -5,6 +5,7 @@ import { useAppStore } from '../store';
 import { collection, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { followUser, unfollowUser } from '../services/followService';
+import { useShallow } from 'zustand/react/shallow';
 
 // Global fast user cache to eliminate repeat network lag
 const userCacheMap = new Map<string, any>();
@@ -90,7 +91,7 @@ const UserRowWithFollow = ({ user, currentUser, onSelect }: { user: any; current
 };
 
 export const LikesList = () => {
-  const { showLikesList, setShowLikesList, targetLikesPostId, setTargetLikesPostId, setViewingUser, pushPage, currentUser } = useAppStore();
+  const { showLikesList, setShowLikesList, targetLikesPostId, setTargetLikesPostId, setViewingUser, pushPage, currentUser } = useAppStore(useShallow((s: any) => ({ showLikesList: s.showLikesList, setShowLikesList: s.setShowLikesList, targetLikesPostId: s.targetLikesPostId, setTargetLikesPostId: s.setTargetLikesPostId, setViewingUser: s.setViewingUser, pushPage: s.pushPage, currentUser: s.currentUser })));
   const [likers, setLikers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

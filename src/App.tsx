@@ -82,7 +82,7 @@ const playNotifChime = () => {
 };
 
 const InAppToaster = memo(() => {
-  const { currentUser, setViewingMedia, setViewingReel, pushPage, setViewingUser, setHighlightedCommentId, setHighlightedPostId, setActiveChat, activeChat } = useAppStore();
+  const { currentUser, setViewingMedia, setViewingReel, pushPage, setViewingUser, setHighlightedCommentId, setHighlightedPostId, setActiveChat, activeChat } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser, setViewingMedia: s.setViewingMedia, setViewingReel: s.setViewingReel, pushPage: s.pushPage, setViewingUser: s.setViewingUser, setHighlightedCommentId: s.setHighlightedCommentId, setHighlightedPostId: s.setHighlightedPostId, setActiveChat: s.setActiveChat, activeChat: s.activeChat })));
   const [toast, setToast] = useState<any | null>(null);
   const timeoutRef = React.useRef<any>(null);
 
@@ -301,6 +301,7 @@ const InAppToaster = memo(() => {
 });
 
 import { requestFirebaseNotificationPermission, onMessageListener } from './services/messagingService';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function App() {
   const { 
@@ -320,7 +321,36 @@ export default function App() {
     popPage,
     cachedReels,
     appTheme
-  } = useAppStore();
+  } = useAppStore(useShallow((s: any) => ({
+    currentPage: s.currentPage,
+    pushPage: s.pushPage,
+    viewingMedia: s.viewingMedia,
+    setViewingMedia: s.setViewingMedia,
+    viewingStory: s.viewingStory,
+    setViewingStory: s.setViewingStory,
+    viewingReel: s.viewingReel,
+    setViewingReel: s.setViewingReel,
+    viewingReelList: s.viewingReelList,
+    setViewingReelList: s.setViewingReelList,
+    viewingReelContext: s.viewingReelContext,
+    setViewingReelContext: s.setViewingReelContext,
+    activeChat: s.activeChat,
+    showCreatePost: s.showCreatePost,
+    showReelCamera: s.showReelCamera,
+    showLikesList: s.showLikesList,
+    showAnalytics: s.showAnalytics,
+    miniChatUser: s.miniChatUser,
+    isAuthenticated: s.isAuthenticated,
+    isAuthLoading: s.isAuthLoading,
+    currentUser: s.currentUser,
+    setCurrentUser: s.setCurrentUser,
+    setNotificationCount: s.setNotificationCount,
+    setMessageCount: s.setMessageCount,
+    isBottomNavHidden: s.isBottomNavHidden,
+    popPage: s.popPage,
+    cachedReels: s.cachedReels,
+    appTheme: s.appTheme,
+  })))
 
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
@@ -1086,7 +1116,7 @@ export default function App() {
 }
 
 function ViewsList() {
-  const { showViewsList, setShowViewsList, targetViewsPostId, setTargetViewsPostId, setViewingUser, pushPage } = useAppStore();
+  const { showViewsList, setShowViewsList, targetViewsPostId, setTargetViewsPostId, setViewingUser, pushPage } = useAppStore(useShallow((s: any) => ({ showViewsList: s.showViewsList, setShowViewsList: s.setShowViewsList, targetViewsPostId: s.targetViewsPostId, setTargetViewsPostId: s.setTargetViewsPostId, setViewingUser: s.setViewingUser, pushPage: s.pushPage })));
   const [viewers, setViewers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -1167,7 +1197,7 @@ const StoryViewer = memo(({ story, onClose }: { story: any, onClose: () => void 
   const [storiesList, setStoriesList] = useState<any[]>([story]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [progress, setProgress] = useState(0);
-  const { currentUser, pushPage, setActiveChat } = useAppStore();
+  const { currentUser, pushPage, setActiveChat } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser, pushPage: s.pushPage, setActiveChat: s.setActiveChat })));
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const [duration, setDuration] = useState(15000); // Default 15s
   const [replyText, setReplyText] = useState('');
@@ -1608,7 +1638,7 @@ const GlobalReelItem = memo(({ reel }: { reel: any }) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isFollowingUser, setIsFollowingUser] = useState(false);
   const [floatingHearts, setFloatingHearts] = useState<{ id: number, x: number, y: number, color: string }[]>([]);
-  const { setViewingUser, setCurrentPage, setViewingReel, currentUser } = useAppStore();
+  const { setViewingUser, setCurrentPage, setViewingReel, currentUser } = useAppStore(useShallow((s: any) => ({ setViewingUser: s.setViewingUser, setCurrentPage: s.setCurrentPage, setViewingReel: s.setViewingReel, currentUser: s.currentUser })));
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -1711,7 +1741,7 @@ const GlobalReelItem = memo(({ reel }: { reel: any }) => {
   };
 
   const isCurrentUser = currentUser?.uid === (reel.authorId || reel.authorUID);
-  const { setHighlightedCommentId, highlightedCommentId, highlightedPostId, setHighlightedPostId } = useAppStore();
+  const { setHighlightedCommentId, highlightedCommentId, highlightedPostId, setHighlightedPostId } = useAppStore(useShallow((s: any) => ({ setHighlightedCommentId: s.setHighlightedCommentId, highlightedCommentId: s.highlightedCommentId, highlightedPostId: s.highlightedPostId, setHighlightedPostId: s.setHighlightedPostId })));
 
   useEffect(() => {
     if (highlightedPostId === reel.id && highlightedCommentId && currentUser) {
@@ -1867,7 +1897,7 @@ const GlobalReelItem = memo(({ reel }: { reel: any }) => {
 
 const CommentsFeed = ({ postId }: { postId: string }) => {
   const [comments, setComments] = useState<any[]>([]);
-  const { currentUser } = useAppStore();
+  const { currentUser } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser })));
 
   useEffect(() => {
     import('./services/postService').then(m => m.getComments(postId)).then(setComments);

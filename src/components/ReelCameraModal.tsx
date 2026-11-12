@@ -39,6 +39,7 @@ import { TagPeopleModal } from './TagPeopleModal';
 import { AdvancedSettingsModal, AdvancedSettings } from './AdvancedSettingsModal';
 import { Song } from '../types';
 import { generateVideoThumbnail } from '../utils';
+import { useShallow } from 'zustand/react/shallow';
 
 // Aspect Ratio Options
 type AspectRatioType = '9:16' | '1:1' | '16:9' | 'original';
@@ -51,7 +52,14 @@ export const ReelCameraModal: React.FC = () => {
     setUploadTask,
     selectedCreateMode,
     setSelectedCreateMode 
-  } = useAppStore();
+  } = useAppStore(useShallow((s: any) => ({
+    showReelCamera: s.showReelCamera,
+    setShowReelCamera: s.setShowReelCamera,
+    currentUser: s.currentUser,
+    setUploadTask: s.setUploadTask,
+    selectedCreateMode: s.selectedCreateMode,
+    setSelectedCreateMode: s.setSelectedCreateMode,
+  })))
 
   // Workflow Stages: 'camera' -> 'preview' -> 'details'
   const [stage, setStage] = useState<'camera' | 'preview' | 'details'>('camera');

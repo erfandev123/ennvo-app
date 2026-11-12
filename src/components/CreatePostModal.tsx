@@ -35,6 +35,7 @@ import { TagPeopleModal } from './TagPeopleModal';
 import { AddLocationModal } from './AddLocationModal';
 import { AdvancedSettingsModal, AdvancedSettings } from './AdvancedSettingsModal';
 import { MusicLibraryModal } from './MusicLibraryModal';
+import { useShallow } from 'zustand/react/shallow';
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -62,7 +63,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   onClose,
   onPostSuccess,
 }) => {
-  const { currentUser } = useAppStore();
+  const { currentUser } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser })));
   const [postText, setPostText] = useState('');
   const [selectedBg, setSelectedBg] = useState(BACKGROUND_PRESETS[0]);
   const [postFiles, setPostFiles] = useState<File[]>([]);

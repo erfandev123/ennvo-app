@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, AlertCircle, EyeOff, Eye, UploadCloud } from 'lucide-react';
 import { useAppStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 export const UploadProgressBar: React.FC = () => {
-  const { uploadTask, setUploadTask } = useAppStore();
+  const { uploadTask, setUploadTask } = useAppStore(useShallow((s: any) => ({ uploadTask: s.uploadTask, setUploadTask: s.setUploadTask })));
   const [isMinimized, setIsMinimized] = useState(false);
 
   if (!uploadTask) return null;

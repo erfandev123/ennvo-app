@@ -77,6 +77,7 @@ import { Post, Comment } from '../types';
 import { followUser, unfollowUser } from '../services/followService';
 import { formatTime, formatCount } from '../utils';
 import { VerifiedBadge } from './VerifiedBadge';
+import { useShallow } from 'zustand/react/shallow';
 
 // Guaranteed instant-render exact Ionicons SVG paths matching previous ion-icon designs
 const IonHeartIcon: React.FC<{ filled?: boolean; className?: string }> = ({ filled, className = "w-[1.85rem] h-[1.85rem]" }) => {
@@ -320,7 +321,7 @@ export const ReelItem: React.FC<ReelItemProps> = React.memo(({ reel, isModal, on
     setSelectedCreateSong,
     navStyle,
     reelsStyle: reelsUiStyle
-  } = useAppStore();
+  } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser, userCache: s.userCache, followingIds: s.followingIds, currentPage: s.currentPage, setViewingUser: s.setViewingUser, pushPage: s.pushPage, setViewingReel: s.setViewingReel, highlightedCommentId: s.highlightedCommentId, setHighlightedCommentId: s.setHighlightedCommentId, highlightedPostId: s.highlightedPostId, setHighlightedPostId: s.setHighlightedPostId, setShowLikesList: s.setShowLikesList, setTargetLikesPostId: s.setTargetLikesPostId, setShowViewsList: s.setShowViewsList, setTargetViewsPostId: s.setTargetViewsPostId, setShowAnalytics: s.setShowAnalytics, setTargetAnalyticsPostId: s.setTargetAnalyticsPostId, globalMuted: s.globalMuted, setGlobalMuted: s.setGlobalMuted, setIsReelsCleanZoom: s.setIsReelsCleanZoom, setIsBottomNavHidden: s.setIsBottomNavHidden, setSelectedCreateSong: s.setSelectedCreateSong, navStyle: s.navStyle, reelsStyle: s.reelsStyle })));
 
   const reelBottomSpacing = isModal ? 'bottom-[78px]' : navStyle === 'glass' ? 'bottom-[calc(98px+var(--app-safe-bottom))]' : 'bottom-[calc(72px+var(--app-safe-bottom))]';
 
@@ -1968,7 +1969,7 @@ const RepostMenuModal: React.FC<RepostMenuModalProps> = ({
   onClose,
   onSelectUser
 }) => {
-  const { currentUser } = useAppStore();
+  const { currentUser } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser })));
   const [filter, setFilter] = useState<'reposts' | 'likes'>(initialTab === 'likes' ? 'likes' : 'reposts');
   
   // Realtime state for activity likes & replies
@@ -2622,7 +2623,7 @@ const RepostMenuModal: React.FC<RepostMenuModalProps> = ({
 const ReelInteractionsModal = RepostMenuModal;
 
 const MentionText = ({ text, onClosePortal }: { text: string; onClosePortal?: () => void }) => {
-  const { setViewingUser, pushPage } = useAppStore();
+  const { setViewingUser, pushPage } = useAppStore(useShallow((s: any) => ({ setViewingUser: s.setViewingUser, pushPage: s.pushPage })));
   const parts = (text || '').split(/(@\w+)/g);
   return (
     <span className="text-[13px] text-gray-900 dark:text-neutral-100 font-normal leading-relaxed break-words">
@@ -2761,7 +2762,7 @@ const CommentItem = React.memo(({ comment, postId, authorId, authorName, authorA
   const [cConfirmDelete, setCConfirmDelete] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isStickerModalOpen, setIsStickerModalOpen] = useState(false);
-  const { currentUser, setViewingUser, pushPage, highlightedCommentId, setHighlightedCommentId } = useAppStore();
+  const { currentUser, setViewingUser, pushPage, highlightedCommentId, setHighlightedCommentId } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser, setViewingUser: s.setViewingUser, pushPage: s.pushPage, highlightedCommentId: s.highlightedCommentId, setHighlightedCommentId: s.setHighlightedCommentId })));
   const itemRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -3023,7 +3024,7 @@ export const CommentsPortal = ({ postId, onClose, authorId, authorName, authorAv
   const audioChunksRef = useRef<Blob[]>([]);
   const recordTimerRef = useRef<any>(null);
 
-  const { currentUser, highlightedCommentId } = useAppStore();
+  const { currentUser, highlightedCommentId } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser, highlightedCommentId: s.highlightedCommentId })));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -3667,7 +3668,7 @@ export const SharePortal = ({
   onDelete?: () => void,
   confirmingDelete?: boolean
 }) => {
-  const { currentUser } = useAppStore();
+  const { currentUser } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser })));
   const [conversations, setConversations] = useState<any[]>([]);
   const [friendsList, setFriendsList] = useState<any[]>([]);
   const [selectedConvs, setSelectedConvs] = useState<string[]>([]);

@@ -5,6 +5,7 @@ import {
   Mail, Lock, Fingerprint, Laptop, ChevronRight, Check
 } from 'lucide-react';
 import { useAppStore } from '../../store';
+import { useShallow } from 'zustand/react/shallow';
 
 interface SecurityCheckupModalProps {
   isOpen: boolean;
@@ -17,7 +18,7 @@ export const SecurityCheckupModal: React.FC<SecurityCheckupModalProps> = ({
   onClose,
   onOpenPasswordModal
 }) => {
-  const { currentUser } = useAppStore();
+  const { currentUser } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser })));
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(
     localStorage.getItem('ennvo_2fa_enabled') === 'true'
   );

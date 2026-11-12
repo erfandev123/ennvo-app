@@ -4,6 +4,7 @@ import { Search, Music, Play, Pause, Bookmark, X, Maximize2, Minimize2 } from 'l
 import { Song } from '../types';
 import { useAppStore } from '../store';
 import { subscribeSongs, toggleSongFavorite, subscribeFavoriteSongs, DEFAULT_SONGS } from '../services/postService';
+import { useShallow } from 'zustand/react/shallow';
 
 interface MusicLibraryModalProps {
   isOpen: boolean;
@@ -18,7 +19,7 @@ export const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({
   onSelectSong,
   selectedSongId,
 }) => {
-  const { currentUser } = useAppStore();
+  const { currentUser } = useAppStore(useShallow((s: any) => ({ currentUser: s.currentUser })));
   const [songs, setSongs] = useState<Song[]>(DEFAULT_SONGS);
   const [favoriteSongIds, setFavoriteSongIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'trending' | 'favorites'>('trending');

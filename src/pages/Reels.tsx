@@ -6,6 +6,7 @@ import { subscribeReels } from '../services/postService';
 import { Post } from '../types';
 import { ReelItem } from '../components/ReelItem';
 import { FacebookReelSkeleton } from '../components/Skeletons';
+import { useShallow } from 'zustand/react/shallow';
 
 const SEEN_REELS_STORAGE_KEY = 'ennvo_seen_reels_v2';
 const NOT_INTERESTED_STORAGE_KEY = 'ennvo_not_interested_reels';
@@ -43,7 +44,7 @@ const markReelAsSeen = (reelId: string) => {
 };
 
 export default function Reels() {
-  const { pushPage, currentUser, cachedReels, setCachedReels, isReelsCleanZoom, newUserWelcomeName, setNewUserWelcomeName, followingIds } = useAppStore();
+  const { pushPage, currentUser, cachedReels, setCachedReels, isReelsCleanZoom, newUserWelcomeName, setNewUserWelcomeName, followingIds } = useAppStore(useShallow((s: any) => ({ pushPage: s.pushPage, currentUser: s.currentUser, cachedReels: s.cachedReels, setCachedReels: s.setCachedReels, isReelsCleanZoom: s.isReelsCleanZoom, newUserWelcomeName: s.newUserWelcomeName, setNewUserWelcomeName: s.setNewUserWelcomeName, followingIds: s.followingIds })));
   const [reels, setReels] = useState<Post[]>(() => {
     if (cachedReels && cachedReels.length > 0) return cachedReels;
     try {
