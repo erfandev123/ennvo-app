@@ -114,7 +114,7 @@ jobs:
 
           mkdir -p "$RUNNER_TEMP/out"
           BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)"
-          KS="$RUNNER_TEMP/ennvo-release.jks"
+          KS="$RUNNER_TEMP/ennvo-release.p12"
 
           if [ -n "${KS_B64:-}" ]; then
             printf '%s' "$KS_B64" | base64 -d > "$KS"
@@ -134,11 +134,19 @@ jobs:
 
           if [[ "$APK" == *unsigned* ]]; then
             "$BT/zipalign" -f -p 4 "$APK" "$RUNNER_TEMP/aligned.apk"
-            "$BT/apksigner" sign \
-              --ks "$KS" --ks-key-alias "$ALIAS" \
-              --ks-pass "pass:$SP" --key-pass "pass:$KP" \
-              --out "$RUNNER_TEMP/out/Ennvo-1.9.0.apk" \
-              "$RUNNER_TEMP/aligned.apk"
+            SIGNED="$RUNNER_TEMP/out/Ennvo-1.9.0.apk"
+            # apksigner reads JKS and PKCS#12; if the auto detection rejects the
+            # keystore, retry with an explicit type.
+            if ! "$BT/apksigner" sign \
+                  --ks "$KS" --ks-key-alias "$ALIAS" \
+                  --ks-pass "pass:$SP" --key-pass "pass:$KP" \
+                  --out "$SIGNED" "$RUNNER_TEMP/aligned.apk"; then
+              echo "::notice::Retrying the signature with an explicit PKCS#12 keystore type."
+              "$BT/apksigner" sign \
+                --ks-type PKCS12 --ks "$KS" --ks-key-alias "$ALIAS" \
+                --ks-pass "pass:$SP" --key-pass "pass:$KP" \
+                --out "$SIGNED" "$RUNNER_TEMP/aligned.apk"
+            fi
           else
             cp "$APK" "$RUNNER_TEMP/out/Ennvo-1.9.0.apk"
           fi
